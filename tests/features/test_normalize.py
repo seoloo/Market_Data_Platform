@@ -33,6 +33,7 @@ D = Decimal
 # --------------------------------------------------------------- causality
 
 
+@pytest.mark.leakage
 class TestCausality:
     """미래 데이터가 과거 결과에 영향을 주면 안 된다."""
 

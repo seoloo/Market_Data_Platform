@@ -61,6 +61,7 @@ def ramp(start: int, count: int, step: int, index_from: int = 0) -> list[Candle]
 # --------------------------------------------------------------- repainting
 
 
+@pytest.mark.leakage
 class TestNoRepainting:
     """확정된 스윙은 절대 바뀌지 않는다."""
 
