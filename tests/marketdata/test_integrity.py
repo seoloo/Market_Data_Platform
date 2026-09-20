@@ -1,7 +1,14 @@
 """무결성 검증 테스트 — 게이트 1 항목.
 
-재집계 대조는 **거래소 원본과 정확히 일치**해야 한다. 둘 다 같은 체결 스트림에서
-나오므로 불일치는 데이터 오염이거나 집계 로직 버그라는 뜻이다.
+재집계 대조의 기준은 "불일치 0건" 이 아니라 **"원인 미규명 불일치 0건"** 이다.
+
+실데이터 확인 (2026-09-21, 706,752 버킷): 거래소의 1m 아카이브와 상위 TF 아카이브가
+실제로 어긋나는 구간이 존재한다. 원인은 두 가지이며 둘 다 우리가 고칠 수 없다.
+
+* 1m 의 거래량 0 채움봉 (거래 없는 분을 직전가로 채움) → ``SOURCE_FILLER_BAR``
+* 두 아카이브의 거래량 보고 차이                        → ``ARCHIVE_DISAGREEMENT``
+
+이 둘로 설명되지 않는 불일치만 ``RESAMPLE_MISMATCH`` (CRITICAL) 로 올린다.
 """
 
 from __future__ import annotations
@@ -204,16 +211,15 @@ class TestResampleCheck:
             ({"h": "9999"}, "high"),
             ({"low": "0.5"}, "low"),
             ({"o": "1"}, "open"),
-            ({"v": "999"}, "volume"),
-            ({"trades": 9999}, "trade_count"),
         ],
     )
-    def test_mismatch_is_critical(self, repo: CandleRepository, field_kwargs, expected):
-        """1m 과 5m 은 같은 체결에서 나오므로 정확히 일치해야 한다."""
-        minutes = [candle(BASE_MS + i * M1.ms) for i in range(5)]
+    def test_price_mismatch_without_cause_is_critical(
+        self, repo: CandleRepository, field_kwargs, expected
+    ):
+        """거래량이 같은데 가격만 다르면 원인 미규명 → 게이트를 막는다."""
+        minutes = [candle(BASE_MS + i * M1.ms, v="1") for i in range(5)]
         seed(repo, M1, minutes)
-        tampered = candle(BASE_MS, M5, **field_kwargs)
-        seed(repo, M5, [tampered])
+        seed(repo, M5, [candle(BASE_MS, M5, v="5", **field_kwargs)])
 
         report = IntegrityReport(SYMBOL)
         IntegrityChecker(repo).check_resample(SYMBOL, M5, report)
@@ -221,6 +227,56 @@ class TestResampleCheck:
         assert len(issues) == 1
         assert issues[0].severity is Severity.CRITICAL
         assert expected in issues[0].detail
+        assert not report.ok
+
+    def test_filler_bar_mismatch_is_warn_not_critical(self, repo: CandleRepository):
+        """1m 아카이브의 거래량 0 채움봉은 거래소 데이터 특성이지 우리 버그가 아니다.
+
+        실데이터 확인 (2026-09-21): 1m 은 거래 없는 분을 직전가 O=H=L=C, vol=0 으로
+        채우고 상위 TF 는 실제 체결부터 시작한다. 그래서 open 이 어긋난다.
+        """
+        minutes = [candle(BASE_MS, c="100", o="100", v="0")]  # 채움봉
+        minutes += [candle(BASE_MS + i * M1.ms, o="200", c="200") for i in range(1, 5)]
+        seed(repo, M1, minutes)
+        seed(repo, M5, [candle(BASE_MS, M5, o="200", c="200")])  # 실제 체결부터 시작
+
+        report = IntegrityReport(SYMBOL)
+        IntegrityChecker(repo).check_resample(SYMBOL, M5, report)
+        assert report.by_kind(IssueKind.SOURCE_FILLER_BAR)
+        assert report.by_kind(IssueKind.RESAMPLE_MISMATCH) == []
+        assert report.ok
+
+    def test_volume_disagreement_is_warn(self, repo: CandleRepository):
+        """거래소의 두 아카이브가 서로 다른 거래량을 보고하는 구간이 실제로 있다."""
+        seed(repo, M1, [candle(BASE_MS + i * M1.ms, v="1") for i in range(5)])
+        seed(repo, M5, [candle(BASE_MS, M5, v="99")])
+
+        report = IntegrityReport(SYMBOL)
+        IntegrityChecker(repo).check_resample(SYMBOL, M5, report)
+        issues = report.by_kind(IssueKind.ARCHIVE_DISAGREEMENT)
+        assert len(issues) == 1
+        assert "1m 누락" in issues[0].detail
+        assert report.ok
+
+    def test_volume_disagreement_direction_is_reported(self, repo: CandleRepository):
+        seed(repo, M1, [candle(BASE_MS + i * M1.ms, v="10") for i in range(5)])
+        seed(repo, M5, [candle(BASE_MS, M5, v="1")])
+        report = IntegrityReport(SYMBOL)
+        IntegrityChecker(repo).check_resample(SYMBOL, M5, report)
+        assert "상위TF 누락" in report.by_kind(IssueKind.ARCHIVE_DISAGREEMENT)[0].detail
+
+    def test_unexplained_price_mismatch_stays_critical(self, repo: CandleRepository):
+        """채움봉도 없고 거래량도 같은데 가격이 다르면 우리 문제다. 게이트를 막아야 한다."""
+        seed(repo, M1, [candle(BASE_MS + i * M1.ms, v="1", c="105") for i in range(5)])
+        # 거래량은 같고(5) 종가만 다른 5m 원본
+        seed(repo, M5, [candle(BASE_MS, M5, v="5", c="777")])
+
+        report = IntegrityReport(SYMBOL)
+        IntegrityChecker(repo).check_resample(SYMBOL, M5, report)
+        issues = report.by_kind(IssueKind.RESAMPLE_MISMATCH)
+        assert len(issues) == 1
+        assert issues[0].severity is Severity.CRITICAL
+        assert "원인 미규명" in issues[0].detail
         assert not report.ok
 
     def test_missing_target_is_warn_not_critical(self, repo: CandleRepository):
@@ -247,9 +303,10 @@ class TestResampleCheck:
         assert report.checked["5m:resample"] == 0
 
     def test_mismatch_reporting_is_capped(self, repo: CandleRepository):
-        minutes = [candle(BASE_MS + i * M1.ms) for i in range(5 * 10)]
+        # 거래량은 맞추고 종가만 어긋나게 해서 "원인 미규명" 으로 분류되게 한다
+        minutes = [candle(BASE_MS + i * M1.ms, v="1") for i in range(5 * 10)]
         seed(repo, M1, minutes)
-        wrong = [candle(BASE_MS + i * M5.ms, M5, c="999") for i in range(10)]
+        wrong = [candle(BASE_MS + i * M5.ms, M5, v="5", c="999") for i in range(10)]
         seed(repo, M5, wrong)
 
         report = IntegrityReport(SYMBOL)
@@ -257,7 +314,7 @@ class TestResampleCheck:
         checker.check_resample(SYMBOL, M5, report)
         issues = report.by_kind(IssueKind.RESAMPLE_MISMATCH)
         assert len(issues) == 4  # 3건 + 요약 1건
-        assert "불일치 10건" in issues[-1].detail
+        assert "총 10건" in issues[-1].detail
 
 
 # ------------------------------------------------------------------ 이상치
@@ -360,9 +417,10 @@ class TestRunAll:
         assert "문제 없음" in report.summary()
 
     def test_resample_mismatch_fails_the_gate(self, repo: CandleRepository):
-        minutes = [candle(BASE_MS + i * M1.ms) for i in range(5)]
+        minutes = [candle(BASE_MS + i * M1.ms, v="1") for i in range(5)]
         seed(repo, M1, minutes)
-        seed(repo, M5, [candle(BASE_MS, M5, c="12345")])
+        # 거래량은 일치시키고 종가만 어긋나게 → 원인 미규명 불일치
+        seed(repo, M5, [candle(BASE_MS, M5, v="5", c="12345")])
 
         report = IntegrityChecker(repo).run(SYMBOL, [M1, M5])
         assert not report.ok

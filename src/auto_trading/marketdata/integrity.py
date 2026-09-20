@@ -23,7 +23,7 @@ from enum import StrEnum
 from auto_trading.core.enums import Timeframe
 from auto_trading.core.money import ZERO, safe_div
 from auto_trading.core.types import Candle
-from auto_trading.marketdata.resample import resample_candles
+from auto_trading.marketdata.resample import bucket_candles, resample_candles
 from auto_trading.storage.repositories.candles import CandleRepository
 
 __all__ = [
@@ -43,6 +43,11 @@ _DAY_MS = 86_400_000
 class IssueKind(StrEnum):
     GAP = "gap"
     RESAMPLE_MISMATCH = "resample_mismatch"
+    """원인이 규명되지 않은 불일치. 우리 집계 로직이나 데이터 사본의 문제를 뜻한다."""
+    SOURCE_FILLER_BAR = "source_filler_bar"
+    """1m 아카이브의 거래량 0 채움봉 때문에 생긴 불일치 (거래소 데이터 특성)."""
+    ARCHIVE_DISAGREEMENT = "archive_disagreement"
+    """거래소의 두 아카이브(1m vs 상위TF)가 서로 다른 거래량을 보고함."""
     PRICE_SPIKE = "price_spike"
     FLAT_PRICE = "flat_price"
     ZERO_VOLUME = "zero_volume"
@@ -218,9 +223,10 @@ class IntegrityChecker:
             )
             return
 
+        buckets = bucket_candles(source_candles, target)
         derived = resample_candles(source_candles, source, target, require_complete=True)
         compared = 0
-        mismatches = 0
+        counts: dict[IssueKind, int] = {}
 
         for candle in derived:
             original = stored.get(candle.open_ms)
@@ -230,34 +236,42 @@ class IntegrityChecker:
             diffs = _compare(original, candle)
             if not diffs:
                 continue
-            mismatches += 1
-            if mismatches <= self.thresholds.max_reported_mismatches:
+
+            kind, cause = _classify(original, candle, buckets.get(candle.open_ms, []))
+            counts[kind] = counts.get(kind, 0) + 1
+            severity = Severity.CRITICAL if kind is IssueKind.RESAMPLE_MISMATCH else Severity.WARN
+            if counts[kind] <= self.thresholds.max_reported_mismatches:
                 report.add(
                     IntegrityIssue(
-                        kind=IssueKind.RESAMPLE_MISMATCH,
-                        severity=Severity.CRITICAL,
+                        kind=kind,
+                        severity=severity,
                         timeframe=target,
                         from_ms=candle.open_ms,
                         to_ms=candle.close_ms,
-                        detail=f"1m 재집계와 원본 불일치: {'; '.join(diffs)}",
+                        detail=f"{cause}: {'; '.join(diffs)}",
                     )
                 )
 
         report.checked[f"{target.value}:resample"] = compared
-        if mismatches > self.thresholds.max_reported_mismatches:
-            report.add(
-                IntegrityIssue(
-                    kind=IssueKind.RESAMPLE_MISMATCH,
-                    severity=Severity.CRITICAL,
-                    timeframe=target,
-                    from_ms=from_ms or 0,
-                    to_ms=to_ms or 0,
-                    detail=(
-                        f"불일치 {mismatches}건 (상위 "
-                        f"{self.thresholds.max_reported_mismatches}건만 표시)"
-                    ),
+        for kind, total in counts.items():
+            if total > self.thresholds.max_reported_mismatches:
+                report.add(
+                    IntegrityIssue(
+                        kind=kind,
+                        severity=(
+                            Severity.CRITICAL
+                            if kind is IssueKind.RESAMPLE_MISMATCH
+                            else Severity.WARN
+                        ),
+                        timeframe=target,
+                        from_ms=from_ms or 0,
+                        to_ms=to_ms or 0,
+                        detail=(
+                            f"총 {total}건 (상위 "
+                            f"{self.thresholds.max_reported_mismatches}건만 표시)"
+                        ),
+                    )
                 )
-            )
 
     # ------------------------------------------------------------- 이상치
 
@@ -412,6 +426,44 @@ class IntegrityChecker:
 
         logger.info("%s", report.summary())
         return report
+
+
+#: 가격 계열 — 여기가 어긋나면 전략 판단이 직접 영향을 받는다
+_PRICE_FIELDS = ("open", "high", "low", "close")
+#: 거래량 계열 — 우리는 상위 TF 를 거래소 원본으로 쓰므로 전략에 직접 쓰이지 않는다
+_VOLUME_FIELDS = ("volume", "quote_volume", "trade_count")
+
+
+def _classify(original: Candle, derived: Candle, members: list[Candle]) -> tuple[IssueKind, str]:
+    """불일치의 **원인**을 규명한다.
+
+    게이트 기준은 "불일치 0건" 이 아니라 "**원인 미규명** 불일치 0건" 이다.
+    거래소의 1m 아카이브와 상위 TF 아카이브는 실제로 서로 어긋나는 구간이 있으므로
+    완전 일치는 달성 불가능한 요구다 (2026-09-21 실데이터 확인).
+
+    우리 집계 로직이나 데이터 사본의 문제라면 소수의 고립된 버킷이 아니라
+    전 구간에서 체계적으로 어긋난다. 그래서 아래 두 원인에 해당하지 않는 불일치만
+    CRITICAL 로 올린다.
+    """
+    has_filler = any(c.volume == ZERO for c in members)
+    price_differs = any(getattr(original, f) != getattr(derived, f) for f in _PRICE_FIELDS)
+
+    if has_filler and price_differs:
+        # 1m 아카이브는 거래 없는 분을 직전가 O=H=L=C, volume=0 으로 채운다.
+        # 상위 TF 는 실제 체결부터 시작하므로 open/low/high 가 어긋난다.
+        return (
+            IssueKind.SOURCE_FILLER_BAR,
+            f"1m 거래량0 채움봉 {sum(1 for c in members if c.volume == ZERO)}개로 인한 차이",
+        )
+    if original.volume != derived.volume:
+        direction = "상위TF 누락" if derived.volume > original.volume else "1m 누락"
+        return (
+            IssueKind.ARCHIVE_DISAGREEMENT,
+            f"거래소 아카이브 간 거래량 불일치 ({direction})",
+        )
+    if has_filler:
+        return (IssueKind.SOURCE_FILLER_BAR, "1m 거래량0 채움봉으로 인한 차이")
+    return (IssueKind.RESAMPLE_MISMATCH, "원인 미규명 불일치")
 
 
 def _compare(original: Candle, derived: Candle) -> list[str]:
