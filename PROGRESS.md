@@ -14,7 +14,7 @@
 ```
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
-Phase 2 — 전략코어 ██████░░░░░░░░░░░░░░  30%  ← 여기
+Phase 2 — 전략코어 ████████░░░░░░░░░░░░  40%  ← 여기
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -44,8 +44,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 8 | 실데이터 백필 실행 + 게이트 1 판정 | ✅ 완료 |
 | 9 | (Phase 2) `features/normalize.py` — causal z-score / percentile | ✅ 완료 |
 | 10 | (Phase 2) `features/` 지표 5종 (B1/B2/T1/T2/T3) | ✅ 완료 |
-| 11 | **(Phase 2) `features/structure.py` — ZigZag 스윙 (손절 위치용)** | ⬅️ **다음** |
-| 12 | (Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py` | 대기 |
+| 11 | (Phase 2) `features/structure.py` — ZigZag 스윙 (repainting 차단) | ✅ 완료 |
+| 12 | **(Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py`** | ⬅️ **다음** |
 | 13 | (Phase 2) `strategy/` bias·trigger·scoring·policy·cost + `decide()` | 대기 |
 | 14 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
@@ -126,12 +126,16 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/features/volatility.py` | **B2** 1h ATR/가격 1년 백분위 |
 | `src/auto_trading/features/momentum.py` | **T1** 15m RSI, **T2** 5m 모멘텀 z-score |
 | `src/auto_trading/features/volume.py` | **T3** 5m 거래량 확인 계수 (곱셈) |
-| `tests/features/test_indicators.py` + `test_features.py` | 132건 |
+| `src/auto_trading/features/structure.py` | ZigZag 스윙. **`confirmed_at_ms` 로 repainting 차단** |
+| `tests/features/test_indicators.py` + `test_features.py` + `test_structure.py` | 164건 |
 
 **실데이터 검증 (2026-09-19 기준)**: b1_trend=+2.43(ATR배수) · b2_volregime=0.179(백분위)
 · t1_pullback RSI=49.6 · t2_momentum z=+0.58 · t3_volume=0.60
 
-**검증 결과**: 574 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 96%
+**검증 결과**: 609 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 96%
+
+**스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
+· 3%→13.6h(94h) · 5%→38.3h(219h). 최근 구조 라벨 `HH/HL` (b1_trend +2.43 과 일치)
 
 **실서버 스모크 (2026-09-21)**: 2024-01 실데이터 1m/5m/1h 적재 → 체크섬 전건 검증,
 **재집계 대조 9,216 + 768 버킷 전부 일치**, 갭·이상치 0건, 8초 / 11MB.
@@ -173,7 +177,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2 | 운용 자본 규모 (D3) | 사용자 | Phase 8 착수 |
 | 3 | 중단 기준 — 가설 몇 개 실패 시 재검토 (D5) | 사용자 | Phase 4 |
 | 4 | `take_profit.r_multiple` 2.0 은 잠정값 | Phase 4에서 결정 | — |
-| 7 | squash 변경으로 진입 임계값 70 의 의미가 달라짐 | Phase 4에서 재조정 | — |
+| 7 | squash·B1 변경으로 진입 임계값 70 의 의미가 달라짐 | Phase 4에서 재조정 | — |
+| 8 | **스윙 확정지연(평균 6.3h)으로 구조적 손절이 사실상 항상 채택됨**<br>실제 손절폭 2~4%, `min_stop_distance` 1% 는 거의 미발동, 실효 레버리지 5x 내외 | Phase 4에서 의도 확인 | — |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 
@@ -262,6 +267,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 2 | squash 를 tanh → x/(k+\|x\|) 로 변경 (플랫폼 결정론) | 완료 |
 | 2026-09-21 | Claude Opus 5 | 2 | indicators (SMA/EMA/ATR/RSI) + 지표 5종 + 테스트 132건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 2 | **B1 정규화 결함 발견·수정**: z-score 는 지속 추세에서 0 수렴 → ATR 단위로 변경 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 2 | structure.py ZigZag 스윙 + repainting 차단 테스트 32건 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

@@ -45,6 +45,7 @@ risk:
     atr_timeframe: 1h
     atr_period: 14
     atr_multiple: 1.5
+    swing_threshold_pct: 0.02       # ZigZag 임계. 실측 확정지연 평균 6.3h / 최대 70h
     swing_buffer_atr: 0.2           # 스윙 저점 바로 밑은 노이즈에 걸린다
     pick: wider                     # 더 먼 손절이 항상 더 안전하다
 
@@ -93,13 +94,15 @@ risk:
 # 가중치는 등가중 고정. 백테스트로 최적화하지 않는다 (12-critique §2).
 features:
   # B1 — 4시간 EMA(50) 추세  [방향 허가]
+  # ATR 단위 정규화. z-score 는 지속 추세에서 0 으로 수렴해 쓰지 않는다 (2026-09-21)
   b1_trend:
     enabled: true
     timeframe: 4h
     weight: 1.0
     params:
       ema_period: 50
-      zscore_lookback: 120          # 20일
+      atr_period: 14
+      slope_bars: 10                # 기울기 구간 (1봉은 노이즈가 큼)
 
   # B2 — 1시간 ATR 변동성 국면  [거래 허가 + 크기]
   b2_volregime:
@@ -152,7 +155,7 @@ policy:
   long_exit_threshold: 45.0         # 진입보다 낮게 = 히스테리시스
   short_entry_threshold: 70.0
   short_exit_threshold: 45.0
-  bias_threshold: 0.5               # |B1 z| 이 미만이면 진입 금지
+  bias_threshold: 0.5               # |B1| (ATR 배수) 이 미만이면 진입 금지
   allow_counter_bias_when_neutral: false
   reversal_requires_flat: true      # 롱->숏 직접 전환 금지
   minimum_required_edge_bps: 5.0

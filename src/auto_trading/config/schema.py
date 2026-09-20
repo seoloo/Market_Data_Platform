@@ -166,6 +166,8 @@ class StopConfig(_Base):
     atr_timeframe: Timeframe = Timeframe.H1
     atr_period: int = Field(default=14, ge=2, le=200)
     atr_multiple: Rate = Field(default=Decimal("1.5"), gt=0, le=10)
+    swing_threshold_pct: Rate = Field(default=Decimal("0.02"), gt=0, lt=1)
+    """ZigZag 되돌림 임계. 클수록 스윙이 줄고 **확정이 늦어진다** (실측: 2%→평균 6.3h)."""
     swing_buffer_atr: Rate = Field(default=Decimal("0.2"), ge=0, le=5)
     pick: StopPick = StopPick.WIDER
 

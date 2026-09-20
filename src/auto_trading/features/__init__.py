@@ -6,6 +6,13 @@
 
 from auto_trading.features.base import Feature, FeatureResult
 from auto_trading.features.momentum import MomentumFeature, PullbackFeature
+from auto_trading.features.structure import (
+    StructureLabel,
+    Swing,
+    SwingKind,
+    SwingSeries,
+    detect_swings,
+)
 from auto_trading.features.trend import TrendFeature
 from auto_trading.features.volatility import VolatilityRegimeFeature
 from auto_trading.features.volume import VolumeConfirmFeature
@@ -15,7 +22,12 @@ __all__ = [
     "FeatureResult",
     "MomentumFeature",
     "PullbackFeature",
+    "StructureLabel",
+    "Swing",
+    "SwingKind",
+    "SwingSeries",
     "TrendFeature",
     "VolatilityRegimeFeature",
     "VolumeConfirmFeature",
+    "detect_swings",
 ]
