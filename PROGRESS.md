@@ -13,7 +13,7 @@
 
 ```
 Phase 0 — 설계     ████████████████████  100%
-Phase 1 — 기반     ████████████████░░░░   80%  ← 여기
+Phase 1 — 기반     ███████████████████░   95%  ← 여기 (실데이터 백필만 남음)
 Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -40,9 +40,10 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 4 | `config/` — pydantic 스키마 + yaml 로더 + 해시 + D9 정합성 검증 | ✅ 완료 |
 | 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository (D10 뷰 포함) | ✅ 완료 |
 | 6 | `marketdata/archive.py` + `backfill.py` — 벌크 아카이브 수집 | ✅ 완료 |
-| 7 | **`marketdata/integrity.py` — 갭·중복·이상치 검증 + 1m→상위TF 재집계 대조** | ⬅️ **다음** |
-| 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
-| 9 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 7 | `marketdata/integrity.py` + `resample.py` — 무결성 검증 | ✅ 완료 |
+| 8 | **실데이터 백필 실행** — 2019-09~현재 전 TF 적재 + 무결성 리포트 (게이트 1 최종) | ⬅️ **다음** |
+| 9 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
+| 10 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -104,9 +105,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `tests/storage/` | DB·마이그레이션·repository 테스트 72건 |
 | `src/auto_trading/marketdata/archive.py` | data.binance.vision 클라이언트. **체크섬 검증 필수**, CSV 파싱, 단위 오판 방어 |
 | `src/auto_trading/marketdata/backfill.py` | 월/일 아카이브 계획·재개·멱등 적재, 부분 실패 허용 |
-| `tests/marketdata/` | MockTransport 기반 테스트 55건 (네트워크 미사용) |
+| `src/auto_trading/marketdata/resample.py` | 순수 재집계 (1m → 상위 TF). 대조 전용 |
+| `src/auto_trading/marketdata/integrity.py` | 갭·스파이크·정지가격·거래량0 + **1m↔상위TF 대조** |
+| `tests/marketdata/` | MockTransport 기반 테스트 97건 (네트워크 미사용, 통합 3건 포함) |
 
-**검증 결과**: 377 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
+**검증 결과**: 419 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
 
 ---
 
@@ -169,7 +172,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [x] import-linter Pure Core 경계 계약 통과
 - [x] 아키텍처 테스트가 실제 위반을 탐지함을 확인
 - [ ] 2019-01~현재 전 TF 캔들 갭 없이 적재 (갭은 전부 설명 가능)
-- [ ] 1m → 5m/15m/1h 재집계가 거래소 원본과 일치
+- [x] 1m → 5m/15m/1h 재집계 대조 **로직** 구현·검증 (실데이터 실행은 남음)
 - [x] 설정 해시 재현성 테스트 통과 (주석·키 순서 무관, 50회 반복 동일)
 - [x] D9 파라미터 정합성 검증이 기동을 막는지 확인
 - [x] 설정 파일에 시크릿이 들어가면 거부
@@ -222,6 +225,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 1 | config 모듈 + base/backtest/paper/testnet/live yaml + 테스트 91건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | storage 모듈 (스키마 23테이블 + 뷰 3종, 마이그레이션, repository) + 테스트 72건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | marketdata 아카이브 클라이언트 + 백필 오케스트레이터 + 테스트 55건 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 1 | resample + integrity 검증기 + 게이트1 통합 테스트 (총 97건) | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
