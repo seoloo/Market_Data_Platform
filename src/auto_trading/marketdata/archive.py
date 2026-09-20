@@ -1,0 +1,298 @@
+"""Binance 공개 데이터 아카이브 클라이언트 (data.binance.vision).
+
+REST ``/fapi/v1/klines`` 로 수년치를 받으면 레이트 리밋을 크게 소모한다.
+공개 아카이브는 월/일 단위 zip 으로 제공되어 대량 백필에 적합하다 (08-external-apis.md §2).
+
+**체크섬을 반드시 검증한다.** 백테스트 신뢰도는 데이터 신뢰도를 넘을 수 없다.
+손상된 파일이 조용히 들어가면 이후 모든 검증이 무의미해진다.
+"""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import io
+import time
+import zipfile
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
+from enum import StrEnum
+from typing import Final
+
+import httpx
+
+from auto_trading.core.enums import Timeframe
+from auto_trading.core.errors import DataIntegrityError, ExchangeError
+from auto_trading.core.types import Candle
+
+__all__ = [
+    "ArchiveFile",
+    "BinanceVisionClient",
+    "Granularity",
+    "months_between",
+    "parse_klines_csv",
+]
+
+BASE_URL: Final = "https://data.binance.vision"
+
+#: USD-M 선물 klines CSV 컬럼 수. 헤더 없는 구버전과 헤더 있는 신버전 모두 12개다.
+_EXPECTED_COLUMNS: Final = 12
+
+#: 2100년을 밀리초로 표현한 값. 이보다 크면 마이크로초 단위로 판단한다.
+_MS_UPPER_BOUND: Final = 4_102_444_800_000
+
+
+class Granularity(StrEnum):
+    MONTHLY = "monthly"
+    DAILY = "daily"
+
+
+@dataclass(frozen=True, slots=True)
+class ArchiveFile:
+    """아카이브 파일 하나 (월 또는 일 단위)."""
+
+    symbol: str
+    timeframe: Timeframe
+    period: date
+    granularity: Granularity
+
+    @property
+    def stem(self) -> str:
+        if self.granularity is Granularity.MONTHLY:
+            return f"{self.symbol}-{self.timeframe.value}-{self.period:%Y-%m}"
+        return f"{self.symbol}-{self.timeframe.value}-{self.period:%Y-%m-%d}"
+
+    @property
+    def filename(self) -> str:
+        return f"{self.stem}.zip"
+
+    def url(self, base_url: str = BASE_URL) -> str:
+        return (
+            f"{base_url}/data/futures/um/{self.granularity.value}/klines/"
+            f"{self.symbol}/{self.timeframe.value}/{self.filename}"
+        )
+
+    def checksum_url(self, base_url: str = BASE_URL) -> str:
+        return f"{self.url(base_url)}.CHECKSUM"
+
+    def __str__(self) -> str:
+        return self.filename
+
+
+def months_between(start: date, end: date) -> list[date]:
+    """``start`` 부터 ``end`` 까지 각 달의 1일을 나열한다 (양끝 포함)."""
+    if end < start:
+        return []
+    months: list[date] = []
+    cursor = start.replace(day=1)
+    last = end.replace(day=1)
+    while cursor <= last:
+        months.append(cursor)
+        cursor = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return months
+
+
+def days_between(start: date, end: date) -> list[date]:
+    """``start`` 부터 ``end`` 까지 날짜를 나열한다 (양끝 포함)."""
+    if end < start:
+        return []
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+
+def _normalize_timestamp(raw: int) -> int:
+    """타임스탬프를 밀리초로 맞춘다.
+
+    Binance 아카이브는 원래 밀리초를 쓰지만 일부 시기의 파일이 마이크로초로 제공된 적이 있다.
+    단위를 잘못 읽으면 봉 시각이 통째로 어긋나고, 그 사실을 알아채기 어렵다.
+    방어적으로 정규화하고, 아래에서 봉 길이를 교차 검증한다.
+    """
+    return raw // 1000 if raw > _MS_UPPER_BOUND else raw
+
+
+def _to_decimal(text: str, field: str, open_ms: int) -> Decimal:
+    try:
+        return Decimal(text.strip())
+    except (InvalidOperation, AttributeError) as exc:
+        raise DataIntegrityError(
+            f"{field} 를 Decimal 로 읽을 수 없다: {text!r} (open_ms={open_ms})"
+        ) from exc
+
+
+def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
+    """Binance klines CSV 를 :class:`Candle` 로 변환한다.
+
+    컬럼: open_time, open, high, low, close, volume, close_time, quote_volume,
+    count, taker_buy_volume, taker_buy_quote_volume, ignore
+
+    신버전 파일에는 헤더 행이 있고 구버전에는 없다. 둘 다 처리한다.
+
+    Raises:
+        DataIntegrityError: 컬럼 수 불일치, 봉 경계 미정렬, 봉 길이 불일치.
+    """
+    text = data.decode("utf-8")
+    reader = csv.reader(io.StringIO(text))
+    candles: list[Candle] = []
+
+    for line_no, row in enumerate(reader, start=1):
+        if not row:
+            continue
+        if len(row) < _EXPECTED_COLUMNS:
+            raise DataIntegrityError(
+                f"CSV 컬럼 수가 부족하다 (line {line_no}): {len(row)} < {_EXPECTED_COLUMNS}"
+            )
+        if not row[0].strip().lstrip("-").isdigit():
+            if line_no == 1:
+                continue  # 헤더 행
+            raise DataIntegrityError(f"open_time 이 숫자가 아니다 (line {line_no}): {row[0]!r}")
+
+        open_ms = _normalize_timestamp(int(row[0]))
+        close_ms = _normalize_timestamp(int(row[6]))
+
+        if open_ms % timeframe.ms != 0:
+            raise DataIntegrityError(
+                f"봉 시작 시각이 {timeframe.value} 경계에 정렬되지 않았다: "
+                f"{open_ms} (line {line_no})"
+            )
+        # 단위 오판을 잡는 교차 검증.
+        # Binance 는 close_time = open_time + interval - 1 ms 를 보장한다.
+        if close_ms - open_ms != timeframe.ms - 1:
+            raise DataIntegrityError(
+                f"봉 길이가 {timeframe.value} 와 다르다 (line {line_no}): "
+                f"{close_ms - open_ms + 1}ms, 기대값 {timeframe.ms}ms. "
+                "타임스탬프 단위가 다를 수 있다."
+            )
+
+        candles.append(
+            Candle(
+                open_ms=open_ms,
+                close_ms=close_ms,
+                open=_to_decimal(row[1], "open", open_ms),
+                high=_to_decimal(row[2], "high", open_ms),
+                low=_to_decimal(row[3], "low", open_ms),
+                close=_to_decimal(row[4], "close", open_ms),
+                volume=_to_decimal(row[5], "volume", open_ms),
+                quote_volume=_to_decimal(row[7], "quote_volume", open_ms),
+                trade_count=int(row[8]),
+            )
+        )
+
+    candles.sort(key=lambda c: c.open_ms)
+    return tuple(candles)
+
+
+def _extract_single_csv(payload: bytes, expected_stem: str) -> bytes:
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
+        if len(names) != 1:
+            raise DataIntegrityError(f"zip 안에 CSV 가 정확히 1개여야 한다: {names}")
+        if names[0] != f"{expected_stem}.csv":
+            raise DataIntegrityError(f"zip 내용물 이름이 예상과 다르다: {names[0]}")
+        return archive.read(names[0])
+
+
+def _parse_checksum(text: str) -> str:
+    """``<sha256>  <filename>`` 형식에서 해시만 뽑는다."""
+    parts = text.strip().split()
+    if not parts or len(parts[0]) != 64:
+        raise DataIntegrityError(f"CHECKSUM 형식을 읽을 수 없다: {text[:80]!r}")
+    return parts[0].lower()
+
+
+class BinanceVisionClient:
+    """공개 아카이브에서 캔들을 가져온다.
+
+    ``httpx.Client`` 를 주입받으므로 테스트에서 ``MockTransport`` 로 대체할 수 있다.
+    실제 네트워크 없이 전 경로를 검증한다.
+    """
+
+    __slots__ = ("_client", "_owns_client", "base_url", "max_retries", "request_delay_s")
+
+    def __init__(
+        self,
+        client: httpx.Client | None = None,
+        *,
+        base_url: str = BASE_URL,
+        max_retries: int = 3,
+        request_delay_s: float = 0.0,
+        timeout_s: float = 60.0,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.max_retries = max_retries
+        self.request_delay_s = request_delay_s
+        self._owns_client = client is None
+        self._client = client if client is not None else httpx.Client(timeout=timeout_s)
+
+    def close(self) -> None:
+        if self._owns_client:
+            self._client.close()
+
+    def __enter__(self) -> BinanceVisionClient:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+    # ------------------------------------------------------------- 내부
+
+    def _get(self, url: str) -> httpx.Response | None:
+        """GET 요청. 404 는 ``None`` (해당 기간 파일이 없음), 그 외 오류는 재시도."""
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries):
+            if self.request_delay_s and attempt == 0:
+                time.sleep(self.request_delay_s)
+            try:
+                response = self._client.get(url)
+            except httpx.HTTPError as exc:
+                last_error = exc
+            else:
+                if response.status_code == httpx.codes.NOT_FOUND:
+                    return None
+                if response.is_success:
+                    return response
+                last_error = ExchangeError(f"HTTP {response.status_code}: {url}")
+            if attempt < self.max_retries - 1:
+                time.sleep(min(2.0**attempt, 8.0) * max(self.request_delay_s, 0.1))
+        raise ExchangeError(f"다운로드 실패 ({self.max_retries}회 시도): {url}") from last_error
+
+    # ------------------------------------------------------------- 공개
+
+    def download(self, file: ArchiveFile, *, verify_checksum: bool = True) -> bytes | None:
+        """zip 원문을 가져온다. 해당 기간 파일이 없으면 ``None``.
+
+        Raises:
+            DataIntegrityError: 체크섬 불일치.
+        """
+        response = self._get(file.url(self.base_url))
+        if response is None:
+            return None
+        payload = response.content
+
+        if verify_checksum:
+            checksum_response = self._get(file.checksum_url(self.base_url))
+            if checksum_response is None:
+                raise DataIntegrityError(
+                    f"CHECKSUM 파일이 없다: {file}. 검증 없이 데이터를 받지 않는다."
+                )
+            expected = _parse_checksum(checksum_response.text)
+            actual = hashlib.sha256(payload).hexdigest()
+            if actual != expected:
+                raise DataIntegrityError(
+                    f"체크섬 불일치: {file}\n  기대: {expected[:16]}\n  실제: {actual[:16]}"
+                )
+        return payload
+
+    def fetch_candles(
+        self, file: ArchiveFile, *, verify_checksum: bool = True
+    ) -> tuple[Candle, ...] | None:
+        """아카이브를 받아 파싱한다. 파일이 없으면 ``None``."""
+        payload = self.download(file, verify_checksum=verify_checksum)
+        if payload is None:
+            return None
+        csv_bytes = _extract_single_csv(payload, file.stem)
+        return parse_klines_csv(csv_bytes, file.timeframe)
+
+
+def utc_today(now_ms: int) -> date:
+    """epoch ms 를 UTC 날짜로 변환한다."""
+    return datetime.fromtimestamp(now_ms / 1000, tz=UTC).date()

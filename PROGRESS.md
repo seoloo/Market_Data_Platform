@@ -13,7 +13,7 @@
 
 ```
 Phase 0 — 설계     ████████████████████  100%
-Phase 1 — 기반     █████████████░░░░░░░   65%  ← 여기
+Phase 1 — 기반     ████████████████░░░░   80%  ← 여기
 Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -39,8 +39,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 3 | 아키텍처 테스트 (Pure Core 경계 AST 검사) | ✅ 완료 |
 | 4 | `config/` — pydantic 스키마 + yaml 로더 + 해시 + D9 정합성 검증 | ✅ 완료 |
 | 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository (D10 뷰 포함) | ✅ 완료 |
-| 6 | **`marketdata/backfill.py` — 과거 캔들/funding 수집** (data.binance.vision 벌크) | ⬅️ **다음** |
-| 7 | `marketdata/integrity.py` — 갭·중복·이상치 검증 | 대기 |
+| 6 | `marketdata/archive.py` + `backfill.py` — 벌크 아카이브 수집 | ✅ 완료 |
+| 7 | **`marketdata/integrity.py` — 갭·중복·이상치 검증 + 1m→상위TF 재집계 대조** | ⬅️ **다음** |
 | 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
 | 9 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
@@ -102,8 +102,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/storage/repositories/meta.py` | config/code 버전 멱등 등록 (재현성 고정점) |
 | `src/auto_trading/ui/__init__.py` | 대시보드 자리표시자 (Phase 6) |
 | `tests/storage/` | DB·마이그레이션·repository 테스트 72건 |
+| `src/auto_trading/marketdata/archive.py` | data.binance.vision 클라이언트. **체크섬 검증 필수**, CSV 파싱, 단위 오판 방어 |
+| `src/auto_trading/marketdata/backfill.py` | 월/일 아카이브 계획·재개·멱등 적재, 부분 실패 허용 |
+| `tests/marketdata/` | MockTransport 기반 테스트 55건 (네트워크 미사용) |
 
-**검증 결과**: 322 passed · mypy strict 0 errors · ruff clean · import-linter **4 contracts kept** · coverage 95%
+**검증 결과**: 377 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
 
 ---
 
@@ -218,6 +221,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 0 | 대시보드·exe 설계 추가 (D10, 14번 문서). Phase 1 스키마에 집계 뷰 반영 | D10 확정 |
 | 2026-09-21 | Claude Opus 5 | 1 | config 모듈 + base/backtest/paper/testnet/live yaml + 테스트 91건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | storage 모듈 (스키마 23테이블 + 뷰 3종, 마이그레이션, repository) + 테스트 72건 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 1 | marketdata 아카이브 클라이언트 + 백필 오케스트레이터 + 테스트 55건 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
