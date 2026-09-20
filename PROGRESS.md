@@ -13,7 +13,7 @@
 
 ```
 Phase 0 — 설계     ████████████████████  100%
-Phase 1 — 기반     ██████████░░░░░░░░░░   50%  ← 여기
+Phase 1 — 기반     █████████████░░░░░░░   65%  ← 여기
 Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -38,8 +38,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2 | `core/` — enums / errors / money / clock / hashing / types | ✅ 완료 |
 | 3 | 아키텍처 테스트 (Pure Core 경계 AST 검사) | ✅ 완료 |
 | 4 | `config/` — pydantic 스키마 + yaml 로더 + 해시 + D9 정합성 검증 | ✅ 완료 |
-| 5 | **`storage/` — SQLite 스키마 + 마이그레이션 + repository**<br>**+ `schema_version`, `v_daily_pnl`, `v_daily_equity` (D10)**<br>+ `config_versions` / `code_versions` 저장 | ⬅️ **다음** |
-| 6 | `marketdata/backfill.py` — 과거 캔들/funding 수집 | 대기 |
+| 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository (D10 뷰 포함) | ✅ 완료 |
+| 6 | **`marketdata/backfill.py` — 과거 캔들/funding 수집** (data.binance.vision 벌크) | ⬅️ **다음** |
 | 7 | `marketdata/integrity.py` — 갭·중복·이상치 검증 | 대기 |
 | 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
 | 9 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
@@ -95,8 +95,15 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/config/loader.py` | yaml 병합 + 환경변수 오버레이 + 해시 + **시크릿 스캔** |
 | `config/base.yaml` + 4개 오버레이 | backtest / paper / testnet / live |
 | `tests/config/` | 스키마·로더 테스트 91건 |
+| `src/auto_trading/storage/sql/001_initial.sql` | 전 테이블 23종 + 집계 뷰 3종 (D10) |
+| `src/auto_trading/storage/db.py` | WAL 연결 + **읽기 전용 연결**(`mode=ro`+`query_only`) + 트랜잭션 |
+| `src/auto_trading/storage/migrations.py` | 마이그레이션 러너 + **체크섬 드리프트 감지** + 버전 검사 |
+| `src/auto_trading/storage/repositories/candles.py` | 캔들 upsert/조회/**갭 탐지** + causal 조회 |
+| `src/auto_trading/storage/repositories/meta.py` | config/code 버전 멱등 등록 (재현성 고정점) |
+| `src/auto_trading/ui/__init__.py` | 대시보드 자리표시자 (Phase 6) |
+| `tests/storage/` | DB·마이그레이션·repository 테스트 72건 |
 
-**검증 결과**: 250 passed · mypy strict 0 errors · ruff clean · import-linter 2 contracts kept · coverage 95%
+**검증 결과**: 322 passed · mypy strict 0 errors · ruff clean · import-linter **4 contracts kept** · coverage 95%
 
 ---
 
@@ -153,7 +160,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 ### Phase 1 — 기반
 - [x] `mypy --strict` / ruff / pytest 통과 (159 passed, 0 errors)
-- [ ] `schema_version` + `v_daily_pnl` / `v_daily_equity` 뷰 (D10 — 나중에 복구 불가)
+- [x] `schema_version` + `v_daily_pnl` / `v_daily_equity` 뷰 (D10)
+- [x] 대시보드 읽기 전용 보장 (INSERT/UPDATE/CREATE 전부 거부 확인)
 - [ ] `account_snapshots` 1분 주기 기록
 - [x] import-linter Pure Core 경계 계약 통과
 - [x] 아키텍처 테스트가 실제 위반을 탐지함을 확인
@@ -209,6 +217,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 0 | D9 파라미터 조정: max_leverage 5→10, min_stop_distance 2%→1% | 완료 |
 | 2026-09-21 | Claude Opus 5 | 0 | 대시보드·exe 설계 추가 (D10, 14번 문서). Phase 1 스키마에 집계 뷰 반영 | D10 확정 |
 | 2026-09-21 | Claude Opus 5 | 1 | config 모듈 + base/backtest/paper/testnet/live yaml + 테스트 91건 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 1 | storage 모듈 (스키마 23테이블 + 뷰 3종, 마이그레이션, repository) + 테스트 72건 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
