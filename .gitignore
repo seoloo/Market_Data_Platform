@@ -1,0 +1,43 @@
+# --- 시크릿 (절대 커밋 금지) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+credentials*.json
+
+# --- 데이터 / DB ---
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.parquet
+!tests/golden/*.parquet
+
+# --- 백테스트 산출물 ---
+reports/
+logs/
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# --- 에디터 / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
