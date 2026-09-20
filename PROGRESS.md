@@ -13,7 +13,7 @@
 
 ```
 Phase 0 — 설계     ████████████████████  100%
-Phase 1 — 기반     ███████████████████░   95%  ← 여기 (실데이터 백필만 남음)
+Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
 Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -41,9 +41,10 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository (D10 뷰 포함) | ✅ 완료 |
 | 6 | `marketdata/archive.py` + `backfill.py` — 벌크 아카이브 수집 | ✅ 완료 |
 | 7 | `marketdata/integrity.py` + `resample.py` — 무결성 검증 | ✅ 완료 |
-| 8 | **실데이터 백필 실행** — `scripts/backfill.py` 로 2019-09~현재 전 TF 적재<br>스크립트 작성·실서버 검증 완료, **전체 실행만 남음** | ⬅️ **다음** |
-| 9 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
-| 10 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 8 | 실데이터 백필 실행 + 게이트 1 판정 | ✅ 완료 |
+| 9 | **(Phase 2) `features/normalize.py` — causal z-score / percentile** | ⬅️ **다음** |
+| 10 | (Phase 2) `features/` 5종 + `risk/sizing.py` (D9) | 대기 |
+| 11 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -124,6 +125,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 | 항목 | 값 |
 |---|---|
+| **검증할 가설 (H1)** | 4h 추세 구간에서 15m 되돌림 후 추세 재개. 크기가 비용을 초과 (D11) |
 | 심볼 / 거래소 | BTCUSDT / Binance USD-M (One-way, Isolated) |
 | 지표 | **5개** 고정, 등가중 (B1 4h추세, B2 1h변동성, T1 15m RSI, T2 5m모멘텀, T3 5m거래량) |
 | 구조 | Bias 게이트 × Trigger 타이밍 (곱셈) |
@@ -147,7 +149,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 | # | 항목 | 담당 | 블로킹 |
 |---|---|---|---|
-| 1 | 검증할 시장 가설 1문장 확정 (작업 가설 잠정 채택) | 사용자 | **Phase 2** (Phase 1 은 무관) |
+| ~~1~~ | ~~검증할 시장 가설~~ → **D11 확정 (가설 H1)** | — | 해소됨 |
 | 2 | 운용 자본 규모 (D3) | 사용자 | Phase 8 착수 |
 | 3 | 중단 기준 — 가설 몇 개 실패 시 재검토 (D5) | 사용자 | Phase 4 |
 | 4 | `take_profit.r_multiple` 2.0 은 잠정값 | Phase 4에서 결정 | — |
@@ -167,7 +169,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [x] DB 스키마 1차 확정
 - [x] 에이전트 작업 규약 수립
 - [x] 커밋 정책 (D8)
-- [ ] 검증할 시장 가설 1문장 (작업 가설 잠정 채택 — Phase 2 전까지 확정 필요)
+- [x] 검증할 시장 가설 1문장 (D11, 가설 H1)
 
 ### Phase 1 — 기반
 - [x] `mypy --strict` / ruff / pytest 통과 (159 passed, 0 errors)
@@ -176,8 +178,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [ ] `account_snapshots` 1분 주기 기록
 - [x] import-linter Pure Core 경계 계약 통과
 - [x] 아키텍처 테스트가 실제 위반을 탐지함을 확인
-- [ ] 2019-01~현재 전 TF 캔들 갭 없이 적재 (갭은 전부 설명 가능)
-- [x] 1m → 5m/15m/1h 재집계 대조 **로직** 구현·검증 (실데이터 실행은 남음)
+- [x] **2020-01-01~2026-09-19 전 6개 TF 적재** (1m 3,533,760봉 = 2,454일×1440, 갭 0건)
+- [x] 1m → 상위 TF 재집계 대조: 706,752 버킷, **원인 미규명 불일치 0건**
 - [x] 설정 해시 재현성 테스트 통과 (주석·키 순서 무관, 50회 반복 동일)
 - [x] D9 파라미터 정합성 검증이 기동을 막는지 확인
 - [x] 설정 파일에 시크릿이 들어가면 거부
@@ -232,6 +234,9 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 1 | marketdata 아카이브 클라이언트 + 백필 오케스트레이터 + 테스트 55건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | resample + integrity 검증기 + 게이트1 통합 테스트 (총 97건) | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | scripts/backfill.py 작성 + 실서버 1개월 스모크 (재집계 전건 일치) | 완료 |
+| 2026-09-21 | Claude Opus 5 | 0 | 시장 가설 H1 확정 (D11) — Phase 0 완료 | D11 확정 |
+| 2026-09-21 | Claude Opus 5 | 1 | 전체 백필 실행 (414만봉 / 878MB / 13.7분) | 완료 |
+| 2026-09-21 | Claude Opus 5 | 1 | 재집계 불일치 78건 원인 규명 → 거래소 아카이브 특성으로 확인, 분류 로직 추가 | **게이트 1 통과** |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
