@@ -85,8 +85,8 @@ def evaluate(
 | ID | 조건 | 기본 제안값 | 코드 |
 |---|---|---|---|
 | G4.1 | 이미 동일 심볼 포지션 보유 (피라미딩 비허용) | — | `POSITION_EXISTS` |
-| G4.2 | 계산된 명목가 > 최대 명목가 | equity × **0.15** [확정] | `MAX_NOTIONAL` |
-| G4.3 | 결과 레버리지 > 최대 | **1.0x** [확정] | `MAX_LEVERAGE` |
+| G4.2 | 계산된 명목가 > 최대 명목가 | equity × **0.50** [확정] (= margin 10% × lev 5) | `MAX_NOTIONAL` |
+| G4.3 | 거래소 레버리지 > 최대 | **5x** [확정] (Phase 8 은 3x) | `MAX_LEVERAGE` |
 | G4.4 | 계산 수량 < 거래소 최소 (minQty / minNotional) | — | `BELOW_MIN_SIZE` |
 | G4.5 | 최소 포지션 유지시간 미경과 상태에서 반대 진입 | **120분** [확정] | `MIN_HOLD_TIME` |
 | G4.6 | 청산 후 재진입 대기시간 미경과 | **60분** [확정] | `REENTRY_COOLDOWN` |
@@ -94,15 +94,18 @@ def evaluate(
 | G4.8 | 청산가가 손절가보다 가까움 | `liq_distance >= 2 × stop_distance` | `LIQUIDATION_TOO_CLOSE` |
 | **G4.9** | **최대 보유시간 초과 → 강제 청산 트리거** | **48시간** [확정] | `MAX_HOLDING_TIME` |
 | **G4.10** | **수량 반올림 오차 > 허용치 (자본 부족)** | **5%** [확정] | `SIZING_RESOLUTION` |
+| **G4.11** | **손절가가 진입가의 이익 방향에 있음 (손절거리 ≤ 0)** | — | `INVALID_STOP` |
+| **G4.12** | **전략 손절이 최소 손절거리보다 좁음** | **2%** [확정] | `STOP_TOO_TIGHT` (SKIP 모드일 때만) |
 
 **G4.8 은 협상 불가 항목이다.** 손절에 닿기 전에 강제청산되면 리스크 모델 전체가 무의미해진다.
-(확정 설정의 0.1x 레버리지에서는 자동으로 통과하지만, 설정이 바뀔 경우를 위해 유지한다.)
+확정 설정(최대 5x)에서는 청산까지 19.6% 로 2% 손절의 9.8배라 사실상 걸리지 않지만,
+Binance 유지증거금률이 명목가에 따라 계단식으로 오르므로 게이트는 유지한다 (§3.5).
 
 **G4.9 는 게이트가 아니라 청산 트리거다.** 다른 게이트와 달리 진입을 막는 것이 아니라
-청산을 *발생시킨다*. 손절이 거의 발동하지 않는 확정 설정에서 2차 탈출 경로 역할을 한다 (→ §3.1c).
+청산을 *발생시킨다*. 보유기간 2~24h 를 넘긴 포지션의 2차 탈출 경로다 (D2).
 
 **G4.10 은 자본 부족을 조용히 넘기지 않기 위한 장치다.** `step_size` 반올림으로 실제 명목가가
-목표에서 5% 이상 벗어나면 진입을 거부하고 경고한다 (→ 13-decisions.md D3).
+목표에서 5% 이상 벗어나면 진입을 거부하고 경고한다 (→ 13-decisions.md D3, 05 §3.4).
 
 ### G5 — 시장 상태 게이트
 
@@ -136,101 +139,335 @@ def evaluate(
 
 ---
 
-## 3. 포지션 사이징
+## 3. 포지션 사이징 — 손절 우선, 레버리지는 결과값
 
-> **확정 방식: 고정 비율 명목가 (`fixed_notional_pct`)** — [13-decisions.md](13-decisions.md) D4
-> 위험기반(`risk_based`) 방식은 §3.1b 에 참고용으로 남긴다. 두 방식 모두 구현하되
-> MVP 기본값은 `fixed_notional_pct` 다.
+> **확정 방식: 위험 기반 사이징 (`risk_based`)** — [13-decisions.md](13-decisions.md) **D9**
+> D4 의 고정 명목가 방식을 **대체**한다. 거래당 위험 1% 는 그대로이며, 명목가를 고정하는 대신
+> **전략이 정한 손절 위치**에서 역산한다.
 
-### 3.1 확정 공식 — 고정 비율 명목가
+### 3.0 계산 순서 (레버리지를 먼저 정하지 않는다)
+
+```
+전략 신호
+  ↓
+[1] entry_price 결정
+  ↓
+[2] stop_price 결정            ← 전략이 먼저. 레버리지와 무관
+      Swing Low/High, 지지·저항, ATR, 피보나치 무효화 수준 등
+  ↓
+[3] stop_distance_pct 계산     ← 항상 양수
+  ↓
+[4] max_loss = equity × RISK_PER_TRADE
+  ↓
+[5] 비용 추정 (진입·청산 수수료, 슬리피지, funding)
+  ↓
+[6] position_notional 계산     ← 비용 포함 닫힌 해
+  ↓
+[7] 상한 적용 (명목가 / 레버리지 / 증거금 / 거래소)
+  ↓
+[8] qty = floor_to_step(notional / price)
+  ↓
+[9] exchange_leverage 결정     ← 정수. 증거금 상한을 만족하는 최소값
+  ↓
+[10] 청산가 안전성 검증
+  ↓
+[11] 거래소 최소 주문 검증
+  ↓
+[12] Risk Engine 최종 승인 → 주문
+```
+
+**핵심**: "몇 배를 쓸까"를 먼저 묻지 않는다.
+`손절 위치 → 허용 손실 → 포지션 크기 → 필요 레버리지` 순서다.
+
+### 3.1 손절 거리
 
 ```python
-# 1. 명목가 = equity 의 고정 비율
-equity   = wallet_balance + unrealized_pnl
-notional = equity * cfg.position_notional_pct        # 확정 0.10
+# 항상 양수
+if side is PositionSide.LONG:
+    stop_distance_pct = (entry_price - stop_price) / entry_price
+else:
+    stop_distance_pct = (stop_price - entry_price) / entry_price
 
-# 2. 손절가 = 진입가 대비 고정 비율
-stop_price = entry_price * (1 - cfg.stop_loss_pct)   # LONG,  확정 0.10
-stop_price = entry_price * (1 + cfg.stop_loss_pct)   # SHORT
+if stop_distance_pct <= 0:
+    return Veto(VetoReason.INVALID_STOP)      # 손절이 진입가의 이익 방향에 있음
+```
 
-# -> 거래당 최대 손실 = equity * position_notional_pct * stop_loss_pct
-#                     = equity * 0.10 * 0.10 = equity * 1.0%
+**최소 손절 거리** (`MIN_STOP_DISTANCE`, 확정 **0.02 = 2%**)
 
-# 3. 수량
-qty_raw = notional / price
+전략 손절이 이보다 좁으면 `TIGHT_STOP_ACTION` 에 따라 처리한다.
 
-# 4. 상한 적용
-qty = min(
-    qty_raw,
-    (equity * cfg.max_notional_multiple) / price,   # G4.2  확정 0.15
-    (equity * cfg.max_leverage) / price,            # G4.3  확정 1.0
-    available_margin_based_cap,                     # G3.6
-    exchange_max_qty,
+| 값 | 동작 |
+|---|---|
+| `WIDEN` (기본) | `MIN_STOP_DISTANCE` 로 넓힌다. 명목가가 줄어 더 안전해진다. 발생 횟수를 기록 |
+| `SKIP` | 거래를 건너뛴다 |
+
+> 2% 라는 값의 근거는 §3.6 에 있다. **임의의 값이 아니라 비용 구조와 레버리지 상한에서
+> 역산된 값**이다. 비용 구조가 바뀌면 이 값도 다시 계산해야 한다.
+
+#### MVP 손절 위치 규칙 (`stop.mode = "structure_or_atr"`)
+
+손절 위치를 정하는 것은 전략의 일이지만, MVP 규칙은 여기에 고정한다.
+
+```python
+# LONG
+structure_stop = last_confirmed_swing_low - swing_buffer_atr * atr   # 기본 0.2 x ATR
+atr_stop       = entry_price - atr_multiple * atr                    # 기본 1.5 x ATR(1h)
+stop_price     = min(structure_stop, atr_stop)      # 더 먼 쪽 = 더 보수적
+
+# SHORT 은 부호 반전, max() 사용
+```
+
+**더 먼 쪽을 고르는 이유**: 손절이 멀수록 명목가가 작아지고, 명목가가 작을수록
+스톱 슬리피지 사고의 피해가 작아진다 (§3.8). 손실 한도(1%)는 어느 쪽이든 같으므로
+**더 먼 손절이 언제나 더 안전하다.**
+
+**스윙은 확정된 것만 쓴다** (`swing_confirmed_at_ms <= as_of_ms`).
+형성 중인 스윙을 쓰면 repainting 이 발생해 백테스트를 신뢰할 수 없다 (06 §7).
+
+### 3.2 명목가 — 비용 포함 닫힌 해
+
+비용을 무시한 단순식은 `N = L / s` 지만, 이는 **수수료·슬리피지만큼 위험 예산을 초과**한다.
+정확히 풀면:
+
+```
+L      = equity × RISK_PER_TRADE          (최대 허용 손실)
+s      = stop_distance_pct
+c_in   = taker_fee + slippage_entry       (진입 비용률)
+c_out  = taker_fee + slippage_stop        (청산 비용률, 스톱은 슬리피지 배수 적용)
+f      = expected_funding_rate            (예상 보유기간 동안, 명목가 대비)
+
+조건:  N·s  +  N·c_in  +  N·(1+s)·c_out  +  N·f  ≤  L
+        └가격손실┘  └진입비용┘   └청산비용┘      └funding┘
+
+풀면:
+       N = L / [ s·(1 + c_out) + c_in + c_out + f ]
+```
+
+```python
+denom = (
+    stop_distance_pct * (Decimal(1) + cost_rate_out)
+    + cost_rate_in
+    + cost_rate_out
+    + expected_funding_rate
 )
-
-# 5. 거래소 정밀도 (항상 내림)
-qty = floor_to_step(qty, step_size)
-
-# 6. 최소 검사
-if qty < min_qty or qty * price < min_notional:
-    return Veto(BELOW_MIN_SIZE)
-
-# 7. 반올림 오차 검사 — 자본이 작으면 여기서 걸린다
-rounding_error = abs(qty * price - notional) / notional
-if rounding_error > cfg.max_rounding_error:          # 기본 0.05 (5%)
-    return Veto(SIZING_RESOLUTION)                   # 자본 부족 경고 동반
+position_notional = safe_div(max_loss, denom)
 ```
 
-**게이트 G4.10 — `SIZING_RESOLUTION`**: `step_size` 때문에 실제 명목가가 목표에서
-5% 이상 벗어나면 진입을 거부한다. 자본이 작을 때 리스크 모델이 조용히 무의미해지는 것을 막는다.
-(→ 13-decisions.md D3 의 최소 자본 산정과 연결)
+**청산 수수료에 `(1+s)` 를 쓰는 이유**: 수수료는 *청산 시점의* 명목가에 부과된다.
+LONG 은 손절 시 명목가가 `N·(1−s)` 로 줄고, SHORT 은 `N·(1+s)` 로 는다.
+양쪽 모두에 `(1+s)` 를 적용하면 LONG 은 약간 과대추정(보수적), SHORT 은 정확하다.
+**보수적인 쪽으로 통일**한다.
 
-### 3.1b 참고 — 위험 기반 방식 (MVP 미사용, 구현은 유지)
+#### 검산 (equity 1,000 / risk 1% / entry 100,000 / stop 98,000)
+
+| 항목 | 값 |
+|---|---|
+| `L` | 10.00 USDT |
+| `s` | 2.00% |
+| `c_in` | 0.065% (taker 0.045% + slip 0.020%) |
+| `c_out` | 0.085% (taker 0.045% + stop slip 0.040%) |
+| 분모 | 0.02×1.00085 + 0.00065 + 0.00085 = **0.021517** |
+| **명목가** | 10 / 0.021517 = **464.7 USDT** |
+| 가격 손실 | 464.7 × 0.02 = 9.29 |
+| 진입 비용 | 464.7 × 0.00065 = 0.30 |
+| 청산 비용 | 464.7 × 0.98 × 0.00085 = 0.39 |
+| **손절 시 총손실** | **9.98 USDT** ≤ 10 ✅ |
+
+비용을 무시했다면 `N = 10/0.02 = 500`, 실제 손실은 10.75 USDT 로 **예산을 7.5% 초과**했을 것이다.
+
+### 3.3 증거금과 레버리지 — 개념 정정 (중요)
+
+> **`MARGIN_ALLOCATION` 은 손실을 제한하지 않는다.**
+
+손절 시 손실은 `명목가 × 손절폭` 으로 결정되며 **증거금과 무관**하다.
+증거금이 결정하는 것은 **청산가까지의 거리** 하나뿐이다.
+
+| 개념 | 정의 | 무엇을 결정하나 |
+|---|---|---|
+| `max_loss` | equity × RISK_PER_TRADE | **거래당 손실 한도** |
+| `position_notional` | max_loss / (s + 비용) | **실제 시장 노출**. 손실과 비용이 여기 비례 |
+| `margin` | notional / leverage | **청산가 거리**. 손실 크기와 무관 |
+| `leverage` | notional / margin | 위 둘의 비율. **입력이 아니라 결과** |
+
+따라서 `MARGIN_ALLOCATION` 은 **"목표"가 아니라 "증거금 상한"** 으로 쓴다.
+증거금이 많을수록(레버리지가 낮을수록) 청산가가 멀어져 안전하므로,
+**상한 안에서 가능한 한 많이** 넣는 것이 옳다.
 
 ```python
-risk_budget    = equity * risk_per_trade_pct          # 예: 0.5%
-atr_stop       = k_atr * ATR('1h')
-structure_stop = distance_to_recent_swing
-stop_distance  = max(atr_stop, structure_stop, min_stop_bps * price)
-qty_raw        = risk_budget / stop_distance
+margin_cap = equity * MARGIN_ALLOCATION            # 확정 0.10
+
+# 증거금 상한을 만족하는 "최소" 정수 레버리지.
+# 레버리지를 낮출수록 증거금이 늘어 청산가가 멀어지므로, 가능한 가장 낮은 값을 쓴다.
+exchange_leverage = max(1, ceil(position_notional / margin_cap))
+
+margin_allocated = position_notional / exchange_leverage   # <= margin_cap 보장
+effective_leverage = position_notional / equity            # 계좌 전체 기준 (보고용)
 ```
 
-변동성에 자동 적응한다는 장점이 있으나, 손절폭이 좁아지면 레버리지가 올라가 비용이
-비례 증가한다 (→ 12-critique §7). Phase 9 이후 A/B 비교 대상으로 남긴다.
+거래소 레버리지는 **정수**이므로 `required_leverage` 를 구해 반올림하지 않고,
+위처럼 **올림(ceil)으로 직접 구한다**. 내림하면 증거금 상한을 넘는다.
 
-### 3.1c 이 방식에서 손절의 역할이 바뀐다 (중요)
+### 3.4 상한 검증
 
-`stop_loss_pct = 0.10` 은 보유기간 2~24시간에서 **거의 발동하지 않는다.**
-BTC의 24시간 내 10% 역행은 연 수 회 수준의 사건이다.
+```python
+if exchange_leverage > MAX_LEVERAGE:                 # 확정 5
+    if LEVERAGE_LIMIT_ACTION == "REDUCE_POSITION":   # 기본
+        position_notional = margin_cap * MAX_LEVERAGE
+        exchange_leverage = MAX_LEVERAGE
+        # -> 실제 위험이 예산보다 작아진다 (안전). 단 §3.6 의 경고를 볼 것
+    else:  # "SKIP_TRADE"
+        return Veto(VetoReason.MAX_LEVERAGE)
 
-→ 손절가는 **파국 방지용 backstop** 이며, 실질적 손실 통제는 다음이 담당한다:
+# 수량 확정 (항상 내림)
+qty = floor_to_step(position_notional / entry_price, step_size)
+actual_notional = qty * entry_price                  # 반올림으로 목표보다 작아짐
 
-| 순위 | 수단 | 설정 |
+# 반올림 후 재계산 — 보고값은 "의도"가 아니라 "실제"여야 한다
+estimated_loss_at_stop = (
+    actual_notional * stop_distance_pct
+    + actual_notional * cost_rate_in
+    + actual_notional * (1 + stop_distance_pct) * cost_rate_out
+    + actual_notional * expected_funding_rate
+)
+assert estimated_loss_at_stop <= max_loss            # 내림했으므로 항상 성립
+
+if qty < min_qty or actual_notional < min_notional:
+    return Veto(VetoReason.BELOW_MIN_SIZE)
+
+rounding_error = abs(actual_notional - position_notional) / position_notional
+if rounding_error > MAX_ROUNDING_ERROR:              # 확정 0.05
+    return Veto(VetoReason.SIZING_RESOLUTION)
+```
+
+### 3.5 청산가 안전성 (G4.8)
+
+```python
+# Isolated margin 근사. mmr 은 거래소 계단식 유지증거금률 (leverageBracket 에서 조회)
+liq_distance_pct = Decimal(1) / exchange_leverage - maintenance_margin_rate
+
+if liq_distance_pct < LIQUIDATION_SAFETY_BUFFER * stop_distance_pct:   # 확정 2.0
+    # 레버리지를 낮추면 청산가가 멀어진다. 증거금 상한을 넘으면 거래를 포기한다.
+    return Veto(VetoReason.LIQUIDATION_TOO_CLOSE)
+```
+
+현재 확정값에서 이 게이트는 **사실상 걸리지 않는다**:
+
+| 레버리지 | 청산까지 | 2% 손절 대비 |
 |---|---|---|
-| 1 | 청산 신호 (`long_score <= exit_threshold`) | 06 §4 |
-| 2 | 최대 보유시간 강제 청산 | `max_holding_hours: 48` |
-| 3 | 일일 손실 한도 / 누적 DD | G3.1 / G3.2 |
-| 4 | 거래소 스톱 주문 (backstop) | `stop_loss_pct: 0.10` |
+| 3x | 32.9% | 16.5배 |
+| **5x (상한)** | **19.6%** | **9.8배** |
+| 10x | 9.6% | 4.8배 |
+| 20x | 4.6% | 2.3배 |
 
-**설계 함의**
-- `max_holding_hours` 게이트를 **반드시 구현**한다 (신규 G4.9). 이것이 2차 탈출 경로다
-- `realized_r` (R 배수) 계산 시 10% 손절폭을 분모로 쓰면 R 값이 항상 0에 가까워 무의미하다.
-  → `realized_r_stop`(10% 기준)과 `realized_r_atr`(2×ATR 기준) **둘 다 기록**한다
-- 백테스트에서 `close_reason` 분포를 반드시 확인한다. `stop` 비율이 5%를 넘으면
-  보유기간 가정이나 변동성 게이트를 재검토해야 한다
+실질적인 제약은 `MAX_LEVERAGE` 다. 그래도 이 게이트를 유지하는 이유:
+① Binance 유지증거금률은 명목가가 커지면 **계단식으로 상승**한다
+② 설정이 바뀌어 레버리지가 20x 를 넘으면 그때는 실제로 걸린다
+③ 방어는 겹쳐 두는 것이 원칙이다
 
-### 3.2 레버리지는 결과값이지 입력값이 아니다
+### 3.6 ⚠ 파라미터 3개는 독립적이지 않다
+
+`RISK_PER_TRADE`, `MARGIN_ALLOCATION`, `MAX_LEVERAGE` 는 **명목가 상한을 통해 묶여 있다**.
 
 ```
-leverage_used = (qty * price) / equity      # 확정 설정에서는 항상 약 0.1x
+명목가 상한 = MARGIN_ALLOCATION × MAX_LEVERAGE × equity
+            = 0.10 × 5 × equity = equity의 50%
+
+이 상한에 걸리기 시작하는 손절폭:
+  s* = RISK_PER_TRADE / (MARGIN_ALLOCATION × MAX_LEVERAGE) − (c_in + c_out)
+     = 0.01 / 0.50 − 0.0015
+     = 1.85%
 ```
 
-- 거래소 레버리지 설정값은 "허용 상한"일 뿐, 사이징에 사용하지 않는다
-- 거래소 레버리지는 `max_leverage` 보다 약간 높게 설정하되(예: 5x), 실제 명목가는 위 공식이 결정
-- 그 이유: 거래소 레버리지를 낮추면 필요 증거금이 커져 오히려 청산가가 가까워질 수 있다.
-  **Isolated 모드 + 낮은 명목가 + 높은 설정 레버리지** 조합이 청산가를 가장 멀리 둔다
+**즉 손절폭이 1.85% 보다 좁으면 레버리지 상한에 무조건 걸린다.**
+그러면 `REDUCE_POSITION` 이 상시 발동해 **체계적으로 예산보다 적게 위험을 진다**.
+이는 안전하지만, 백테스트의 R 분포를 왜곡해 전략 평가를 어렵게 만든다.
 
-### 3.3 size_multiplier — MVP 에서는 1.0 고정 (확정)
+→ **`MIN_STOP_DISTANCE = 2%` 는 여기서 나온 값이다.** 세 파라미터와 정합시킨 결과다.
+
+#### 설정 검증 (config/schema.py 에서 강제)
+
+기동 시 다음을 계산하고, 불일치하면 **경고 후 기동 중단**한다.
+
+```python
+implied_min_stop = RISK_PER_TRADE / (MARGIN_ALLOCATION * MAX_LEVERAGE) - (c_in + c_out)
+if MIN_STOP_DISTANCE < implied_min_stop:
+    raise ConfigError(
+        f"MIN_STOP_DISTANCE({MIN_STOP_DISTANCE:.2%}) 가 "
+        f"레버리지 상한이 함의하는 최소 손절폭({implied_min_stop:.2%}) 보다 작다. "
+        f"MAX_LEVERAGE 를 {RISK_PER_TRADE / (MARGIN_ALLOCATION * MIN_STOP_DISTANCE):.1f} "
+        f"이상으로 올리거나 MIN_STOP_DISTANCE 를 올려야 캡이 상시 발동하지 않는다."
+    )
+```
+
+#### 다른 조합을 쓰고 싶다면
+
+| 원하는 최소 손절폭 | 필요한 MAX_LEVERAGE (MARGIN 10% 기준) |
+|---|---|
+| 3% | 3.3 이상 |
+| **2% (확정)** | **5 이상** |
+| 1% | 10 이상 |
+| 0.5% | 20 이상 |
+
+### 3.7 손절폭에 따른 사이징 표 (equity 1,000 / risk 1%)
+
+| 손절폭 | 명목가 | 계좌대비 | 거래소 레버리지 | 왕복 비용 | 비용/예산 | 캡 |
+|---|---|---|---|---|---|---|
+| 0.5% | 1,537 | 154% | 16x | 2.30 | **23.0%** | 걸림 |
+| 1.0% | 869 | 87% | 9x | 1.30 | **13.0%** | 걸림 |
+| 1.5% | 606 | 61% | 7x | 0.90 | 9.0% | 걸림 |
+| **2.0%** | **465** | **46%** | **5x** | **0.69** | **6.9%** | — |
+| 3.0% | 317 | 32% | 4x | 0.47 | 4.7% | — |
+| 5.0% | 194 | 19% | 2x | 0.28 | 2.8% | — |
+| 10.0% | 98 | 10% | 1x | 0.14 | 1.4% | — |
+
+**읽는 법 두 가지**
+
+1. **좁은 손절은 비싸다.** 0.5% 손절은 위험 예산의 23%를 비용으로 쓴다.
+   같은 1% 위험을 지는데 실제로 이길 확률이 낮아진다는 뜻이다.
+2. **10% 손절 행이 곧 기존 D4 설정이다.** 명목가 98 ≈ equity의 10%, 레버리지 1x.
+   즉 이 방식은 D4 를 폐기하는 것이 아니라 **일반화한 것**이다.
+
+### 3.8 "1% 손실"은 보장이 아니라 목표다
+
+`STOP_MARKET` 은 **시장가 체결**이다. 지정한 가격에 체결된다는 보장이 없다.
+
+| 상황 | 결과 |
+|---|---|
+| 정상 | 손실 ≈ 예산의 100% 이하 ✅ |
+| 급락·유동성 공백 | 스톱 가격을 지나쳐 체결 → **예산 초과** |
+
+**그리고 이 초과분은 명목가에 비례한다.** 이것이 이 설계에서 가장 중요한 실거래 위험이다.
+
+```
+BTC 가 스톱을 5% 지나쳐 체결된 경우의 추가 손실:
+  D4 방식  (명목가  98 = equity 10%):   4.9 USDT  (equity의 0.5%)
+  신방식   (명목가 465 = equity 46%):  23.3 USDT  (equity의 2.3%)   ← 4.7배
+```
+
+즉 **명목가가 커진 만큼 슬리피지 꼬리위험도 커진다.** 이를 통제하는 장치는:
+
+| 장치 | 역할 |
+|---|---|
+| `MAX_LEVERAGE` | 명목가 상한 = equity의 50%. **이것이 갭 위험의 실질적 상한** |
+| `G5.1 변동성 상한` | 슬리피지가 큰 국면에서 진입 금지 |
+| `daily_loss_limit` / `max_drawdown` | 사후 방어 |
+| Phase 8 실측 | 실제 슬리피지를 측정해 `slippage_stop` 계수 보정 |
+
+→ **Phase 8(소액 실거래) 은 `MAX_LEVERAGE = 3` 으로 시작**하고, 실측 슬리피지를 확인한 뒤
+Phase 9 에서 5 로 올린다. 검증 전에 명목가를 키우면 손실만 커진다.
+
+### 3.9 레버리지는 결과값이지 입력값이 아니다
+
+```
+effective_leverage = actual_notional / equity          # 계좌 전체 기준 (보고용)
+exchange_leverage  = ceil(notional / margin_cap)       # 거래소 설정값 (정수)
+```
+
+거래소 레버리지 설정은 **"허용 상한"** 일 뿐 사이징에 쓰지 않는다.
+포지션 진입 전에 `POST /fapi/v1/leverage` 로 설정하며, **설정 실패 시 진입하지 않는다.**
+포지션 보유 중에는 변경이 제한되므로 반드시 진입 전에 수행한다.
+
+### 3.10 size_multiplier — MVP 에서는 1.0 고정 (확정)
 
 가변 사이징은 [13-decisions.md](13-decisions.md) D1 에 따라 MVP 에서 제외되었다.
 구현은 남기되 기본값은 `1.0` 이다.
@@ -238,28 +475,69 @@ leverage_used = (qty * price) / equity      # 확정 설정에서는 항상 약 
 ```python
 # Phase 9 이후 A/B 검증 대상 (MVP 미사용)
 size_multiplier = clip(bias_multiplier * confidence_factor * risk_factor, 0.25, 1.0)
+max_loss = equity * RISK_PER_TRADE * size_multiplier
 ```
 
-### 3.4 변동성 적응 부재에 대한 보완
-
-고정 비율 명목가는 변동성에 적응하지 않는다. 같은 10% 명목가라도 고변동 국면에서는
-저변동 국면보다 몇 배 큰 손익 변동을 만든다.
-
-→ **변동성 게이트 G5.1 / G5.2 가 유일한 적응 장치**가 되므로 중요도가 올라간다.
-→ 임계값(상한 98% / 하한 5%)을 Phase 4 백테스트에서 국면별 성과와 함께 재검토한다.
-→ 향후 선택지: `vol_target` 오버레이 (명목가를 ATR 백분위로 ±50% 조정). Phase 9 이후.
-
-### 3.5 Stop / Take Profit / Trailing
+### 3.11 Stop / Take Profit / Trailing
 
 | 항목 | 설계 |
 |---|---|
-| Stop Loss | 진입 즉시 거래소에 `STOP_MARKET` + `closePosition=true`, `workingType=MARK_PRICE`. 진입가 대비 **-10%** (확정) |
-| Take Profit | `TAKE_PROFIT_MARKET` + `closePosition=true`. 손절폭이 고정이므로 **% 기준** (잠정 +5%, Phase 4에서 결정) |
-| Trailing | **MVP 제외.** 거래소 `TRAILING_STOP_MARKET` 대신 우리가 스톱을 갱신하는 방식을 권장 (백테스트 재현 가능하므로). Phase 9+ |
-| 손익분기 이동 | 1R 도달 시 스톱을 진입가 + 비용으로 이동 — 선택적, config |
+| Stop Loss | 진입 체결 즉시 `STOP_MARKET` + `closePosition=true`, `workingType=MARK_PRICE`. **전략이 정한 가격** |
+| Take Profit | `TAKE_PROFIT_MARKET` + `closePosition=true`. **R 배수 기준** (손절폭이 가변이므로). 기본 2R |
+| Trailing | **MVP 제외.** Phase 14 |
+| 최대 보유시간 | 48시간 초과 시 강제 청산 (G4.9) |
 
-SL/TP 를 둘 다 `closePosition=true` 로 걸면 한쪽 체결 후 다른 쪽이 자동 취소되지 않는 경우가 있다.
-→ 포지션이 FLAT이 되면 해당 심볼의 잔여 reduce-only 주문을 **명시적으로 취소**한다 (INV-5 보호).
+> 손절폭이 가변이 되었으므로 익절도 **% 고정이 아니라 R 배수**로 되돌린다.
+> 2% 손절이면 익절 +4%, 5% 손절이면 익절 +10%. 일관된 손익비가 유지된다.
+
+### 3.12 기록 항목
+
+진입 직전 아래 값을 `decisions.sizing_json` 에 저장하고, 체결 후 `positions` 에 반영한다.
+Telegram 진입 알림에도 요약을 포함한다.
+
+```json
+{
+  "account_equity": "1000.00",
+  "risk_per_trade": "0.01",
+  "max_loss": "10.00",
+  "entry_price": "100000",
+  "stop_price": "98000",
+  "stop_distance_pct": "0.02",
+  "stop_source": "swing_low",
+  "stop_widened": false,
+  "cost_rate_in": "0.00065",
+  "cost_rate_out": "0.00085",
+  "expected_funding_rate": "0.0000",
+  "target_notional": "464.75",
+  "actual_notional": "464.00",
+  "qty": "0.00464",
+  "margin_cap": "100.00",
+  "margin_allocated": "92.80",
+  "exchange_leverage": 5,
+  "effective_leverage": "0.464",
+  "estimated_loss_at_stop": "9.97",
+  "liquidation_price": "80320",
+  "liq_distance_pct": "0.1968",
+  "liq_buffer_ratio": "9.84",
+  "leverage_capped": false,
+  "rounding_error": "0.0016",
+  "risk_approved": true,
+  "veto_reasons": []
+}
+```
+
+우리 스키마 대응 (03-data-model.md):
+
+| 저장 위치 | 항목 |
+|---|---|
+| `decisions.sizing_json` (신규 컬럼) | 위 JSON 전체 |
+| `positions.planned_risk_usdt` | `estimated_loss_at_stop` |
+| `positions.initial_stop_price` | `stop_price` |
+| `positions.leverage_used` | `exchange_leverage` |
+| `trades.realized_r` | `net_pnl / planned_risk_usdt` — 손절폭이 가변이므로 **R 배수가 유일하게 비교 가능한 척도** |
+
+> D4 에서 `realized_r_stop` / `realized_r_atr` 을 나눠 기록하기로 했던 것은 **철회**한다.
+> 손절폭이 전략적으로 결정되므로 `planned_risk_usdt` 하나로 R 이 제대로 정의된다.
 
 ---
 
@@ -310,39 +588,62 @@ drawdown_pct = (equity_high_water - current_equity) / equity_high_water
 
 ## 6. 확정 설정값 (config/base.yaml)
 
-> **확정 출처**: [13-decisions.md](13-decisions.md) D2 / D4. `[확정]` 표시가 없는 값은 잠정 초안이다.
+> **확정 출처**: [13-decisions.md](13-decisions.md) D2 / **D9**. `[확정]` 표시가 없는 값은 잠정 초안이다.
 
 ```yaml
 risk:
-  sizing_mode: "fixed_notional_pct"   # [확정]
-  position_notional_pct: 0.10         # [확정] 명목가 = equity * 10%
-  stop_loss_pct: 0.10                 # [확정] 진입가 대비 -10%
-  # -> 거래당 최대 손실 = equity * 1.0%
-
-  max_leverage: 1.0                   # [확정] 설계는 0.1x, 상한은 1.0 으로 방어
-  max_notional_multiple: 0.15         # [확정]
+  # --- 사이징 (D9: 손절 우선, 레버리지는 결과값) --------------------------
+  sizing_mode: "risk_based"           # [확정] D4 의 fixed_notional_pct 를 대체
+  risk_per_trade: 0.01                # [확정] 거래당 최대 손실 = equity * 1%
+  margin_allocation: 0.10             # [확정] 증거금 "상한" (목표 아님, §3.3)
+  max_leverage: 5                     # [확정] Phase 8 에서는 3 으로 시작 (§3.8)
+  min_stop_distance: 0.02             # [확정] §3.6 에서 역산된 값. 임의값 아님
   max_rounding_error: 0.05            # [확정] 초과 시 SIZING_RESOLUTION veto
+  liquidation_safety_buffer: 2.0      # [확정] 청산거리 >= 2 x 손절거리
 
+  leverage_limit_action: "REDUCE_POSITION"   # REDUCE_POSITION | SKIP_TRADE
+  tight_stop_action: "WIDEN"                 # WIDEN | SKIP
+
+  # --- 손절 위치 규칙 (§3.1) ---------------------------------------------
+  stop:
+    mode: "structure_or_atr"
+    atr_timeframe: "1h"
+    atr_period: 14
+    atr_multiple: 1.5
+    swing_buffer_atr: 0.2
+    pick: "wider"                 # wider | tighter
+
+  # 명목가 상한 = margin_allocation * max_leverage = equity 의 50%
+  # 이 값이 갭·슬리피지 꼬리위험의 실질적 상한이다 (§3.8)
+
+  # --- 비용 추정 (사이징 공식의 입력) -------------------------------------
+  cost:
+    taker_fee_rate: 0.00045           # 거래소 API 로 갱신. 하드코딩 아님
+    maker_fee_rate: 0.00020
+    slippage_entry_rate: 0.00020      # Phase 8 실측으로 보정
+    slippage_stop_multiple: 2.0       # 스톱은 유동성 공백에서 체결되므로 가중
+    include_funding: true
+
+  # --- 손실 한도 ----------------------------------------------------------
   daily_loss_limit_pct: 0.02          # [확정] 손절 2회분
   max_drawdown_pct: 0.10              # [확정] 누적 DD -> HALTED
   consecutive_loss_limit: 4
   cooldown_after_losses_min: 240
 
+  # --- 거래 빈도 / 보유 ---------------------------------------------------
   daily_trade_limit: 2                # [확정] 보유기간 2~24h 와 정합
   min_hold_minutes: 120               # [확정]
   reentry_cooldown_minutes: 60        # [확정]
   max_holding_hours: 48               # [확정] 2차 탈출 경로 (G4.9)
   same_direction_limit: 2
-
-  liquidation_buffer_multiple: 2.0
   max_unprotected_ms: 5000
 
   take_profit:
     enabled: true
-    mode: "pct"                       # [확정] R배수 대신 % (손절폭 고정이므로)
-    take_profit_pct: 0.05             # 잠정 — Phase 4 에서 결정
+    mode: "r_multiple"                # [확정] 손절폭이 가변이므로 R 배수 (§3.11)
+    r_multiple: 2.0                   # 잠정 — Phase 4 에서 결정
 
-  volatility_gate:                    # 고정 사이징이라 중요도 높음 (§3.4)
+  volatility_gate:
     atr_pct_upper: 0.98
     atr_pct_lower: 0.05
     lookback_days: 365
@@ -357,13 +658,25 @@ risk:
     mode: "block_entries"             # block_entries | flatten
 
   # MVP 미사용 (구현은 유지, Phase 9+ A/B 대상)
-  risk_based:
+  fixed_notional:
     enabled: false
-    risk_per_trade_pct: 0.005
-    k_atr: 2.0
-    atr_timeframe: "1h"
-    min_stop_bps: 15
+    position_notional_pct: 0.10
 ```
+
+### 설정 정합성 검증 (기동 시 강제)
+
+`config/schema.py` 는 값의 범위뿐 아니라 **파라미터 간 관계**를 검증한다 (§3.6).
+
+```python
+implied_min_stop = risk_per_trade / (margin_allocation * max_leverage) - (c_in + c_out)
+# 0.01 / (0.10 * 5) - 0.0015 = 1.85%
+
+if min_stop_distance < implied_min_stop:
+    raise ConfigError(...)      # 레버리지 캡이 상시 발동하게 되는 설정
+```
+
+이 검증이 없으면 세 파라미터를 따로 바꿨을 때 **캡이 조용히 상시 발동**하여
+백테스트의 위험 분포가 왜곡된다. 설정 오타보다 발견하기 어려운 종류의 사고다.
 
 **`[확정]` 이 아닌 값들은 검증되지 않은 출발점이다.** 백테스트 결과로 리스크 한도를
 느슨하게 조정하는 것은 과최적화다. 조정은 오직 보수적인 방향으로만 한다.

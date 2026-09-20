@@ -1,7 +1,7 @@
 # 13 — Phase 0 확정 결정 기록
 
 확정일: 2026-09-20
-상태: **D1·D2·D4·D6·D7·D8 확정 / D3·D5 보류**
+상태: **D1·D2·D6·D7·D8·D9 확정 / D3·D5 보류 / D4 는 D9 로 대체**
 
 이 문서가 Phase 1 이후 구현의 기준이다. 여기 없는 것은 확정되지 않은 것이다.
 
@@ -51,13 +51,18 @@
 
 Phase 1~4(데이터 · 전략코어 · 백테스트 · 검증)는 자본 규모와 무관하게 진행한다.
 
-### Phase 8 착수 전에 확인해야 할 최소 자본 (D4 확정값 기준)
+### Phase 8 착수 전에 확인해야 할 최소 자본 (**D9** 기준)
 
-명목가 = equity × 10% 이므로, 거래소 제약을 만족하려면:
+D9 에서 명목가는 손절폭에 따라 달라지므로, **가장 불리한 경우(넓은 손절)** 로 계산한다.
+손절폭 10% 일 때 명목가가 가장 작아진다 (≈ equity × 10%):
 
 ```
 equity × 0.10  >=  max(min_notional, step_size × price)
 ```
+
+손절폭 2% 일 때는 명목가가 equity × 46% 이므로 제약이 훨씬 느슨하다.
+**좁은 손절만 잡히는 구간에서는 소액으로도 거래가 되지만, 넓은 손절이 나오면 주문이 거부된다.**
+이 비대칭이 조용한 사고가 되지 않도록 G4.10 `SIZING_RESOLUTION` 게이트가 잡는다.
 
 | 제약 | Binance BTCUSDT (런타임 조회) |
 |---|---|
@@ -77,7 +82,12 @@ BTC 가격이 높을수록 `step_size × price` 가 커져 필요 자본이 올�
 
 ---
 
-## D4. 리스크 한도 — 고정 비율 명목가 방식 ✅ 확정
+## D4. 리스크 한도 — 고정 비율 명목가 방식 ⚠️ **D9 로 대체됨**
+
+> **이 절의 사이징 방식은 [D9](#d9-포지션-사이징--손절-우선-레버리지는-결과값--확정-d4-사이징-방식을-대체) 로 대체되었다.**
+> 유지되는 것: **거래당 최대 손실 = equity 1%**, 계좌 누적 DD −10%, 일일 손실 2%.
+> 대체되는 것: 명목가 10% 고정 → 손절폭에서 역산. 손절 −10% 고정 → 전략이 결정.
+> 아래 내용은 판단 근거 보존을 위해 남긴다.
 
 ### 지정하신 값 (사용자 확인 완료)
 
@@ -283,6 +293,162 @@ class LLMProvider(Protocol):
 
 ---
 
+## D9. 포지션 사이징 — 손절 우선, 레버리지는 결과값 ✅ 확정 (D4 사이징 방식을 대체)
+
+### 결정
+
+레버리지를 먼저 고정하지 않는다. 다음 순서로 계산한다.
+
+```
+손절 위치 (전략이 결정)  →  허용 손실 (계좌 1%)  →  포지션 크기  →  필요 레버리지
+```
+
+| 파라미터 | 값 | 비고 |
+|---|---|---|
+| `risk_per_trade` | **0.01** | 거래당 최대 손실 = equity × 1% (**D4 와 동일, 변경 없음**) |
+| `margin_allocation` | **0.10** | 증거금 **상한** (목표 아님 — §D9-2) |
+| `max_leverage` | **5** | Phase 8 소액 실거래는 **3** 으로 시작 |
+| `min_stop_distance` | **0.02** | §D9-3 에서 **역산된** 값. 임의값 아님 |
+| `liquidation_safety_buffer` | **2.0** | 청산거리 ≥ 2 × 손절거리 |
+| `leverage_limit_action` | `REDUCE_POSITION` | 대안: `SKIP_TRADE` |
+| `tight_stop_action` | `WIDEN` | 대안: `SKIP` |
+
+명목가 공식 (비용 포함 닫힌 해):
+
+```
+N = L / [ s·(1 + c_out) + c_in + c_out + f ]
+
+L = equity × risk_per_trade     s = stop_distance_pct
+c_in  = taker_fee + slippage_entry
+c_out = taker_fee + slippage_stop        (스톱은 슬리피지 배수 적용)
+f     = 예상 funding (보유기간 기준)
+```
+
+거래소 레버리지 (정수):
+
+```
+exchange_leverage = max(1, ceil(N / (equity × margin_allocation)))
+margin_allocated  = N / exchange_leverage        # margin 상한 이하 보장
+```
+
+전체 설계: [05-risk-engine.md §3](05-risk-engine.md)
+
+### D4 와의 관계 — 폐기가 아니라 일반화
+
+D4 는 `명목가 = equity × 10%`, `손절 = 가격 −10%` 였다.
+D9 공식에 **손절폭 10% 를 넣으면 명목가 98.4 (≈ equity 10%), 레버리지 1x** 가 나온다.
+**즉 D4 는 D9 의 특수해다.** 거래당 위험 1% 도 동일하다.
+
+| | D4 (구) | D9 (신) |
+|---|---|---|
+| 거래당 최대 손실 | equity 1% | equity 1% (**동일**) |
+| 손절 위치 | 가격 −10% 고정 | **전략이 결정** (스윙/ATR/피보나치 등) |
+| 명목가 | equity 10% 고정 | 손절폭에서 역산 (최대 equity 50%) |
+| 레버리지 | 0.1x | 1x ~ 5x (결과값) |
+| 익절 | +5% 고정 | **2R** (손절폭 가변이므로) |
+| 손절의 역할 | 파국 방지 backstop (거의 미발동) | **실제 리스크 통제 수단** |
+
+### D9 채택으로 바뀌는 것 3가지
+
+#### 1. 손절이 실제로 작동하기 시작한다
+
+D4 의 −10% 손절은 2~24시간 보유에서 거의 발동하지 않아, 실질 손실 통제를 청산 신호와
+`max_holding_hours` 가 담당했다. D9 에서는 손절폭이 2~5% 수준이 되므로 **손절이 주 탈출 경로**가 된다.
+
+→ `max_holding_hours = 48` 은 유지한다 (3차 방어선).
+→ 백테스트에서 `close_reason` 분포가 D4 가정과 크게 달라진다. Phase 4 에서 재확인 필요.
+
+#### 2. 명목가가 커져 슬리피지 꼬리위험이 확대된다
+
+```
+스톱을 5% 지나쳐 체결된 경우의 추가 손실
+  D4 (명목가  98 = equity 10%):   4.9 USDT  (equity 0.5%)
+  D9 (명목가 465 = equity 46%):  23.3 USDT  (equity 2.3%)   ← 4.7배
+```
+
+"1% 손실"은 **목표이지 보장이 아니다.** `STOP_MARKET` 은 시장가 체결이다.
+→ 그래서 Phase 8 은 `max_leverage = 3` 으로 시작하고, 실측 슬리피지 확인 후 Phase 9 에서 5 로 올린다.
+
+#### 3. R 배수가 제대로 정의된다
+
+손절폭이 전략적으로 결정되므로 `planned_risk_usdt = estimated_loss_at_stop` 이 의미를 갖는다.
+→ D4 에서 `realized_r_stop` / `realized_r_atr` 로 나눠 기록하기로 한 것은 **철회**한다.
+→ `trades.realized_r` 하나로 충분하며, 이것이 사이징과 무관하게 전략을 평가하는 유일한 척도다.
+
+### 설계 검토에서 정정한 사항 4가지
+
+원안(GPT 논의안)에서 수학적·실무적으로 바로잡은 부분이다.
+
+| # | 원안 | 정정 | 이유 |
+|---|---|---|---|
+| 1 | `MARGIN_ALLOCATION` = 한 거래에 쓰는 증거금 비율 | **증거금 상한**으로 재정의 | 증거금은 손실 크기를 결정하지 않는다. 청산가 거리만 결정한다 |
+| 2 | `Position Notional = Max Loss / Stop Distance` | `N = L / [s(1+c_out) + c_in + c_out + f]` | 청산 수수료는 *청산 시점* 명목가에 부과된다. 단순식은 예산을 7.5% 초과한다 |
+| 3 | `Required Leverage = N / Margin` 후 상한 검증 | `exchange_leverage = ceil(N / margin_cap)` | 거래소 레버리지는 정수다. 내림하면 증거금 상한을 넘는다 |
+| 4 | `MIN_STOP_DISTANCE = 0.005` (예시) | **0.02** + 설정 정합성 검증 | 0.5% 손절은 비용이 위험예산의 23%. 또한 §D9-3 참조 |
+
+### D9-2. 증거금은 손실을 제한하지 않는다 (개념 정정)
+
+| 개념 | 무엇을 결정하나 |
+|---|---|
+| `position_notional` | **손실과 비용**. 손절 시 손실 = 명목가 × 손절폭 |
+| `margin` | **청산가까지의 거리**. 손실 크기와 **무관** |
+| `leverage` | 위 둘의 비율. 입력이 아니라 **결과** |
+
+증거금이 많을수록(레버리지가 낮을수록) 청산가가 멀어져 안전하다.
+따라서 `margin_allocation` 은 "목표"가 아니라 "상한"이며, **상한 안에서 최대한 많이** 넣는다.
+
+### D9-3. ⚠ 세 파라미터는 독립적이지 않다
+
+```
+명목가 상한 = margin_allocation × max_leverage × equity = equity의 50%
+
+레버리지 상한에 걸리기 시작하는 손절폭:
+  s* = risk_per_trade / (margin_allocation × max_leverage) − (c_in + c_out)
+     = 0.01 / 0.50 − 0.0015 = 1.85%
+```
+
+**손절폭이 1.85% 보다 좁으면 레버리지 캡에 무조건 걸린다.**
+그러면 `REDUCE_POSITION` 이 상시 발동해 체계적으로 예산보다 적게 위험을 지고,
+백테스트의 R 분포가 왜곡되어 전략 평가가 어려워진다.
+
+→ **`min_stop_distance = 2%` 는 여기서 역산된 값이다.**
+
+| 원하는 최소 손절폭 | 필요한 `max_leverage` (margin 10% 기준) |
+|---|---|
+| 3% | 3.3 이상 |
+| **2% (확정)** | **5 이상** |
+| 1% | 10 이상 |
+| 0.5% | 20 이상 |
+
+`config/schema.py` 가 기동 시 이 관계를 검증하고, 불일치하면 **기동을 중단**한다.
+값 범위 검증만으로는 잡히지 않는 종류의 설정 사고이기 때문이다.
+
+### 손절폭별 사이징 (equity 1,000 / risk 1%)
+
+| 손절폭 | 명목가 | 계좌대비 | 레버리지 | 왕복비용 | 비용/예산 | 캡 |
+|---|---|---|---|---|---|---|
+| 0.5% | 1,537 | 154% | 16x | 2.30 | **23.0%** | 걸림 |
+| 1.0% | 869 | 87% | 9x | 1.30 | **13.0%** | 걸림 |
+| 1.5% | 606 | 61% | 7x | 0.90 | 9.0% | 걸림 |
+| **2.0%** | **465** | **46%** | **5x** | **0.69** | **6.9%** | — |
+| 3.0% | 317 | 32% | 4x | 0.47 | 4.7% | — |
+| 5.0% | 194 | 19% | 2x | 0.28 | 2.8% | — |
+| 10.0% | 98 | 10% | 1x | 0.14 | 1.4% | — (= D4) |
+
+**좁은 손절은 비싸다.** 같은 1% 위험을 지면서 비용만 늘어난다.
+
+### 구현 범위 (Phase 2)
+
+- `risk/sizing.py` — `PositionSizingEngine` (순수 함수)
+- `risk/gates.py` — G4.11 `INVALID_STOP`, G4.12 `STOP_TOO_TIGHT` 추가
+- `core/types.py` — `SizingPlan` 불변 타입 (13-decisions D9 §기록 항목)
+- `config/schema.py` — 파라미터 정합성 검증
+- `storage/` — `decisions.sizing_json` 컬럼 추가
+- 단위 테스트: 닫힌 해 검산, 캡 동작, 청산 안전성, 반올림, 경계값
+
+
+---
+
 ## D5. 실패 시 중단 기준 — 미정 ⏸
 
 [12-critique.md](12-critique.md) §14 Q7 미답변.
@@ -310,10 +476,16 @@ strategy:
   evaluation_interval: 1m
   target_holding: "2h~24h"          # D2
 
-risk:
-  sizing_mode: fixed_notional_pct   # D4
-  position_notional_pct: 0.10
-  stop_loss_pct: 0.10
+risk:                               # D9 (D4 사이징 대체)
+  sizing_mode: risk_based
+  risk_per_trade: 0.01              # 거래당 최대 손실 = equity 1%
+  margin_allocation: 0.10           # 증거금 "상한"
+  max_leverage: 5                   # Phase 8 은 3
+  min_stop_distance: 0.02           # 정합성에서 역산
+  liquidation_safety_buffer: 2.0
+  leverage_limit_action: REDUCE_POSITION
+  tight_stop_action: WIDEN
+  take_profit: {mode: r_multiple, r_multiple: 2.0}
   max_drawdown_pct: 0.10
   daily_loss_limit_pct: 0.02
   daily_trade_limit: 2

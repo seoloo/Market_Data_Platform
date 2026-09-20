@@ -37,10 +37,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 1 | 프로젝트 스캐폴딩 (pyproject, ruff, mypy, pytest, pre-commit, CI, import-linter) | ✅ 완료 |
 | 2 | `core/` — enums / errors / money / clock / hashing / types | ✅ 완료 |
 | 3 | 아키텍처 테스트 (Pure Core 경계 AST 검사) | ✅ 완료 |
-| 4 | **`config/` — pydantic 스키마 + yaml 로더 + 해시 + config_versions** | ⬅️ **다음** |
+| 4 | **`config/` — pydantic 스키마 + yaml 로더 + 해시 + config_versions**<br>D9 파라미터 정합성 검증 포함 | ⬅️ **다음** |
 | 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository | 대기 |
 | 6 | `marketdata/backfill.py` — 과거 캔들/funding 수집 | 대기 |
 | 7 | `marketdata/integrity.py` — 갭·중복·이상치 검증 | 대기 |
+| 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
 
 ---
 
@@ -102,9 +103,12 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 지표 | **5개** 고정, 등가중 (B1 4h추세, B2 1h변동성, T1 15m RSI, T2 5m모멘텀, T3 5m거래량) |
 | 구조 | Bias 게이트 × Trigger 타이밍 (곱셈) |
 | 보유기간 | 2~24시간 / 최대 48h 강제청산 |
-| 매매 금액 | 총액의 **10%** |
-| 손절 | 진입가 −**10%** (= 총액의 1%) |
-| 익절 | 진입가 +5% (잠정) |
+| **거래당 최대 손실** | **총액의 1%** (D9 — 이것이 기준) |
+| 사이징 | 손절 우선 역산 `N = L / [s(1+c_out)+c_in+c_out+f]` |
+| 손절 위치 | 전략 결정 (스윙/ATR 중 더 먼 쪽), 최소 **2%** |
+| 증거금 상한 | 총액의 **10%** |
+| 레버리지 | 자동 계산, 최대 **5x** (Phase 8 은 3x) |
+| 익절 | **2R** |
 | 하루 거래 | 최대 **2회** |
 | 일일 손실 한도 | 총액 2% |
 | 누적 DD 한도 | −10% → HALTED |
@@ -119,8 +123,9 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 1 | 검증할 시장 가설 1문장 확정 (작업 가설 잠정 채택) | 사용자 | **Phase 2** (Phase 1 은 무관) |
 | 2 | 운용 자본 규모 (D3) | 사용자 | Phase 8 착수 |
 | 3 | 중단 기준 — 가설 몇 개 실패 시 재검토 (D5) | 사용자 | Phase 4 |
-| 4 | `take_profit_pct` 5% 는 잠정값 | Phase 4에서 결정 | — |
-| 5 | 슬리피지 모델 계수 | Phase 8 실측으로 보정 | — |
+| 4 | `take_profit.r_multiple` 2.0 은 잠정값 | Phase 4에서 결정 | — |
+| 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
+| 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 
 ---
 
@@ -187,6 +192,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-20 | Claude Opus 5 | 1 | core 모듈 6종 + 테스트 159건 (coverage 93%) | 완료 |
 | 2026-09-20 | Claude Opus 5 | 1 | Pure Core AST 아키텍처 테스트. 위반 주입으로 탐지 동작 확인 | 완료 |
 | 2026-09-20 | Claude Opus 5 | 1 | 커밋 제안 형식을 GitHub Desktop 기준(파일 목록)으로 변경 | 완료 |
+| 2026-09-20 | Claude Opus 5 | 0 | 사이징 방식 재설계 검토 후 D9 확정 (D4 사이징 대체). 05/13/CATALOG 갱신 | D9 확정 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
