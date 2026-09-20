@@ -343,7 +343,7 @@ effective_leverage = position_notional / equity            # 계좌 전체 기�
 ### 3.4 상한 검증
 
 ```python
-if exchange_leverage > MAX_LEVERAGE:                 # 확정 5
+if exchange_leverage > MAX_LEVERAGE:                 # 확정 10
     if LEVERAGE_LIMIT_ACTION == "REDUCE_POSITION":   # 기본
         position_notional = margin_cap * MAX_LEVERAGE
         exchange_leverage = MAX_LEVERAGE
@@ -677,6 +677,15 @@ risk:
   max_holding_hours: 48               # [확정] 2차 탈출 경로 (G4.9)
   same_direction_limit: 2
   max_unprotected_ms: 5000
+
+  # --- 하드 게이트 임계값 (G2/G3/G5) ------------------------------------
+  margin_availability_buffer: 1.5
+  max_spread_bps: 5
+  max_price_divergence_bps: 50
+  recent_spike_window_min: 3
+  recent_spike_pct: 0.03
+  extreme_funding_rate: 0.001
+  funding_imminent_min: 5
 
   take_profit:
     enabled: true

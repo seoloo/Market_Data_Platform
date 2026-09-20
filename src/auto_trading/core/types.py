@@ -41,6 +41,7 @@ __all__ = [
     "PositionSnapshot",
     "RiskVerdict",
     "ScoreSet",
+    "SizingPlan",
     "TimeframeSeries",
 ]
 
@@ -541,6 +542,113 @@ class RiskVerdict:
 
 
 @dataclass(frozen=True, slots=True)
+class SizingPlan:
+    """D9 손절 우선 사이징의 확정 결과.
+
+    모든 금액·수량·비율은 ``Decimal`` 이다. 목표값뿐 아니라 거래소 수량 단위로
+    내림한 실제값을 함께 보존해야 백테스트와 실거래를 같은 입력으로 재현할 수 있다.
+    """
+
+    account_equity: Decimal
+    risk_per_trade: Decimal
+    max_loss: Decimal
+    entry_price: Decimal
+    stop_price: Decimal
+    stop_distance_pct: Decimal
+    stop_source: str
+    stop_widened: bool
+    cost_rate_in: Decimal
+    cost_rate_out: Decimal
+    expected_funding_rate: Decimal
+    target_notional: Decimal
+    actual_notional: Decimal
+    qty: Decimal
+    margin_cap: Decimal
+    margin_allocated: Decimal
+    exchange_leverage: int
+    effective_leverage: Decimal
+    estimated_loss_at_stop: Decimal
+    liquidation_price: Decimal
+    liq_distance_pct: Decimal
+    liq_buffer_ratio: Decimal
+    leverage_capped: bool
+    rounding_error: Decimal
+
+    def __post_init__(self) -> None:
+        positive = (
+            "account_equity",
+            "risk_per_trade",
+            "max_loss",
+            "entry_price",
+            "stop_price",
+            "stop_distance_pct",
+            "target_notional",
+            "actual_notional",
+            "qty",
+            "margin_cap",
+            "margin_allocated",
+        )
+        for name in positive:
+            value: Decimal = getattr(self, name)
+            if value <= ZERO:
+                raise DataIntegrityError(f"SizingPlan.{name} 가 0 이하: {value}")
+        non_negative = (
+            "cost_rate_in",
+            "cost_rate_out",
+            "expected_funding_rate",
+            "effective_leverage",
+            "estimated_loss_at_stop",
+            "liquidation_price",
+            "liq_distance_pct",
+            "liq_buffer_ratio",
+            "rounding_error",
+        )
+        for name in non_negative:
+            value = getattr(self, name)
+            if value < ZERO:
+                raise DataIntegrityError(f"SizingPlan.{name} 가 음수: {value}")
+        if self.exchange_leverage < 1:
+            raise DataIntegrityError(
+                f"SizingPlan.exchange_leverage 가 1 미만: {self.exchange_leverage}"
+            )
+        if self.actual_notional > self.target_notional:
+            raise DataIntegrityError("수량 내림 후 actual_notional 이 target_notional 을 초과했다")
+        if self.estimated_loss_at_stop > self.max_loss:
+            raise DataIntegrityError(
+                "예상 손절 손실이 위험 예산을 초과했다: "
+                f"{self.estimated_loss_at_stop} > {self.max_loss}"
+            )
+
+    def to_digest_dict(self) -> dict[str, Any]:
+        return {
+            "equity": self.account_equity,
+            "risk_pct": self.risk_per_trade,
+            "max_loss": self.max_loss,
+            "entry": self.entry_price,
+            "stop": self.stop_price,
+            "stop_pct": self.stop_distance_pct,
+            "stop_source": self.stop_source,
+            "stop_widened": self.stop_widened,
+            "cost_in": self.cost_rate_in,
+            "cost_out": self.cost_rate_out,
+            "funding": self.expected_funding_rate,
+            "target_notional": self.target_notional,
+            "actual_notional": self.actual_notional,
+            "qty": self.qty,
+            "margin_cap": self.margin_cap,
+            "margin": self.margin_allocated,
+            "exchange_leverage": self.exchange_leverage,
+            "effective_leverage": self.effective_leverage,
+            "loss_at_stop": self.estimated_loss_at_stop,
+            "liquidation_price": self.liquidation_price,
+            "liq_distance_pct": self.liq_distance_pct,
+            "liq_buffer_ratio": self.liq_buffer_ratio,
+            "leverage_capped": self.leverage_capped,
+            "rounding_error": self.rounding_error,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
     """한 번의 평가 결과. 주문 여부와 무관하게 **항상** 기록된다 (AGENTS.md §3.7)."""
 
@@ -553,6 +661,7 @@ class Decision:
     veto_reasons: tuple[VetoReason, ...] = ()
     intents: tuple[Intent, ...] = ()
     components: tuple[Component, ...] = ()
+    sizing: SizingPlan | None = None
     expected_edge_bps: float | None = None
     expected_cost_bps: float | None = None
     required_edge_bps: float | None = None
@@ -580,6 +689,7 @@ class Decision:
             "scores": self.scores,
             "vetoes": sorted(r.value for r in self.veto_reasons),
             "intents": list(self.intents),
+            "sizing": self.sizing,
             "edge": self.expected_edge_bps,
             "cost": self.expected_cost_bps,
             "required": self.required_edge_bps,

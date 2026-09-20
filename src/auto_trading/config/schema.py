@@ -251,6 +251,15 @@ class RiskConfig(_Base):
     same_direction_limit: int = Field(default=2, ge=1, le=50)
     max_unprotected_ms: int = Field(default=5000, ge=100, le=60_000)
 
+    # --- 하드 게이트 임계값 ---
+    margin_availability_buffer: Rate = Field(default=Decimal("1.5"), ge=1, le=10)
+    max_spread_bps: Rate = Field(default=Decimal("5"), gt=0, le=1000)
+    max_price_divergence_bps: Rate = Field(default=Decimal("50"), gt=0, le=5000)
+    recent_spike_window_min: int = Field(default=3, ge=1, le=1440)
+    recent_spike_pct: Rate = Field(default=Decimal("0.03"), gt=0, le=1)
+    extreme_funding_rate: Rate = Field(default=Decimal("0.001"), gt=0, le=Decimal("0.1"))
+    funding_imminent_min: int = Field(default=5, ge=0, le=480)
+
     volatility_gate: VolatilityGateConfig = Field(default_factory=VolatilityGateConfig)
     blackout: dict[str, BlackoutWindow] = Field(default_factory=dict)
     killswitch: KillswitchConfig = Field(default_factory=KillswitchConfig)

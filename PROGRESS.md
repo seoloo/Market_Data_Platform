@@ -4,8 +4,8 @@
 > 대화 기록은 사라지지만 이 파일은 남는다. 여기 없는 것은 진행되지 않은 것이다.
 
 **최종 갱신**: 2026-09-21
-**갱신자**: Claude Opus 5
-**저장소 상태**: b2794da (Phase 0 문서) + 미커밋 작업물 (Phase 1 스캐폴딩 + core)
+**갱신자**: Codex
+**저장소 상태**: bcc9bb0 + 미커밋 작업물 (Phase 2 risk 사이징·게이트)
 
 ---
 
@@ -14,7 +14,7 @@
 ```
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
-Phase 2 — 전략코어 ████████░░░░░░░░░░░░  40%  ← 여기
+Phase 2 — 전략코어 ████████████░░░░░░░░  60%  ← 여기
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -30,7 +30,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 ## ➡️ 다음 작업
 
-**Phase 1 — 기반 구축 진행 중**
+**Phase 2 — 전략 코어 진행 중**
 
 | 순서 | 작업 | 상태 |
 |---|---|---|
@@ -45,8 +45,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 9 | (Phase 2) `features/normalize.py` — causal z-score / percentile | ✅ 완료 |
 | 10 | (Phase 2) `features/` 지표 5종 (B1/B2/T1/T2/T3) | ✅ 완료 |
 | 11 | (Phase 2) `features/structure.py` — ZigZag 스윙 (repainting 차단) | ✅ 완료 |
-| 12 | **(Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py`** | ⬅️ **다음** |
-| 13 | (Phase 2) `strategy/` bias·trigger·scoring·policy·cost + `decide()` | 대기 |
+| 12 | (Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py` | ✅ 완료 |
+| 13 | **(Phase 2) `strategy/` bias·trigger·scoring·policy·cost + `decide()`** | ⬅️ **다음** |
 | 14 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
@@ -128,11 +128,16 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/features/volume.py` | **T3** 5m 거래량 확인 계수 (곱셈) |
 | `src/auto_trading/features/structure.py` | ZigZag 스윙. **`confirmed_at_ms` 로 repainting 차단** |
 | `tests/features/test_indicators.py` + `test_features.py` + `test_structure.py` | 164건 |
+| `src/auto_trading/risk/sizing.py` | D9 비용 포함 닫힌 해, 스윙/ATR 손절 선택, 수량 내림·레버리지 올림·청산 안전성 |
+| `src/auto_trading/risk/gates.py` | G1~G7 전체 veto 수집, 안전 방향 우회, 최대 보유시간 강제청산 트리거 분리 |
+| `src/auto_trading/core/types.py` | `SizingPlan` 불변 기록 타입 추가 |
+| `tests/risk/` | 사이징·게이트 통과/경계/거부 및 장애 주입 80건 |
 
 **실데이터 검증 (2026-09-19 기준)**: b1_trend=+2.43(ATR배수) · b2_volregime=0.179(백분위)
 · t1_pullback RSI=49.6 · t2_momentum z=+0.58 · t3_volume=0.60
 
-**검증 결과**: 609 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 96%
+**검증 결과**: 689 passed · leakage 9 passed · mypy strict 0 errors · ruff clean
+· import-linter 4 contracts kept · coverage 95%
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
 · 3%→13.6h(94h) · 5%→38.3h(219h). 최근 구조 라벨 `HH/HL` (b1_trend +2.43 과 일치)
@@ -181,6 +186,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 8 | **스윙 확정지연(평균 6.3h)으로 구조적 손절이 사실상 항상 채택됨**<br>실제 손절폭 2~4%, `min_stop_distance` 1% 는 거의 미발동, 실효 레버리지 5x 내외 | Phase 4에서 의도 확인 | — |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
+| 9 | 로컬 `.venv` 가 제거된 Python 3.14 경로를 가리켜 실행 불가 | 개발 환경 재생성 필요 | 다음 로컬 검증 |
 
 ---
 
@@ -268,6 +274,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 2 | indicators (SMA/EMA/ATR/RSI) + 지표 5종 + 테스트 132건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 2 | **B1 정규화 결함 발견·수정**: z-score 는 지속 추세에서 0 수렴 → ATR 단위로 변경 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 2 | structure.py ZigZag 스윙 + repainting 차단 테스트 32건 | 완료 |
+| 2026-09-21 | Codex | 2 | D9 PositionSizingEngine + G1~G7 리스크 게이트 + 테스트 80건 | 완료 |
+| 2026-09-21 | Codex | 2 | causal/repainting 테스트 9건에 leakage marker 연결 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

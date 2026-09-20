@@ -68,6 +68,15 @@ risk:
   same_direction_limit: 2
   max_unprotected_ms: 5000          # 초과 시 포지션 강제 청산
 
+  # --- 하드 게이트 임계값 (G2/G3/G5) -----------------------------------
+  margin_availability_buffer: 1.5   # 필요 증거금 대비 가용잔고 여유
+  max_spread_bps: 5                 # G2.5
+  max_price_divergence_bps: 50      # G2.6 mark-last 괴리
+  recent_spike_window_min: 3        # G5.3 입력 변화율의 관측 창
+  recent_spike_pct: 0.03            # G5.3
+  extreme_funding_rate: 0.001       # G5.4, 0.1% / 8h
+  funding_imminent_min: 5           # G5.5
+
   # --- 변동성 게이트 (G5.1 / G5.2) ---------------------------------------
   volatility_gate:
     enabled: true

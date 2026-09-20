@@ -517,9 +517,9 @@ python -m auto_trading.backtest --config config/base.yaml --disable t3_volume --
 | 하고 싶은 것 | 고칠 곳 |
 |---|---|
 | 한 거래 손실 한도 바꾸기 | `config/base.yaml` → `risk.risk_per_trade` (기본 0.01 = 1%) |
-| 레버리지 상한 바꾸기 | `risk.max_leverage` (기본 5). **`min_stop_distance` 와 함께 바꿔야 함** |
+| 레버리지 상한 바꾸기 | `risk.max_leverage` (기본 10). **`min_stop_distance` 와 함께 바꿔야 함** |
 | 증거금 상한 바꾸기 | `risk.margin_allocation` (기본 0.10) |
-| 최소 손절폭 바꾸기 | `risk.min_stop_distance` (기본 0.02) |
+| 최소 손절폭 바꾸기 | `risk.min_stop_distance` (기본 0.01) |
 | 익절 배수 바꾸기 | `risk.take_profit.r_multiple` (기본 2.0) |
 | 진입을 더 까다롭게 | `policy.long_entry_threshold` 를 70 → 75 |
 | 거래를 더 자주 | `risk.daily_trade_limit`, `risk.min_hold_minutes` |
