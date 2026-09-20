@@ -1,0 +1,16 @@
+# 개발은 Windows, 운영은 Linux. 저장소 안에서는 항상 LF 로 통일한다.
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.sql   text eol=lf
+*.sh    text eol=lf
+
+*.parquet binary
+*.zip     binary
+*.png     binary
+*.db      binary
