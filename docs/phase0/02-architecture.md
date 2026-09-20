@@ -98,6 +98,15 @@ L2가 핵심이다. 로컬 손절 로직만 있으면 프로세스 사망 = 무�
 **Watchdog** 은 위 그림 밖의 별도 프로세스로, DB 하트비트와 거래소 포지션을 독립적으로 조회하여
 "OPEN 포지션인데 보호주문 없음", "메인 프로세스 무응답" 등을 감지한다.
 
+**Dashboard** 도 별도 프로세스다. DB 를 **읽기 전용**(`mode=ro`)으로만 열고
+`127.0.0.1` 에만 바인딩하며, 쓰기 엔드포인트가 하나도 없다 (D10 / [14](14-ui-and-packaging.md)).
+
+```
+  매매 프로세스 ──write──▶  SQLite (WAL)  ◀──read only──  대시보드 프로세스
+       ▲                         ▲                              │
+       └──── 워치독이 감시 ───────┘                        브라우저(localhost)
+```
+
 ---
 
 ## 3. 데이터 흐름 (C)
@@ -189,6 +198,7 @@ for bar_close_ts in timeline(1m):                        # 1분 단위 전진
 Auto_Trading/
 ├── main.py                     # 엔트리포인트 (얇게 유지)
 ├── watchdog.py                 # 별도 프로세스 엔트리포인트
+├── dashboard.py                # 대시보드 엔트리포인트 (D10, 읽기 전용)
 ├── pyproject.toml
 ├── .env.example                # 실제 .env 는 gitignore
 ├── config/
@@ -282,6 +292,13 @@ Auto_Trading/
     │   ├── telegram.py
     │   ├── templates.py
     │   └── daily_report.py
+    ├── ui/                     # [신설] 대시보드 — 읽기 전용, 별도 프로세스 (D10)
+    │   ├── app.py              #   FastAPI
+    │   ├── db.py               #   mode=ro 커넥션 + query_only
+    │   ├── queries.py          #   집계 SQL (매매 로직 없음)
+    │   ├── routes/             #   summary / equity / calendar / trades / diagnostics
+    │   ├── templates/
+    │   └── static/             #   css, js, vendor/chart.min.js (CDN 금지)
     ├── ops/                    # [신설]
     │   ├── health.py           # 헬스체크 / 하트비트
     │   ├── killswitch.py
@@ -308,6 +325,7 @@ Auto_Trading/
 | `ops/` 신설 | 킬스위치·상태·헬스를 전략 코드에서 분리 |
 | `exchange/paper.py` | Paper trading을 별도 모드가 아니라 **어댑터 교체**로 구현 → 코드 경로 단일화 |
 | `config/schema.py` (pydantic) | 설정 오타로 인한 사고 차단 (레버리지·비율 범위 검증) |
+| `ui/` 신설 + `dashboard.py` | 결과 확인용 대시보드. **별도 프로세스 + 읽기 전용 DB** 라 UI 장애가 매매에 닿지 않음 (D10) |
 
 ### 의존 방향 규칙 (CI에서 강제)
 
@@ -320,5 +338,6 @@ core  <-  features  <-  strategy  <-  risk
 ```
 
 - `core`, `features`, `strategy`, `risk` 는 `exchange`, `storage`, `marketdata`, `notify`, `ai` 를 **import 할 수 없다**
+- `ui` 는 `core` 와 `storage` 만 import 한다. `strategy`, `risk`, `exchange`, `execution`, `ai` 는 **금지** (D10)
 - CI에서 `import-linter` 로 검사한다
 - 이 규칙이 깨지면 백테스트-실거래 일치성이 **조용히** 무너진다. 그래서 사람 리뷰가 아니라 린터로 강제한다

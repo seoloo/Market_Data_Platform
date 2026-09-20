@@ -23,12 +23,13 @@ P5 거래소연동 → P6 Paper → P7 Testnet → P8 소액실거래 → P9 실
 | 프로젝트 스캐폴딩 | `pyproject.toml`, ruff, mypy strict, pytest, pre-commit(gitleaks 포함), CI |
 | `core/` | 불변 타입, enum, Clock 추상화, Decimal 기반 money |
 | `config/` | pydantic 스키마, yaml 로더, 해시, config_versions 저장 |
-| `storage/` | SQLite 스키마 + 마이그레이션 + repository |
+| `storage/` | SQLite 스키마 + 마이그레이션 + repository<br>**+ `schema_version`, `v_daily_pnl`, `v_daily_equity` 뷰 (D10)** |
 | `marketdata/backfill.py` | Binance 벌크 데이터 다운로드 (1m/5m/15m/1h/4h/1d, 최소 2019~현재) |
 | `marketdata/integrity.py` | 갭/중복/이상치 검증 + 리포트 |
 | funding 이력 수집 | |
 
 **게이트 1**
+- [ ] `account_snapshots` 1분 주기 기록 + 달력용 집계 뷰 동작 (D10 — 나중에 복구 불가한 데이터)
 - [ ] 2019-01~현재 전 TF 캔들이 갭 없이 적재됨 (갭은 전부 설명 가능해야 함 — 거래소 점검 등)
 - [ ] 1m → 5m/15m/1h 재집계 결과가 거래소 원본과 일치 (무결성 교차검증)
 - [ ] `mypy --strict` / ruff / pytest 통과
@@ -115,13 +116,28 @@ P5 거래소연동 → P6 Paper → P7 Testnet → P8 소액실거래 → P9 실
 
 ---
 
-### Phase 6 — Paper Trading (최소 4주 연속)
+### Phase 6 — Paper Trading (최소 4주 연속) + 대시보드
 
 - 실시간 **mainnet 시세** + 가상 체결 (testnet 보다 시세가 현실적)
 - 목표: 전략 성과가 아니라 **시스템 안정성** 검증
 - 매일 Parity Test 자동 실행
 
+**병행 산출물 — 대시보드 (D10 / [14-ui-and-packaging.md](14-ui-and-packaging.md))**
+
+4주간 돌아가는 시스템을 지켜봐야 하므로 이 시점에 실제로 필요해진다.
+
+| 항목 | 내용 |
+|---|---|
+| `ui/` | FastAPI + Jinja2 + Chart.js. **읽기 전용, 별도 프로세스, 127.0.0.1** |
+| 화면 | 요약 / 자산곡선 / **달력(일별 손익)** / 거래목록 / **거래상세(판단근거)** |
+| `dashboard.py` | 엔트리포인트 |
+| `AutoTradingDashboard.exe` | PyInstaller 패키징 (대시보드 안정화 후) |
+
 **게이트 6**
+- [ ] 대시보드 연결로 `INSERT` 시도 시 예외 발생 (읽기 전용 보장)
+- [ ] FastAPI 라우트 중 `POST/PUT/DELETE/PATCH` 개수 = 0
+- [ ] 대시보드를 강제 종료해도 매매 프로세스가 영향받지 않음
+- [ ] exe 가 DB 스키마 버전 불일치를 명확한 메시지로 거부
 - [ ] 4주 연속 무중단 (또는 모든 중단이 설명 가능하고 복구 정상)
 - [ ] Parity Test 불일치 0건
 - [ ] 백테스트 대비 결정 시점 100% 일치
@@ -174,6 +190,7 @@ P5 거래소연동 → P6 Paper → P7 Testnet → P8 소액실거래 → P9 실
 | 12 | FOMC 문서 LLM 분석 | 11 완료 |
 | 13 | Elliott 파동 카운팅 (실험) | 구조 feature 가 유효함을 먼저 입증 |
 | 14 | Trailing stop, 부분 익절 | 기본 전략 안정화 |
+| 14b | 대시보드 진단 화면 확장 (veto 분포, regime 분해) | 실거래 데이터 축적 |
 | 15 | 가중치 walk-forward 최적화 | 등가중 대비 개선 입증 가능한 데이터량 확보 |
 | 16 | 다중 심볼 (ETH 등) | 단일 심볼 6개월 안정 운용 |
 | 17 | Bybit 등 거래소 확장 | Adapter 인터페이스 안정화 |
@@ -197,7 +214,8 @@ P5 거래소연동 → P6 Paper → P7 Testnet → P8 소액실거래 → P9 실
 | **피라미딩 / 분할 진입** | 상태 복잡도 급증, 복구 로직 난이도 상승 | 심볼당 포지션 1개 |
 | **지정가 진입** | 체결 시뮬 불확실성 | 시장가만 |
 | **다중 심볼 / 다중 거래소** | 검증 안 된 전략의 확장은 무의미 | BTCUSDT 단일 |
-| **웹 대시보드** | 운영에 불필요 | Telegram + SQL 쿼리 |
+| **웹 대시보드** | MVP(Phase 1~5) 에는 불필요 | Telegram + SQL 쿼리 → **Phase 6 에서 구현** (D10) |
+| **매매 엔진 exe 로 실거래** | Windows 절전·재부팅으로 신호청산이 멈춘다 | 실거래는 Linux VPS + systemd (D10) |
 | **지표 15종 전부** | 상관 중복 + 표본 부족 | feature 5개 |
 | **1분 스캘핑** | 비용 구조상 개인이 이기기 어려움 | 보유기간을 먼저 결정 (→ 12-critique) |
 

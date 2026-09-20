@@ -24,6 +24,7 @@ Phase 0이 확정되기 전까지 `src/` 아래 구현 코드를 작성하지 �
 | [11-testing.md](11-testing.md) | 테스트 전략 | N |
 | **[12-critique.md](12-critique.md)** | **명세에 대한 비판적 검토 + 미결 결정사항** | 추가 |
 | **[13-decisions.md](13-decisions.md)** | **확정 결정 기록 — 구현의 기준** | 추가 |
+| [14-ui-and-packaging.md](14-ui-and-packaging.md) | 대시보드(읽기 전용 웹 UI) 및 exe 패키징 | 추가 |
 
 > 처음 읽는다면 **12 → 13** 순서를 권한다. 나머지 문서의 설계 선택 대부분이 거기서 나온다.
 > 값이 충돌할 경우 **13번 문서가 우선**한다.
@@ -32,10 +33,12 @@ Phase 0이 확정되기 전까지 `src/` 아래 구현 코드를 작성하지 �
 
 - [x] MVP 범위 합의 — 12-critique 권고 5가지 전부 수용 (13-decisions **D1**)
 - [x] 목표 보유기간 확정 — 2시간 ~ 24시간 (13-decisions **D2**)
-- [x] 리스크 한도 확정 — 명목가 10% / 손절 -10% (= 총액 1%) / DD -10% (13-decisions **D4**)
+- [x] 리스크 한도 확정 — 거래당 최대 손실 총액 1% / DD -10% (13-decisions **D4** → **D9**)
 - [x] DB 스키마 1차 확정 (03)
 - [x] 멀티 에이전트 개발 체계 + Phase 보고 규약 (13-decisions **D6 / D7**)
 - [x] 매매 개념 카탈로그 작성 ([../STRATEGY-CATALOG.md](../STRATEGY-CATALOG.md))
+- [x] 포지션 사이징 재설계 (13-decisions **D9**)
+- [x] 운영 UI / exe 배포 설계 (13-decisions **D10**, [14](14-ui-and-packaging.md))
 - [ ] **검증할 시장 가설 1개를 문장으로 확정** (12-critique §14 Q4) ← **Phase 1 착수 블로킹**
 - [ ] (Phase 8 이전까지) 운용 자본 규모 (**D3**), 중단 기준 (**D5**)
 

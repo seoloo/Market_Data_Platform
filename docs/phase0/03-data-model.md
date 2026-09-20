@@ -48,6 +48,14 @@
 ### 3.1 기준/메타
 
 ```sql
+-- exe 와 DB 버전 불일치를 감지한다 (D10 §4.3).
+-- 조용히 잘못 읽는 것이 최악이므로 기동 시 검사하고 불일치면 중단한다.
+CREATE TABLE schema_version (
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    version         INTEGER NOT NULL,
+    applied_ms      INTEGER NOT NULL
+);
+
 CREATE TABLE config_versions (
     id              INTEGER PRIMARY KEY,
     hash            TEXT NOT NULL UNIQUE,          -- SHA-256 of canonical JSON
@@ -323,6 +331,10 @@ CREATE TABLE account_snapshots (
 );
 CREATE INDEX idx_acct_ts ON account_snapshots(mode, ts_ms DESC);
 
+-- 기록 주기: 1분 (D10). 자산 곡선 해상도를 위해 Phase 1 부터 기록한다.
+-- 나중에 UI 를 만들 때 과거 데이터를 복구할 방법이 없다.
+-- 연 52.6만 행이지만 행이 작아 문제 없다.
+
 CREATE TABLE risk_state (                          -- 단일 행 갱신 + 이력
     id                  INTEGER PRIMARY KEY,
     ts_ms               INTEGER NOT NULL,
@@ -450,7 +462,48 @@ CREATE TABLE backtest_runs (
 );
 ```
 
-## 4. 거래 재구성 뷰 (원 명세 §12의 요구사항)
+## 4. 대시보드용 집계 뷰 (D10)
+
+[14-ui-and-packaging.md](14-ui-and-packaging.md) §3.3 참조.
+**UI 구현은 Phase 6 이지만 뷰와 기록은 Phase 1 에 넣는다** — 기록하지 않은 데이터는 복구할 수 없다.
+
+```sql
+-- 날짜별 실현손익 (달력 화면). 기준 시간대 UTC = Risk Engine 일일 리셋과 동일
+CREATE VIEW v_daily_pnl AS
+SELECT
+    date(t.closed_ms / 1000, 'unixepoch')        AS trade_date,
+    p.mode,
+    p.run_id,
+    COUNT(*)                                      AS trade_count,
+    SUM(CAST(t.net_pnl AS REAL))                  AS realized_pnl,
+    SUM(CAST(t.gross_pnl AS REAL))                AS gross_pnl,
+    SUM(CAST(t.entry_fee AS REAL) + CAST(t.exit_fee AS REAL)) AS fees,
+    SUM(CAST(t.funding_paid AS REAL))             AS funding,
+    SUM(CASE WHEN CAST(t.net_pnl AS REAL) > 0 THEN 1 ELSE 0 END) AS wins,
+    AVG(t.realized_r)                             AS avg_r
+FROM trades t
+JOIN positions p ON p.id = t.position_id
+GROUP BY trade_date, p.mode, p.run_id;
+
+-- 날짜별 자산 변동 (미실현 포함)
+CREATE VIEW v_daily_equity AS
+SELECT
+    date(ts_ms / 1000, 'unixepoch')   AS trade_date,
+    mode,
+    MIN(ts_ms)                        AS first_ms,
+    MAX(ts_ms)                        AS last_ms,
+    MAX(CAST(equity AS REAL))         AS equity_high,
+    MIN(CAST(equity AS REAL))         AS equity_low
+FROM account_snapshots
+GROUP BY trade_date, mode;
+```
+
+> `CAST(... AS REAL)` 은 **집계와 화면 표시에만** 쓴다. 매매 판단 경로는 여전히 `Decimal` 이다 (§1).
+> 두 뷰의 값은 포지션을 하루 넘겨 보유하면 달라진다. UI 는 둘 다 보여주고 차이를 설명한다.
+
+---
+
+## 5. 거래 재구성 뷰 (원 명세 §12의 요구사항)
 
 ```sql
 CREATE VIEW v_trade_explain AS
@@ -470,12 +523,13 @@ JOIN config_versions cv ON cv.id = d.config_version_id
 JOIN code_versions codev ON codev.id = d.code_version_id;
 ```
 
-## 5. 보존 정책
+## 6. 보존 정책
 
 | 테이블 | 보존 | 비고 |
 |---|---|---|
 | `candles` | 영구 | 압축된 parquet 아카이브 병행 |
-| `decisions` | 라이브 영구 / 백테스트는 run 단위 삭제 | `components_json` 은 90일 후 NULL 처리 가능 (재계산 가능하므로) |
+| `decisions` | 라이브 영구 / 백테스트는 run 단위 삭제 | `components_json` 은 90일 후 NULL 처리 가능 (재계산 가능하므로). 단 **대시보드 거래상세 화면이 이를 쓰므로** 거래로 이어진 decision 은 보존 |
+| `account_snapshots` | 1분 기록. 1년 후 1시간 단위로 다운샘플 | 자산 곡선 장기 보관 |
 | `orders`, `fills`, `trades`, `positions` | 영구 | 회계 기록 |
 | `news_items` | 180일 | 본문 저장 시 라이선스 확인 필요 |
 | `errors`, `system_events` | 365일 | |

@@ -1,7 +1,7 @@
 # 13 — Phase 0 확정 결정 기록
 
 확정일: 2026-09-20
-상태: **D1·D2·D6·D7·D8·D9 확정 / D3·D5 보류 / D4 는 D9 로 대체**
+상태: **D1·D2·D6·D7·D8·D9·D10 확정 / D3·D5 보류 / D4 는 D9 로 대체**
 
 이 문서가 Phase 1 이후 구현의 기준이다. 여기 없는 것은 확정되지 않은 것이다.
 
@@ -465,6 +465,65 @@ Phase 9 에서 단계적으로 3 → 5 → 10 으로 올린다. **10 은 설계�
 
 ---
 
+## D10. 운영 UI 및 배포 형태 ✅ 확정
+
+전체 설계: [14-ui-and-packaging.md](14-ui-and-packaging.md)
+
+### 결정 요약
+
+| 항목 | 결정 |
+|---|---|
+| 대시보드 | **로컬 웹 UI, 읽기 전용, 별도 프로세스** |
+| 스택 | FastAPI + Jinja2 + Chart.js (로컬 번들). **npm 빌드 단계 없음** |
+| 접근 | `127.0.0.1:8787` 만 바인딩. 인증 없음 |
+| 화면 | 요약 / 자산곡선 / **달력(일별 손익)** / 거래목록 / **거래상세(판단근거)** / 진단 |
+| exe | **PyInstaller.** 대시보드는 권장, 매매 엔진은 백테스트·Paper 로 제한 |
+| 구현 시점 | 스키마는 **Phase 1**, UI 는 **Phase 6**, exe 는 Phase 6 말 |
+
+### 협상 불가 제약 4가지
+
+| # | 제약 | 이유 |
+|---|---|---|
+| 1 | **UI 는 별도 프로세스** | UI 가 죽어도 매매는 계속된다. UI 버그가 자금에 닿지 않는다 |
+| 2 | **DB 를 읽기 전용으로 연다** (`mode=ro`, `query_only=ON`) | 쓰기가 물리적으로 불가능해야 한다 |
+| 3 | **쓰기 엔드포인트 0개** | 주문·설정 변경 API 를 만들지 않는다. 킬 스위치도 UI 에 넣지 않는다 |
+| 4 | **거래소 API 키를 UI 프로세스에 로드하지 않음** | 대시보드는 자격증명을 아예 모른다 |
+
+테스트로 강제한다 (14 §7): 대시보드 연결로 `INSERT` 시도 → 예외 발생,
+FastAPI 라우트 중 `POST/PUT/DELETE/PATCH` 개수 = 0.
+
+### Phase 1 에 지금 넣어야 하는 것 ⭐
+
+UI 구현은 미뤄도 되지만 **기록하지 않은 데이터는 나중에 복구할 수 없다.**
+
+- `account_snapshots` **1분 주기 기록** (자산 곡선 해상도)
+- `v_daily_pnl` 뷰 (달력 화면 — 날짜별 실현손익)
+- `v_daily_equity` 뷰 (미실현 포함 자산 변동)
+- `schema_version` 테이블 (exe 와 DB 버전 불일치 감지)
+
+### 달력 화면의 시간대
+
+기본 **UTC**. Risk Engine 의 일일 손실 한도 리셋이 UTC 00:00 이므로 같은 기준을 써야
+"오늘 왜 거래가 멈췄지"를 추적할 수 있다. KST 토글은 제공하되 화면에 시간대를 항상 표시한다.
+
+### exe 에 대한 경고 (14 §4.2)
+
+**실거래(Phase 8~9)는 Linux VPS + systemd 를 유지한다.**
+Windows 개인 PC 는 절전·자동 업데이트 재부팅·회선 불안정 때문에 24시간 매매 호스트로 부적합하다.
+
+거래소 `STOP_MARKET` 은 프로그램이 죽어도 작동하므로 파국은 막히지만,
+**우리 전략의 주 탈출 경로는 신호 청산이다** (D9 §0).
+프로세스가 멈추면 "손절은 되지만 익절·신호청산은 안 되는" 상태가 이어져 전략이 반쯤 무력화된다.
+
+| 모드 | Windows exe |
+|---|---|
+| 백테스트 | ✅ |
+| Paper Trading | ✅ |
+| Testnet | ⚠️ 비권장 |
+| **실거래** | ❌ **Linux VPS 사용** |
+
+---
+
 ## D5. 실패 시 중단 기준 — 미정 ⏸
 
 [12-critique.md](12-critique.md) §14 Q7 미답변.
@@ -517,6 +576,13 @@ excluded_from_mvp:                  # D1
   - limit_order_entry
   - multi_symbol
   - multi_exchange
+
+ui:                                 # D10
+  dashboard: read_only_local_web    # FastAPI, 127.0.0.1:8787, 별도 프로세스
+  write_endpoints: 0                # 협상 불가
+  packaging: pyinstaller            # 대시보드 권장 / 매매엔진은 backtest·paper 한정
+  live_trading_host: linux_systemd  # Windows exe 로 실거래 금지
+  implement_at: {schema: phase1, ui: phase6, exe: phase6}
 
 dev_process:                        # D6 / D7
   multi_agent: true                 # Claude Opus / Codex 계열 교대 작업

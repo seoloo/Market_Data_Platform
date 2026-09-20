@@ -38,10 +38,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2 | `core/` — enums / errors / money / clock / hashing / types | ✅ 완료 |
 | 3 | 아키텍처 테스트 (Pure Core 경계 AST 검사) | ✅ 완료 |
 | 4 | **`config/` — pydantic 스키마 + yaml 로더 + 해시 + config_versions**<br>D9 파라미터 정합성 검증 포함 | ⬅️ **다음** |
-| 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository | 대기 |
+| 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository<br>**+ `schema_version`, `v_daily_pnl`, `v_daily_equity` (D10)** | 대기 |
 | 6 | `marketdata/backfill.py` — 과거 캔들/funding 수집 | 대기 |
 | 7 | `marketdata/integrity.py` — 갭·중복·이상치 검증 | 대기 |
 | 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
+| 9 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -65,6 +66,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `docs/phase0/11-testing.md` | 테스트 전략 |
 | `docs/phase0/12-critique.md` | 원 명세 비판적 검토 |
 | `docs/phase0/13-decisions.md` | **확정 결정 기록** |
+| `docs/phase0/14-ui-and-packaging.md` | 대시보드 · exe 배포 설계 (D10) |
 | `docs/STRATEGY-CATALOG.md` | **매매 개념 (사람용)** |
 | `AGENTS.md` / `CLAUDE.md` / `PROGRESS.md` | 에이전트 작업 규약 |
 | `.gitignore` | 시크릿 유출 방지 |
@@ -112,6 +114,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 하루 거래 | 최대 **2회** |
 | 일일 손실 한도 | 총액 2% |
 | 누적 DD 한도 | −10% → HALTED |
+| 결과 확인 UI | 로컬 대시보드 (읽기 전용, 별도 프로세스) — **Phase 6**. 스키마는 Phase 1 |
+| 배포 | 대시보드 exe 권장 / **실거래는 Linux VPS + systemd** |
 | MVP 제외 | Elliott 카운팅, 뉴스 LLM, 거시 surprise, 가중치 최적화, 가변 사이징, trailing stop, 지정가 진입, 다중 심볼/거래소 |
 
 ---
@@ -144,6 +148,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 ### Phase 1 — 기반
 - [x] `mypy --strict` / ruff / pytest 통과 (159 passed, 0 errors)
+- [ ] `schema_version` + `v_daily_pnl` / `v_daily_equity` 뷰 (D10 — 나중에 복구 불가)
+- [ ] `account_snapshots` 1분 주기 기록
 - [x] import-linter Pure Core 경계 계약 통과
 - [x] 아키텍처 테스트가 실제 위반을 탐지함을 확인
 - [ ] 2019-01~현재 전 TF 캔들 갭 없이 적재 (갭은 전부 설명 가능)
@@ -194,6 +200,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-20 | Claude Opus 5 | 1 | 커밋 제안 형식을 GitHub Desktop 기준(파일 목록)으로 변경 | 완료 |
 | 2026-09-20 | Claude Opus 5 | 0 | 사이징 방식 재설계 검토 후 D9 확정 (D4 사이징 대체). 05/13/CATALOG 갱신 | D9 확정 |
 | 2026-09-21 | Claude Opus 5 | 0 | D9 파라미터 조정: max_leverage 5→10, min_stop_distance 2%→1% | 완료 |
+| 2026-09-21 | Claude Opus 5 | 0 | 대시보드·exe 설계 추가 (D10, 14번 문서). Phase 1 스키마에 집계 뷰 반영 | D10 확정 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
