@@ -41,7 +41,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository (D10 뷰 포함) | ✅ 완료 |
 | 6 | `marketdata/archive.py` + `backfill.py` — 벌크 아카이브 수집 | ✅ 완료 |
 | 7 | `marketdata/integrity.py` + `resample.py` — 무결성 검증 | ✅ 완료 |
-| 8 | **실데이터 백필 실행** — 2019-09~현재 전 TF 적재 + 무결성 리포트 (게이트 1 최종) | ⬅️ **다음** |
+| 8 | **실데이터 백필 실행** — `scripts/backfill.py` 로 2019-09~현재 전 TF 적재<br>스크립트 작성·실서버 검증 완료, **전체 실행만 남음** | ⬅️ **다음** |
 | 9 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
 | 10 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
@@ -108,8 +108,13 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/marketdata/resample.py` | 순수 재집계 (1m → 상위 TF). 대조 전용 |
 | `src/auto_trading/marketdata/integrity.py` | 갭·스파이크·정지가격·거래량0 + **1m↔상위TF 대조** |
 | `tests/marketdata/` | MockTransport 기반 테스트 97건 (네트워크 미사용, 통합 3건 포함) |
+| `scripts/backfill.py` | 백필+검증 실행 스크립트 (dry-run / 재개 / 검증만 지원) |
 
 **검증 결과**: 419 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
+
+**실서버 스모크 (2026-09-21)**: 2024-01 실데이터 1m/5m/1h 적재 → 체크섬 전건 검증,
+**재집계 대조 9,216 + 768 버킷 전부 일치**, 갭·이상치 0건, 8초 / 11MB.
+전체 추정: 약 414만 봉 / **0.8GB** / 20~40분.
 
 ---
 
@@ -226,6 +231,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 1 | storage 모듈 (스키마 23테이블 + 뷰 3종, 마이그레이션, repository) + 테스트 72건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | marketdata 아카이브 클라이언트 + 백필 오케스트레이터 + 테스트 55건 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | resample + integrity 검증기 + 게이트1 통합 테스트 (총 97건) | 완료 |
+| 2026-09-21 | Claude Opus 5 | 1 | scripts/backfill.py 작성 + 실서버 1개월 스모크 (재집계 전건 일치) | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

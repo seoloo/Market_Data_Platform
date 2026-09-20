@@ -64,6 +64,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
+# 실행 스크립트는 콘솔 출력이 본래 목적이다.
+"scripts/**" = ["T20"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["auto_trading"]
@@ -77,6 +79,10 @@ warn_unreachable = true
 warn_no_return = true
 show_error_codes = true
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "scripts.*"
+disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
 module = "tests.*"
