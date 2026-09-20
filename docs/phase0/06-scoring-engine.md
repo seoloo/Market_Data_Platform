@@ -62,8 +62,15 @@ def causal_zscore(series: Sequence[float], lookback: int) -> float:
     return 0.0 if sd == 0 else (series[-1] - mu) / sd
 
 def squash(z: float, k: float = 1.5) -> float:
-    return math.tanh(z / k)               # 이상치 지배 억제, [-1,+1] 보장
+    """[-1,+1] 로 압축. 이상치 지배 억제."""
+    return round(z / (k + abs(z)), 9)     # tanh 가 아니다 — 아래 참조
 ```
+
+> **왜 `tanh` 가 아닌가**: `tanh` 는 초월함수라 libm 구현에 따라 최하위 비트가 달라질 수 있다.
+> 개발(Windows)과 운영(Linux)이 다른 값을 내면 Parity Test(07 §6.1)가 무의미해진다.
+> `z/(k+|z|)` 는 사칙연산만 쓰므로 IEEE 754 상 모든 플랫폼에서 비트 단위로 같다.
+> 형태도 유사하며, 입력이 `k` 일 때 출력이 정확히 0.5 다.
+> 출력은 9자리로 양자화해 미세 차이가 하위 계층에 전파되지 않게 한다.
 
 **금지 사항 (테스트로 강제)**
 - `MinMaxScaler`/`StandardScaler` 를 전체 데이터에 fit 하는 것
@@ -99,6 +106,7 @@ bias_multiplier = f(B2_volregime)   # 정상 변동성 1.0, 고변동 0.5, 극�
 trigger = squash(
     w1 * T1_pullback + w2 * T2_momentum
 ) * confirm(T3_volume)          # confirm ∈ [0.6, 1.0]
+# squash(x, k) = x / (k + |x|)  — tanh 가 아니다 (플랫폼 결정론)
 ```
 
 `T3` 를 가중합에 더하지 않고 곱하는 이유: 거래량 자체는 방향이 없다. 가중합에 넣으면

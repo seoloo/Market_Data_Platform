@@ -14,7 +14,7 @@
 ```
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
-Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
+Phase 2 — 전략코어 ██░░░░░░░░░░░░░░░░░░  10%  ← 여기
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -42,9 +42,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 6 | `marketdata/archive.py` + `backfill.py` — 벌크 아카이브 수집 | ✅ 완료 |
 | 7 | `marketdata/integrity.py` + `resample.py` — 무결성 검증 | ✅ 완료 |
 | 8 | 실데이터 백필 실행 + 게이트 1 판정 | ✅ 완료 |
-| 9 | **(Phase 2) `features/normalize.py` — causal z-score / percentile** | ⬅️ **다음** |
-| 10 | (Phase 2) `features/` 5종 + `risk/sizing.py` (D9) | 대기 |
-| 11 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 9 | (Phase 2) `features/normalize.py` — causal z-score / percentile | ✅ 완료 |
+| 10 | **(Phase 2) `features/` 지표 5종 (B1/B2/T1/T2/T3) + `structure.py`** | ⬅️ **다음** |
+| 11 | (Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py` | 대기 |
+| 12 | (Phase 2) `strategy/` bias·trigger·scoring·policy·cost + `decide()` | 대기 |
+| 13 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -111,7 +113,14 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `tests/marketdata/` | MockTransport 기반 테스트 97건 (네트워크 미사용, 통합 3건 포함) |
 | `scripts/backfill.py` | 백필+검증 실행 스크립트 (dry-run / 재개 / 검증만 지원) |
 
-**검증 결과**: 419 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
+### Phase 2 — 전략 코어 (2026-09-21, 진행 중)
+
+| 산출물 | 내용 |
+|---|---|
+| `src/auto_trading/features/normalize.py` | causal z-score / 백분위 / squash. **미래 데이터 물리적 차단** |
+| `tests/features/test_normalize.py` | 50건 — causality 속성 테스트 포함 |
+
+**검증 결과**: 474 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept · coverage 95%
 
 **실서버 스모크 (2026-09-21)**: 2024-01 실데이터 1m/5m/1h 적재 → 체크섬 전건 검증,
 **재집계 대조 9,216 + 768 버킷 전부 일치**, 갭·이상치 0건, 8초 / 11MB.
@@ -153,6 +162,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2 | 운용 자본 규모 (D3) | 사용자 | Phase 8 착수 |
 | 3 | 중단 기준 — 가설 몇 개 실패 시 재검토 (D5) | 사용자 | Phase 4 |
 | 4 | `take_profit.r_multiple` 2.0 은 잠정값 | Phase 4에서 결정 | — |
+| 7 | squash 변경으로 진입 임계값 70 의 의미가 달라짐 | Phase 4에서 재조정 | — |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 
@@ -237,6 +247,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 0 | 시장 가설 H1 확정 (D11) — Phase 0 완료 | D11 확정 |
 | 2026-09-21 | Claude Opus 5 | 1 | 전체 백필 실행 (414만봉 / 878MB / 13.7분) | 완료 |
 | 2026-09-21 | Claude Opus 5 | 1 | 재집계 불일치 78건 원인 규명 → 거래소 아카이브 특성으로 확인, 분류 로직 추가 | **게이트 1 통과** |
+| 2026-09-21 | Claude Opus 5 | 2 | features/normalize.py (causal z-score/백분위) + 테스트 50건 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 2 | squash 를 tanh → x/(k+\|x\|) 로 변경 (플랫폼 결정론) | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
