@@ -1,0 +1,22 @@
+# 실거래 오버레이
+#
+# 이 파일을 쓰려면 Phase 8 게이트를 통과해야 한다 (10-roadmap.md).
+#
+# 스키마가 live 모드에 추가 제약을 건다 (config/schema.py):
+#   - max_leverage > 5 거부
+#   - killswitch.mode = flatten 거부
+#
+# Phase 8 (소액 실거래) 는 max_leverage = 3 으로 시작하고,
+# 실측 슬리피지를 확인한 뒤 Phase 9 에서 3 -> 5 로 올린다 (D9 §2).
+
+risk:
+  max_leverage: 3                   # Phase 8 출발값. 임의로 올리지 않는다
+  min_stop_distance: 0.035          # max_leverage=3 과 정합 (D9-3)
+  killswitch:
+    mode: block_entries
+
+ui:
+  enabled: true
+
+notify:
+  telegram_enabled: true

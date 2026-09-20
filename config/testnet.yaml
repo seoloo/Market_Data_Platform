@@ -1,0 +1,13 @@
+# Testnet 오버레이 (Phase 7)
+#
+# 목적은 "주문 API 정합성" 확인이다. 성과는 보지 않는다.
+# testnet 유동성은 비현실적이라 체결 품질 검증에 쓸 수 없다 (12-critique §12).
+
+ui:
+  enabled: true
+
+notify:
+  telegram_enabled: true
+
+execution:
+  max_order_retries: 5              # 에러 코드 처리 경로를 많이 태운다

@@ -13,7 +13,7 @@
 
 ```
 Phase 0 — 설계     ████████████████████  100%
-Phase 1 — 기반     ███████░░░░░░░░░░░░░   35%  ← 여기
+Phase 1 — 기반     ██████████░░░░░░░░░░   50%  ← 여기
 Phase 2 — 전략코어 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -37,8 +37,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 1 | 프로젝트 스캐폴딩 (pyproject, ruff, mypy, pytest, pre-commit, CI, import-linter) | ✅ 완료 |
 | 2 | `core/` — enums / errors / money / clock / hashing / types | ✅ 완료 |
 | 3 | 아키텍처 테스트 (Pure Core 경계 AST 검사) | ✅ 완료 |
-| 4 | **`config/` — pydantic 스키마 + yaml 로더 + 해시 + config_versions**<br>D9 파라미터 정합성 검증 포함 | ⬅️ **다음** |
-| 5 | `storage/` — SQLite 스키마 + 마이그레이션 + repository<br>**+ `schema_version`, `v_daily_pnl`, `v_daily_equity` (D10)** | 대기 |
+| 4 | `config/` — pydantic 스키마 + yaml 로더 + 해시 + D9 정합성 검증 | ✅ 완료 |
+| 5 | **`storage/` — SQLite 스키마 + 마이그레이션 + repository**<br>**+ `schema_version`, `v_daily_pnl`, `v_daily_equity` (D10)**<br>+ `config_versions` / `code_versions` 저장 | ⬅️ **다음** |
 | 6 | `marketdata/backfill.py` — 과거 캔들/funding 수집 | 대기 |
 | 7 | `marketdata/integrity.py` — 갭·중복·이상치 검증 | 대기 |
 | 8 | (Phase 2) `risk/sizing.py` — PositionSizingEngine (D9) | 대기 |
@@ -91,7 +91,12 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `tests/core/` | money / enums / clock / hashing / types 테스트 |
 | `tests/architecture/test_pure_core.py` | AST 로 I/O·난수·시계 사용 검사 |
 
-**검증 결과**: 159 passed · mypy strict 0 errors · ruff clean · import-linter 2 contracts kept · coverage 93%
+| `src/auto_trading/config/schema.py` | pydantic 스키마. `extra=forbid` + 범위 + **파라미터 간 정합성**(D9-3) |
+| `src/auto_trading/config/loader.py` | yaml 병합 + 환경변수 오버레이 + 해시 + **시크릿 스캔** |
+| `config/base.yaml` + 4개 오버레이 | backtest / paper / testnet / live |
+| `tests/config/` | 스키마·로더 테스트 91건 |
+
+**검증 결과**: 250 passed · mypy strict 0 errors · ruff clean · import-linter 2 contracts kept · coverage 95%
 
 ---
 
@@ -154,7 +159,9 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [x] 아키텍처 테스트가 실제 위반을 탐지함을 확인
 - [ ] 2019-01~현재 전 TF 캔들 갭 없이 적재 (갭은 전부 설명 가능)
 - [ ] 1m → 5m/15m/1h 재집계가 거래소 원본과 일치
-- [ ] 설정 해시 재현성 테스트 통과
+- [x] 설정 해시 재현성 테스트 통과 (주석·키 순서 무관, 50회 반복 동일)
+- [x] D9 파라미터 정합성 검증이 기동을 막는지 확인
+- [x] 설정 파일에 시크릿이 들어가면 거부
 
 ### Phase 2 — 전략 코어
 - [ ] `decide()` 가 I/O 없이 동작 (import-linter 통과)
@@ -201,6 +208,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-20 | Claude Opus 5 | 0 | 사이징 방식 재설계 검토 후 D9 확정 (D4 사이징 대체). 05/13/CATALOG 갱신 | D9 확정 |
 | 2026-09-21 | Claude Opus 5 | 0 | D9 파라미터 조정: max_leverage 5→10, min_stop_distance 2%→1% | 완료 |
 | 2026-09-21 | Claude Opus 5 | 0 | 대시보드·exe 설계 추가 (D10, 14번 문서). Phase 1 스키마에 집계 뷰 반영 | D10 확정 |
+| 2026-09-21 | Claude Opus 5 | 1 | config 모듈 + base/backtest/paper/testnet/live yaml + 테스트 91건 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

@@ -1,0 +1,13 @@
+# Paper Trading 오버레이 (Phase 6)
+#
+# 실시간 mainnet 시세 + 가상 체결. testnet 보다 시세가 현실적이라
+# 시스템 안정성 검증에 적합하다.
+#
+# 리스크 파라미터는 base 와 동일하게 둔다. Paper 에서 느슨하게 돌리면
+# 실거래로 넘어갈 때 검증된 것이 없어진다.
+
+ui:
+  enabled: true                     # 4주간 지켜봐야 하므로 대시보드를 켠다
+
+notify:
+  telegram_enabled: true
