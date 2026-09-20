@@ -86,8 +86,13 @@ def squash(z: float, k: float = 1.5) -> float:
 
 | ID | 정의 | TF | 근거 |
 |---|---|---|---|
-| `B1_trend` | EMA(50) 대비 가격 위치 + EMA(50) 기울기의 causal z | 4h | 가장 널리 문서화된 암호화폐 추세 지속 효과 |
+| `B1_trend` | EMA(50) 대비 가격 위치 + 기울기, **ATR 단위** | 4h | 가장 널리 문서화된 암호화폐 추세 지속 효과 |
 | `B2_volregime` | ATR(14)/Close 의 1년 백분위 | 1h | 국면 분류. 방향 신호가 아니라 게이트/사이즈용 |
+
+> ⚠ **B1 에는 z-score 를 쓰지 않는다** (2026-09-21 구현 중 정정).
+> z-score 는 "최근 이력 대비 이례적인가" 를 재므로, 지속 추세에서 분산이 줄어 0 에 수렴한다.
+> 그러면 강한 추세장에서 bias 게이트가 열리지 않는다. ATR 단위 정규화가 맞다.
+> z-score 는 T2(되돌림 종료 = 이례적 움직임 탐지)에만 쓴다.
 
 ```python
 bias_direction = sign(B1_trend) if |B1_trend| >= cfg.bias_threshold else 0
