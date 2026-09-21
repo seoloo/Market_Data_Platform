@@ -179,14 +179,12 @@ soft 값이다. hard 차단은 Risk Engine 게이트가 담당한다 (→ 05 문
 
 ---
 
-## 4. 진입 / 청산 정책 (히스테리시스)
+## 4. 진입 / 청산 정책
 
 ```yaml
 policy:
   long_entry_threshold:  70       # long_score >= 70  -> 롱 진입 후보
-  long_exit_threshold:   45       # long_score <= 45  -> 롱 청산
   short_entry_threshold: 70       # short_score >= 70
-  short_exit_threshold:  45
   reversal_requires_flat: true    # 반대 진입은 반드시 청산 후 별도 판단
 ```
 
@@ -195,13 +193,20 @@ long_score
    100 ┤
     70 ┤━━━━━━━━━ 진입선 ━━━━━━━━━━
        │         ↑ 진입           ↓ 유지 구간 (아무 동작 없음)
-    45 ┤━━━━━━━━━ 청산선 ━━━━━━━━━━
-       │         ↓ 청산
+    50 ┤━━━━━━━━━ 중립선 ━━━━━━━━━━
+       │         ↓ short_score가 long_score를 추월하면 롱 청산
      0 ┤
 ```
 
+신호 청산은 임계값 설정이 아니라 **두 방향 점수의 상대 비교**다 (D12).
+
+- LONG 보유: `short_score > long_score` 이면 `SIGNAL` 청산
+- SHORT 보유: `long_score > short_score` 이면 `SIGNAL` 청산
+- 동점(`50 == 50`)은 유지한다. 반대 점수가 엄격히 커져야 한다.
+- 실현손익의 부호와 무관하게 닫는다. 수익이면 성과 집계상 익절이지만 `close_reason` 은 항상 `SIGNAL` 이다.
+
 추가 규칙 (전부 config):
-- `min_hold_minutes` — 최소 보유 시간 (Risk Engine G4.5)
+- `min_hold_minutes` — 반대 진입 제한 시간 (Risk Engine G4.5). 신호 청산은 막지 않음
 - `reentry_cooldown_minutes` — 청산 후 재진입 대기 (G4.6)
 - `same_direction_limit` — 동일 방향 연속 진입 제한 (G4.7)
 - `daily_trade_limit`, `consecutive_loss_limit` (G3.3/G3.5)
@@ -352,7 +357,7 @@ def decide(snapshot, portfolio, cfg) -> Decision:
     trigger = compute_trigger(feats, cfg)
     scores  = compose_scores(bias, trigger, feats, cfg)
 
-    action  = policy.resolve(scores, portfolio, cfg)   # 히스테리시스 적용
+    action  = policy.resolve(scores, portfolio, cfg)   # 진입 임계값 / 점수 역전 청산
     if action is Action.NONE:
         return Decision.no_action(scores)
 

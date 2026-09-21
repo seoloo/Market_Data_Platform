@@ -224,7 +224,6 @@ class TestRealConfigFiles:
         assert cfg.risk.max_leverage == 10
         assert cfg.risk.min_stop_distance == Decimal("0.01")
         assert cfg.risk.daily_trade_limit == 2
-        assert cfg.risk.max_holding_hours == 48
         assert cfg.risk.max_drawdown_pct == Decimal("0.10")
 
     def test_live_starts_at_leverage_three(self):

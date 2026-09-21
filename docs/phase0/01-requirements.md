@@ -35,7 +35,7 @@
 - FR-2.1 **마감된** 봉만 사용하여 전략 평가 (형성 중 봉 사용 금지)
 - FR-2.2 다중 타임프레임 신호를 **느린 층(Bias)** 과 **빠른 층(Trigger)** 으로 분리 (→ 06 문서)
 - FR-2.3 `direction`, `long_score`, `short_score`, `risk_score`, `confidence_score` 산출
-- FR-2.4 진입 임계값과 청산 임계값 분리 (히스테리시스)
+- FR-2.4 진입은 70점 임계값, 청산은 반대 방향 점수의 엄격한 역전으로 분리 (D12)
 - FR-2.5 모든 요소는 config로 개별 on/off 가능
 - FR-2.6 Strategy Core는 순수 함수 — 시간·네트워크·DB·난수 접근 금지
 

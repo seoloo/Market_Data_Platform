@@ -225,7 +225,7 @@ P5 거래소연동 → P6 Paper → P7 Testnet → P8 소액실거래 → P9 실
 
 ### MVP 에 **반드시 포함**되는 것
 
-데이터 수집·무결성 / feature 5개 / bias-trigger 스코어링 / 히스테리시스 정책 /
+데이터 수집·무결성 / feature 5개 / bias-trigger 스코어링 / 진입 임계값·점수 역전 청산 정책 /
 비용 게이트 / Risk Engine 전 게이트 / 거래소 측 보호주문 / 멱등 주문 / reconciliation /
 상태머신 / 백테스트 엔진 + 검증 프로토콜 / decisions 저널 / Telegram / 워치독
 

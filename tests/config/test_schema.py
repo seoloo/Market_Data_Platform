@@ -211,29 +211,18 @@ class TestStopEconomics:
         assert share > D("0.10")  # 13% 수준 — 싸지는 않다
 
 
-class TestHoldingWindows:
-    def test_min_hold_longer_than_max_holding_rejected(self):
-        with pytest.raises(ValidationError, match="min_hold_minutes"):
-            RiskConfig.model_validate({"min_hold_minutes": 3000, "max_holding_hours": 48})
-
-
 class TestVolatilityGate:
     def test_inverted_bounds_rejected(self):
         with pytest.raises(ValidationError, match="모든 거래가 차단"):
             VolatilityGateConfig.model_validate({"atr_pct_lower": 0.9, "atr_pct_upper": 0.5})
 
 
-class TestPolicyHysteresis:
-    def test_exit_above_entry_rejected(self):
-        with pytest.raises(ValidationError, match="히스테리시스"):
-            PolicyConfig.model_validate({"long_entry_threshold": 70.0, "long_exit_threshold": 75.0})
-
-    def test_equal_thresholds_rejected(self):
-        """같은 값이면 경계선에서 진입·청산을 반복한다."""
-        with pytest.raises(ValidationError, match="히스테리시스"):
-            PolicyConfig.model_validate(
-                {"short_entry_threshold": 70.0, "short_exit_threshold": 70.0}
-            )
+class TestPolicyThresholds:
+    def test_removed_time_and_exit_threshold_settings_are_rejected(self):
+        with pytest.raises(ValidationError):
+            RiskConfig.model_validate({"max_holding_hours": 48})
+        with pytest.raises(ValidationError):
+            PolicyConfig.model_validate({"long_exit_threshold": 45.0})
 
     def test_entry_must_exceed_fifty(self):
         """long_score 50 은 중립이다. 그 이하를 진입선으로 두면 항상 진입한다."""

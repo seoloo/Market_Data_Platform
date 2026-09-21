@@ -5,7 +5,7 @@
 
 **최종 갱신**: 2026-09-21
 **갱신자**: Codex
-**저장소 상태**: bcc9bb0 + 미커밋 작업물 (Phase 2 risk 사이징·게이트)
+**저장소 상태**: 7d5c364 + 미커밋 작업물 (D12 보유·청산 정책 + strategy/policy)
 
 ---
 
@@ -14,7 +14,7 @@
 ```
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
-Phase 2 — 전략코어 ████████████░░░░░░░░  60%  ← 여기
+Phase 2 — 전략코어 █████████████░░░░░░░  65%  ← 여기
 Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
@@ -46,8 +46,9 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 10 | (Phase 2) `features/` 지표 5종 (B1/B2/T1/T2/T3) | ✅ 완료 |
 | 11 | (Phase 2) `features/structure.py` — ZigZag 스윙 (repainting 차단) | ✅ 완료 |
 | 12 | (Phase 2) `risk/sizing.py` PositionSizingEngine (D9) + `risk/gates.py` | ✅ 완료 |
-| 13 | **(Phase 2) `strategy/` bias·trigger·scoring·policy·cost + `decide()`** | ⬅️ **다음** |
-| 14 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 13 | (Phase 2) `strategy/policy.py` — 진입 임계값 + D12 점수 역전 청산 | ✅ 완료 |
+| 14 | **(Phase 2) `strategy/` bias·trigger·scoring·cost + `decide()`** | ⬅️ **다음** |
+| 15 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -129,14 +130,16 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/features/structure.py` | ZigZag 스윙. **`confirmed_at_ms` 로 repainting 차단** |
 | `tests/features/test_indicators.py` + `test_features.py` + `test_structure.py` | 164건 |
 | `src/auto_trading/risk/sizing.py` | D9 비용 포함 닫힌 해, 스윙/ATR 손절 선택, 수량 내림·레버리지 올림·청산 안전성 |
-| `src/auto_trading/risk/gates.py` | G1~G7 전체 veto 수집, 안전 방향 우회, 최대 보유시간 강제청산 트리거 분리 |
+| `src/auto_trading/risk/gates.py` | G1~G7 전체 veto 수집, 안전 방향 우회 |
 | `src/auto_trading/core/types.py` | `SizingPlan` 불변 기록 타입 추가 |
 | `tests/risk/` | 사이징·게이트 통과/경계/거부 및 장애 주입 80건 |
+| `src/auto_trading/strategy/policy.py` | 진입 70점, 롱/숏 대칭 점수 역전 신호청산. 동점 유지·보유시간/손익 무관 |
+| `tests/strategy/test_policy.py` | D12 경계·대칭·손익 독립·무제한 보유 테스트 10건 |
 
 **실데이터 검증 (2026-09-19 기준)**: b1_trend=+2.43(ATR배수) · b2_volregime=0.179(백분위)
 · t1_pullback RSI=49.6 · t2_momentum z=+0.58 · t3_volume=0.60
 
-**검증 결과**: 689 passed · leakage 9 passed · mypy strict 0 errors · ruff clean
+**검증 결과**: 699 passed · leakage 9 passed · mypy strict 0 errors · ruff clean
 · import-linter 4 contracts kept · coverage 95%
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
@@ -158,7 +161,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 심볼 / 거래소 | BTCUSDT / Binance USD-M (One-way, Isolated) |
 | 지표 | **5개** 고정, 등가중 (B1 4h추세, B2 1h변동성, T1 15m RSI, T2 5m모멘텀, T3 5m거래량) |
 | 구조 | Bias 게이트 × Trigger 타이밍 (곱셈) |
-| 보유기간 | 2~24시간 / 최대 48h 강제청산 |
+| 보유기간 / 청산 | 목표 2~24시간, 최대 제한 없음 / 반대 점수 엄격 역전 시 `SIGNAL` 청산 (D12) |
 | **거래당 최대 손실** | **총액의 1%** (D9 — 이것이 기준) |
 | 사이징 | 손절 우선 역산 `N = L / [s(1+c_out)+c_in+c_out+f]` |
 | 손절 위치 | 전략 결정 (스윙/ATR 중 더 먼 쪽), 최소 **1%** |
@@ -187,6 +190,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 | 9 | 로컬 `.venv` 가 제거된 Python 3.14 경로를 가리켜 실행 불가 | 개발 환경 재생성 필요 | 다음 로컬 검증 |
+| 10 | **JEV 도입 역할 미정** — shadow 판단기(권장) / 진입 veto / 신규 신호 중 선택 필요 | 사용자 | 현재 Phase 2 비블로킹 |
 
 ---
 
@@ -202,6 +206,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [x] 에이전트 작업 규약 수립
 - [x] 커밋 정책 (D8)
 - [x] 검증할 시장 가설 1문장 (D11, 가설 H1)
+- [x] 보유시간 상한 제거 + 반대 점수 역전 청산 (D12)
 
 ### Phase 1 — 기반
 - [x] `mypy --strict` / ruff / pytest 통과 (159 passed, 0 errors)
@@ -276,6 +281,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude Opus 5 | 2 | structure.py ZigZag 스윙 + repainting 차단 테스트 32건 | 완료 |
 | 2026-09-21 | Codex | 2 | D9 PositionSizingEngine + G1~G7 리스크 게이트 + 테스트 80건 | 완료 |
 | 2026-09-21 | Codex | 2 | causal/repainting 테스트 9건에 leakage marker 연결 | 완료 |
+| 2026-09-21 | Codex | 0/2 | D12 무제한 보유·점수 역전 청산 확정, 설정/리스크 정합화 + strategy policy 테스트 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

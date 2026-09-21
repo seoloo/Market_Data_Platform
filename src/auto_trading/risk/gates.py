@@ -24,7 +24,6 @@ __all__ = ["GateContext", "RiskGateEngine", "RiskState"]
 
 _BPS = Decimal("10000")
 _MINUTE_MS = 60_000
-_HOUR_MS = 60 * _MINUTE_MS
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,20 +96,6 @@ class RiskGateEngine:
         ]
         unique = tuple(dict.fromkeys(reasons))
         return RiskVerdict.veto(*unique) if unique else RiskVerdict.approve()
-
-    def force_exit_reasons(self, context: GateContext) -> tuple[VetoReason, ...]:
-        """진입 veto와 분리된 강제청산 트리거를 반환한다.
-
-        현재는 G4.9 최대 보유시간만 포함한다. 반환 타입은 기록 코드 호환을 위해
-        ``VetoReason`` 을 쓰지만, 이 값으로 청산을 막거나 진입 verdict를 만들지 않는다.
-        """
-        position = context.portfolio.position
-        if position is None or position.is_flat:
-            return ()
-        max_holding_ms = self._cfg.max_holding_hours * _HOUR_MS
-        if position.holding_ms(context.snapshot.as_of_ms) >= max_holding_ms:
-            return (VetoReason.MAX_HOLDING_TIME,)
-        return ()
 
     def _system_reasons(self, context: GateContext) -> list[VetoReason]:
         reasons: list[VetoReason] = []

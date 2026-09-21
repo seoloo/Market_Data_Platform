@@ -252,7 +252,7 @@ Auto_Trading/
     │   ├── bias.py             # [신설] 느린 층 (4h/1d/거시) -> 허용 방향 + 사이즈 배수
     │   ├── trigger.py          # [신설] 빠른 층 (15m/5m/1m) -> 진입 타이밍
     │   ├── scoring.py          # 합성 -> direction / confidence / risk_score
-    │   ├── policy.py           # 진입·청산 임계값, 히스테리시스, 쿨다운
+    │   ├── policy.py           # 진입 임계값, 점수 역전 청산, 쿨다운
     │   ├── cost.py             # expected_edge / expected_cost 게이트
     │   └── pipeline.py         # decide() — 순수 진입점
     ├── risk/

@@ -247,7 +247,6 @@ class RiskConfig(_Base):
     daily_trade_limit: int = Field(default=2, ge=1, le=100)
     min_hold_minutes: int = Field(default=120, ge=0, le=10_080)
     reentry_cooldown_minutes: int = Field(default=60, ge=0, le=10_080)
-    max_holding_hours: int = Field(default=48, ge=1, le=720)
     same_direction_limit: int = Field(default=2, ge=1, le=50)
     max_unprotected_ms: int = Field(default=5000, ge=100, le=60_000)
 
@@ -328,14 +327,6 @@ class RiskConfig(_Base):
                 "하루 한도를 채우면 곧바로 HALTED 가 되어 일일 한도가 무의미해진다."
             )
 
-        # 보유 시간 창
-        if self.min_hold_minutes > self.max_holding_hours * 60:
-            problems.append(
-                f"min_hold_minutes({self.min_hold_minutes}) 가 "
-                f"max_holding_hours({self.max_holding_hours}h = "
-                f"{self.max_holding_hours * 60}분) 를 넘는다."
-            )
-
         # 손절폭이 비용 대비 너무 좁으면 위험 예산을 비용이 잠식한다
         share = self.cost_share_of_budget
         if share > _MAX_COST_SHARE:
@@ -377,31 +368,19 @@ class FeaturesConfig(_Base):
 
 
 class PolicyConfig(_Base):
-    """진입·청산 정책 (06 §4). 히스테리시스로 경계선 왕복을 막는다."""
+    """진입·청산 정책 (06 §4).
+
+    진입에는 높은 임계값을 쓰되, 보유 포지션은 반대 방향 점수가 현재 방향
+    점수를 엄격히 추월하는 순간 신호 청산한다 (D12).
+    """
 
     long_entry_threshold: float = Field(default=70.0, gt=50.0, le=100.0)
-    long_exit_threshold: float = Field(default=45.0, ge=0.0, lt=100.0)
     short_entry_threshold: float = Field(default=70.0, gt=50.0, le=100.0)
-    short_exit_threshold: float = Field(default=45.0, ge=0.0, lt=100.0)
     bias_threshold: float = Field(default=0.5, gt=0.0, le=1.0)
     allow_counter_bias_when_neutral: bool = False
     reversal_requires_flat: bool = True
     minimum_required_edge_bps: float = Field(default=5.0, ge=0.0, le=1000.0)
     confidence_full_at: float = Field(default=0.6, gt=0.0, le=1.0)
-
-    @model_validator(mode="after")
-    def _check_hysteresis(self) -> PolicyConfig:
-        for side in ("long", "short"):
-            entry: float = getattr(self, f"{side}_entry_threshold")
-            exit_: float = getattr(self, f"{side}_exit_threshold")
-            if exit_ >= entry:
-                raise ValueError(
-                    f"{side}_exit_threshold({exit_}) 가 "
-                    f"{side}_entry_threshold({entry}) 이상이다. "
-                    "히스테리시스가 성립하지 않아 경계선에서 진입·청산을 반복하며 "
-                    "수수료만 소모한다 (06 §4)."
-                )
-        return self
 
 
 class DataConfig(_Base):
@@ -542,6 +521,6 @@ class RootConfig(_Base):
             f"누적DD한도={r.max_drawdown_pct:.1%} "
             f"일일거래한도={r.daily_trade_limit}회",
             f"진입={self.policy.long_entry_threshold:.0f} "
-            f"청산={self.policy.long_exit_threshold:.0f} "
+            "청산=반대점수 역전 "
             f"활성feature={len(self.features.enabled_names)}개",
         )

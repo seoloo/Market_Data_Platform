@@ -64,7 +64,6 @@ risk:
   daily_trade_limit: 2              # [확정] 한도는 이상 동작 탐지용이다
   min_hold_minutes: 120             # [확정]
   reentry_cooldown_minutes: 60      # [확정]
-  max_holding_hours: 48             # [확정] 2차 탈출 경로 (G4.9)
   same_direction_limit: 2
   max_unprotected_ms: 5000          # 초과 시 포지션 강제 청산
 
@@ -161,12 +160,10 @@ features:
 # ============================================================ 진입·청산 정책
 policy:
   long_entry_threshold: 70.0
-  long_exit_threshold: 45.0         # 진입보다 낮게 = 히스테리시스
   short_entry_threshold: 70.0
-  short_exit_threshold: 45.0
   bias_threshold: 0.5               # |B1| (ATR 배수) 이 미만이면 진입 금지
   allow_counter_bias_when_neutral: false
-  reversal_requires_flat: true      # 롱->숏 직접 전환 금지
+  reversal_requires_flat: true      # 점수 역전 시 청산 후, 쿨다운 뒤 반대 진입 재판단
   minimum_required_edge_bps: 5.0
   confidence_full_at: 0.6
 

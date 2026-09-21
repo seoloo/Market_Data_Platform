@@ -266,20 +266,6 @@ class TestExposureGates:
         result = reasons(context(sizing=None, sizing_veto_reasons=(sizing_reason,)))
         assert sizing_reason in result
 
-    def test_max_holding_is_force_exit_not_entry_veto(self):
-        position = PositionSnapshot(
-            symbol="BTCUSDT",
-            side=PositionSide.LONG,
-            state=PositionState.OPEN,
-            qty=D("0.01"),
-            entry_price=D("100000"),
-            opened_ms=AS_OF_MS - 48 * 60 * 60 * 1000,
-        )
-        ctx = context(portfolio=portfolio(position=position))
-        engine = RiskGateEngine(RiskConfig())
-        assert engine.force_exit_reasons(ctx) == (VetoReason.MAX_HOLDING_TIME,)
-        assert VetoReason.MAX_HOLDING_TIME not in engine.evaluate(ctx).reasons
-
 
 class TestMarketEventAndCostGates:
     def test_volatility_bounds_are_strict(self):
