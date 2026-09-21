@@ -303,11 +303,14 @@ class TestPullbackFeature:
         assert -1.0 <= result.normalized <= 1.0
 
     def test_does_not_interpret_direction(self):
-        """방향 해석은 strategy 의 일이다. feature 는 RSI 값만 낸다."""
+        """방향 해석은 strategy 의 일이다. feature 는 RSI 값과 창만 낸다."""
         feature = PullbackFeature()
         result = feature.compute(make_series(rising(feature.warmup_bars), Timeframe.M15))
         assert result.detail is not None
-        assert set(result.detail) == {"rsi"}
+        assert set(result.detail) == {"rsi", "history"}
+        history = result.detail["history"]
+        assert len(history) == feature.history_bars
+        assert history[-1] == result.raw  # 창의 마지막이 현재값
 
 
 # --------------------------------------------------------------- T2 모멘텀

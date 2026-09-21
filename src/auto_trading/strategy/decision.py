@@ -35,7 +35,7 @@ from auto_trading.core.types import (
 )
 from auto_trading.features.base import FeatureResult
 from auto_trading.features.indicators import atr_series
-from auto_trading.features.registry import build_feature_set
+from auto_trading.features.registry import build_feature_set, int_param
 from auto_trading.features.structure import SwingKind, detect_swings
 from auto_trading.risk.gates import GateContext, RiskGateEngine, RiskState
 from auto_trading.risk.sizing import PositionSizingEngine, SizingRequest, SizingResult
@@ -119,7 +119,9 @@ def decide(
         )
 
     trend, volatility, pullback, momentum, volume = features
-    bias = compute_bias(trend, volatility, cfg.policy, cfg.risk.volatility_gate)
+    bias = compute_bias(
+        trend, volatility, cfg.policy, cfg.risk.volatility_gate, cfg.features.b2_volregime
+    )
     trigger = compute_trigger(
         pullback,
         momentum,
@@ -132,6 +134,7 @@ def decide(
         bias,
         trigger,
         cfg.policy,
+        setup_lookback_bars=int_param(cfg.features.t1_pullback, "setup_lookback_bars", 12),
         data_quality=1.0,
         regime_stability=runtime.regime_stability,
         spread_risk=_spread_risk(snapshot, cfg),
@@ -158,7 +161,7 @@ def decide(
     cost = estimate_cost(cfg.risk.cost, side=side, funding_rate=snapshot.funding_rate)
     edge = estimate_edge(runtime.expected_edge_bps, runtime.edge_sample_count)
     required = cost.total_bps + Decimal(str(cfg.policy.minimum_required_edge_bps))
-    sizing_result = _size_entry(snapshot, portfolio, cfg, runtime, side)
+    sizing_result = _size_entry(snapshot, portfolio, cfg, runtime, side, bias.risk_scale)
     recent_change = _recent_price_change(snapshot, cfg)
     gate = RiskGateEngine(cfg.risk).evaluate(
         GateContext(
@@ -225,6 +228,7 @@ def _size_entry(
     cfg: RootConfig,
     context: DecisionContext,
     side: PositionSide,
+    risk_scale: Decimal,
 ) -> SizingResult:
     required = (
         context.qty_step,
@@ -269,6 +273,7 @@ def _size_entry(
             min_notional=cast(Decimal, context.min_notional),
             maintenance_margin_rate=cast(Decimal, context.maintenance_margin_rate),
             expected_funding_rate=snapshot.funding_rate,
+            risk_scale=risk_scale,
         )
     )
 
@@ -308,15 +313,17 @@ def _components(
 
     ``signal`` 은 **실제 합성식에 들어간 값 그대로**여야 한다. 기록용으로 한 번 더
     가공하면 나중에 "왜 이 점수가 나왔나" 를 재현할 수 없다 (D13 단일 squash).
+
+    D14 이후 T1 은 가중합에 들어가지 않고 **setup 조건**(0/1)으로 작동하므로,
+    signal 에는 setup 성립 여부를 1/0 으로 남기고 경과 봉·깊이는 raw 로 남긴다.
     """
     trend, volatility, pullback, momentum, volume = features
-    t1_weight = cfg.features.t1_pullback.weight
-    t2_weight = cfg.features.t2_momentum.weight
+    setup = trigger.setup
     return (
         _component(trend, "bias", float(trend.normalized or 0.0), 1.0),
         _component(volatility, "bias", 0.0, 1.0),
-        _component(pullback, "trigger", trigger.pullback_signal, t1_weight),
-        _component(momentum, "trigger", trigger.momentum_value, t2_weight),
+        _component(pullback, "trigger", 1.0 if setup.armed else 0.0, 0.0),
+        _component(momentum, "trigger", trigger.momentum_value, 1.0),
         _component(volume, "trigger", trigger.volume_confirm, 0.0),
     )
 

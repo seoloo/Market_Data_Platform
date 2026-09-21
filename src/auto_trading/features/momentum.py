@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import cast
 
 from auto_trading.core.enums import Timeframe
 from auto_trading.core.types import TimeframeSeries
@@ -35,16 +36,30 @@ class PullbackFeature:
 
     ``normalized`` 는 중립(50) 기준 편차를 ``[-1, +1]`` 로 옮긴 값이다
     (RSI 0 → -1, 50 → 0, 100 → +1). 방향 해석은 하지 않는다.
+
+    ``detail["history"]`` 에 최근 ``history_bars`` 개의 RSI 를 **오름차순**으로 담는다.
+    T1 은 "지금 눌려 있는가" 가 아니라 **"최근에 눌렸다가 풀렸는가"** 라는 시간적
+    조건이므로 (D14), 해석하는 쪽이 현재값 하나가 아니라 창을 봐야 한다.
+    측정과 해석의 분리는 그대로다 — 여기서는 창을 **제공만** 한다.
     """
 
     timeframe: Timeframe = Timeframe.M15
     rsi_period: int = 14
+    history_bars: int = 16
     name: str = "t1_pullback"
+
+    def __post_init__(self) -> None:
+        if self.history_bars < 1:
+            raise ValueError(f"history_bars 는 1 이상이어야 한다: {self.history_bars}")
 
     @property
     def warmup_bars(self) -> int:
-        """Wilder 평활도 초기 시드 영향이 남으므로 여유를 둔다."""
-        return self.rsi_period * 4 + 1
+        """Wilder 평활도 초기 시드 영향이 남으므로 여유를 둔다.
+
+        setup 판정에 쓸 창(``history_bars``)까지 **전부 RSI 가 채워져야** 한다.
+        창이 부족한 상태로 판정하면 "되돌림이 없었다" 와 "아직 모른다" 가 섞인다.
+        """
+        return self.rsi_period * 4 + self.history_bars
 
     def compute(self, series: TimeframeSeries) -> FeatureResult:
         if len(series) < self.warmup_bars:
@@ -59,13 +74,17 @@ class PullbackFeature:
         if current is None:  # pragma: no cover - warm-up 검사로 도달 불가
             return FeatureResult.unavailable(self.name, self.timeframe, "RSI 계산 실패")
 
+        window = rsis[-self.history_bars :]
+        if any(value is None for value in window):  # pragma: no cover - warm-up 으로 차단
+            return FeatureResult.unavailable(self.name, self.timeframe, "RSI 창 미충족")
+
         return FeatureResult(
             name=self.name,
             timeframe=self.timeframe,
             available=True,
             raw=current,
             normalized=float((current - _RSI_MID) / _RSI_MID),
-            detail={"rsi": current},
+            detail={"rsi": current, "history": tuple(cast("list[Decimal]", window))},
         )
 
 

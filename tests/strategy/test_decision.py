@@ -132,11 +132,24 @@ def test_bad_data_fails_closed_before_feature_computation() -> None:
 
 
 def signal_features(direction: int = 1) -> tuple[FeatureResult, ...]:
-    rsi = "38" if direction > 0 else "62"
+    """setup 이 걸린 상태 + 방아쇠가 당겨진 상태 (D14).
+
+    T1 은 창을 제공하고 setup 판정은 strategy 가 한다. 롱이면 최근에 RSI 가
+    눌림 구간(35~50)에 들어왔다가 나온 이력을 준다.
+    """
+    rsi = D("38") if direction > 0 else D("62")
+    history = tuple([D("55") if direction > 0 else D("45")] * 8 + [rsi] * 4)
     return (
         FeatureResult("b1_trend", Timeframe.H4, True, D(direction), float(direction)),
         FeatureResult("b2_volregime", Timeframe.H1, True, D("0.02"), 0.5),
-        FeatureResult("t1_pullback", Timeframe.M15, True, D(rsi), -0.24 * direction),
+        FeatureResult(
+            "t1_pullback",
+            Timeframe.M15,
+            True,
+            rsi,
+            -0.24 * direction,
+            detail={"rsi": rsi, "history": history},
+        ),
         FeatureResult("t2_momentum", Timeframe.M5, True, D("0.01"), 1.2 * direction),
         FeatureResult("t3_volume", Timeframe.M5, True, D("1.3"), 1.0),
     )
@@ -171,7 +184,8 @@ def test_approved_entry_builds_entry_stop_and_take_profit_intents(
     assert not result.veto_reasons
     assert result.sizing is not None
     assert tuple(intent.purpose.value for intent in result.intents) == ("E", "S", "T")
-    assert result.scores.long_score == pytest.approx(70.0)
+    # D14: direction = squash(1.2, 1.5) * T3(1.0) = 1.2/2.7. 국면 계수는 곱하지 않는다.
+    assert result.scores.long_score == pytest.approx(50.0 * (1 + 1.2 / 2.7))
 
 
 def test_missing_runtime_entry_inputs_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:

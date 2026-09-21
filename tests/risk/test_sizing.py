@@ -188,3 +188,37 @@ class TestSizingVetoes:
     def test_invalid_exchange_inputs_raise(self, overrides: dict[str, Decimal]):
         with pytest.raises(ValueError):
             PositionSizingEngine(RiskConfig()).calculate(request(**overrides))
+
+
+class TestRegimeRiskScale:
+    """D14-2 — 국면 계수는 **크기**로만 들어온다."""
+
+    def test_half_risk_scale_halves_the_position(self):
+        engine = PositionSizingEngine(RiskConfig())
+        full = engine.calculate(request()).plan
+        half = engine.calculate(request(risk_scale=D("0.5"))).plan
+        assert full is not None
+        assert half is not None
+        # 명목가는 허용 손실에 선형이므로 절반이 된다 (수량 내림 오차 범위 내).
+        assert half.target_notional == pytest.approx(full.target_notional / 2, rel=Decimal("1e-9"))
+        assert half.max_loss == full.max_loss / 2
+
+    def test_effective_risk_is_recorded_not_the_nominal_one(self):
+        """기록에 남는 risk_per_trade 는 **실제 적용된** 값이어야 재현이 된다."""
+        plan = PositionSizingEngine(RiskConfig()).calculate(request(risk_scale=D("0.5"))).plan
+        assert plan is not None
+        assert plan.risk_per_trade == RiskConfig().risk_per_trade * D("0.5")
+
+    def test_scaled_position_still_respects_the_loss_cap(self):
+        plan = PositionSizingEngine(RiskConfig()).calculate(request(risk_scale=D("0.25"))).plan
+        assert plan is not None
+        assert plan.estimated_loss_at_stop <= plan.max_loss
+
+    def test_default_scale_changes_nothing(self):
+        engine = PositionSizingEngine(RiskConfig())
+        assert engine.calculate(request()).plan == engine.calculate(request(risk_scale=D(1))).plan
+
+    @pytest.mark.parametrize("bad", [D(0), D("-0.5"), D("1.5")])
+    def test_scale_outside_unit_interval_is_rejected(self, bad):
+        with pytest.raises(ValueError, match="risk_scale"):
+            request(risk_scale=bad)

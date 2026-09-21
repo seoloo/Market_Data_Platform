@@ -112,7 +112,7 @@ features:
       atr_period: 14
       slope_bars: 10                # 기울기 구간 (1봉은 노이즈가 큼)
 
-  # B2 — 1시간 ATR 변동성 국면  [거래 허가 + 크기]
+  # B2 — 1시간 ATR 변동성 국면  [크기 조절 전용. 방향 점수에 곱하지 않는다 — D14]
   b2_volregime:
     enabled: true
     timeframe: 1h
@@ -120,29 +120,34 @@ features:
     params:
       atr_period: 14
       lookback_days: 365
+      high_percentile: 0.70         # 이 위는 고변동 국면
+      high_risk_scale: 0.5          # 고변동장에서는 거래당 리스크를 절반으로
+                                    # (진입 점수는 그대로 — 막는 건 극단 국면 게이트뿐)
 
-  # T1 — 15분 RSI(14) 되돌림  [진입 타이밍]
+  # T1 — 15분 RSI(14) 되돌림  [setup 조건. 점수에 더하지 않는다 — D14]
   t1_pullback:
     enabled: true
     timeframe: 15m
-    weight: 0.5                     # T1/T2 등가중
+    weight: 0.0                     # 가중합에 들어가지 않는다 (조건이지 점수가 아님)
     params:
       rsi_period: 14
       long_zone: [35.0, 50.0]
       short_zone: [50.0, 65.0]
       invalidate_below: 30.0
       invalidate_above: 70.0
+      setup_lookback_bars: 12       # 12 x 15m = 3시간. 이 안에 되돌림이 있어야 방아쇠 유효
+                                    # ⚠ 신규 파라미터. Phase 4 에서 민감도 확인 필요
 
   # T2 — 5분 모멘텀  [진입 타이밍]
   t2_momentum:
     enabled: true
     timeframe: 5m
-    weight: 0.5                     # T1/T2 등가중
+    weight: 1.0                     # D14 이후 유일한 방향 컴포넌트
     params:
       return_bars: 6                # 30분
       zscore_lookback: 288          # 24시간
       min_abs_z: 0.3
-      squash_k: 1.5                # T1+원 T2 z 합성값에 한 번만 적용
+      squash_k: 1.5                 # 원 z 에 한 번만 적용
 
   # T3 — 5분 거래량 확인  [곱셈. 더하지 않는다]
   t3_volume:

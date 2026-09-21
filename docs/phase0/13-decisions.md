@@ -1,7 +1,7 @@
 # 13 — Phase 0 확정 결정 기록
 
 확정일: 2026-09-20
-상태: **D1·D2·D6~D13 확정 / D3·D5 보류 / D4 는 D9 로 대체**
+상태: **D1·D2·D6~D14 확정 / D3·D5 보류 / D4 는 D9 로, D13 일부는 D14 로 대체**
 
 이 문서가 Phase 1 이후 구현의 기준이다. 여기 없는 것은 확정되지 않은 것이다.
 
@@ -631,6 +631,55 @@ Phase 4에서는 70점이라는 값의 성과를 검증하되, Phase 2 구현은
 
 ---
 
+## D14. Trigger 시간 구조 · 국면 계수 적용 지점 ✅ 확정
+
+2026-09-21 실데이터 스윕(2,184회 평가, 진입 16건)에서 드러난 두 구조적 결함을 고친다.
+D13 의 "단일 squash" 는 유지되고, **무엇을 합성하는가**가 바뀐다.
+
+### D14-1. T1 은 가산 점수가 아니라 시간적 setup 조건이다
+
+```python
+setup   = 최근 setup_lookback_bars 안에 T1 되돌림이 있었고 무효화되지 않았는가
+trigger = squash(T2_momentum_z, k) * T3_volume_confirm   if setup else 0
+```
+
+- **관측**: 진입 16건 중 12건의 T1 신호가 정확히 0 이었다.
+- **원인**: T1 은 RSI 가 눌림 구간에 *있을 때* 양수인데, T2 z 가 +2 를 넘으려면
+  가격이 방금 크게 튀어야 하고 그러면 RSI 는 이미 눌림 구간을 벗어난다.
+  같은 시점의 가중합으로는 두 조건이 동시에 성립할 수 없다.
+- **근거**: 가설 H1(D11)이 말한 것은 원래 **순서**다 — 되돌림이 먼저, 재개가 나중.
+  가중합은 그 순서를 표현하지 못한다.
+- setup 무효화: 되돌림 이후 `invalidate_below`(롱) 아래로 이탈하면 추세 이탈로 본다.
+- setup 신선도는 `confidence_score` 에만 반영하고 **진입 판정에는 쓰지 않는다**.
+
+### D14-2. 변동성 국면 계수는 방향 점수가 아니라 포지션 크기에 적용한다
+
+```python
+# 금지 — direction 에 곱하면 완충장치가 거부권이 된다
+direction = trigger * bias_multiplier
+
+# 확정
+direction = trigger
+max_loss  = equity * risk_per_trade * bias.risk_scale
+```
+
+- **관측**: 전체 봉의 48% 가 고변동 국면이었는데 진입 16건은 전부 정상 국면이었다.
+- **원인**: `squash` 출력이 유계라 70점 진입선은 `|direction| >= 0.40` 을 요구한다.
+  앞에 0.5 가 곱해지면 필요한 합성값이 6.0(T2 z 로 11.0)이 되어 도달 불가능하다.
+- 06 §2.2 표는 원래 B2 를 "게이트/사이즈용" 이라고 적고 있었다 — 구현이 문서를 벗어나 있었다.
+- **극단 국면은 별도로 명시 차단**한다: `compute_bias` 는 국면을 보고만 하고,
+  차단은 리스크 게이트 G5.1/G5.2(`VOL_TOO_HIGH`/`VOL_TOO_LOW`)가 한다.
+  완충(크기 축소)과 차단(거래 금지)을 서로 다른 장치가 맡는 것이 이 결정의 핵심이다.
+
+### D14-3. 임계값은 결과 없이 조정하지 않는다
+
+진입선 70 은 **그대로 둔다.** D14 는 임계값이 아니라 구조를 바꾼 것이며,
+성과 근거 없이 임계값을 만지면 그 시점부터 과최적화가 시작된다.
+`setup_lookback_bars = 12` (3시간)는 신규 파라미터라 값이 필요해 선험적으로 정했고,
+민감도는 비교 백테스트에 함께 보고한다. **성과가 가장 좋은 값을 고르지 않는다.**
+
+---
+
 ## D5. 실패 시 중단 기준 — 미정 ⏸
 
 [12-critique.md](12-critique.md) §14 Q7 미답변.
@@ -679,9 +728,12 @@ policy:                             # D12
   time_based_exit: disabled         # 시간 기반 강제청산 없음
   reversal_requires_flat: true
 
-scoring:                            # D13
-  trigger: squash(0.5*T1 + 0.5*T2_raw_z) * T3_confirm
+scoring:                            # D13 + D14
+  setup: T1 되돌림이 최근 setup_lookback_bars(12) 안에 있었는가
+  trigger: squash(T2_raw_z) * T3_confirm   # setup 성립 시에만
   squash_count: 1
+  regime_coefficient_applies_to: position_size   # NOT direction (D14-2)
+  extreme_regime: explicit_no_trade_gate
 
 excluded_from_mvp:                  # D1
   - elliott_wave_counting

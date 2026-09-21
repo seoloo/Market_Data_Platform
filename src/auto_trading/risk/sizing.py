@@ -55,6 +55,16 @@ class SizingRequest:
     min_notional: Decimal
     maintenance_margin_rate: Decimal
     expected_funding_rate: Decimal | None = None
+    risk_scale: Decimal = ONE
+    """국면별 리스크 축소 계수 (D14). 거래당 허용 손실에만 곱한다, (0,1].
+
+    고변동 국면에서 "작게 걸기" 를 표현하는 유일한 지점이다. 점수 쪽에 곱하면
+    고정 진입 임계값과 만나 거래 자체가 불가능해진다 (strategy/bias.py 참조).
+    """
+
+    def __post_init__(self) -> None:
+        if not ZERO < self.risk_scale <= ONE:
+            raise ValueError(f"risk_scale 은 (0,1] 이어야 한다: {self.risk_scale}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +165,8 @@ class PositionSizingEngine:
             stop_price = round_to_tick(stop_price, request.price_tick, rounding=rounding)
             stop_distance = self._stop_distance(request.side, request.entry_price, stop_price)
 
-        max_loss = request.equity * self._cfg.risk_per_trade
+        effective_risk = self._cfg.risk_per_trade * request.risk_scale
+        max_loss = request.equity * effective_risk
         cost_in = self._cfg.cost.cost_rate_in
         cost_out = self._cfg.cost.cost_rate_out
         funding = self._funding_rate(request.expected_funding_rate)
@@ -201,7 +212,7 @@ class PositionSizingEngine:
 
         plan = SizingPlan(
             account_equity=request.equity,
-            risk_per_trade=self._cfg.risk_per_trade,
+            risk_per_trade=effective_risk,
             max_loss=max_loss,
             entry_price=request.entry_price,
             stop_price=stop_price,

@@ -34,6 +34,7 @@ __all__ = [
     "Component",
     "DataQuality",
     "Decision",
+    "FundingRate",
     "Intent",
     "MarketSnapshot",
     "OrderSnapshot",
@@ -100,6 +101,39 @@ class Candle:
             "c": self.close,
             "v": self.volume,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class FundingRate:
+    """정산된 funding 한 건.
+
+    ``funding_ms`` 는 정산 시각이다. 그 시점에 롱은 ``rate`` 만큼 숏에게 지불한다
+    (음수면 반대). 보유 중 정산 시각을 지나면 실제 현금이 오간다.
+
+    ``interval_hours`` 를 함께 저장하는 이유: 다음 정산 시각을 알아야 진입 직전에
+    "곧 정산이다" 를 판단할 수 있는데, 주기는 심볼·시점마다 다르다. 연속한 두 행의
+    간격으로 역산하면 결측이 있을 때 조용히 틀린다.
+    """
+
+    funding_ms: int
+    rate: Decimal
+    interval_hours: int = 8
+    mark_price: Decimal | None = None
+
+    def __post_init__(self) -> None:
+        if self.funding_ms <= 0:
+            raise DataIntegrityError(f"funding_ms 가 0 이하: {self.funding_ms}")
+        if not 0 < self.interval_hours <= 24:
+            raise DataIntegrityError(f"funding 주기가 비정상: {self.interval_hours}시간")
+        if self.mark_price is not None and self.mark_price <= ZERO:
+            raise DataIntegrityError(f"mark_price 가 0 이하: {self.mark_price}")
+
+    @property
+    def next_funding_ms(self) -> int:
+        return self.funding_ms + self.interval_hours * 3_600_000
+
+    def to_digest_dict(self) -> dict[str, Any]:
+        return {"ms": self.funding_ms, "rate": self.rate, "h": self.interval_hours}
 
 
 @dataclass(frozen=True, slots=True)

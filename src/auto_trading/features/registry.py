@@ -20,7 +20,7 @@ from auto_trading.features.trend import TrendFeature
 from auto_trading.features.volatility import VolatilityRegimeFeature
 from auto_trading.features.volume import VolumeConfirmFeature
 
-__all__ = ["FeatureSet", "build_feature_set", "float_param", "int_param"]
+__all__ = ["FeatureSet", "build_feature_set", "float_param", "int_param", "zone_param"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +67,8 @@ def build_feature_set(cfg: FeaturesConfig) -> FeatureSet:
         pullback=PullbackFeature(
             timeframe=t1.timeframe,
             rsi_period=int_param(t1, "rsi_period", 14),
+            # setup 판정 창보다 이력이 짧으면 "되돌림 없음" 과 "모름" 을 구별할 수 없다.
+            history_bars=int_param(t1, "setup_lookback_bars", 12) + 4,
         ),
         momentum=MomentumFeature(
             timeframe=t2.timeframe,
@@ -97,3 +99,12 @@ def float_param(cfg: FeatureConfig, name: str, default: float) -> float:
     if isinstance(value, list):
         raise ValueError(f"{name} 은 숫자여야 한다")
     return float(value)
+
+
+def zone_param(cfg: FeatureConfig, name: str, default: tuple[float, float]) -> tuple[float, float]:
+    value = cfg.params.get(name)
+    if value is None:
+        return default
+    if not isinstance(value, list) or len(value) != 2:
+        raise ValueError(f"{name} 은 숫자 2개의 배열이어야 한다")
+    return float(value[0]), float(value[1])
