@@ -375,6 +375,10 @@ class PortfolioState:
 # ---------------------------------------------------------------- 전략 산출
 
 
+_MAX_COMPONENT_SIGNAL = 50.0
+"""컴포넌트 signal 의 온전성 한계. 정규화된 지표가 이 값을 넘으면 입력이 깨진 것이다."""
+
+
 @dataclass(frozen=True, slots=True)
 class Component:
     """점수 구성 요소 하나. ``decisions.components_json`` 에 그대로 저장된다."""
@@ -384,11 +388,21 @@ class Component:
     raw: float
     normalized: float
     signal: float
+    """**가중합에 실제로 들어간 값.** 기록용으로 다시 가공하지 않는다.
+
+    D13 이전에는 각 컴포넌트가 이미 압축된 값을 냈으므로 ``[-1,1]`` 이었다. D13 은
+    T2 를 압축 전 z-score 로 합성하므로 (`|z|` 가 1 을 넘는 것이 정상), 그 범위 제약은
+    더 이상 성립하지 않는다. 기록을 범위에 맞추려고 한 번 더 압축하면 "왜 이 점수가
+    나왔나" 를 재현할 수 없다 — 그래서 제약이 아니라 기록 쪽을 맞춘다.
+    """
     weight: float
 
     def __post_init__(self) -> None:
-        if not -1.0 <= self.signal <= 1.0:
-            raise ValueError(f"signal 은 [-1,1] 범위여야 한다: {self.name}={self.signal}")
+        # 유한성 검사. z-score 가 이 정도면 데이터가 깨진 것이다 (NaN 도 여기서 걸린다).
+        if not -_MAX_COMPONENT_SIGNAL <= self.signal <= _MAX_COMPONENT_SIGNAL:
+            raise ValueError(
+                f"signal 이 비정상이다 (|값| <= {_MAX_COMPONENT_SIGNAL}): {self.name}={self.signal}"
+            )
         if self.layer not in ("bias", "trigger"):
             raise ValueError(f"layer 는 bias 또는 trigger: {self.layer}")
 

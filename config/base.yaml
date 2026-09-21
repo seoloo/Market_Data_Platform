@@ -142,7 +142,7 @@ features:
       return_bars: 6                # 30분
       zscore_lookback: 288          # 24시간
       min_abs_z: 0.3
-      squash_k: 1.5
+      squash_k: 1.5                # T1+원 T2 z 합성값에 한 번만 적용
 
   # T3 — 5분 거래량 확인  [곱셈. 더하지 않는다]
   t3_volume:

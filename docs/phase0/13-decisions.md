@@ -1,7 +1,7 @@
 # 13 — Phase 0 확정 결정 기록
 
 확정일: 2026-09-20
-상태: **D1·D2·D6~D12 확정 / D3·D5 보류 / D4 는 D9 로 대체**
+상태: **D1·D2·D6~D13 확정 / D3·D5 보류 / D4 는 D9 로 대체**
 
 이 문서가 Phase 1 이후 구현의 기준이다. 여기 없는 것은 확정되지 않은 것이다.
 
@@ -614,6 +614,23 @@ Windows 개인 PC 는 절전·자동 업데이트 재부팅·회선 불안정 �
 
 ---
 
+## D13. Trigger 단일 squash ✅ 확정
+
+```python
+trigger = squash(0.5 * T1_pullback + 0.5 * T2_momentum_z) * T3_volume_confirm
+```
+
+- `T2_momentum_z` 는 압축 전 causal z-score를 사용한다.
+- T1/T2 합성값에 `squash`를 **한 번만** 적용한다.
+- T3는 방향 신호가 아니므로 마지막에 `[0.6, 1.0]` 확인 계수로 곱한다.
+- T2를 먼저 squash하고 합성값을 다시 squash하는 이중 압축은 금지한다. 이 방식은
+  `direction` 절댓값을 0.4 미만으로 가둬 확정 진입선 70점에 도달할 수 없게 한다.
+
+Phase 4에서는 70점이라는 값의 성과를 검증하되, Phase 2 구현은 우선 진입선이 수학적으로
+도달 가능한 이 식을 기준으로 한다.
+
+---
+
 ## D5. 실패 시 중단 기준 — 미정 ⏸
 
 [12-critique.md](12-critique.md) §14 Q7 미답변.
@@ -661,6 +678,10 @@ policy:                             # D12
   exit_rule: opposite_score_overtakes
   time_based_exit: disabled         # 시간 기반 강제청산 없음
   reversal_requires_flat: true
+
+scoring:                            # D13
+  trigger: squash(0.5*T1 + 0.5*T2_raw_z) * T3_confirm
+  squash_count: 1
 
 excluded_from_mvp:                  # D1
   - elliott_wave_counting

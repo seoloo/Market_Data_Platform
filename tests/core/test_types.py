@@ -443,9 +443,22 @@ class TestComponent:
         c = Component(name="b1", layer="bias", raw=1.2, normalized=1.2, signal=0.6, weight=0.5)
         assert c.contribution == pytest.approx(0.3)
 
-    def test_signal_range(self):
+    def test_raw_zscore_above_one_is_allowed(self):
+        """D13 이후 T2 는 압축 전 z-score 로 합성된다. |z| > 1 은 정상이다."""
+        component = Component(
+            name="t2_momentum", layer="trigger", raw=0.01, normalized=2.4, signal=2.4, weight=0.5
+        )
+        assert component.contribution == pytest.approx(1.2)
+
+    def test_absurd_signal_is_rejected(self):
         with pytest.raises(ValueError, match="signal"):
-            Component(name="x", layer="bias", raw=0.0, normalized=0.0, signal=2.0, weight=1.0)
+            Component(name="x", layer="bias", raw=0.0, normalized=0.0, signal=999.0, weight=1.0)
+
+    def test_nan_signal_is_rejected(self):
+        with pytest.raises(ValueError, match="signal"):
+            Component(
+                name="x", layer="bias", raw=0.0, normalized=0.0, signal=float("nan"), weight=1.0
+            )
 
     def test_layer_validation(self):
         with pytest.raises(ValueError, match="layer"):
