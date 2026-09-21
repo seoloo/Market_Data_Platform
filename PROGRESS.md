@@ -5,7 +5,7 @@
 
 **최종 갱신**: 2026-09-22
 **갱신자**: Codex
-**저장소 상태**: 77dc5ca + 미커밋 작업물 (Phase 4 TRAIN edge table)
+**저장소 상태**: 39e63d9 + 미커밋 작업물 (Phase 4 다중 horizon edge 게이트 연동)
 
 ---
 
@@ -16,7 +16,7 @@ Phase 0 — 설계     ███████████████████
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
 Phase 2 — 전략코어 ████████████████████ 100%  ✅ 게이트 2 통과
 Phase 3 — 백테스트 ████████████████████ 100%  ✅ 게이트 3 통과
-Phase 4 — 검증 ★   ██░░░░░░░░░░░░░░░░░░  10%  ← 현재
+Phase 4 — 검증 ★   ████░░░░░░░░░░░░░░░░  20%  ← 현재
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 6 — Paper    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 7 — Testnet  ░░░░░░░░░░░░░░░░░░░░   0%
@@ -54,7 +54,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 18 | (Phase 3) `feed.py` + `fills.py` + `portfolio.py` + `engine.py` | ✅ 완료 |
 | 19 | (Phase 3) `metrics.py` + `regimes.py` + `report.py` | ✅ 완료 |
 | 20 | (Phase 3) buy&hold·랜덤·단일 feature 기준선 | ✅ 완료 |
-| 21 | **(Phase 4) TRAIN 구간 검증 + edge table 추정** | 다중 horizon 원시표 완료, 단일 기준 확정·연동 대기 |
+| 21 | **(Phase 4) TRAIN 구간 검증 + edge table 추정** | 다중 horizon 최저값 게이트 연동·실데이터 재생 완료 — H1 비용 기준 실패 |
 | 22 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
@@ -210,7 +210,7 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 **구조 변경은 실측으로 확인됨**: 고변동 국면 진입 0건 → 31건(2024). end-to-end
 `decide()` 40일 구간에서 진입 23건 승인, 국면별 리스크 1.00%/0.50% 적용 확인.
 
-**검증 결과**: 926 passed · leakage 39 passed · mypy strict 0 errors · ruff clean
+**검증 결과**: 935 passed · leakage 39 passed · mypy strict 0 errors · ruff clean
 · import-linter 4 contracts kept
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
@@ -228,10 +228,15 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 | `strategy.evaluate_scores()` | `decide()`와 edge 추정이 공유하는 순수 점수 경로. 주문·사이징·snapshot 해시를 생략해 재생 시간 단축 |
 | `scripts/estimate_edge_table.py` | 92일 단위 병렬 재생, 연도/분할 경계 라벨 보존, 결정론적 JSON+digest 출력 |
 | `tests/backtest/test_edge.py` | 방향 대칭, 버킷 경계, 표본 하한, lookup 분리, digest 결정론 등 8건 |
+| `config/edge_table.yaml` | 2020~2022 TRAIN 표를 설정에 고정. 2/6/12/24h가 모두 가용할 때 최저 edge 사용 |
+| `config/schema.py` + `config/loader.py` | edge table 내용·파생값·digest 검증, 자동 로드 및 config hash 포함 |
+| `strategy/decision.py` | 런타임 수동값이 없으면 score×side×regime 다중 horizon table 직접 조회 |
+| `scripts/run_backtest.py` | SQLite 실데이터 → 공용 `decide()` 이벤트 재생 → 13종 리포트 생성 CLI |
 
 **가용 TRAIN edge 추정 (2020-01-01~2022-12-31, 5m 판단)**:
 209,761회 평가 · 진입 점수 신호 6,650개 · 2/6/12/24h 관측 26,591개 · 라벨 누락 9개 ·
-68개 버킷(표본 30개 이상 48개) · 테이블 digest `9812fa452e71`.
+68개 버킷(표본 30개 이상 48개) · 테이블 digest `43a9f73c46af` · 최종 config hash
+`d34550f5a48a`.
 
 | horizon | LONG gross edge | SHORT gross edge | 양수 비율 LONG / SHORT |
 |---|---:|---:|---:|
@@ -243,6 +248,28 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 이는 중첩된 진입 점수 관측의 **비용 차감 전 TRAIN 평균**이며 성과 증거가 아니다. 대부분의
 전체 평균이 음수이고 일부 세부 버킷만 양수다. 단일 horizon 을 성적순으로 고르지 않았으며,
 VALIDATION·봉인 TEST에는 아직 접근하지 않았다. 동일 1주 입력 재실행 JSON SHA-256 일치 확인.
+
+**다중 horizon 정책**: 2h·6h·12h·24h 네 셀이 모두 `n>=30` 이어야 하며, 그중 가장 낮은
+gross edge를 진입 기대값으로 쓴다. 완전 가용한 score×side×regime 조합은 12개였고,
+최저 edge가 왕복비용 13bps + 안전마진 5bps = 18bps를 넘는 조합은 **0개**였다
+(최고도 −1.59bps). 누락/표본 부족은 그대로 fail-closed 한다.
+
+**TRAIN 실제 엔진 재생 (2020~2022)**:
+
+| 연도 | 평가 | 진입 신호 | `INSUFFICIENT_EDGE` | 체결 |
+|---|---:|---:|---:|---:|
+| 2020 | 0 | 0 | 0 | 0 |
+| 2021 | 104,641 | 3,529 | 3,529 | 0 |
+| 2022 | 105,121 | 3,121 | 3,121 | 0 |
+| **합계** | **209,762** | **6,650** | **6,650** | **0** |
+
+2020은 가용 데이터가 2020-01부터라 B2의 365일 causal warm-up을 채우지 못해 평가 0회다.
+연도 분할은 사전 계산으로 모든 진입이 차단됨을 확인한 뒤 병렬 실행했으므로 포지션 상태 단절이
+없다. 경제지표 캘린더가 아직 없어 `EVENT_BLACKOUT`도 모든 신호에 함께 기록됐지만,
+`INSUFFICIENT_EDGE`만으로도 전 신호가 독립적으로 차단된다. 이 결과는 수익성 0%가 아니라
+**현재 H1이 보수적 비용 게이트를 통과하지 못해 거래 가능한 표본이 없다는 실패 판정**이다.
+게이트를 낮추거나 VALIDATION/TEST를 열지 않는다. 다음은 TRAIN 안에서 신호 중첩·국면별 실패
+원인을 진단한 뒤, 가설 자체를 바꿀지 사용자와 결정한다.
 
 ---
 

@@ -21,11 +21,15 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from auto_trading.core.enums import Mode, Timeframe
+from auto_trading.core.enums import Mode, PositionSide, Timeframe
+from auto_trading.core.hashing import sha256_hex
 
 __all__ = [
     "BlackoutWindow",
     "CostConfig",
+    "EdgeAggregationMode",
+    "EdgeBucketConfig",
+    "EdgeTableConfig",
     "FeatureConfig",
     "FeaturesConfig",
     "KillswitchMode",
@@ -121,6 +125,165 @@ class KillswitchMode(StrEnum):
 class DisplayTimezone(StrEnum):
     UTC = "UTC"
     KST = "KST"
+
+
+class EdgeAggregationMode(StrEnum):
+    """다중 horizon edge를 하나의 진입 게이트 값으로 합치는 규칙."""
+
+    ALL_HORIZONS_MIN = "all_horizons_min"
+
+
+class EdgeBucketConfig(_Base):
+    """TRAIN에서 고정한 단일 score×side×regime×horizon 관측치."""
+
+    side: PositionSide
+    regime: str = Field(min_length=1)
+    horizon_bars: int = Field(gt=0)
+    score_from: float = Field(ge=0.0, lt=100.0)
+    score_to: float = Field(gt=0.0, le=100.0)
+    sample_count: int = Field(ge=0)
+    observed_mean_bps: Rate
+    positive_rate: Rate = Field(ge=0, le=1)
+    min_samples: int = Field(ge=30)
+    available: bool
+    edge_bps: Rate
+
+    @model_validator(mode="after")
+    def _check_derived_values(self) -> EdgeBucketConfig:
+        if self.side is PositionSide.FLAT:
+            raise ValueError("edge bucket 방향은 LONG 또는 SHORT 여야 한다")
+        if self.score_from >= self.score_to:
+            raise ValueError("score_from 은 score_to 보다 작아야 한다")
+        available = self.sample_count >= self.min_samples
+        expected_edge = self.observed_mean_bps if available else Decimal(0)
+        if self.available is not available or self.edge_bps != expected_edge:
+            raise ValueError("available/edge_bps 가 sample_count 기반 파생값과 다르다")
+        return self
+
+    def artifact_payload(self) -> dict[str, Any]:
+        return {
+            "side": self.side.value,
+            "regime": self.regime,
+            "horizon_bars": self.horizon_bars,
+            "score_from": self.score_from,
+            "score_to": self.score_to,
+            "sample_count": self.sample_count,
+            "observed_mean_bps": str(self.observed_mean_bps),
+            "positive_rate": str(self.positive_rate),
+            "min_samples": self.min_samples,
+            "available": self.available,
+            "edge_bps": str(self.edge_bps),
+        }
+
+
+class EdgeTableConfig(_Base):
+    """재현 가능한 TRAIN edge 산출물과 보수적 조회 정책."""
+
+    aggregation: EdgeAggregationMode = EdgeAggregationMode.ALL_HORIZONS_MIN
+    digest: str = Field(pattern="^[0-9a-f]{64}$")
+    symbol: str = Field(min_length=3, max_length=20)
+    source_config_hash: str = Field(pattern="^[0-9a-f]{64}$")
+    train_from_ms: int = Field(ge=0)
+    train_to_ms: int = Field(gt=0)
+    decision_timeframe: Timeframe
+    score_boundaries: tuple[float, ...]
+    horizons_bars: tuple[int, ...]
+    min_samples: int = Field(ge=30)
+    observations: int = Field(ge=0)
+    buckets: tuple[EdgeBucketConfig, ...]
+
+    @model_validator(mode="after")
+    def _check_table(self) -> EdgeTableConfig:
+        if self.train_to_ms <= self.train_from_ms:
+            raise ValueError("TRAIN 종료는 시작보다 뒤여야 한다")
+        if (
+            len(self.score_boundaries) < 2
+            or tuple(sorted(set(self.score_boundaries))) != self.score_boundaries
+            or self.score_boundaries[0] < 0.0
+            or self.score_boundaries[-1] > 100.0
+        ):
+            raise ValueError("score_boundaries 는 [0,100] 안의 중복 없는 오름차순이어야 한다")
+        if (
+            not self.horizons_bars
+            or tuple(sorted(set(self.horizons_bars))) != self.horizons_bars
+            or any(value <= 0 for value in self.horizons_bars)
+        ):
+            raise ValueError("horizons_bars 는 중복 없는 양의 오름차순이어야 한다")
+
+        identities: set[tuple[PositionSide, str, int, float, float]] = set()
+        for bucket in self.buckets:
+            identity = (
+                bucket.side,
+                bucket.regime,
+                bucket.horizon_bars,
+                bucket.score_from,
+                bucket.score_to,
+            )
+            if identity in identities:
+                raise ValueError(f"중복 edge bucket: {identity}")
+            identities.add(identity)
+            if bucket.horizon_bars not in self.horizons_bars:
+                raise ValueError("bucket horizon 이 horizons_bars 에 없다")
+            if bucket.min_samples != self.min_samples:
+                raise ValueError("bucket min_samples 가 table min_samples 와 다르다")
+
+        if sha256_hex(self.artifact_payload()) != self.digest:
+            raise ValueError("edge table digest 가 내용과 일치하지 않는다")
+        return self
+
+    def artifact_payload(self) -> dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "source_config_hash": self.source_config_hash,
+            "train_from_ms": self.train_from_ms,
+            "train_to_ms": self.train_to_ms,
+            "decision_timeframe": self.decision_timeframe.value,
+            "score_boundaries": list(self.score_boundaries),
+            "horizons_bars": list(self.horizons_bars),
+            "min_samples": self.min_samples,
+            "observations": self.observations,
+            "buckets": [bucket.artifact_payload() for bucket in self.buckets],
+        }
+
+    def resolve(
+        self,
+        *,
+        side: PositionSide,
+        score: float,
+        regime: str,
+    ) -> tuple[Decimal | None, int | None]:
+        """모든 horizon이 가용할 때만 최악의 평균 edge를 반환한다."""
+        bounds = next(
+            (
+                (lower, upper)
+                for index, (lower, upper) in enumerate(
+                    zip(self.score_boundaries, self.score_boundaries[1:], strict=False)
+                )
+                if lower <= score < upper
+                or (index == len(self.score_boundaries) - 2 and score == upper)
+            ),
+            None,
+        )
+        if bounds is None or side is PositionSide.FLAT:
+            return None, None
+        lower, upper = bounds
+        matched = {
+            bucket.horizon_bars: bucket
+            for bucket in self.buckets
+            if bucket.side is side
+            and bucket.regime == regime
+            and bucket.score_from == lower
+            and bucket.score_to == upper
+        }
+        if set(matched) != set(self.horizons_bars):
+            return None, None
+        selected = tuple(matched[horizon] for horizon in self.horizons_bars)
+        if not all(bucket.available for bucket in selected):
+            return None, min(bucket.sample_count for bucket in selected)
+        return (
+            min(bucket.observed_mean_bps for bucket in selected),
+            min(bucket.sample_count for bucket in selected),
+        )
 
 
 # --------------------------------------------------------------------- 리스크
@@ -464,6 +627,7 @@ class RootConfig(_Base):
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     ui: UiConfig = Field(default_factory=UiConfig)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
+    edge_table: EdgeTableConfig | None = None
 
     @model_validator(mode="after")
     def _check_required_timeframes(self) -> RootConfig:
@@ -482,6 +646,24 @@ class RootConfig(_Base):
             raise ValueError(
                 f"feature/risk 가 사용하는 타임프레임이 data.timeframes 에 없다: {missing}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _check_edge_table_identity(self) -> RootConfig:
+        if self.edge_table is None:
+            return self
+        if self.edge_table.symbol != self.symbol:
+            raise ValueError("edge_table.symbol 이 전략 symbol 과 다르다")
+        trigger_timeframe = min(
+            (
+                self.features.t1_pullback.timeframe,
+                self.features.t2_momentum.timeframe,
+                self.features.t3_volume.timeframe,
+            ),
+            key=lambda timeframe: timeframe.ms,
+        )
+        if self.edge_table.decision_timeframe is not trigger_timeframe:
+            raise ValueError("edge_table.decision_timeframe 이 전략 판단 주기와 다르다")
         return self
 
     @model_validator(mode="after")

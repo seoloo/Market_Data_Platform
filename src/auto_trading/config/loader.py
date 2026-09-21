@@ -1,6 +1,7 @@
 """설정 로더.
 
-``base.yaml`` + 모드별 오버레이 + 환경변수를 병합해 검증된 :class:`RootConfig` 를 만든다.
+``base.yaml`` + 모드별 오버레이 + 고정 edge table + 환경변수를 병합해 검증된
+:class:`RootConfig` 를 만든다.
 
 **이 모듈은 파일과 환경변수에 접근하므로 순수하지 않다.**
 Pure Core (``core``/``features``/``strategy``/``risk``) 는 이 모듈을 import 하지 않는다.
@@ -138,6 +139,8 @@ def load_config(
     config_dir: Path | str = "config",
     environ: dict[str, str] | None = None,
     apply_env: bool = True,
+    include_edge_table: bool = True,
+    edge_table_path: Path | str | None = None,
 ) -> LoadedConfig:
     """설정을 로드하고 검증한다.
 
@@ -145,13 +148,16 @@ def load_config(
 
     1. ``config/base.yaml``
     2. ``config/<mode>.yaml`` (있으면)
-    3. 환경변수 ``AT_*`` (``apply_env=True`` 일 때)
+    3. ``config/edge_table.yaml`` 또는 명시한 edge table 경로 (있으면)
+    4. 환경변수 ``AT_*`` (``apply_env=True`` 일 때)
 
     Args:
         mode: 실행 모드. ``None`` 이면 ``AT_MODE`` 환경변수, 그것도 없으면 base.yaml 의 값.
         config_dir: 설정 디렉터리.
         environ: 환경변수 (테스트 주입용). ``None`` 이면 ``os.environ``.
         apply_env: 환경변수 오버레이 적용 여부.
+        include_edge_table: 고정 edge table 오버레이를 포함할지 여부. 추정기만 ``False``.
+        edge_table_path: 기본 경로 대신 사용할 edge table YAML 경로.
 
     Raises:
         ConfigError: 파일 없음, 파싱 실패, 검증 실패, 시크릿 포함.
@@ -171,6 +177,17 @@ def load_config(
         merged = merge_dicts(merged, _read_yaml(overlay_path))
         merged["mode"] = resolved_mode.value  # 오버레이가 mode 를 덮어쓰지 못하게 한다
         sources.append(str(overlay_path))
+
+    if include_edge_table:
+        edge_path = (
+            Path(edge_table_path) if edge_table_path is not None else directory / "edge_table.yaml"
+        )
+        if edge_table_path is not None and not edge_path.is_file():
+            raise ConfigError(f"설정 파일이 없다: {edge_path}")
+        if edge_path.is_file():
+            merged = merge_dicts(merged, _read_yaml(edge_path))
+            merged["mode"] = resolved_mode.value
+            sources.append(str(edge_path))
 
     if apply_env:
         overlay = _env_overlay(env)

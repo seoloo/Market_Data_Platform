@@ -7,8 +7,9 @@ from decimal import Decimal
 
 import pytest
 
-from auto_trading.config.schema import RootConfig
+from auto_trading.config.schema import EdgeTableConfig, RootConfig
 from auto_trading.core.enums import Action, Mode, PositionSide, PositionState, Timeframe, VetoReason
+from auto_trading.core.hashing import sha256_hex
 from auto_trading.core.types import (
     Candle,
     DataQuality,
@@ -188,6 +189,52 @@ def entry_context() -> DecisionContext:
     )
 
 
+def table_config(*, edge_by_horizon: dict[int, str]) -> RootConfig:
+    cfg = config()
+    buckets = [
+        {
+            "side": "LONG",
+            "regime": "normal",
+            "horizon_bars": horizon,
+            "score_from": 70.0,
+            "score_to": 80.0,
+            "sample_count": 40,
+            "observed_mean_bps": edge,
+            "positive_rate": "0.6",
+            "min_samples": 30,
+            "available": True,
+            "edge_bps": edge,
+        }
+        for horizon, edge in edge_by_horizon.items()
+    ]
+    payload: dict[str, object] = {
+        "symbol": "BTCUSDT",
+        "source_config_hash": "a" * 64,
+        "train_from_ms": 1,
+        "train_to_ms": 2,
+        "decision_timeframe": "5m",
+        "score_boundaries": [70.0, 80.0, 90.0, 100.0],
+        "horizons_bars": [24, 72, 144, 288],
+        "min_samples": 30,
+        "observations": 160,
+        "buckets": buckets,
+    }
+    payload["digest"] = sha256_hex(payload)
+    payload["aggregation"] = "all_horizons_min"
+    return cfg.model_copy(update={"edge_table": EdgeTableConfig.model_validate(payload)})
+
+
+def exchange_context() -> DecisionContext:
+    return DecisionContext(
+        qty_step=D("0.001"),
+        price_tick=D("0.1"),
+        min_qty=D("0.001"),
+        min_notional=D("5"),
+        maintenance_margin_rate=D("0.005"),
+        event_calendar_available=True,
+    )
+
+
 def test_approved_entry_builds_entry_stop_and_take_profit_intents(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -199,6 +246,33 @@ def test_approved_entry_builds_entry_stop_and_take_profit_intents(
     assert tuple(intent.purpose.value for intent in result.intents) == ("E", "S", "T")
     # D14: direction = squash(1.2, 1.5) * T3(1.0) = 1.2/2.7. 국면 계수는 곱하지 않는다.
     assert result.scores.long_score == pytest.approx(50.0 * (1 + 1.2 / 2.7))
+
+
+def test_configured_multi_horizon_edge_uses_worst_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_features(monkeypatch)
+    cfg = table_config(edge_by_horizon={24: "35", 72: "30", 144: "25", 288: "28"})
+    result = decide(snapshot(), portfolio(), cfg, exchange_context())
+    assert result.action is Action.OPEN_LONG
+    assert result.expected_edge_bps == 25.0
+    assert VetoReason.INSUFFICIENT_EDGE not in result.veto_reasons
+
+
+def test_one_weak_horizon_vetoes_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    patch_features(monkeypatch)
+    cfg = table_config(edge_by_horizon={24: "35", 72: "30", 144: "10", 288: "28"})
+    result = decide(snapshot(), portfolio(), cfg, exchange_context())
+    assert result.expected_edge_bps == 10.0
+    assert VetoReason.INSUFFICIENT_EDGE in result.veto_reasons
+
+
+def test_manual_edge_override_has_priority_over_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    patch_features(monkeypatch)
+    cfg = table_config(edge_by_horizon={24: "1", 72: "1", 144: "1", 288: "1"})
+    result = decide(snapshot(), portfolio(), cfg, entry_context())
+    assert result.expected_edge_bps == 30.0
+    assert VetoReason.INSUFFICIENT_EDGE not in result.veto_reasons
 
 
 def test_missing_runtime_entry_inputs_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:

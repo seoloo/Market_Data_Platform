@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
+
+import yaml
 
 from auto_trading.backtest.edge import (
     EdgeCollection,
@@ -19,6 +22,13 @@ from auto_trading.core.enums import Mode
 from auto_trading.features.registry import build_feature_set
 from auto_trading.storage.db import Database
 from auto_trading.storage.repositories.candles import CandleRepository
+
+stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+stderr_reconfigure = getattr(sys.stderr, "reconfigure", None)
+if stdout_reconfigure is not None:
+    stdout_reconfigure(encoding="utf-8", errors="replace")
+if stderr_reconfigure is not None:
+    stderr_reconfigure(encoding="utf-8", errors="replace")
 
 
 def _utc_ms(text: str, *, end: bool = False) -> int:
@@ -49,7 +59,7 @@ def _collect_chunk(
     train_to_ms: int,
     horizons_bars: tuple[int, ...],
 ) -> EdgeCollection:
-    loaded = load_config(Mode.BACKTEST, apply_env=False)
+    loaded = load_config(Mode.BACKTEST, apply_env=False, include_edge_table=False)
     cfg = loaded.config
     label_to_ms = min(
         train_to_ms,
@@ -136,10 +146,15 @@ def main() -> int:
         type=Path,
         default=Path("reports/phase4/train_edge_table.json"),
     )
+    parser.add_argument(
+        "--config-output",
+        type=Path,
+        help="전략이 자동 로드할 edge_table YAML 경로 (예: config/edge_table.yaml)",
+    )
     parser.add_argument("--workers", type=int, default=1, help="92일 단위 병렬 프로세스 수")
     args = parser.parse_args()
 
-    loaded = load_config(Mode.BACKTEST, apply_env=False)
+    loaded = load_config(Mode.BACKTEST, apply_env=False, include_edge_table=False)
     cfg = loaded.config
     from_ms = _utc_ms(args.from_date)
     to_ms = _utc_ms(args.to_date, end=True)
@@ -165,6 +180,19 @@ def main() -> int:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(table.to_json(), encoding="utf-8")
+    if args.config_output is not None:
+        config_payload = table.payload()
+        config_payload["digest"] = table.digest
+        config_payload["aggregation"] = "all_horizons_min"
+        args.config_output.parent.mkdir(parents=True, exist_ok=True)
+        args.config_output.write_text(
+            yaml.safe_dump(
+                {"edge_table": config_payload},
+                allow_unicode=True,
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
     print(f"config={loaded.hash[:12]} table={table.digest[:12]}")
     print(
         f"evaluated={collection.decisions_evaluated:,} signals={collection.signals_observed:,} "
@@ -172,6 +200,8 @@ def main() -> int:
         f"labels_skipped={collection.labels_skipped:,}"
     )
     print(f"buckets={len(table.buckets):,} output={args.output}")
+    if args.config_output is not None:
+        print(f"config_output={args.config_output}")
     return 0
 
 

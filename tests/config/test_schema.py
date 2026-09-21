@@ -14,13 +14,15 @@ from pydantic import ValidationError
 
 from auto_trading.config.schema import (
     CostConfig,
+    EdgeTableConfig,
     PolicyConfig,
     RiskConfig,
     RootConfig,
     UiConfig,
     VolatilityGateConfig,
 )
-from auto_trading.core.enums import Mode, Timeframe
+from auto_trading.core.enums import Mode, PositionSide, Timeframe
+from auto_trading.core.hashing import sha256_hex
 
 D = Decimal
 
@@ -36,6 +38,43 @@ FEATURES = {
 def root(**overrides) -> RootConfig:
     data = {"features": FEATURES, **overrides}
     return RootConfig.model_validate(data)
+
+
+def edge_table_payload(*, missing_horizon: int | None = None) -> dict[str, object]:
+    horizons = (24, 72, 144, 288)
+    means = {24: "31", 72: "27", 144: "22", 288: "25"}
+    buckets = [
+        {
+            "side": "LONG",
+            "regime": "normal",
+            "horizon_bars": horizon,
+            "score_from": 70.0,
+            "score_to": 80.0,
+            "sample_count": 40,
+            "observed_mean_bps": means[horizon],
+            "positive_rate": "0.6",
+            "min_samples": 30,
+            "available": True,
+            "edge_bps": means[horizon],
+        }
+        for horizon in horizons
+        if horizon != missing_horizon
+    ]
+    payload: dict[str, object] = {
+        "symbol": "BTCUSDT",
+        "source_config_hash": "a" * 64,
+        "train_from_ms": 1,
+        "train_to_ms": 2,
+        "decision_timeframe": "5m",
+        "score_boundaries": [70.0, 80.0, 90.0, 100.0],
+        "horizons_bars": list(horizons),
+        "min_samples": 30,
+        "observations": 160,
+        "buckets": buckets,
+    }
+    payload["digest"] = sha256_hex(payload)
+    payload["aggregation"] = "all_horizons_min"
+    return payload
 
 
 class TestDecimalPrecision:
@@ -228,6 +267,37 @@ class TestPolicyThresholds:
         """long_score 50 은 중립이다. 그 이하를 진입선으로 두면 항상 진입한다."""
         with pytest.raises(ValidationError):
             PolicyConfig.model_validate({"long_entry_threshold": 40.0})
+
+
+class TestEdgeTable:
+    def test_resolve_requires_every_horizon_and_uses_worst_edge(self):
+        table = EdgeTableConfig.model_validate(edge_table_payload())
+        assert table.resolve(
+            side=PositionSide.LONG,
+            score=75.0,
+            regime="normal",
+        ) == (D("22"), 40)
+
+    def test_missing_horizon_fails_closed(self):
+        table = EdgeTableConfig.model_validate(edge_table_payload(missing_horizon=144))
+        assert table.resolve(
+            side=PositionSide.LONG,
+            score=75.0,
+            regime="normal",
+        ) == (None, None)
+
+    def test_tampered_artifact_is_rejected(self):
+        payload = edge_table_payload()
+        payload["observations"] = 999
+        with pytest.raises(ValidationError, match="digest"):
+            EdgeTableConfig.model_validate(payload)
+
+    def test_table_contents_change_root_config_hash(self):
+        from auto_trading.config.loader import compute_config_hash
+
+        without = root()
+        with_table = root(edge_table=edge_table_payload())
+        assert compute_config_hash(without) != compute_config_hash(with_table)
 
 
 class TestUiGuardrails:

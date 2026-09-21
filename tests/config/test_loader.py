@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from auto_trading.config.loader import (
     LoadedConfig,
@@ -14,6 +15,7 @@ from auto_trading.config.loader import (
 )
 from auto_trading.core.enums import Mode
 from auto_trading.core.errors import ConfigError
+from auto_trading.core.hashing import sha256_hex
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
@@ -112,6 +114,51 @@ class TestModeOverlay:
     def test_explicit_mode_beats_env(self, config_dir: Path):
         loaded = load_config("testnet", config_dir=config_dir, environ={"AT_MODE": "paper"})
         assert loaded.config.mode is Mode.TESTNET
+
+
+class TestEdgeTableOverlay:
+    def _write_table(self, config_dir: Path) -> Path:
+        buckets = []
+        payload: dict[str, object] = {
+            "symbol": "BTCUSDT",
+            "source_config_hash": "a" * 64,
+            "train_from_ms": 1,
+            "train_to_ms": 2,
+            "decision_timeframe": "5m",
+            "score_boundaries": [70.0, 80.0],
+            "horizons_bars": [24],
+            "min_samples": 30,
+            "observations": 0,
+            "buckets": buckets,
+        }
+        payload["digest"] = sha256_hex(payload)
+        payload["aggregation"] = "all_horizons_min"
+        path = config_dir / "edge_table.yaml"
+        path.write_text(
+            yaml.safe_dump({"edge_table": payload}, sort_keys=False),
+            encoding="utf-8",
+        )
+        return path
+
+    def test_default_edge_table_is_loaded_and_hashed(self, config_dir: Path):
+        path = self._write_table(config_dir)
+        with_table = load_config(config_dir=config_dir, apply_env=False)
+        without_table = load_config(
+            config_dir=config_dir,
+            apply_env=False,
+            include_edge_table=False,
+        )
+        assert with_table.config.edge_table is not None
+        assert str(path) in with_table.sources
+        assert with_table.hash != without_table.hash
+
+    def test_explicit_missing_edge_table_raises(self, config_dir: Path):
+        with pytest.raises(ConfigError, match="설정 파일이 없다"):
+            load_config(
+                config_dir=config_dir,
+                apply_env=False,
+                edge_table_path=config_dir / "missing.yaml",
+            )
 
 
 class TestEnvOverlay:

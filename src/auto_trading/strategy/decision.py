@@ -154,7 +154,8 @@ def decide(
 
     side = PositionSide.LONG if action is Action.OPEN_LONG else PositionSide.SHORT
     cost = estimate_cost(cfg.risk.cost, side=side, funding_rate=snapshot.funding_rate)
-    edge = estimate_edge(runtime.expected_edge_bps, runtime.edge_sample_count)
+    edge_bps, edge_sample_count = _resolve_edge_input(runtime, cfg, side, scores)
+    edge = estimate_edge(edge_bps, edge_sample_count)
     required = cost.total_bps + Decimal(str(cfg.policy.minimum_required_edge_bps))
     sizing_result = _size_entry(snapshot, portfolio, cfg, runtime, side, evaluation.risk_scale)
     recent_change = _recent_price_change(snapshot, cfg)
@@ -204,6 +205,25 @@ def decide(
         expected_edge_bps=float(edge.edge_bps),
         expected_cost_bps=float(cost.total_bps),
         required_edge_bps=float(required),
+    )
+
+
+def _resolve_edge_input(
+    runtime: DecisionContext,
+    cfg: RootConfig,
+    side: PositionSide,
+    scores: ScoreSet,
+) -> tuple[Decimal | None, int | None]:
+    """수동 재현값이 없을 때만 설정에 고정된 다중 horizon table을 조회한다."""
+    if runtime.expected_edge_bps is not None or runtime.edge_sample_count is not None:
+        return runtime.expected_edge_bps, runtime.edge_sample_count
+    if cfg.edge_table is None:
+        return None, None
+    score = scores.long_score if side is PositionSide.LONG else scores.short_score
+    return cfg.edge_table.resolve(
+        side=side,
+        score=score,
+        regime=scores.regime or "unknown",
     )
 
 
