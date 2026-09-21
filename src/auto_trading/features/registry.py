@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from auto_trading.config.schema import FeatureConfig, FeaturesConfig
 from auto_trading.core.enums import Timeframe
+from auto_trading.core.hashing import sha256_hex
 from auto_trading.features.base import Feature
 from auto_trading.features.momentum import MomentumFeature, PullbackFeature
 from auto_trading.features.trend import TrendFeature
@@ -48,8 +49,33 @@ class FeatureSet:
         return required
 
 
+_CACHE: dict[str, FeatureSet] = {}
+_CACHE_LIMIT = 8
+"""설정 조합별 FeatureSet 캐시.
+
+같은 설정이면 **같은 객체**를 돌려주는 것이 중요하다. feature 가 들고 있는 계산
+캐시(B2 의 1년 백분위 등)가 호출 간에 살아남아야 백테스트가 현실적인 시간에 끝난다.
+설정은 한 프로세스에서 몇 개 안 되므로 작게 유지하고, 넘치면 통째로 비운다.
+
+캐시 키는 설정 내용 해시다. 객체 동일성이 결과를 바꾸지 않는 이유는 feature 가
+순수하기 때문이다 — 같은 설정·같은 입력이면 같은 출력이다.
+"""
+
+
 def build_feature_set(cfg: FeaturesConfig) -> FeatureSet:
-    """설정값으로 feature 5개를 조립한다."""
+    """설정값으로 feature 5개를 조립한다. 같은 설정이면 같은 객체를 돌려준다."""
+    key = sha256_hex(cfg.model_dump(mode="json"))
+    cached = _CACHE.get(key)
+    if cached is not None:
+        return cached
+    built = _build(cfg)
+    if len(_CACHE) >= _CACHE_LIMIT:
+        _CACHE.clear()
+    _CACHE[key] = built
+    return built
+
+
+def _build(cfg: FeaturesConfig) -> FeatureSet:
     b1, b2 = cfg.b1_trend, cfg.b2_volregime
     t1, t2, t3 = cfg.t1_pullback, cfg.t2_momentum, cfg.t3_volume
     return FeatureSet(

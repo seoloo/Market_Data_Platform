@@ -66,6 +66,12 @@ class Candle:
     volume: Decimal
     quote_volume: Decimal = ZERO
     trade_count: int = 0
+    _digest: str | None = field(default=None, init=False, compare=False, repr=False)
+    """지연 계산된 해시 캐시. 비교·표시에서 제외되므로 값의 동일성에 영향이 없다.
+
+    캔들은 불변이고 백테스트는 같은 객체를 수만 번 재사용하므로, 한 번만 계산한다.
+    일반 대입은 막혀 있으며 ``digest()`` 안에서만 내부 캐시를 채운다.
+    """
 
     def __post_init__(self) -> None:
         if self.close_ms <= self.open_ms:
@@ -101,6 +107,13 @@ class Candle:
             "c": self.close,
             "v": self.volume,
         }
+
+    def digest(self) -> str:
+        """이 봉 하나의 해시. 첫 호출에만 계산하고 이후에는 캐시를 쓴다."""
+        if self._digest is None:
+            object.__setattr__(self, "_digest", sha256_hex(self.to_digest_dict()))
+        assert self._digest is not None
+        return self._digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,8 +200,26 @@ class TimeframeSeries:
             for i in range(1, len(self.candles))
         )
 
+    def digest(self) -> str:
+        """시계열 전체의 해시.
+
+        봉 하나하나를 JSON 으로 다시 직렬화하지 않고, **캔들별 캐시된 해시를
+        이어붙여** 한 번만 해싱한다. 내용 민감도는 그대로 유지된다 — 봉이 하나라도
+        다르면 이어붙인 문자열이 달라진다.
+
+        이 최적화 전에는 스냅샷 해싱이 ``decide()`` 시간의 83% 를 차지했다
+        (2026-09-21 프로파일, 결정 1회당 캔들 약 9,500개 × 필드 6개 정규화).
+        """
+        return sha256_hex(
+            {
+                "tf": self.timeframe.value,
+                "n": len(self.candles),
+                "members": "".join(c.digest() for c in self.candles),
+            }
+        )
+
     def to_digest_dict(self) -> dict[str, Any]:
-        return {"tf": self.timeframe.value, "candles": list(self.candles)}
+        return {"tf": self.timeframe.value, "digest": self.digest()}
 
 
 @dataclass(frozen=True, slots=True)

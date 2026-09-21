@@ -14,7 +14,7 @@ BTC 가 3만일 때의 ATR 300 과 10만일 때의 ATR 300 은 다른 의미이�
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from auto_trading.core.enums import Timeframe
@@ -37,6 +37,18 @@ class VolatilityRegimeFeature:
     atr_period: int = 14
     lookback_days: int = 365
     name: str = "b2_volregime"
+    _cache: dict[str, FeatureResult] = field(
+        default_factory=dict, init=False, compare=False, repr=False
+    )
+    """직전 계산 1건 캐시. 값의 동일성에는 관여하지 않는다 (compare=False).
+
+    B2 는 1년치 ATR 백분위라 창이 8,774봉이고 계산이 ``decide()`` 시간의 73% 를
+    차지한다 (2026-09-21 프로파일). 그런데 5분마다 판단하는 동안 1시간봉은 12번에
+    한 번만 바뀌므로, 같은 창을 12번 다시 계산하고 있었다.
+
+    키는 **시계열 전체의 해시**다. 창 경계만 쓰면 과거 봉이 정정됐을 때 낡은 값을
+    돌려줄 수 있다. 봉별 해시가 캐시되어 있어 (Candle.digest) 키 계산은 싸다.
+    """
 
     @property
     def lookback_bars(self) -> int:
@@ -49,6 +61,16 @@ class VolatilityRegimeFeature:
         return self.atr_period + self.lookback_bars
 
     def compute(self, series: TimeframeSeries) -> FeatureResult:
+        key = series.digest()
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        result = self._compute(series)
+        self._cache.clear()
+        self._cache[key] = result
+        return result
+
+    def _compute(self, series: TimeframeSeries) -> FeatureResult:
         if len(series) < self.warmup_bars:
             return FeatureResult.unavailable(
                 self.name,

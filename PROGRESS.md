@@ -5,7 +5,7 @@
 
 **최종 갱신**: 2026-09-21
 **갱신자**: Codex
-**저장소 상태**: 7d5c364 + 미커밋 작업물 (D12 보유·청산 정책 + strategy/policy)
+**저장소 상태**: 78e95d7 + 미커밋 작업물 (Phase 3 백테스트 재생 엔진)
 
 ---
 
@@ -14,8 +14,8 @@
 ```
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
-Phase 2 — 전략코어 ███████████████████░  95%  ← 여기
-Phase 3 — 백테스트 ░░░░░░░░░░░░░░░░░░░░   0%
+Phase 2 — 전략코어 ████████████████████ 100%  ✅ 게이트 2 통과
+Phase 3 — 백테스트 ███████░░░░░░░░░░░░░  35%  ← 여기
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 6 — Paper    ░░░░░░░░░░░░░░░░░░░░   0%
@@ -30,7 +30,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 ## ➡️ 다음 작업
 
-**Phase 2 — 전략 코어 진행 중**
+**Phase 3 — 백테스트 엔진 진행 중**
 
 | 순서 | 작업 | 상태 |
 |---|---|---|
@@ -51,8 +51,10 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 15 | (Phase 2) `marketdata/snapshot.py` causal 관문 + 실데이터 `decide()` 검증 | ✅ 완료 |
 | 16 | (Phase 2) **D14** — T1 을 시간적 setup 으로, 국면계수를 사이징으로 이전 + 비교 백테스트 | ✅ 완료 |
 | 17 | (Phase 2→3) **funding rate 수집** — 게이트 차단 요인 해소 | ✅ 완료 |
-| 18 | **(Phase 3) 백테스트 엔진** — 증분 feature 계산 필수 (현재 92ms/평가) | ⬅️ **다음** |
-| 19 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 18 | (Phase 3) `feed.py` + `fills.py` + `portfolio.py` + `engine.py` | ✅ 완료 |
+| 19 | **(Phase 3) `metrics.py` + `regimes.py` + `report.py`** | ⬅️ **다음** |
+| 20 | (Phase 3) buy&hold·랜덤·단일 feature 기준선 + 골든 테스트 | 대기 |
+| 21 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -155,6 +157,22 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `scripts/backfill_funding.py` | CLI. resume·dry-run·결측 리포트 |
 | `tests/marketdata/test_funding.py` | 파싱·계획·인과성·지터 허용·체크섬 실패 31건 |
 
+### Phase 3 — 백테스트 엔진 (2026-09-21, 진행 중)
+
+| 산출물 | 내용 |
+|---|---|
+| `src/auto_trading/backtest/feed.py` | 전 구간 인메모리 적재 + 인과적 rolling window. 형성 중 봉 물리적 배제 |
+| `src/auto_trading/backtest/fills.py` | 다음 1분봉 체결, 거래량 0 미체결, 갭·슬리피지, 동일 봉 손절 우선 |
+| `src/auto_trading/backtest/portfolio.py` | 수수료·funding·MAE/MFE·강제청산 회계 + 경로 의존 `RiskState` 추적 |
+| `src/auto_trading/backtest/engine.py` | 라이브와 같은 `decide()`를 호출하는 이벤트 재생 루프. 5m 판단→1m 체결 |
+| `core/types.py` + `features/{registry,volatility}.py` | snapshot digest·B2 캐시. `decide()` 92ms→10.5ms/평가 |
+| `tests/backtest/` | 체결·비용·funding·청산·인과성·결정론·fail-closed·일일 한도 72건 |
+
+**실데이터 스모크 (2024-01-15~29, 진단용 edge 60bps)**:
+4,033회 평가 · 진입 후보 157회 · 거래 2건 · 최종 9,984.74 USDT(-0.15%) · 노출 29.4% ·
+손절 1 / 2R 익절 1 · `SAME_DIRECTION_LIMIT` 154회 / `REENTRY_COOLDOWN` 7회.
+edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거가 아니라 엔진 경로 스모크**다.
+
 **실데이터 검증 (2026-09-19 기준)**: b1_trend=+2.43(ATR배수) · b2_volregime=0.179(백분위)
 · t1_pullback RSI=49.6 · t2_momentum z=+0.58 · t3_volume=0.60
 
@@ -185,7 +203,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 **구조 변경은 실측으로 확인됨**: 고변동 국면 진입 0건 → 31건(2024). end-to-end
 `decide()` 40일 구간에서 진입 23건 승인, 국면별 리스크 1.00%/0.50% 적용 확인.
 
-**검증 결과**: 830 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept
+**검증 결과**: 902 passed · leakage 38 passed · mypy strict 0 errors · ruff clean
+· import-linter 4 contracts kept
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
 · 3%→13.6h(94h) · 5%→38.3h(219h). 최근 구조 라벨 `HH/HL` (b1_trend +2.43 과 일치)
@@ -237,7 +256,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 15 | **D14 의 성과 우열은 아직 미확인** — 근사 비교에서 연도별로 부호가 뒤집힌다.<br>D12 점수 역전 청산(주 청산 경로)을 반영하지 못한 근사이므로 판단 불가.<br>**Phase 3 엔진으로 재측정하기 전까지 임계값·파라미터를 만지지 않는다** | Phase 3 | Phase 4 |
 | 16 | `setup_lookback_bars=12` 는 선험적 기본값. 민감도 6/12/24 에서 단조성 없음 | Phase 4 | — |
 | ~~13~~ | ~~`funding_rates` 비어 있음~~ → **7,305건 적재, 결측 0건. end-to-end 진입 승인 확인** | — | 해소됨 |
-| 14 | `decide()` 1회 **92ms** — 5분봉 3년 백테스트 = 약 8시간. 증분 계산 필요 | Phase 3 설계 | Phase 3 |
+| ~~14~~ | ~~`decide()` 1회 92ms~~ → digest/B2 캐시로 **10.5ms/평가** 실측 | — | 해소됨 |
+| 17 | **동일 방향 연속 진입 제한이 실데이터 후보 대부분을 차단** — 2주 스모크에서 157개 후보 중 154개가 `SAME_DIRECTION_LIMIT`.<br>확정 리스크 한도이므로 임의 완화 금지. Phase 3 전체 재생 통계로 재확인 | Phase 3 | Phase 4 |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 | 9 | 로컬 `.venv` 가 제거된 Python 3.14 경로를 가리켜 실행 불가 | 개발 환경 재생성 필요 | 다음 로컬 검증 |
@@ -273,14 +293,14 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 - [x] 설정 파일에 시크릿이 들어가면 거부
 
 ### Phase 2 — 전략 코어
-- [ ] `decide()` 가 I/O 없이 동작 (import-linter 통과)
-- [ ] 동일 입력 → 동일 Decision 해시 (1000회)
-- [ ] 전 게이트에 통과/거부 테스트 존재
-- [ ] feature 상관행렬 |corr| < 0.7
+- [x] `decide()` 가 I/O 없이 동작 (import-linter 통과)
+- [x] 동일 입력 → 동일 Decision 해시 (1000회)
+- [x] 전 게이트에 통과/거부 테스트 존재
+- [x] feature 상관행렬 |corr| < 0.7 (실측 최대 0.392)
 
 ### Phase 3 — 백테스트
-- [ ] 합성 데이터에서 체결·수수료·funding 이 수기 계산과 일치
-- [ ] 강제청산 시뮬레이션 동작
+- [x] 합성 데이터에서 체결·수수료·funding 이 수기 계산과 일치
+- [x] 강제청산 시뮬레이션 동작
 - [ ] 동일 run_id 재실행 시 지표 완전 일치 (골든)
 - [ ] 리포트 전 항목 생성
 
@@ -334,6 +354,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Codex | 2 | causal/repainting 테스트 9건에 leakage marker 연결 | 완료 |
 | 2026-09-21 | Codex | 0/2 | D12 무제한 보유·점수 역전 청산 확정, 설정/리스크 정합화 + strategy policy 테스트 | 완료 |
 | 2026-09-21 | Codex | 0/2 | D13 단일 squash 확정, bias/trigger/scoring/cost + 순수 decide() 및 결정론 테스트 | 완료 |
+| 2026-09-21 | Claude Opus 5 | 3 | 인메모리 feed·체결·portfolio·이벤트 재생 엔진 및 백테스트 테스트 작성 | 미커밋 인계 |
+| 2026-09-21 | Codex | 3 | Opus 작업 인계 검증, 누적 RiskState·정산시점 funding·stale funding 보정, 실데이터 2주 스모크 | 완료 |
 | 2026-09-21 | Claude | 2 | Codex 산출물 검토 — 구조 손절 미연결·기록/수식 불일치·Component 불변식 충돌 3건 수정 | 완료 |
 | 2026-09-21 | Claude | 2 | `features/registry.py` + `marketdata/snapshot.py` + 테스트 30건 | 완료 |
 | 2026-09-21 | Claude | 2 | 실데이터 `decide()` 스윕 2,184회 — 진입 16건 실증, 상관행렬 통과, 미해결 #11~#14 발견 | 완료 |

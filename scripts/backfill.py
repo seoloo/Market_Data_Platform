@@ -34,6 +34,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:  # 설치 없이 실행할 수 있게
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
+# Windows 기본 콘솔은 cp949 라 한글 타이포그래피 기호에서 죽는다.
+# 리포트 출력 때문에 스크립트가 실패하면 안 되므로 UTF-8 로 고정한다.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from auto_trading.config.loader import load_config  # noqa: E402
 from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.marketdata.archive import ArchiveFile, BinanceVisionClient  # noqa: E402
