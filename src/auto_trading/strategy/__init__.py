@@ -2,7 +2,7 @@
 
 from auto_trading.strategy.bias import BiasResult, compute_bias
 from auto_trading.strategy.cost import CostEstimate, EdgeEstimate, estimate_cost, estimate_edge
-from auto_trading.strategy.decision import DecisionContext, decide
+from auto_trading.strategy.decision import DecisionContext, ScoreEvaluation, decide, evaluate_scores
 from auto_trading.strategy.policy import resolve_action
 from auto_trading.strategy.scoring import compose_scores
 from auto_trading.strategy.trigger import TriggerResult, compute_trigger
@@ -12,6 +12,7 @@ __all__ = [
     "CostEstimate",
     "DecisionContext",
     "EdgeEstimate",
+    "ScoreEvaluation",
     "TriggerResult",
     "compose_scores",
     "compute_bias",
@@ -19,5 +20,6 @@ __all__ = [
     "decide",
     "estimate_cost",
     "estimate_edge",
+    "evaluate_scores",
     "resolve_action",
 ]

@@ -45,7 +45,7 @@ from auto_trading.strategy.policy import resolve_action
 from auto_trading.strategy.scoring import compose_scores
 from auto_trading.strategy.trigger import TriggerResult, compute_trigger
 
-__all__ = ["DecisionContext", "decide"]
+__all__ = ["DecisionContext", "ScoreEvaluation", "decide", "evaluate_scores"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +82,25 @@ class DecisionContext:
     regime_stability: float = 1.0
 
 
+@dataclass(frozen=True, slots=True)
+class ScoreEvaluation:
+    """한 스냅샷의 순수 점수 계산 결과.
+
+    edge 추정은 주문 의도·사이징·리스크 게이트가 아니라 이 결과만 필요하다.
+    ``decide()``도 같은 함수를 호출하므로 연구용 점수 경로가 따로 생기지 않는다.
+    """
+
+    scores: ScoreSet
+    components: tuple[Component, ...]
+    risk_scale: Decimal
+    volatility_percentile: float | None
+    unavailable_names: tuple[str, ...] = ()
+
+    @property
+    def available(self) -> bool:
+        return not self.unavailable_names
+
+
 def decide(
     snapshot: MarketSnapshot,
     portfolio: PortfolioState,
@@ -96,16 +115,15 @@ def decide(
     if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
         return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
 
-    features = _compute_features(snapshot, cfg)
-    unavailable = tuple(result for result in features if not result.available)
-    if unavailable:
+    evaluation = evaluate_scores(snapshot, cfg, runtime)
+    if not evaluation.available:
         quality = DataQuality(
             ok=False,
             warmup_ok=False,
             stale_timeframes=snapshot.data_quality.stale_timeframes,
             missing_timeframes=snapshot.data_quality.missing_timeframes,
             gapped_timeframes=snapshot.data_quality.gapped_timeframes,
-            notes=tuple(result.name for result in unavailable),
+            notes=evaluation.unavailable_names,
         )
         return Decision(
             as_of_ms=snapshot.as_of_ms,
@@ -118,31 +136,8 @@ def decide(
             notes=("feature warm-up 미충족",),
         )
 
-    trend, volatility, pullback, momentum, volume = features
-    bias = compute_bias(
-        trend, volatility, cfg.policy, cfg.risk.volatility_gate, cfg.features.b2_volregime
-    )
-    trigger = compute_trigger(
-        pullback,
-        momentum,
-        volume,
-        bias_direction=bias.direction,
-        pullback_cfg=cfg.features.t1_pullback,
-        momentum_cfg=cfg.features.t2_momentum,
-    )
-    scores = compose_scores(
-        bias,
-        trigger,
-        cfg.policy,
-        setup_lookback_bars=int_param(cfg.features.t1_pullback, "setup_lookback_bars", 12),
-        data_quality=1.0,
-        regime_stability=runtime.regime_stability,
-        spread_risk=_spread_risk(snapshot, cfg),
-        event_proximity=runtime.event_proximity,
-        funding_extremity=_funding_extremity(snapshot, cfg),
-        volatility_percentile=volatility.normalized or 0.0,
-    )
-    components = _components(features, trigger, cfg)
+    scores = evaluation.scores
+    components = evaluation.components
     action = resolve_action(scores, portfolio, cfg.policy)
 
     if action is Action.NONE:
@@ -161,7 +156,7 @@ def decide(
     cost = estimate_cost(cfg.risk.cost, side=side, funding_rate=snapshot.funding_rate)
     edge = estimate_edge(runtime.expected_edge_bps, runtime.edge_sample_count)
     required = cost.total_bps + Decimal(str(cfg.policy.minimum_required_edge_bps))
-    sizing_result = _size_entry(snapshot, portfolio, cfg, runtime, side, bias.risk_scale)
+    sizing_result = _size_entry(snapshot, portfolio, cfg, runtime, side, evaluation.risk_scale)
     recent_change = _recent_price_change(snapshot, cfg)
     gate = RiskGateEngine(cfg.risk).evaluate(
         GateContext(
@@ -177,7 +172,7 @@ def decide(
             clock_drift_ms=runtime.clock_drift_ms,
             reconcile_ok=runtime.reconcile_ok,
             bad_price=runtime.bad_price,
-            volatility_percentile=volatility.normalized,
+            volatility_percentile=evaluation.volatility_percentile,
             recent_price_change_pct=recent_change,
             event_blackout_active=runtime.event_blackout_active,
             event_calendar_available=runtime.event_calendar_available,
@@ -209,6 +204,70 @@ def decide(
         expected_edge_bps=float(edge.edge_bps),
         expected_cost_bps=float(cost.total_bps),
         required_edge_bps=float(required),
+    )
+
+
+def evaluate_scores(
+    snapshot: MarketSnapshot,
+    cfg: RootConfig,
+    context: DecisionContext | None = None,
+) -> ScoreEvaluation:
+    """라이브 ``decide()``와 동일한 경로로 점수까지만 계산한다.
+
+    I/O·시계·난수를 사용하지 않는 순수 함수다. 데이터 품질 자체의 승인 여부는
+    호출자가 확인하며, feature warm-up 부족은 ``available=False`` 로 반환한다.
+    """
+    runtime = context if context is not None else DecisionContext()
+    if snapshot.symbol != cfg.symbol:
+        raise ValueError(f"snapshot.symbol({snapshot.symbol}) != cfg.symbol({cfg.symbol})")
+    if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
+        return ScoreEvaluation(
+            scores=ScoreSet.neutral(),
+            components=(),
+            risk_scale=ZERO,
+            volatility_percentile=None,
+            unavailable_names=("data_quality",),
+        )
+    features = _compute_features(snapshot, cfg)
+    unavailable = tuple(result.name for result in features if not result.available)
+    if unavailable:
+        return ScoreEvaluation(
+            scores=ScoreSet.neutral(),
+            components=(),
+            risk_scale=ZERO,
+            volatility_percentile=None,
+            unavailable_names=unavailable,
+        )
+
+    trend, volatility, pullback, momentum, volume = features
+    bias = compute_bias(
+        trend, volatility, cfg.policy, cfg.risk.volatility_gate, cfg.features.b2_volregime
+    )
+    trigger = compute_trigger(
+        pullback,
+        momentum,
+        volume,
+        bias_direction=bias.direction,
+        pullback_cfg=cfg.features.t1_pullback,
+        momentum_cfg=cfg.features.t2_momentum,
+    )
+    scores = compose_scores(
+        bias,
+        trigger,
+        cfg.policy,
+        setup_lookback_bars=int_param(cfg.features.t1_pullback, "setup_lookback_bars", 12),
+        data_quality=1.0,
+        regime_stability=runtime.regime_stability,
+        spread_risk=_spread_risk(snapshot, cfg),
+        event_proximity=runtime.event_proximity,
+        funding_extremity=_funding_extremity(snapshot, cfg),
+        volatility_percentile=volatility.normalized or 0.0,
+    )
+    return ScoreEvaluation(
+        scores=scores,
+        components=_components(features, trigger, cfg),
+        risk_scale=bias.risk_scale,
+        volatility_percentile=volatility.normalized,
     )
 
 

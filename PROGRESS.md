@@ -3,9 +3,9 @@
 > **모든 AI 에이전트는 작업 시작 전 이 파일을 읽고, 작업 종료 시 반드시 갱신한다.**
 > 대화 기록은 사라지지만 이 파일은 남는다. 여기 없는 것은 진행되지 않은 것이다.
 
-**최종 갱신**: 2026-09-21
+**최종 갱신**: 2026-09-22
 **갱신자**: Codex
-**저장소 상태**: d36a807 + 미커밋 작업물 (Phase 3 기준선 비교)
+**저장소 상태**: 77dc5ca + 미커밋 작업물 (Phase 4 TRAIN edge table)
 
 ---
 
@@ -15,8 +15,8 @@
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
 Phase 2 — 전략코어 ████████████████████ 100%  ✅ 게이트 2 통과
-Phase 3 — 백테스트 ████████████████████ 100%  ✅ 게이트 3 통과  ← 현재 (Phase 4 승인 대기)
-Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
+Phase 3 — 백테스트 ████████████████████ 100%  ✅ 게이트 3 통과
+Phase 4 — 검증 ★   ██░░░░░░░░░░░░░░░░░░  10%  ← 현재
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 6 — Paper    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 7 — Testnet  ░░░░░░░░░░░░░░░░░░░░   0%
@@ -30,7 +30,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 
 ## ➡️ 다음 작업
 
-**Phase 3 — 백테스트 엔진 진행 중**
+**Phase 4 — 전략 검증 진행 중 (TRAIN만 접근)**
 
 | 순서 | 작업 | 상태 |
 |---|---|---|
@@ -54,7 +54,7 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 18 | (Phase 3) `feed.py` + `fills.py` + `portfolio.py` + `engine.py` | ✅ 완료 |
 | 19 | (Phase 3) `metrics.py` + `regimes.py` + `report.py` | ✅ 완료 |
 | 20 | (Phase 3) buy&hold·랜덤·단일 feature 기준선 | ✅ 완료 |
-| 21 | **(Phase 4) TRAIN 구간 검증 + edge table 추정** | 사용자 승인 대기 |
+| 21 | **(Phase 4) TRAIN 구간 검증 + edge table 추정** | 다중 horizon 원시표 완료, 단일 기준 확정·연동 대기 |
 | 22 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
@@ -210,7 +210,7 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 **구조 변경은 실측으로 확인됨**: 고변동 국면 진입 0건 → 31건(2024). end-to-end
 `decide()` 40일 구간에서 진입 23건 승인, 국면별 리스크 1.00%/0.50% 적용 확인.
 
-**검증 결과**: 916 passed · leakage 39 passed · mypy strict 0 errors · ruff clean
+**검증 결과**: 926 passed · leakage 39 passed · mypy strict 0 errors · ruff clean
 · import-linter 4 contracts kept
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
@@ -219,6 +219,30 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 **실서버 스모크 (2026-09-21)**: 2024-01 실데이터 1m/5m/1h 적재 → 체크섬 전건 검증,
 **재집계 대조 9,216 + 768 버킷 전부 일치**, 갭·이상치 0건, 8초 / 11MB.
 전체 추정: 약 414만 봉 / **0.8GB** / 20~40분.
+
+### Phase 4 — 전략 검증 (2026-09-22, 진행 중)
+
+| 산출물 | 내용 |
+|---|---|
+| `src/auto_trading/backtest/edge.py` | TRAIN 전용 다중 horizon edge 관측·버킷 집계. 비용 전 gross return, `n<30` 은 edge 0 fail-closed |
+| `strategy.evaluate_scores()` | `decide()`와 edge 추정이 공유하는 순수 점수 경로. 주문·사이징·snapshot 해시를 생략해 재생 시간 단축 |
+| `scripts/estimate_edge_table.py` | 92일 단위 병렬 재생, 연도/분할 경계 라벨 보존, 결정론적 JSON+digest 출력 |
+| `tests/backtest/test_edge.py` | 방향 대칭, 버킷 경계, 표본 하한, lookup 분리, digest 결정론 등 8건 |
+
+**가용 TRAIN edge 추정 (2020-01-01~2022-12-31, 5m 판단)**:
+209,761회 평가 · 진입 점수 신호 6,650개 · 2/6/12/24h 관측 26,591개 · 라벨 누락 9개 ·
+68개 버킷(표본 30개 이상 48개) · 테이블 digest `9812fa452e71`.
+
+| horizon | LONG gross edge | SHORT gross edge | 양수 비율 LONG / SHORT |
+|---|---:|---:|---:|
+| 2h | −1.97bps | −3.74bps | 45.8% / 45.1% |
+| 6h | −12.89bps | −8.71bps | 43.5% / 45.6% |
+| 12h | −9.96bps | −8.25bps | 44.1% / 46.2% |
+| 24h | +8.18bps | −5.23bps | 49.4% / 46.5% |
+
+이는 중첩된 진입 점수 관측의 **비용 차감 전 TRAIN 평균**이며 성과 증거가 아니다. 대부분의
+전체 평균이 음수이고 일부 세부 버킷만 양수다. 단일 horizon 을 성적순으로 고르지 않았으며,
+VALIDATION·봉인 TEST에는 아직 접근하지 않았다. 동일 1주 입력 재실행 JSON SHA-256 일치 확인.
 
 ---
 
@@ -265,6 +289,8 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 | ~~13~~ | ~~`funding_rates` 비어 있음~~ → **7,305건 적재, 결측 0건. end-to-end 진입 승인 확인** | — | 해소됨 |
 | ~~14~~ | ~~`decide()` 1회 92ms~~ → digest/B2 캐시로 **10.5ms/평가** 실측 | — | 해소됨 |
 | 17 | **동일 방향 연속 진입 제한이 실데이터 후보 대부분을 차단** — 2주 스모크에서 157개 후보 중 154개가 `SAME_DIRECTION_LIMIT`.<br>확정 리스크 한도이므로 임의 완화 금지. Phase 3 전체 재생 통계로 재확인 | Phase 3 | Phase 4 |
+| 18 | **계획 TRAIN은 2019~2022지만 로컬 데이터는 2020-01-01부터 시작** — 현재 edge table은 2020~2022 가용 TRAIN 기준 | 사용자/Phase 4 | 2019 백필 여부 결정 |
+| 19 | **`expected_holding_bars`가 문서에만 있고 설정에는 없음** — 2/6/12/24h 표를 모두 생성했으나 런타임 비용 게이트가 사용할 단일 기준은 미확정 | 사용자/Phase 4 | edge table 연동 |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
 | ~~9~~ | ~~로컬 `.venv` 실행 불가~~ → sandbox 외부 프로젝트 가상환경으로 전체 검증 성공 | — | 해소됨 |
@@ -371,6 +397,8 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 | 2026-09-21 | Claude | 0/2 | **D14 확정·구현** — T1 을 시간적 setup 으로, 국면계수를 사이징으로 이전 | 완료 |
 | 2026-09-21 | Claude | 2 | D13 vs D14 동일데이터 비교 (2023·2024·2025) — 우열 판정 불가, 노이즈 범위 | 완료 |
 | 2026-09-21 | Claude | 2/3 | funding 수집 — 7,305건 적재, 게이트 차단 해소. 지터 오탐 2,256건 방지 | 완료 |
+| 2026-09-22 | Codex | 4 | 가용 TRAIN 2020~2022 다중 horizon edge table 추정 — 전체 평균 대부분 음수, VALIDATION/TEST 미접근 | 진행 중 |
+| 2026-09-22 | Codex | 4 | 공통 `evaluate_scores()` 경로·병렬 추정기·fail-closed 버킷 테스트, 926 tests/39 leakage 통과 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.

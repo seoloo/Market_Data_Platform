@@ -18,7 +18,7 @@ from auto_trading.core.types import (
     TimeframeSeries,
 )
 from auto_trading.features.base import FeatureResult
-from auto_trading.strategy import DecisionContext, decide
+from auto_trading.strategy import DecisionContext, decide, evaluate_scores
 
 D = Decimal
 
@@ -123,6 +123,19 @@ def test_decide_is_deterministic_for_one_thousand_repetitions() -> None:
     cfg = config()
     expected = decide(snap, portfolio(), cfg).digest()
     assert {decide(snap, portfolio(), cfg).digest() for _ in range(1000)} == {expected}
+
+
+def test_score_only_path_matches_full_decision() -> None:
+    snap = snapshot()
+    cfg = config()
+    assert evaluate_scores(snap, cfg).scores == decide(snap, portfolio(), cfg).scores
+
+
+def test_score_only_path_fails_closed_on_bad_data() -> None:
+    result = evaluate_scores(snapshot(quality=DataQuality(ok=False)), config())
+    assert not result.available
+    assert result.unavailable_names == ("data_quality",)
+    assert result.scores == result.scores.neutral()
 
 
 def test_bad_data_fails_closed_before_feature_computation() -> None:
