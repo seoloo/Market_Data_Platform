@@ -5,7 +5,7 @@
 
 **최종 갱신**: 2026-09-21
 **갱신자**: Codex
-**저장소 상태**: 78e95d7 + 미커밋 작업물 (Phase 3 백테스트 재생 엔진)
+**저장소 상태**: 8d69ba8 + 미커밋 작업물 (Phase 3 지표·국면·리포트)
 
 ---
 
@@ -15,7 +15,7 @@
 Phase 0 — 설계     ████████████████████  100%
 Phase 1 — 기반     ████████████████████  100%  ✅ 게이트 1 통과
 Phase 2 — 전략코어 ████████████████████ 100%  ✅ 게이트 2 통과
-Phase 3 — 백테스트 ███████░░░░░░░░░░░░░  35%  ← 여기
+Phase 3 — 백테스트 ███████████████░░░░░  75%  ← 여기
 Phase 4 — 검증 ★   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5 — 거래소   ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 6 — Paper    ░░░░░░░░░░░░░░░░░░░░   0%
@@ -52,8 +52,8 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 16 | (Phase 2) **D14** — T1 을 시간적 setup 으로, 국면계수를 사이징으로 이전 + 비교 백테스트 | ✅ 완료 |
 | 17 | (Phase 2→3) **funding rate 수집** — 게이트 차단 요인 해소 | ✅ 완료 |
 | 18 | (Phase 3) `feed.py` + `fills.py` + `portfolio.py` + `engine.py` | ✅ 완료 |
-| 19 | **(Phase 3) `metrics.py` + `regimes.py` + `report.py`** | ⬅️ **다음** |
-| 20 | (Phase 3) buy&hold·랜덤·단일 feature 기준선 + 골든 테스트 | 대기 |
+| 19 | (Phase 3) `metrics.py` + `regimes.py` + `report.py` | ✅ 완료 |
+| 20 | **(Phase 3) buy&hold·랜덤·단일 feature 기준선** | ⬅️ **다음** |
 | 21 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
@@ -167,6 +167,10 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/backtest/engine.py` | 라이브와 같은 `decide()`를 호출하는 이벤트 재생 루프. 5m 판단→1m 체결 |
 | `core/types.py` + `features/{registry,volatility}.py` | snapshot digest·B2 캐시. `decide()` 92ms→10.5ms/평가 |
 | `tests/backtest/` | 체결·비용·funding·청산·인과성·결정론·fail-closed·일일 한도 72건 |
+| `src/auto_trading/backtest/metrics.py` | 원 명세 지표 + 비용비율·R·DSR·bootstrap CI·DD 지속·MAE/MFE 등 07 §4 전 지표 |
+| `src/auto_trading/backtest/regimes.py` | 200일 EMA·ATR 백분위 causal 국면 라벨 + 진입시점 기준 국면별 성과 |
+| `src/auto_trading/backtest/report.py` + `charts.py` | 외부 plotting 의존성 없이 명세의 리포트 13종 생성 |
+| `tests/backtest/test_metrics_and_report.py` + `test_regimes.py` | 골든 digest·동일 run_id 바이트 일치·PNG·경로탈출·국면 causality 7건 |
 
 **실데이터 스모크 (2024-01-15~29, 진단용 edge 60bps)**:
 4,033회 평가 · 진입 후보 157회 · 거래 2건 · 최종 9,984.74 USDT(-0.15%) · 노출 29.4% ·
@@ -203,7 +207,7 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 **구조 변경은 실측으로 확인됨**: 고변동 국면 진입 0건 → 31건(2024). end-to-end
 `decide()` 40일 구간에서 진입 23건 승인, 국면별 리스크 1.00%/0.50% 적용 확인.
 
-**검증 결과**: 902 passed · leakage 38 passed · mypy strict 0 errors · ruff clean
+**검증 결과**: 909 passed · leakage 38 passed · mypy strict 0 errors · ruff clean
 · import-linter 4 contracts kept
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
@@ -260,7 +264,7 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 | 17 | **동일 방향 연속 진입 제한이 실데이터 후보 대부분을 차단** — 2주 스모크에서 157개 후보 중 154개가 `SAME_DIRECTION_LIMIT`.<br>확정 리스크 한도이므로 임의 완화 금지. Phase 3 전체 재생 통계로 재확인 | Phase 3 | Phase 4 |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
-| 9 | 로컬 `.venv` 가 제거된 Python 3.14 경로를 가리켜 실행 불가 | 개발 환경 재생성 필요 | 다음 로컬 검증 |
+| ~~9~~ | ~~로컬 `.venv` 실행 불가~~ → sandbox 외부 프로젝트 가상환경으로 전체 검증 성공 | — | 해소됨 |
 | 10 | **JEV 도입 역할 미정** — shadow 판단기(권장) / 진입 veto / 신규 신호 중 선택 필요 | 사용자 | 현재 Phase 2 비블로킹 |
 
 ---
@@ -301,8 +305,8 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 ### Phase 3 — 백테스트
 - [x] 합성 데이터에서 체결·수수료·funding 이 수기 계산과 일치
 - [x] 강제청산 시뮬레이션 동작
-- [ ] 동일 run_id 재실행 시 지표 완전 일치 (골든)
-- [ ] 리포트 전 항목 생성
+- [x] 동일 run_id 재실행 시 지표 완전 일치 (골든 digest + 파일 바이트 비교)
+- [x] 리포트 전 항목 생성 (JSON/Markdown/CSV/PNG 13종)
 
 ### Phase 4 — 검증 ★ 최대 관문
 - [ ] TEST 구간 비용 반영 후 양의 기댓값
@@ -356,6 +360,7 @@ edge 60bps는 아직 TRAIN에서 추정한 값이 아니므로 **성과 근거�
 | 2026-09-21 | Codex | 0/2 | D13 단일 squash 확정, bias/trigger/scoring/cost + 순수 decide() 및 결정론 테스트 | 완료 |
 | 2026-09-21 | Claude Opus 5 | 3 | 인메모리 feed·체결·portfolio·이벤트 재생 엔진 및 백테스트 테스트 작성 | 미커밋 인계 |
 | 2026-09-21 | Codex | 3 | Opus 작업 인계 검증, 누적 RiskState·정산시점 funding·stale funding 보정, 실데이터 2주 스모크 | 완료 |
+| 2026-09-21 | Codex | 3 | 전 성과지표·causal 국면분해·리포트 13종 + 동일 run_id 골든 테스트 구현 | 완료 |
 | 2026-09-21 | Claude | 2 | Codex 산출물 검토 — 구조 손절 미연결·기록/수식 불일치·Component 불변식 충돌 3건 수정 | 완료 |
 | 2026-09-21 | Claude | 2 | `features/registry.py` + `marketdata/snapshot.py` + 테스트 30건 | 완료 |
 | 2026-09-21 | Claude | 2 | 실데이터 `decide()` 스윕 2,184회 — 진입 16건 실증, 상관행렬 통과, 미해결 #11~#14 발견 | 완료 |
