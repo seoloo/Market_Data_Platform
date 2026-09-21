@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import yaml
@@ -13,15 +15,17 @@ import yaml
 from auto_trading.backtest.edge import (
     EdgeCollection,
     collect_edge_observations,
+    diagnose_edge_observations,
     estimate_edge_table,
 )
 from auto_trading.backtest.feed import CandleFeed, FeedWindow
 from auto_trading.config.loader import load_config
 from auto_trading.config.schema import RootConfig
-from auto_trading.core.enums import Mode
+from auto_trading.core.enums import Mode, PositionSide
 from auto_trading.features.registry import build_feature_set
 from auto_trading.storage.db import Database
 from auto_trading.storage.repositories.candles import CandleRepository
+from auto_trading.strategy.cost import estimate_cost
 
 stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
 stderr_reconfigure = getattr(sys.stderr, "reconfigure", None)
@@ -151,6 +155,11 @@ def main() -> int:
         type=Path,
         help="전략이 자동 로드할 edge_table YAML 경로 (예: config/edge_table.yaml)",
     )
+    parser.add_argument(
+        "--diagnostics-output",
+        type=Path,
+        help="24시간 비중첩 신호와 원 신호를 비교한 TRAIN 진단 JSON 경로",
+    )
     parser.add_argument("--workers", type=int, default=1, help="92일 단위 병렬 프로세스 수")
     args = parser.parse_args()
 
@@ -193,6 +202,24 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
+    if args.diagnostics_output is not None:
+        fixed_cost = estimate_cost(
+            cfg.risk.cost,
+            side=PositionSide.LONG,
+            funding_rate=Decimal(0),
+        ).total_bps
+        required_edge = fixed_cost + Decimal(str(cfg.policy.minimum_required_edge_bps))
+        diagnostics = diagnose_edge_observations(
+            collection.observations,
+            table,
+            embargo_bars=max(args.horizons_bars),
+            required_edge_bps=required_edge,
+        )
+        args.diagnostics_output.parent.mkdir(parents=True, exist_ok=True)
+        args.diagnostics_output.write_text(
+            json.dumps(diagnostics, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     print(f"config={loaded.hash[:12]} table={table.digest[:12]}")
     print(
         f"evaluated={collection.decisions_evaluated:,} signals={collection.signals_observed:,} "
@@ -202,6 +229,8 @@ def main() -> int:
     print(f"buckets={len(table.buckets):,} output={args.output}")
     if args.config_output is not None:
         print(f"config_output={args.config_output}")
+    if args.diagnostics_output is not None:
+        print(f"diagnostics_output={args.diagnostics_output}")
     return 0
 
 

@@ -31,8 +31,10 @@ __all__ = [
     "EdgeObservation",
     "EdgeTable",
     "collect_edge_observations",
+    "diagnose_edge_observations",
     "estimate_edge_table",
     "forward_return_bps",
+    "thin_edge_observations",
 ]
 
 _BPS = Decimal("10000")
@@ -362,6 +364,165 @@ def estimate_edge_table(
         observations=len(observations),
         buckets=tuple(buckets),
     )
+
+
+def thin_edge_observations(
+    observations: tuple[EdgeObservation, ...],
+    *,
+    embargo_bars: int,
+    decision_timeframe: Timeframe,
+) -> tuple[EdgeObservation, ...]:
+    """가장 이른 신호를 택하고 고정 시간 동안 뒤따르는 중첩 신호를 제거한다.
+
+    선택은 오직 당시 시각만 사용하며 수익률을 보지 않는다. 한 신호의 모든 horizon
+    관측은 함께 유지한다. 전역 embargo를 쓰는 이유는 실제 시스템이 심볼당 포지션을
+    하나만 보유하므로 반대 방향 신호도 동시에 독립 거래가 될 수 없기 때문이다.
+    """
+    if embargo_bars <= 0:
+        raise ValueError("embargo_bars 는 1 이상이어야 한다")
+    grouped: dict[int, list[EdgeObservation]] = {}
+    for observation in sorted(observations, key=lambda item: (item.as_of_ms, item.horizon_bars)):
+        grouped.setdefault(observation.as_of_ms, []).append(observation)
+
+    selected: list[EdgeObservation] = []
+    next_allowed_ms = -1
+    for as_of_ms, group in grouped.items():
+        identities = {(item.side, item.score, item.regime) for item in group}
+        if len(identities) != 1:
+            raise ValueError(f"같은 결정 시각에 서로 다른 edge 신호가 있다: {as_of_ms}")
+        if as_of_ms < next_allowed_ms:
+            continue
+        selected.extend(group)
+        next_allowed_ms = as_of_ms + embargo_bars * decision_timeframe.ms
+    return tuple(selected)
+
+
+def diagnose_edge_observations(
+    observations: tuple[EdgeObservation, ...],
+    table: EdgeTable,
+    *,
+    embargo_bars: int,
+    required_edge_bps: Decimal,
+) -> dict[str, Any]:
+    """원 신호와 비중첩 신호의 edge 구조를 비교하는 결정론적 TRAIN 진단."""
+    if required_edge_bps < 0:
+        raise ValueError("required_edge_bps 는 0 이상이어야 한다")
+    independent = thin_edge_observations(
+        observations,
+        embargo_bars=embargo_bars,
+        decision_timeframe=table.decision_timeframe,
+    )
+    independent_table = estimate_edge_table(
+        independent,
+        symbol=table.symbol,
+        source_config_hash=table.source_config_hash,
+        train_from_ms=table.train_from_ms,
+        train_to_ms=table.train_to_ms,
+        decision_timeframe=table.decision_timeframe,
+        score_boundaries=table.score_boundaries,
+        min_samples=table.min_samples,
+        horizons_bars=table.horizons_bars,
+    )
+    raw_signals = len({item.as_of_ms for item in observations})
+    independent_signals = len({item.as_of_ms for item in independent})
+    payload: dict[str, Any] = {
+        "method": "earliest_signal_global_embargo",
+        "embargo_bars": embargo_bars,
+        "embargo_ms": embargo_bars * table.decision_timeframe.ms,
+        "required_edge_bps": str(required_edge_bps),
+        "raw": _diagnostic_cohort(observations, table, required_edge_bps),
+        "independent": _diagnostic_cohort(
+            independent,
+            independent_table,
+            required_edge_bps,
+        ),
+        "signals_removed": raw_signals - independent_signals,
+        "signals_removed_rate": (
+            "0"
+            if raw_signals == 0
+            else str(Decimal(raw_signals - independent_signals) / raw_signals)
+        ),
+    }
+    payload["digest"] = sha256_hex(payload)
+    return payload
+
+
+def _diagnostic_cohort(
+    observations: tuple[EdgeObservation, ...],
+    table: EdgeTable,
+    required_edge_bps: Decimal,
+) -> dict[str, Any]:
+    combinations = _edge_combinations(table, required_edge_bps)
+    available = [item for item in combinations if item["available"]]
+    passing = [item for item in available if item["passes"]]
+    return {
+        "signal_count": len({item.as_of_ms for item in observations}),
+        "observation_count": len(observations),
+        "table_digest": table.digest,
+        "horizon_summary": _horizon_summary(observations),
+        "complete_available_combinations": len(available),
+        "passing_combinations": len(passing),
+        "best_worst_edge_bps": (
+            None
+            if not available
+            else str(max(Decimal(str(item["worst_edge_bps"])) for item in available))
+        ),
+        "combinations": combinations,
+    }
+
+
+def _horizon_summary(observations: tuple[EdgeObservation, ...]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[PositionSide, int], list[Decimal]] = {}
+    for observation in observations:
+        grouped.setdefault((observation.side, observation.horizon_bars), []).append(
+            observation.gross_return_bps
+        )
+    result: list[dict[str, Any]] = []
+    for (side, horizon), values in sorted(
+        grouped.items(), key=lambda item: (item[0][1], item[0][0].value)
+    ):
+        count = len(values)
+        result.append(
+            {
+                "side": side.value,
+                "horizon_bars": horizon,
+                "sample_count": count,
+                "mean_bps": str(sum(values, Decimal(0)) / count),
+                "positive_rate": str(Decimal(sum(value > 0 for value in values)) / count),
+            }
+        )
+    return result
+
+
+def _edge_combinations(table: EdgeTable, required_edge_bps: Decimal) -> list[dict[str, Any]]:
+    grouped: dict[tuple[PositionSide, str, float, float], dict[int, EdgeBucket]] = {}
+    for bucket in table.buckets:
+        key = (bucket.side, bucket.regime, bucket.score_from, bucket.score_to)
+        grouped.setdefault(key, {})[bucket.horizon_bars] = bucket
+
+    result: list[dict[str, Any]] = []
+    for (side, regime, score_from, score_to), by_horizon in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0].value, item[0][1], item[0][2]),
+    ):
+        complete = set(by_horizon) == set(table.horizons_bars)
+        buckets = tuple(by_horizon[horizon] for horizon in table.horizons_bars if complete)
+        available = complete and all(bucket.available for bucket in buckets)
+        worst = min((bucket.observed_mean_bps for bucket in buckets), default=None)
+        result.append(
+            {
+                "side": side.value,
+                "regime": regime,
+                "score_from": score_from,
+                "score_to": score_to,
+                "complete": complete,
+                "available": available,
+                "min_sample_count": (min((bucket.sample_count for bucket in buckets), default=0)),
+                "worst_edge_bps": None if worst is None else str(worst),
+                "passes": available and worst is not None and worst > required_edge_bps,
+            }
+        )
+    return result
 
 
 def _snapshot(feed: CandleFeed, cfg: RootConfig, as_of_ms: int) -> MarketSnapshot:

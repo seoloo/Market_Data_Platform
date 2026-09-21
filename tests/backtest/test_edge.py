@@ -6,7 +6,13 @@ from decimal import Decimal
 
 import pytest
 
-from auto_trading.backtest.edge import EdgeObservation, estimate_edge_table, forward_return_bps
+from auto_trading.backtest.edge import (
+    EdgeObservation,
+    diagnose_edge_observations,
+    estimate_edge_table,
+    forward_return_bps,
+    thin_edge_observations,
+)
 from auto_trading.core.enums import PositionSide, Timeframe
 
 D = Decimal
@@ -19,9 +25,10 @@ def observation(
     score: float = 75.0,
     regime: str = "normal",
     horizon: int = 24,
+    as_of_ms: int = 1,
 ) -> EdgeObservation:
     return EdgeObservation(
-        as_of_ms=1,
+        as_of_ms=as_of_ms,
         side=side,
         score=score,
         regime=regime,
@@ -146,3 +153,57 @@ def test_requested_horizons_survive_when_there_are_no_signals() -> None:
     assert result.observations == 0
     assert not result.buckets
     assert '"source_config_hash": "test-config"' in result.to_json()
+
+
+def test_thinning_keeps_all_horizons_and_removes_overlapping_signals() -> None:
+    step = Timeframe.M5.ms
+    items = tuple(
+        observation(
+            str(horizon),
+            horizon=horizon,
+            as_of_ms=signal_bar * step,
+        )
+        for signal_bar in (0, 10, 24)
+        for horizon in (2, 4)
+    )
+    thinned = thin_edge_observations(
+        items,
+        embargo_bars=24,
+        decision_timeframe=Timeframe.M5,
+    )
+    assert {item.as_of_ms for item in thinned} == {0, 24 * step}
+    assert len(thinned) == 4
+
+
+def test_diagnostics_compare_raw_and_non_overlapping_cohorts() -> None:
+    step = Timeframe.M5.ms
+    items = tuple(
+        observation(
+            value,
+            horizon=horizon,
+            as_of_ms=signal_bar * step,
+        )
+        for signal_bar, value in ((0, "30"), (1, "-10"), (2, "-10"), (4, "30"))
+        for horizon in (2, 4)
+    )
+    raw_table = estimate_edge_table(
+        items,
+        symbol="BTCUSDT",
+        source_config_hash="test-config",
+        train_from_ms=0,
+        train_to_ms=10 * step,
+        decision_timeframe=Timeframe.M5,
+        min_samples=1,
+        horizons_bars=(2, 4),
+    )
+    result = diagnose_edge_observations(
+        items,
+        raw_table,
+        embargo_bars=4,
+        required_edge_bps=D("18"),
+    )
+    assert result["raw"]["signal_count"] == 4
+    assert result["independent"]["signal_count"] == 2
+    assert result["signals_removed"] == 2
+    assert result["raw"]["passing_combinations"] == 0
+    assert result["independent"]["passing_combinations"] == 1
