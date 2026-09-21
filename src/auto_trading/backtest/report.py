@@ -21,6 +21,7 @@ from auto_trading.backtest.regimes import RegimePerformance
 from auto_trading.core.money import ZERO
 
 if TYPE_CHECKING:
+    from auto_trading.backtest.baselines import BaselineComparison
     from auto_trading.backtest.engine import BacktestResult
 
 __all__ = ["ReportArtifacts", "ReportMetadata", "generate_report"]
@@ -79,15 +80,18 @@ def generate_report(
     *,
     output_root: Path = Path("reports"),
     regimes: tuple[RegimePerformance, ...] = (),
+    baselines: BaselineComparison | None = None,
     correlation_markdown: str | None = None,
     baselines_markdown: str | None = None,
     robustness_markdown: str | None = None,
 ) -> ReportArtifacts:
     """문서 명세의 리포트 파일 13개를 모두 생성한다.
 
-    아직 계산하지 않은 Phase 3 후속 항목은 빈 파일 대신 명시적인 ``미실행`` 문서를
-    남긴다. 이로써 리포트 소비자는 누락과 실패를 구분할 수 있다.
+    호출자가 제공하지 않은 선택 분석은 빈 파일 대신 명시적인 ``미실행`` 문서를 남긴다.
+    이로써 리포트 소비자는 누락과 실패를 구분할 수 있다.
     """
+    if baselines is not None and baselines_markdown is not None:
+        raise ValueError("baselines 와 baselines_markdown 을 동시에 줄 수 없다")
     directory = output_root / metadata.run_id
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -106,6 +110,7 @@ def generate_report(
         "veto_counts": dict(sorted(result.veto_counts.items())),
         "metrics": metrics.to_dict(),
         "regimes": [regime.to_dict() for regime in regimes],
+        "baselines": None if baselines is None else baselines.to_dict(),
     }
     _write_text(
         directory / "summary.json",
@@ -119,7 +124,11 @@ def generate_report(
     )
     _write_text(
         directory / "baselines.md",
-        baselines_markdown or _pending("기준선 비교", "buy&hold·랜덤·단일 feature 미실행"),
+        (
+            baselines.to_markdown()
+            if baselines is not None
+            else baselines_markdown or _pending("기준선 비교", "buy&hold·랜덤·단일 feature 미실행")
+        ),
     )
     _write_text(
         directory / "robustness.md",
