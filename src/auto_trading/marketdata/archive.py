@@ -18,19 +18,22 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Final
+from typing import Final, Protocol
 
 import httpx
 
 from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError, ExchangeError
-from auto_trading.core.types import Candle
+from auto_trading.core.types import Candle, FundingRate
 
 __all__ = [
     "ArchiveFile",
     "BinanceVisionClient",
+    "FundingArchiveFile",
     "Granularity",
+    "RemoteArchive",
     "months_between",
+    "parse_funding_csv",
     "parse_klines_csv",
 ]
 
@@ -39,6 +42,9 @@ BASE_URL: Final = "https://data.binance.vision"
 #: USD-M 선물 klines CSV 컬럼 수. 헤더 없는 구버전과 헤더 있는 신버전 모두 12개다.
 _EXPECTED_COLUMNS: Final = 12
 
+#: fundingRate CSV 컬럼 수 (calc_time, funding_interval_hours, last_funding_rate).
+_FUNDING_COLUMNS: Final = 3
+
 #: 2100년을 밀리초로 표현한 값. 이보다 크면 마이크로초 단위로 판단한다.
 _MS_UPPER_BOUND: Final = 4_102_444_800_000
 
@@ -46,6 +52,24 @@ _MS_UPPER_BOUND: Final = 4_102_444_800_000
 class Granularity(StrEnum):
     MONTHLY = "monthly"
     DAILY = "daily"
+
+
+class RemoteArchive(Protocol):
+    """다운로드 대상 아카이브 파일의 공통 계약.
+
+    klines 와 fundingRate 는 URL 경로만 다르고 받는 방식(zip + CHECKSUM)은 같다.
+    클라이언트가 둘 다 다룰 수 있도록 최소 계약만 둔다.
+    """
+
+    @property
+    def stem(self) -> str: ...
+
+    @property
+    def filename(self) -> str: ...
+
+    def url(self, base_url: str = ...) -> str: ...
+
+    def checksum_url(self, base_url: str = ...) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +96,31 @@ class ArchiveFile:
             f"{base_url}/data/futures/um/{self.granularity.value}/klines/"
             f"{self.symbol}/{self.timeframe.value}/{self.filename}"
         )
+
+    def checksum_url(self, base_url: str = BASE_URL) -> str:
+        return f"{self.url(base_url)}.CHECKSUM"
+
+    def __str__(self) -> str:
+        return self.filename
+
+
+@dataclass(frozen=True, slots=True)
+class FundingArchiveFile:
+    """funding rate 아카이브 (월 단위만 제공된다)."""
+
+    symbol: str
+    period: date
+
+    @property
+    def stem(self) -> str:
+        return f"{self.symbol}-fundingRate-{self.period:%Y-%m}"
+
+    @property
+    def filename(self) -> str:
+        return f"{self.stem}.zip"
+
+    def url(self, base_url: str = BASE_URL) -> str:
+        return f"{base_url}/data/futures/um/monthly/fundingRate/{self.symbol}/{self.filename}"
 
     def checksum_url(self, base_url: str = BASE_URL) -> str:
         return f"{self.url(base_url)}.CHECKSUM"
@@ -181,6 +230,52 @@ def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
     return tuple(candles)
 
 
+def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
+    """fundingRate CSV 를 파싱한다.
+
+    컬럼: ``calc_time, funding_interval_hours, last_funding_rate``.
+    구버전 파일에는 헤더가 없을 수 있으므로 첫 줄을 보고 판단한다.
+
+    캔들과 달리 "봉 경계" 같은 교차 검증 수단이 없다. 대신 주기 값을 함께 저장해
+    다음 정산 시각을 역산하지 않는다 (core/types.FundingRate 참조).
+    """
+    text = data.decode("utf-8-sig", errors="strict")
+    rows = list(csv.reader(io.StringIO(text)))
+    if not rows:
+        return ()
+    if rows[0] and not rows[0][0].strip().lstrip("-").isdigit():
+        rows = rows[1:]  # 헤더
+
+    rates: list[FundingRate] = []
+    seen: set[int] = set()
+    for line_no, row in enumerate(rows, start=1):
+        if not row or not row[0].strip():
+            continue
+        if len(row) < _FUNDING_COLUMNS:
+            raise DataIntegrityError(
+                f"fundingRate CSV 컬럼 수가 {len(row)} 다 (line {line_no}), "
+                f"{_FUNDING_COLUMNS}개를 기대한다"
+            )
+        try:
+            funding_ms = _normalize_timestamp(int(row[0]))
+            interval_hours = int(row[1])
+        except ValueError as exc:
+            raise DataIntegrityError(f"fundingRate 정수 파싱 실패 (line {line_no}): {exc}") from exc
+        if funding_ms in seen:
+            raise DataIntegrityError(f"funding 정산 시각 중복: {funding_ms} (line {line_no})")
+        seen.add(funding_ms)
+        rates.append(
+            FundingRate(
+                funding_ms=funding_ms,
+                rate=_to_decimal(row[2], "last_funding_rate", funding_ms),
+                interval_hours=interval_hours,
+            )
+        )
+
+    rates.sort(key=lambda r: r.funding_ms)
+    return tuple(rates)
+
+
 def _extract_single_csv(payload: bytes, expected_stem: str) -> bytes:
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
@@ -257,7 +352,7 @@ class BinanceVisionClient:
 
     # ------------------------------------------------------------- 공개
 
-    def download(self, file: ArchiveFile, *, verify_checksum: bool = True) -> bytes | None:
+    def download(self, file: RemoteArchive, *, verify_checksum: bool = True) -> bytes | None:
         """zip 원문을 가져온다. 해당 기간 파일이 없으면 ``None``.
 
         Raises:
@@ -291,6 +386,15 @@ class BinanceVisionClient:
             return None
         csv_bytes = _extract_single_csv(payload, file.stem)
         return parse_klines_csv(csv_bytes, file.timeframe)
+
+    def fetch_funding(
+        self, file: FundingArchiveFile, *, verify_checksum: bool = True
+    ) -> tuple[FundingRate, ...] | None:
+        """funding 아카이브를 받아 파싱한다. 해당 달 파일이 없으면 ``None``."""
+        payload = self.download(file, verify_checksum=verify_checksum)
+        if payload is None:
+            return None
+        return parse_funding_csv(_extract_single_csv(payload, file.stem))
 
 
 def utc_today(now_ms: int) -> date:

@@ -17,7 +17,12 @@ import httpx
 import pytest
 
 from auto_trading.core.enums import Timeframe
-from auto_trading.marketdata.archive import ArchiveFile, BinanceVisionClient, Granularity
+from auto_trading.marketdata.archive import (
+    ArchiveFile,
+    BinanceVisionClient,
+    Granularity,
+    RemoteArchive,
+)
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
 from auto_trading.storage.repositories.candles import CandleRepository
@@ -66,22 +71,22 @@ class FakeArchiveServer:
     corrupt_checksums: set[str] = field(default_factory=set)
     server_errors: dict[str, int] = field(default_factory=dict)
 
-    def add(self, archive_file: ArchiveFile, csv_text: str) -> None:
+    def add(self, archive_file: RemoteArchive, csv_text: str) -> None:
         payload = make_zip(archive_file.stem, csv_text)
         self.files[archive_file.url()] = payload
         digest = hashlib.sha256(payload).hexdigest()
         self.files[archive_file.checksum_url()] = (f"{digest}  {archive_file.filename}\n").encode()
 
-    def add_raw(self, archive_file: ArchiveFile, payload: bytes) -> None:
+    def add_raw(self, archive_file: RemoteArchive, payload: bytes) -> None:
         self.files[archive_file.url()] = payload
         digest = hashlib.sha256(payload).hexdigest()
         self.files[archive_file.checksum_url()] = (f"{digest}  {archive_file.filename}\n").encode()
 
-    def corrupt(self, archive_file: ArchiveFile) -> None:
+    def corrupt(self, archive_file: RemoteArchive) -> None:
         """체크섬은 그대로 두고 본문만 바꿔 불일치를 만든다."""
         self.files[archive_file.url()] = b"corrupted payload"
 
-    def drop_checksum(self, archive_file: ArchiveFile) -> None:
+    def drop_checksum(self, archive_file: RemoteArchive) -> None:
         self.files.pop(archive_file.checksum_url(), None)
 
     def handler(self, request: httpx.Request) -> httpx.Response:

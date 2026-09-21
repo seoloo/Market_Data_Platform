@@ -22,6 +22,7 @@ from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import DataQuality, MarketSnapshot, TimeframeSeries
 from auto_trading.features.registry import build_feature_set
 from auto_trading.storage.repositories.candles import CandleRepository
+from auto_trading.storage.repositories.funding import FundingRateRepository
 
 __all__ = [
     "SWING_LOOKBACK_BARS",
@@ -104,10 +105,12 @@ class SnapshotBuilder:
         repo: CandleRepository,
         cfg: RootConfig,
         *,
+        funding: FundingRateRepository | None = None,
         requirements: tuple[TimeframeRequirement, ...] | None = None,
     ) -> None:
         self._repo = repo
         self._cfg = cfg
+        self._funding = funding
         self._requirements = build_requirements(cfg) if requirements is None else requirements
 
     @property
@@ -155,6 +158,9 @@ class SnapshotBuilder:
             if self._is_stale(loaded, as_of_ms):
                 stale.append(requirement.timeframe)
 
+        resolved_funding, resolved_next = self._resolve_funding(
+            target, as_of_ms, funding_rate, next_funding_ms, notes
+        )
         resolved_mark = self._resolve_mark_price(series, mark_price, notes)
         quality = DataQuality(
             ok=not missing and not stale and not gapped,
@@ -171,10 +177,46 @@ class SnapshotBuilder:
             series=tuple(series),
             mark_price=resolved_mark,
             last_price=last_price,
-            funding_rate=funding_rate,
-            next_funding_ms=next_funding_ms,
+            funding_rate=resolved_funding,
+            next_funding_ms=resolved_next,
             spread_bps=spread_bps,
             data_quality=quality,
+        )
+
+    def _resolve_funding(
+        self,
+        symbol: str,
+        as_of_ms: int,
+        funding_rate: Decimal | None,
+        next_funding_ms: int | None,
+        notes: list[str],
+    ) -> tuple[Decimal | None, int | None]:
+        """저장된 정산 내역에서 현재 funding 을 찾는다.
+
+        호출자가 값을 주면 그대로 쓴다 (실거래에서는 거래소가 실시간 값을 준다).
+        저장소가 없거나 해당 시점 이전 정산이 없으면 **추정하지 않고 ``None``** 을
+        돌려준다 — 리스크 게이트가 ``DATA_QUALITY`` 로 진입을 거부하도록 두는 것이
+        옳다 (AGENTS.md §3.6 fail-closed).
+
+        ``funding_ms <= as_of_ms`` 만 보므로 미래 정산이 새어들 수 없다.
+        """
+        if funding_rate is not None and next_funding_ms is not None:
+            return funding_rate, next_funding_ms
+        if self._funding is None:
+            notes.append("funding 저장소 미연결 — 진입은 게이트에서 거부된다")
+            return funding_rate, next_funding_ms
+        latest = self._funding.latest_as_of(symbol, as_of_ms)
+        if latest is None:
+            notes.append(f"funding 이력 없음 (as_of={as_of_ms})")
+            return funding_rate, next_funding_ms
+        resolved_next = latest.next_funding_ms
+        if resolved_next <= as_of_ms:
+            # 다음 정산 시각이 이미 지났는데 그 행이 없다 = 적재 누락. 추정하지 않는다.
+            notes.append(f"funding 이 오래됐다 (마지막 정산 {latest.funding_ms})")
+            return funding_rate, next_funding_ms
+        return (
+            latest.rate if funding_rate is None else funding_rate,
+            resolved_next if next_funding_ms is None else next_funding_ms,
         )
 
     def _is_stale(self, series: TimeframeSeries, as_of_ms: int) -> bool:

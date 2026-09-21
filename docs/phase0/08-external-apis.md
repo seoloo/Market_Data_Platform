@@ -51,6 +51,22 @@
 | 소스 | 내용 | 비고 |
 |---|---|---|
 | **Binance Public Data** (`data.binance.vision`) | 월별/일별 klines, aggTrades, funding CSV(zip) | 무료. 대량 백필에 최적. REST 로 수년치 받으면 rate limit 소모가 크다 |
+
+> **funding 아카이브 실측 (2026-09-21)**
+>
+> 경로: `/data/futures/um/monthly/fundingRate/<SYMBOL>/<SYMBOL>-fundingRate-<YYYY-MM>.zip`
+> 컬럼: `calc_time, funding_interval_hours, last_funding_rate` — **월 단위만** 제공된다
+> (klines 와 달리 일별 파일이 없다). 따라서 진행 중인 달은 REST 로 보충해야 한다.
+>
+> BTCUSDT 2020-01 ~ 2026-08: **7,305건, 결측 0건**, 전 구간 8시간 주기.
+> 2019-09~12 는 아카이브 자체가 없다 (캔들도 2020-01 부터라 영향 없음).
+>
+> ⚠ **`calc_time` 은 정각에서 수 밀리초 흔들린다.** 7,305건 중 **2,256건**이 8시간을
+> 1~4ms 초과했다. 간격을 정확히 비교하면 결측 0건인 데이터에서 2,256건을 오탐하므로,
+> 결측 판정에 **1분 허용치**를 둔다 (`storage/repositories/funding.JITTER_TOLERANCE_MS`).
+>
+> `funding_interval_hours` 를 **반드시 함께 저장한다.** 심볼·시점마다 8h/4h/1h 로
+> 다르고, 연속한 두 행의 간격으로 역산하면 결측이 있을 때 조용히 틀린다.
 | `GET /fapi/v1/klines` | 최근 데이터 보충 | 갭 메우기용 |
 | `GET /fapi/v1/fundingRate` | funding 이력 | 페이지네이션 |
 

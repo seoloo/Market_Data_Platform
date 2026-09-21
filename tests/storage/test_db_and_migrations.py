@@ -185,8 +185,9 @@ class TestApplyMigrations:
     def test_applies_and_records(self, db_path: Path):
         conn = connect(db_path)
         applied = apply_migrations(conn, now_ms=NOW)
-        assert applied == (1,)
-        assert read_schema_version(conn) == 1
+        # 마이그레이션이 늘어나도 깨지지 않게, 번호 자체가 아니라 순서·기록을 본다.
+        assert applied == tuple(m.version for m in discover_migrations())
+        assert read_schema_version(conn) == max(applied)
         row = conn.execute("SELECT * FROM schema_migrations WHERE version = 1").fetchone()
         assert row["name"] == "initial"
         assert row["applied_ms"] == NOW

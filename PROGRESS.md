@@ -49,9 +49,10 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 13 | (Phase 2) `strategy/policy.py` — 진입 임계값 + D12 점수 역전 청산 | ✅ 완료 |
 | 14 | (Phase 2) `strategy/` bias·trigger·scoring·cost + `decide()` | ✅ 완료 |
 | 15 | (Phase 2) `marketdata/snapshot.py` causal 관문 + 실데이터 `decide()` 검증 | ✅ 완료 |
-| 16 | **(Phase 2→3) funding rate 수집 — 없으면 모든 진입이 게이트에서 거부됨** | ⬅️ **다음** |
-| 17 | (Phase 3) 백테스트 엔진 — 증분 feature 계산 필수 (현재 92ms/평가) | 대기 |
-| 18 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
+| 16 | (Phase 2) **D14** — T1 을 시간적 setup 으로, 국면계수를 사이징으로 이전 + 비교 백테스트 | ✅ 완료 |
+| 17 | (Phase 2→3) **funding rate 수집** — 게이트 차단 요인 해소 | ✅ 완료 |
+| 18 | **(Phase 3) 백테스트 엔진** — 증분 feature 계산 필수 (현재 92ms/평가) | ⬅️ **다음** |
+| 19 | (Phase 6) `ui/` 대시보드 + `AutoTradingDashboard.exe` (D10) | 대기 |
 
 ---
 
@@ -145,6 +146,14 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | `src/auto_trading/features/registry.py` | feature 조립 **단일 지점**. `decide()` 와 `SnapshotBuilder` 가 같은 정의를 쓴다 |
 | `src/auto_trading/marketdata/snapshot.py` | 저장소 → `MarketSnapshot` 인과성 관문. 필요 봉 수를 warm-up 에서 **파생** |
 | `tests/marketdata/test_snapshot.py` + `tests/features/test_registry.py` | 형성 중 봉 배제·stale·갭·결측 fail-closed·mark price 출처 30건 |
+| `src/auto_trading/strategy/setup.py` | **D14-1** T1 을 시간적 setup 조건으로. 되돌림 → 무효화 → 신선도 |
+| `src/auto_trading/strategy/{bias,trigger,scoring}.py` | **D14-2** 국면계수를 `risk_scale` 로 분리. 방향 점수에 곱하지 않는다 |
+| `src/auto_trading/risk/sizing.py` | `SizingRequest.risk_scale` — 국면 축소가 들어오는 **유일한** 지점 |
+| `tests/strategy/test_scoring.py` + `tests/risk/test_sizing.py` | setup 성립/무효/만료/대칭, 국면계수가 점수를 안 깎음 등 40건 |
+| `src/auto_trading/marketdata/funding.py` + `storage/repositories/funding.py` | funding 아카이브 백필 · 인과적 조회 · 결측 탐지 · 보유구간 정산 집계 |
+| `src/auto_trading/storage/sql/002_funding_interval.sql` | `interval_hours` 컬럼 + 조회 인덱스 |
+| `scripts/backfill_funding.py` | CLI. resume·dry-run·결측 리포트 |
+| `tests/marketdata/test_funding.py` | 파싱·계획·인과성·지터 허용·체크섬 실패 31건 |
 
 **실데이터 검증 (2026-09-19 기준)**: b1_trend=+2.43(ATR배수) · b2_volregime=0.179(백분위)
 · t1_pullback RSI=49.6 · t2_momentum z=+0.58 · t3_volume=0.60
@@ -160,7 +169,23 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | Spearman 최대 \|r\| | **0.392** (t1_rsi↔t2_z) → 06 §2.3 기준 0.7 통과 |
 | **T1 기여** | **16건 중 12건이 정확히 0.00**, 나머지 4건도 ±0.20 → 미해결 #11 |
 
-**검증 결과**: 768 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept
+**D13 vs D14 동일 데이터 비교** (1시간 간격, 손절/2R 익절만 반영 — D12 점수청산 미반영):
+
+| 연도 | 기존 D13 | 수정 D14 | 비고 |
+|---|---|---|---|
+| 2023 | −2.91R (48건) | **+14.40R** (68건) | D14 우세 |
+| 2024 | **+10.57R** (38건) | +4.16R (79건) | D13 우세 |
+| 2025 (~9월) | **+4.79R** (29건) | −1.25R (43건) | D13 우세 |
+| **합계** | +12.45R / 115건 | +17.31R / 190건 | **평균 R 차이가 표준오차 이내** |
+
+연도마다 부호가 뒤집히고 t≈0.9 로 **우열 판정 불가**. 표본 부족 + 주 청산 경로
+(D12 점수 역전) 미반영이 원인이다. Phase 3 엔진 전까지 파라미터를 동결한다 (미해결 #15).
+`setup_lookback_bars` 민감도 6/12/24 도 단조성이 없어 **성적으로 고르지 않았다**.
+
+**구조 변경은 실측으로 확인됨**: 고변동 국면 진입 0건 → 31건(2024). end-to-end
+`decide()` 40일 구간에서 진입 23건 승인, 국면별 리스크 1.00%/0.50% 적용 확인.
+
+**검증 결과**: 830 passed · mypy strict 0 errors · ruff clean · import-linter 4 contracts kept
 
 **스윙 확정지연 실측 (1시간봉 1년)**: 임계 1%→평균 2.5h(최대 46h) · **2%→6.3h(70h)**
 · 3%→13.6h(94h) · 5%→38.3h(219h). 최근 구조 라벨 `HH/HL` (b1_trend +2.43 과 일치)
@@ -207,9 +232,11 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 4 | `take_profit.r_multiple` 2.0 은 잠정값 | Phase 4에서 결정 | — |
 | ~~7~~ | ~~이중 squash로 진입 임계값 70 도달 불가~~ → **D13 단일 squash 확정** | — | 해소됨 |
 | 8 | **스윙 확정지연(평균 6.3h)으로 구조적 손절이 사실상 항상 채택됨** — 실데이터 16/16건<br>실측 손절폭 평균 3.14%, 레버리지 4.1x, `min_stop_distance` 1% 는 미발동 | Phase 4에서 의도 확인 | — |
-| 11 | **T1(눌림목)이 진입에 기여하지 않음** — 실데이터 진입 16건 중 12건이 T1=0.00<br>진입을 만드는 것은 전적으로 T2 z-spike 다. 즉 현재 구현은 "눌림목 재개"(H1)가<br>아니라 **모멘텀 돌파**다. RSI 눌림과 z≥2 가 동시에 성립하기 어렵기 때문 | **사용자 판단 필요** | Phase 3 착수 전 |
-| 12 | **고변동 국면(전체의 48%)에서 진입이 수학적으로 불가능**<br>`bias_multiplier=0.5` 가 direction 에 곱해져 70점에 T2z≥11 이 필요해진다.<br>T3 약확인(0.6)도 같은 구조로 사실상 거부권이 된다 — 완충장치가 veto 로 작동 | **사용자 판단 필요** | Phase 3 착수 전 |
-| 13 | `funding_rates` 테이블이 **비어 있음** → 게이트가 모든 진입을 DATA_QUALITY 로 거부 | 다음 작업에서 해소 | Phase 3 |
+| ~~11~~ | ~~T1 이 진입에 기여하지 않음~~ → **D14-1 로 setup 조건화** | — | 해소됨 |
+| ~~12~~ | ~~고변동 국면에서 진입 불가~~ → **D14-2 로 국면계수를 사이징으로 이전** | — | 해소됨 |
+| 15 | **D14 의 성과 우열은 아직 미확인** — 근사 비교에서 연도별로 부호가 뒤집힌다.<br>D12 점수 역전 청산(주 청산 경로)을 반영하지 못한 근사이므로 판단 불가.<br>**Phase 3 엔진으로 재측정하기 전까지 임계값·파라미터를 만지지 않는다** | Phase 3 | Phase 4 |
+| 16 | `setup_lookback_bars=12` 는 선험적 기본값. 민감도 6/12/24 에서 단조성 없음 | Phase 4 | — |
+| ~~13~~ | ~~`funding_rates` 비어 있음~~ → **7,305건 적재, 결측 0건. end-to-end 진입 승인 확인** | — | 해소됨 |
 | 14 | `decide()` 1회 **92ms** — 5분봉 3년 백테스트 = 약 8시간. 증분 계산 필요 | Phase 3 설계 | Phase 3 |
 | 6 | D9 도입으로 `close_reason` 분포가 D4 가정과 달라짐 | Phase 4에서 재확인 | — |
 | 5 | 슬리피지 모델 계수 (D9 에서 사이징에 직접 영향) | Phase 8 실측으로 보정 | — |
@@ -310,6 +337,9 @@ Phase 정의: [`docs/phase0/10-roadmap.md`](docs/phase0/10-roadmap.md)
 | 2026-09-21 | Claude | 2 | Codex 산출물 검토 — 구조 손절 미연결·기록/수식 불일치·Component 불변식 충돌 3건 수정 | 완료 |
 | 2026-09-21 | Claude | 2 | `features/registry.py` + `marketdata/snapshot.py` + 테스트 30건 | 완료 |
 | 2026-09-21 | Claude | 2 | 실데이터 `decide()` 스윕 2,184회 — 진입 16건 실증, 상관행렬 통과, 미해결 #11~#14 발견 | 완료 |
+| 2026-09-21 | Claude | 0/2 | **D14 확정·구현** — T1 을 시간적 setup 으로, 국면계수를 사이징으로 이전 | 완료 |
+| 2026-09-21 | Claude | 2 | D13 vs D14 동일데이터 비교 (2023·2024·2025) — 우열 판정 불가, 노이즈 범위 | 완료 |
+| 2026-09-21 | Claude | 2/3 | funding 수집 — 7,305건 적재, 게이트 차단 해소. 지터 오탐 2,256건 방지 | 완료 |
 
 > **작성 규칙**: 작업 종료 시 이 표에 한 줄 추가. `날짜 / 에이전트 / Phase / 무엇을 / 결과`.
 > 실패한 작업도 기록한다 — 같은 실패를 반복하지 않기 위해서다.
