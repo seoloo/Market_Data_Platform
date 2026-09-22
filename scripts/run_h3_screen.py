@@ -18,7 +18,6 @@ import json
 import math
 import sqlite3
 import sys
-from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -155,7 +154,66 @@ def _last_before(sorted_times: list[int], at_ms: int) -> int | None:
     return lo - 1 if lo else None
 
 
+def _month_start_ms(year: int, month: int) -> int:
+    while month > 12:
+        year, month = year + 1, month - 12
+    while month < 1:
+        year, month = year - 1, month + 12
+    return int(datetime(year, month, 1, tzinfo=UTC).timestamp() * 1000)
+
+
+def month_window(month: str) -> tuple[int, int, int]:
+    """``(적재 시작, 관측 시작, 관측 끝)`` 밀리초.
+
+    적재는 **직전 달부터** — causal z-score 의 7일 warm-up 이 필요하다.
+    관측은 그 달 안에서만 만들되, 선행수익이 다음 달로 넘어가므로 적재는 **다음 달까지** 한다.
+    """
+    year, mon = (int(part) for part in month.split("-"))
+    return (
+        _month_start_ms(year, mon - 1),
+        _month_start_ms(year, mon),
+        _month_start_ms(year, mon + 1),
+    )
+
+
+def load_window(
+    conn: sqlite3.Connection, symbol: str, exchange: str, from_ms: int, to_ms: int
+) -> tuple[Series, Metrics, Series]:
+    """한 심볼의 구간 데이터만 읽는다.
+
+    심볼 전체를 읽으면 272개를 합쳐 수 GB 가 된다 (같은 실수를 수집기에서 이미 했다,
+    marketdata/bulk.py 참조). 달 단위로 끊어 읽고 달이 끝나면 버린다.
+    """
+    closes = {
+        int(r[0]): float(r[1])
+        for r in conn.execute(
+            "SELECT open_ms, close FROM candles WHERE exchange=? AND symbol=?"
+            " AND timeframe='5m' AND open_ms >= ? AND open_ms < ? ORDER BY open_ms",
+            (exchange, symbol, from_ms, to_ms),
+        )
+    }
+    metrics = {
+        int(r[0]): (float(r[1]), float(r[2]), float(r[3]), float(r[4]))
+        for r in conn.execute(
+            "SELECT at_ms, open_interest, taker_buy_sell_ratio,"
+            " account_long_short_ratio, toptrader_position_ratio FROM perp_metrics"
+            " WHERE exchange=? AND symbol=? AND at_ms >= ? AND at_ms < ? ORDER BY at_ms",
+            (exchange, symbol, from_ms, to_ms),
+        )
+    }
+    funding = {
+        int(r[0]): float(r[1])
+        for r in conn.execute(
+            "SELECT funding_ms, rate FROM funding_rates WHERE exchange=? AND symbol=?"
+            " AND funding_ms >= ? AND funding_ms < ? ORDER BY funding_ms",
+            (exchange, symbol, from_ms - 40 * 86_400_000, to_ms),
+        )
+    }
+    return closes, metrics, funding
+
+
 def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[PanelObservation]]]:
+    """달 단위로 읽어 단면을 만든다. 달이 끝나면 그 달 데이터는 버린다."""
     config = load_config().config
     conn = sqlite3.connect(f"file:{REPO_ROOT / config.data.db_path}?mode=ro", uri=True)
     universe = {
@@ -163,48 +221,58 @@ def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[Pan
         for month, names in json.loads(UNIVERSE.read_text(encoding="utf-8")).items()
         if from_month <= month <= to_month
     }
-    members = sorted({s for names in universe.values() for s in names})
-    print(f"유니버스 {len(universe)}개월 · 심볼 {len(members)}개 로딩 중...")
-
-    signals: dict[str, dict[str, dict[int, float]]] = defaultdict(dict)
-    closes_by_symbol: dict[str, dict[int, float]] = {}
-    for n, symbol in enumerate(members, 1):
-        closes, metrics, funding = load_symbol(conn, symbol, config.exchange)
-        if not metrics or not closes:
-            continue
-        closes_by_symbol[symbol] = closes
-        for name, series in signal_series(closes, metrics, funding).items():
-            signals[name][symbol] = series
-        if n % 50 == 0:
-            print(f"  {n}/{len(members)}", flush=True)
-
     panels: dict[str, dict[str, list[PanelObservation]]] = {
         name: {h: [] for h in HORIZONS} for name in SIGNALS
     }
-    all_times = sorted({t for series in signals["X4_rel_crowd_gap"].values() for t in series})
-    for at_ms in all_times:
-        month = month_of(at_ms)
-        eligible = universe.get(month)
-        if not eligible:
-            continue
-        for name in SIGNALS:
-            for horizon, bars in HORIZONS.items():
-                values: dict[str, float] = {}
-                forward: dict[str, float] = {}
-                for symbol in eligible:
-                    value = signals[name].get(symbol, {}).get(at_ms)
-                    if value is None:
-                        continue
-                    entry = closes_by_symbol.get(symbol, {}).get(at_ms + STEP_MS)
-                    exit_ = closes_by_symbol.get(symbol, {}).get(at_ms + STEP_MS + bars * STEP_MS)
-                    if not entry or not exit_:
-                        continue
-                    values[symbol] = value
-                    forward[symbol] = (exit_ - entry) / entry * 10_000
-                if len(values) >= 2 * LEG:
-                    panels[name][horizon].append(
-                        PanelObservation(at_ms=at_ms, values=values, forward_bps=forward)
-                    )
+    print(f"유니버스 {len(universe)}개월 처리 중...")
+
+    for index, (month, members) in enumerate(sorted(universe.items()), 1):
+        load_from, month_from, month_to = month_window(month)
+        year, mon = (int(part) for part in month.split("-"))
+        load_to = _month_start_ms(year, mon + 2)  # 다음 달까지 실어 월말 선행수익을 채운다
+        signals: dict[str, dict[str, Series]] = {name: {} for name in SIGNALS}
+        closes_by_symbol: dict[str, Series] = {}
+        for symbol in members:
+            closes, metrics, funding = load_window(
+                conn, symbol, config.exchange, load_from, load_to
+            )
+            if not metrics or not closes:
+                continue
+            closes_by_symbol[symbol] = closes
+            for name, values_by_time in signal_series(closes, metrics, funding).items():
+                signals[name][symbol] = values_by_time
+
+        times = sorted(
+            {t for by_time in signals["X4_rel_crowd_gap"].values() for t in by_time}
+            | {t for by_time in signals["X5_rel_reversal"].values() for t in by_time}
+        )
+        for at_ms in times:
+            if not month_from <= at_ms < month_to:
+                continue  # warm-up 구간의 시각은 관측으로 쓰지 않는다
+            for name in SIGNALS:
+                for horizon, bars in HORIZONS.items():
+                    values: dict[str, float] = {}
+                    forward: dict[str, float] = {}
+                    for symbol in members:
+                        value = signals[name].get(symbol, {}).get(at_ms)
+                        if value is None:
+                            continue
+                        prices = closes_by_symbol.get(symbol)
+                        if prices is None:
+                            continue
+                        entry = prices.get(at_ms + STEP_MS)
+                        exit_ = prices.get(at_ms + STEP_MS + bars * STEP_MS)
+                        if not entry or not exit_:
+                            continue
+                        values[symbol] = value
+                        forward[symbol] = (exit_ - entry) / entry * 10_000
+                    if len(values) >= 2 * LEG:
+                        panels[name][horizon].append(
+                            PanelObservation(at_ms=at_ms, values=values, forward_bps=forward)
+                        )
+        if index % 6 == 0:
+            counts = len(panels["X4_rel_crowd_gap"]["6h"])
+            print(f"  {index}/{len(universe)} ({month}) · 단면 {counts:,}", flush=True)
     return panels
 
 
