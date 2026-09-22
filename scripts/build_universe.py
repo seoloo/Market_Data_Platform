@@ -67,6 +67,38 @@ LOOKBACK_DAYS = 30
 MIN_DAILY_QUOTE = 20_000_000
 """일 거래대금 하한 (USDT). 이보다 작으면 슬리피지를 신뢰할 수 없다."""
 
+NON_CRYPTO_PREFIXES = (
+    "XAU",
+    "XAG",  # 금·은
+    "NVDA",
+    "MSTR",
+    "INTC",
+    "CRCL",
+    "EWY",  # 토큰화 주식·ETF
+    "TSLA",
+    "AAPL",
+    "META",
+    "GOOGL",
+    "AMZN",
+    "MSFT",
+    "COIN",
+    "HOOD",
+    "SPY",
+    "QQQ",
+    "GLD",
+    "PLTR",
+)
+"""유니버스에서 제외할 비암호 기초자산.
+
+Binance USD-M 에는 금·은·주식을 기초로 한 무기한 선물이 있다 (2026 유니버스의 10%).
+H3 의 메커니즘은 **암호화폐 무기한 선물의 레버리지 포지셔닝 해소**인데, 이들은
+실물 기초자산이 가격을 지배하고 funding·OI 의 의미도 다르다. 섞으면 가설이 말하는
+것과 다른 것을 재게 된다.
+
+⚠ 이 제외는 **신호를 돌리기 전에** 정했다. 성과를 보고 고른 것이 아니라
+기초자산 종류로 나눈 구조적 판단이다.
+"""
+
 
 def candidates() -> list[str]:
     coverage = json.loads(COVERAGE.read_text(encoding="utf-8"))
@@ -139,6 +171,8 @@ def build(top: int) -> dict[str, list[str]]:
         window_start = as_of - LOOKBACK_DAYS * 86_400_000
         ranked: list[tuple[float, str]] = []
         for symbol, series in daily.items():
+            if symbol.startswith(NON_CRYPTO_PREFIXES):
+                continue
             values = [v for ms, v in series.items() if window_start <= ms < as_of]
             if len(values) < LOOKBACK_DAYS // 2:
                 continue  # 상장 직후거나 이미 폐지됨
