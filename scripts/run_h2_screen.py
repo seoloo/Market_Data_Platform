@@ -54,6 +54,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--years", type=int, nargs="+", default=[2021, 2023])
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "reports/phase4/h2_screen.json")
+    parser.add_argument(
+        "--signals",
+        nargs="+",
+        default=None,
+        help="특정 신호만 낸다. 재현 검정에서 다른 신호를 **보지 않기 위해** 쓴다 — "
+        "보고 나서 고르면 사전 등록이 무의미해진다.",
+    )
     args = parser.parse_args()
 
     config = load_config().config
@@ -83,6 +90,8 @@ def main() -> int:
         covered.append(f"{year}({len(inputs.at_ms):,})")
 
         for name, values in signals.items():
+            if args.signals and name not in args.signals:
+                continue
             bucket = points.setdefault(name, [])
             for index, at_ms in enumerate(inputs.at_ms):
                 value = values[index]
@@ -104,6 +113,7 @@ def main() -> int:
     print(f"기준: 평균-2SE > {REQUIRED_EDGE_BPS}bps, n >= {MIN_SAMPLES}, decile {DECILE:.0%}\n")
 
     payload: dict[str, object] = {
+        "signals_requested": args.signals or "all",
         "required_edge_bps": REQUIRED_EDGE_BPS,
         "min_samples": MIN_SAMPLES,
         "horizons_ms": HORIZONS_MS,
