@@ -85,6 +85,8 @@ Phase 4에서 승인된 전략은 없다. Phase 5 이후와 실거래는 미착�
 | C4 | 무제한 보유와 “최대 보유기간만큼 embargo” 양립 불명확 | 전략별 label/포지션 구간 purge 및 경계 보유 처리 사전등록 |
 | C5 | 운용 자본 및 새 전략 미선정 | 후보 비교 → 사용자 선택 → 수치 사전등록 |
 | C6 | 실거래 관련 API 명세와 안전장치는 설계만 존재 | Phase 5에서 당시 공식 API 확인 후 구현·장애검증 |
+| C7 | D22 제외가 사용자 의도인지 미확인 (2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`) | 사용자 확인. 원문은 [초안 보관](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
+| C8 | Phase 4 OOS `실제 거래 n≥100` 이 TRAIN 보다 약해, 23~35bps 효과는 TRAIN 통과 후 OOS 확인 불가 | 사전등록 전 사용자 결정. 선택지는 [후보 비교 §6](../research/01-candidate-comparison.md) |
 
 ## 문서 정리 이력
 
