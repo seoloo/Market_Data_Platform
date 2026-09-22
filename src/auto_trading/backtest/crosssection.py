@@ -26,8 +26,10 @@ from itertools import pairwise
 __all__ = [
     "CrossSectionResult",
     "PanelObservation",
+    "SignalScreenVerdict",
     "evaluate_panel",
     "long_short_return",
+    "preregistered_signal_verdict",
     "quantile_returns",
 ]
 
@@ -131,6 +133,74 @@ class CrossSectionResult:
         if len(values) < 2:
             return False
         return all(v > 0 for v in values) or all(v < 0 for v in values)
+
+
+@dataclass(frozen=True, slots=True)
+class SignalScreenVerdict:
+    """H3 사전등록의 신호 단위 종합 판정."""
+
+    passes: bool
+    numeric_horizons: tuple[str, ...]
+    same_sign_horizons: tuple[str, ...]
+    qualifying_horizons: tuple[str, ...]
+    failure_reasons: tuple[str, ...]
+
+
+def preregistered_signal_verdict(
+    results: Sequence[CrossSectionResult],
+    *,
+    required_bps: float,
+    min_samples: int,
+) -> SignalScreenVerdict:
+    """23 §5의 비용·표본·단조성·연도·horizon 기준을 모두 적용한다.
+
+    최종 통과 horizon은 수치 기준을 넘고, 5분위가 단조이며, TRAIN 각 연도의
+    부호가 같고, 다른 horizon 하나 이상과 전체 평균 부호도 같아야 한다.
+    """
+    if len({result.horizon for result in results}) != len(results):
+        raise ValueError("같은 horizon 결과가 중복됐다")
+    if len({result.name for result in results}) > 1:
+        raise ValueError("서로 다른 신호 결과를 함께 판정할 수 없다")
+
+    numeric = tuple(
+        result.horizon for result in results if result.passes(required_bps, min_samples)
+    )
+    signs = {
+        result.horizon: 1 if result.mean_bps > 0 else -1 if result.mean_bps < 0 else 0
+        for result in results
+    }
+    same_sign = tuple(
+        result.horizon
+        for result in results
+        if signs[result.horizon] != 0
+        and sum(sign == signs[result.horizon] for sign in signs.values()) >= 2
+    )
+    qualifying = tuple(
+        result.horizon
+        for result in results
+        if result.horizon in numeric
+        and result.horizon in same_sign
+        and result.is_monotone
+        and result.is_year_consistent
+    )
+    reasons: list[str] = []
+    if not numeric:
+        reasons.append("EDGE_OR_SAMPLE")
+    if len(same_sign) < 2:
+        reasons.append("HORIZON_SIGN")
+    if not any(result.is_monotone for result in results if result.horizon in numeric):
+        reasons.append("MONOTONICITY")
+    if not any(result.is_year_consistent for result in results if result.horizon in numeric):
+        reasons.append("YEAR_SIGN")
+    if numeric and same_sign and not qualifying and not reasons:
+        reasons.append("CRITERIA_NOT_SAME_HORIZON")
+    return SignalScreenVerdict(
+        passes=bool(qualifying),
+        numeric_horizons=numeric,
+        same_sign_horizons=same_sign,
+        qualifying_horizons=qualifying,
+        failure_reasons=tuple(reasons),
+    )
 
 
 def evaluate_panel(

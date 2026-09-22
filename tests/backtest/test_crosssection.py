@@ -11,9 +11,11 @@ import math
 import pytest
 
 from auto_trading.backtest.crosssection import (
+    CrossSectionResult,
     PanelObservation,
     evaluate_panel,
     long_short_return,
+    preregistered_signal_verdict,
     quantile_returns,
 )
 
@@ -169,3 +171,79 @@ class TestStructureChecks:
         """한 해만으로는 일관성을 판단할 수 없다."""
         result = self._from_quantiles([float(j) * 10 for j in range(10)], years=1)
         assert not result.is_year_consistent
+
+
+class TestPreregisteredSignalVerdict:
+    @staticmethod
+    def _result(
+        horizon: str,
+        *,
+        mean_bps: float = 30.0,
+        quantiles: tuple[float, ...] = (-20.0, -10.0, 0.0, 10.0, 20.0),
+        yearly: dict[int, float] | None = None,
+    ) -> CrossSectionResult:
+        return CrossSectionResult(
+            name="X",
+            horizon=horizon,
+            sample_count=300,
+            mean_bps=mean_bps,
+            stderr_bps=2.0,
+            positive_rate=0.6,
+            quantile_means_bps=quantiles,
+            yearly_means_bps=yearly or {2023: 28.0, 2024: 32.0},
+        )
+
+    def test_all_preregistered_conditions_pass_together(self) -> None:
+        results = [self._result("2h"), self._result("4h"), self._result("6h", mean_bps=-5.0)]
+
+        verdict = preregistered_signal_verdict(results, required_bps=22.0, min_samples=200)
+
+        assert verdict.passes
+        assert verdict.qualifying_horizons == ("2h", "4h")
+        assert verdict.failure_reasons == ()
+
+    def test_numeric_edge_alone_does_not_pass_without_monotonicity(self) -> None:
+        jagged = (0.0, 20.0, -10.0, 15.0, 5.0)
+        results = [
+            self._result("2h", quantiles=jagged),
+            self._result("4h", mean_bps=10.0, quantiles=jagged),
+            self._result("6h", mean_bps=-5.0, quantiles=jagged),
+        ]
+
+        verdict = preregistered_signal_verdict(results, required_bps=22.0, min_samples=200)
+
+        assert not verdict.passes
+        assert "MONOTONICITY" in verdict.failure_reasons
+
+    def test_one_horizon_cannot_pass_without_a_same_sign_peer(self) -> None:
+        results = [
+            self._result("2h"),
+            self._result("4h", mean_bps=-10.0),
+            self._result("6h", mean_bps=0.0),
+        ]
+
+        verdict = preregistered_signal_verdict(results, required_bps=22.0, min_samples=200)
+
+        assert not verdict.passes
+        assert "HORIZON_SIGN" in verdict.failure_reasons
+
+    def test_train_year_sign_reversal_rejects_numeric_edge(self) -> None:
+        inconsistent = {2023: 35.0, 2024: -5.0}
+        results = [
+            self._result("2h", yearly=inconsistent),
+            self._result("4h", mean_bps=10.0),
+            self._result("6h", mean_bps=-5.0),
+        ]
+
+        verdict = preregistered_signal_verdict(results, required_bps=22.0, min_samples=200)
+
+        assert not verdict.passes
+        assert "YEAR_SIGN" in verdict.failure_reasons
+
+    def test_duplicate_horizon_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="중복"):
+            preregistered_signal_verdict(
+                [self._result("2h"), self._result("2h")],
+                required_bps=22.0,
+                min_samples=200,
+            )

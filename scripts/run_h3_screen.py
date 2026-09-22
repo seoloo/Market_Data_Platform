@@ -19,6 +19,7 @@ import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:
@@ -29,7 +30,12 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-from auto_trading.backtest.crosssection import PanelObservation, evaluate_panel  # noqa: E402
+from auto_trading.backtest.crosssection import (  # noqa: E402
+    CrossSectionResult,
+    PanelObservation,
+    evaluate_panel,
+    preregistered_signal_verdict,
+)
 from auto_trading.backtest.signals_h3 import (  # noqa: E402
     SIGNAL_NAMES,
     Metrics,
@@ -217,6 +223,90 @@ def require_coverage(found: dict[str, float]) -> None:
     )
 
 
+def result_to_row(result: CrossSectionResult) -> dict[str, object]:
+    """수치 결과와 사전등록 구조 검사를 재현 가능한 JSON 행으로 만든다."""
+    return {
+        "horizon": result.horizon,
+        "n": result.sample_count,
+        "mean_bps": result.mean_bps,
+        "stderr_bps": result.stderr_bps,
+        "lower_bound_bps": result.lower_bound_bps,
+        "positive_rate": result.positive_rate,
+        "quantiles": list(result.quantile_means_bps),
+        "monotone": result.is_monotone,
+        "year_consistent": result.is_year_consistent,
+        "yearly": {str(y): v for y, v in result.yearly_means_bps.items()},
+        "passes_numeric": result.passes(REQUIRED_EDGE_BPS, MIN_SAMPLES),
+    }
+
+
+def row_to_result(name: str, row: dict[str, Any]) -> CrossSectionResult:
+    """이전 실행기의 JSON도 새 종합 판정기로 다시 평가한다."""
+    return CrossSectionResult(
+        name=name,
+        horizon=str(row["horizon"]),
+        sample_count=int(row["n"]),
+        mean_bps=float(row["mean_bps"]),
+        stderr_bps=float(row["stderr_bps"]),
+        positive_rate=float(row["positive_rate"]),
+        quantile_means_bps=tuple(float(value) for value in row["quantiles"]),
+        yearly_means_bps={int(year): float(value) for year, value in row["yearly"].items()},
+    )
+
+
+def aggregate_verdict(results: list[CrossSectionResult]) -> dict[str, object]:
+    verdict = preregistered_signal_verdict(
+        results,
+        required_bps=REQUIRED_EDGE_BPS,
+        min_samples=MIN_SAMPLES,
+    )
+    return {
+        "passes": verdict.passes,
+        "numeric_horizons": list(verdict.numeric_horizons),
+        "same_sign_horizons": list(verdict.same_sign_horizons),
+        "qualifying_horizons": list(verdict.qualifying_horizons),
+        "failure_reasons": list(verdict.failure_reasons),
+    }
+
+
+def finalize_existing(source: Path, destination: Path) -> None:
+    """구 실행기가 만든 수치 결과에 사전등록 종합 판정만 적용한다."""
+    raw: dict[str, Any] = json.loads(source.read_text(encoding="utf-8"))
+    raw_signals = raw.get("signals")
+    if not isinstance(raw_signals, dict):
+        raise SystemExit(f"signals가 없는 결과 파일이다: {source}")
+
+    signals: dict[str, list[dict[str, Any]]] = {}
+    signal_verdicts: dict[str, dict[str, object]] = {}
+    for name, untyped_rows in raw_signals.items():
+        if not isinstance(untyped_rows, list):
+            raise SystemExit(f"신호 결과 형식이 잘못됐다: {name}")
+        rows = [dict(row) for row in untyped_rows]
+        for row in rows:
+            if "passes" in row and "passes_numeric" not in row:
+                row["passes_numeric"] = row.pop("passes")
+        results = [row_to_result(str(name), row) for row in rows]
+        signals[str(name)] = rows
+        signal_verdicts[str(name)] = aggregate_verdict(results)
+
+    payload = {
+        key: value
+        for key, value in raw.items()
+        if key not in {"digest", "signals", "signal_verdicts", "verdict"}
+    }
+    payload["source_digest"] = raw.get("digest")
+    payload["verdict_rule"] = "23-h3-preregistration.md §5 (2026-09-22 clarification)"
+    payload["signals"] = signals
+    payload["signal_verdicts"] = signal_verdicts
+    any_pass = any(bool(item["passes"]) for item in signal_verdicts.values())
+    payload["verdict"] = "1개 이상 통과" if any_pass else "전부 실패 — H3 기각 (23 §6)"
+    payload["digest"] = sha256_hex(payload)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"사전등록 종합 판정: {payload['verdict']}")
+    print(f"기록: {destination}")
+
+
 def build_panels(
     from_month: str, to_month: str
 ) -> tuple[dict[str, dict[str, list[PanelObservation]]], dict[str, float]]:
@@ -306,7 +396,21 @@ def main() -> int:
     parser.add_argument("--from", dest="from_month", default="2023-01")
     parser.add_argument("--to", dest="to_month", default="2024-12")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "reports/phase4/h3_screen.json")
+    parser.add_argument(
+        "--finalize-only",
+        action="store_true",
+        help="기존 --out 수치 결과를 다시 계산하지 않고 사전등록 종합 판정만 적용",
+    )
+    parser.add_argument(
+        "--final-out",
+        type=Path,
+        default=REPO_ROOT / "reports/phase4/h3_screen_final.json",
+    )
     args = parser.parse_args()
+
+    if args.finalize_only:
+        finalize_existing(args.out, args.final_out)
+        return 0
 
     panels, found = build_panels(args.from_month, args.to_month)
     print(f"\n구간 {args.from_month} ~ {args.to_month}")
@@ -316,16 +420,21 @@ def main() -> int:
     )
     print(f"롱 {LEG} / 숏 {LEG} · embargo = horizon\n")
 
+    signal_rows: dict[str, list[dict[str, object]]] = {}
+    signal_verdicts: dict[str, dict[str, object]] = {}
     payload: dict[str, object] = {
         "required_edge_bps": REQUIRED_EDGE_BPS,
         "min_samples": MIN_SAMPLES,
         "coverage": found,
-        "signals": {},
+        "verdict_rule": "23-h3-preregistration.md §5 (2026-09-22 clarification)",
+        "signals": signal_rows,
+        "signal_verdicts": signal_verdicts,
     }
     any_pass = False
     for name in SIGNALS:
         print(f"── {name}")
-        rows = []
+        rows: list[dict[str, object]] = []
+        results: list[CrossSectionResult] = []
         for horizon, bars in HORIZONS.items():
             result = evaluate_panel(
                 name,
@@ -335,37 +444,31 @@ def main() -> int:
                 leg=LEG,
                 buckets=BUCKETS,
             )
-            passed = result.passes(REQUIRED_EDGE_BPS, MIN_SAMPLES)
-            any_pass = any_pass or passed
+            passed_numeric = result.passes(REQUIRED_EDGE_BPS, MIN_SAMPLES)
             shape = " ".join(f"{v:+6.1f}" for v in result.quantile_means_bps)
             print(
                 f"   {horizon:>3} n={result.sample_count:<6}"
                 f" 롱숏 {result.mean_bps:+7.2f}±{result.stderr_bps:5.2f}"
                 f"  하한 {result.lower_bound_bps:+7.2f}"
                 f"  양수 {result.positive_rate:5.1%}"
-                f"  {'PASS' if passed else '    '}"
+                f"  {'수치통과' if passed_numeric else '        '}"
             )
             print(
                 f"       5분위 {shape}  단조 {'O' if result.is_monotone else 'X'}"
                 f"  연도 {'일관' if result.is_year_consistent else '불일치'}"
                 f" { ({y: round(v, 1) for y, v in result.yearly_means_bps.items()}) }"
             )
-            rows.append(
-                {
-                    "horizon": horizon,
-                    "n": result.sample_count,
-                    "mean_bps": result.mean_bps,
-                    "stderr_bps": result.stderr_bps,
-                    "lower_bound_bps": result.lower_bound_bps,
-                    "positive_rate": result.positive_rate,
-                    "quantiles": list(result.quantile_means_bps),
-                    "monotone": result.is_monotone,
-                    "year_consistent": result.is_year_consistent,
-                    "yearly": {str(y): v for y, v in result.yearly_means_bps.items()},
-                    "passes": passed,
-                }
-            )
-        payload["signals"][name] = rows  # type: ignore[index]
+            rows.append(result_to_row(result))
+            results.append(result)
+        verdict = aggregate_verdict(results)
+        signal_rows[name] = rows
+        signal_verdicts[name] = verdict
+        any_pass = any_pass or bool(verdict["passes"])
+        print(
+            f"   종합 {'PASS' if verdict['passes'] else 'FAIL'}"
+            f" · 통과 horizon {verdict['qualifying_horizons']}"
+            f" · 실패 사유 {verdict['failure_reasons']}"
+        )
         print()
 
     verdict = "1개 이상 통과" if any_pass else "전부 실패 — H3 기각 (23 §6)"
