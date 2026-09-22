@@ -38,6 +38,7 @@ __all__ = [
     "Intent",
     "MarketSnapshot",
     "OrderSnapshot",
+    "PerpMetrics",
     "PortfolioState",
     "PositionSnapshot",
     "RiskVerdict",
@@ -147,6 +148,44 @@ class FundingRate:
 
     def to_digest_dict(self) -> dict[str, Any]:
         return {"ms": self.funding_ms, "rate": self.rate, "h": self.interval_hours}
+
+
+@dataclass(frozen=True, slots=True)
+class PerpMetrics:
+    """무기한 선물 포지셔닝 스냅샷 하나 (5분 간격).
+
+    **가격에서 파생되지 않은** 유일한 정보원이다 (16-h2-proposal.md).
+    누가 얼마나 들고 있는지를 나타내며, 차트에서는 볼 수 없는 값이다.
+
+    비율 값들은 롱/숏 비다 — 1.0 이 균형, 2.0 이면 롱이 숏의 두 배다.
+    0 이하는 거래소가 줄 수 없는 값이므로 데이터 손상으로 본다.
+    """
+
+    at_ms: int
+    open_interest: Decimal
+    open_interest_value: Decimal
+    toptrader_account_ratio: Decimal
+    toptrader_position_ratio: Decimal
+    account_long_short_ratio: Decimal
+    taker_buy_sell_ratio: Decimal
+
+    def __post_init__(self) -> None:
+        if self.at_ms <= 0:
+            raise DataIntegrityError(f"at_ms 가 0 이하: {self.at_ms}")
+        if self.open_interest < ZERO or self.open_interest_value < ZERO:
+            raise DataIntegrityError(f"미결제약정이 음수 (at_ms={self.at_ms})")
+        for name in (
+            "toptrader_account_ratio",
+            "toptrader_position_ratio",
+            "account_long_short_ratio",
+            "taker_buy_sell_ratio",
+        ):
+            ratio: Decimal = getattr(self, name)
+            if ratio <= ZERO:
+                raise DataIntegrityError(f"{name} 가 0 이하: {ratio} (at_ms={self.at_ms})")
+
+    def to_digest_dict(self) -> dict[str, Any]:
+        return {"ms": self.at_ms, "oi": self.open_interest, "tb": self.taker_buy_sell_ratio}
 
 
 @dataclass(frozen=True, slots=True)

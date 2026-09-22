@@ -24,17 +24,19 @@ import httpx
 
 from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError, ExchangeError
-from auto_trading.core.types import Candle, FundingRate
+from auto_trading.core.types import Candle, FundingRate, PerpMetrics
 
 __all__ = [
     "ArchiveFile",
     "BinanceVisionClient",
     "FundingArchiveFile",
     "Granularity",
+    "MetricsArchiveFile",
     "RemoteArchive",
     "months_between",
     "parse_funding_csv",
     "parse_klines_csv",
+    "parse_metrics_csv",
 ]
 
 BASE_URL: Final = "https://data.binance.vision"
@@ -44,6 +46,10 @@ _EXPECTED_COLUMNS: Final = 12
 
 #: fundingRate CSV 컬럼 수 (calc_time, funding_interval_hours, last_funding_rate).
 _FUNDING_COLUMNS: Final = 3
+
+#: metrics CSV 컬럼 수 (create_time, symbol, OI 2개, 비율 4개).
+_METRICS_COLUMNS: Final = 8
+
 
 #: 2100년을 밀리초로 표현한 값. 이보다 크면 마이크로초 단위로 판단한다.
 _MS_UPPER_BOUND: Final = 4_102_444_800_000
@@ -121,6 +127,31 @@ class FundingArchiveFile:
 
     def url(self, base_url: str = BASE_URL) -> str:
         return f"{base_url}/data/futures/um/monthly/fundingRate/{self.symbol}/{self.filename}"
+
+    def checksum_url(self, base_url: str = BASE_URL) -> str:
+        return f"{self.url(base_url)}.CHECKSUM"
+
+    def __str__(self) -> str:
+        return self.filename
+
+
+@dataclass(frozen=True, slots=True)
+class MetricsArchiveFile:
+    """포지셔닝 지표 아카이브 (**일 단위만** 제공된다 — 월별 파일이 없다)."""
+
+    symbol: str
+    period: date
+
+    @property
+    def stem(self) -> str:
+        return f"{self.symbol}-metrics-{self.period:%Y-%m-%d}"
+
+    @property
+    def filename(self) -> str:
+        return f"{self.stem}.zip"
+
+    def url(self, base_url: str = BASE_URL) -> str:
+        return f"{base_url}/data/futures/um/daily/metrics/{self.symbol}/{self.filename}"
 
     def checksum_url(self, base_url: str = BASE_URL) -> str:
         return f"{self.url(base_url)}.CHECKSUM"
@@ -276,6 +307,71 @@ def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
     return tuple(rates)
 
 
+def parse_metrics_csv(data: bytes) -> tuple[PerpMetrics, ...]:
+    """포지셔닝 지표 CSV 를 파싱한다.
+
+    컬럼: ``create_time, symbol, sum_open_interest, sum_open_interest_value,
+    count_toptrader_long_short_ratio, sum_toptrader_long_short_ratio,
+    count_long_short_ratio, sum_taker_long_short_vol_ratio``.
+
+    ``create_time`` 은 epoch 가 아니라 ``YYYY-MM-DD HH:MM:SS`` UTC 문자열이다.
+
+    ⚠ **같은 시각이 두 번 들어 있는 파일이 있다** (2026-09-22 실측: 2021-01-15 파일은
+    288행이 아니라 577행으로 전 행이 중복). 조용히 넘기면 표본 수가 두 배로 부풀어
+    모든 통계가 틀어지므로, 중복은 **값이 같을 때만** 하나로 합치고 다르면 거부한다.
+    """
+    text = data.decode("utf-8-sig", errors="strict")
+    rows = list(csv.reader(io.StringIO(text)))
+    if not rows:
+        return ()
+    if rows[0] and not rows[0][0].strip()[:1].isdigit():
+        rows = rows[1:]  # 헤더
+
+    seen: dict[int, PerpMetrics] = {}
+    for line_no, row in enumerate(rows, start=1):
+        if not row or not row[0].strip():
+            continue
+        if len(row) < _METRICS_COLUMNS:
+            raise DataIntegrityError(
+                f"metrics CSV 컬럼 수가 {len(row)} 다 (line {line_no}), "
+                f"{_METRICS_COLUMNS}개를 기대한다"
+            )
+        at_ms = _parse_metrics_time(row[0], line_no)
+        if any(not row[i].strip() for i in range(2, _METRICS_COLUMNS)):
+            # 값이 비어 있는 스냅샷이 실제로 존재한다 (2026-09-22 실측: 2021-05-07 등).
+            # 0 이나 직전값으로 메우지 않고 **그 시각을 없는 것으로** 둔다 — 결측은
+            # find_gaps 가 드러내고, 그 구간에서는 신호를 만들지 않는다.
+            continue
+        entry = PerpMetrics(
+            at_ms=at_ms,
+            open_interest=_to_decimal(row[2], "sum_open_interest", at_ms),
+            open_interest_value=_to_decimal(row[3], "sum_open_interest_value", at_ms),
+            toptrader_account_ratio=_to_decimal(row[4], "toptrader_account_ratio", at_ms),
+            toptrader_position_ratio=_to_decimal(row[5], "toptrader_position_ratio", at_ms),
+            account_long_short_ratio=_to_decimal(row[6], "account_long_short_ratio", at_ms),
+            taker_buy_sell_ratio=_to_decimal(row[7], "taker_buy_sell_ratio", at_ms),
+        )
+        previous = seen.get(at_ms)
+        if previous is not None and previous != entry:
+            raise DataIntegrityError(
+                f"같은 시각에 서로 다른 지표가 있다 (line {line_no}, at_ms={at_ms})"
+            )
+        seen[at_ms] = entry
+
+    # 빈 행은 거래소 측 결측이다. 하루 전체가 비어 있는 날도 실제로 있다
+    # (2026-09-22 실측: 2021-12-31, 2022-01-01). 오류가 아니라 "그 시각 데이터 없음"
+    # 이므로 빈 튜플을 돌려주고, 결과는 find_gaps 가 드러낸다.
+    return tuple(seen[key] for key in sorted(seen))
+
+
+def _parse_metrics_time(text: str, line_no: int) -> int:
+    try:
+        parsed = datetime.strptime(text.strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+    except ValueError as exc:
+        raise DataIntegrityError(f"create_time 을 읽을 수 없다 (line {line_no}): {text!r}") from exc
+    return int(parsed.timestamp() * 1000)
+
+
 def _extract_single_csv(payload: bytes, expected_stem: str) -> bytes:
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
@@ -395,6 +491,15 @@ class BinanceVisionClient:
         if payload is None:
             return None
         return parse_funding_csv(_extract_single_csv(payload, file.stem))
+
+    def fetch_metrics(
+        self, file: MetricsArchiveFile, *, verify_checksum: bool = True
+    ) -> tuple[PerpMetrics, ...] | None:
+        """지표 아카이브를 받아 파싱한다. 해당 날짜 파일이 없으면 ``None``."""
+        payload = self.download(file, verify_checksum=verify_checksum)
+        if payload is None:
+            return None
+        return parse_metrics_csv(_extract_single_csv(payload, file.stem))
 
 
 def utc_today(now_ms: int) -> date:
