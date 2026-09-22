@@ -33,30 +33,23 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
+from auto_trading.backtest.triggers import (  # noqa: E402
+    BARS_PER_HOUR,
+    CASCADE_MOVE_SD,
+    CASCADE_OI_DROP,
+    CONTRACTION_QUANTILE,
+    RANGE_BARS,
+    TREND_BARS,
+    breakout_triggers,
+    cascade_triggers,
+    contraction_flags,
+    rolling_vol,
+)
 from auto_trading.config.loader import load_config  # noqa: E402
 
-BARS_PER_HOUR = 12
 MS_PER_YEAR = 365.25 * 24 * 3_600_000
 
-# --- 후보 A: HTF 방향 + 변동성 수축 + LTF 구조 돌파 ---
-VOL_WINDOW = 24 * BARS_PER_HOUR
-RANK_WINDOW = 30 * 24 * BARS_PER_HOUR
-CONTRACTION_Q = 0.30
-TREND_BARS = 4 * BARS_PER_HOUR * 50
-"""4시간봉 50개 상당의 추세 판단 구간 (5분봉 환산)."""
-RANGE_BARS = 6 * BARS_PER_HOUR
-"""돌파를 재는 직전 레인지 (6시간)."""
-
-# --- 후보 B: 청산 캐스케이드 반전 ---
-CASCADE_MOVE_SD = 3.0
-"""30분 가격 변화가 직전 변동성의 몇 배일 때 '급변' 으로 볼 것인가."""
-CASCADE_OI_DROP = 0.005
-"""같은 30분 동안 미결제약정이 이 비율 이상 **줄었는가** (강제 청산의 흔적)."""
-CASCADE_WINDOW = 6
-"""30분 = 5분봉 6개."""
-
-# --- 후보 C: 다일 추세 추종 ---
-MOMENTUM_DAYS = 28
+# --- 후보 C: 다일 추세 추종 (트리거 모듈이 아니라 보유기간으로 상한을 잡는다) ---
 MOMENTUM_HOLD_DAYS = 14
 
 
@@ -75,82 +68,6 @@ def load_open_interest(conn: sqlite3.Connection, exchange: str) -> dict[int, flo
         (exchange,),
     ).fetchall()
     return {int(r[0]): float(r[1]) for r in rows if r[1] is not None}
-
-
-def rolling_vol(closes: list[float]) -> list[float | None]:
-    out: list[float | None] = [None] * len(closes)
-    if len(closes) <= VOL_WINDOW:
-        return out
-    steps = [0.0] * len(closes)
-    for i in range(1, len(closes)):
-        prev = closes[i - 1]
-        steps[i] = (closes[i] - prev) / prev if prev > 0.0 else 0.0
-    total = sum(steps[1 : VOL_WINDOW + 1])
-    total_sq = sum(v * v for v in steps[1 : VOL_WINDOW + 1])
-    for i in range(VOL_WINDOW, len(closes)):
-        variance = max(total_sq / VOL_WINDOW - (total / VOL_WINDOW) ** 2, 0.0)
-        out[i] = variance**0.5
-        if i + 1 < len(closes):
-            leaving, entering = steps[i - VOL_WINDOW + 1], steps[i + 1]
-            total += entering - leaving
-            total_sq += entering * entering - leaving * leaving
-    return out
-
-
-def count_candidate_a(closes: list[float], vol: list[float | None]) -> int:
-    """수축 국면에서 직전 레인지를 HTF 추세 방향으로 돌파한 횟수 (중복 진입 제외)."""
-    history: list[float] = []
-    triggers = 0
-    blocked_until = 0
-    for i, value in enumerate(vol):
-        if value is None:
-            continue
-        contracted = False
-        if len(history) >= RANK_WINDOW:
-            recent = history[-RANK_WINDOW:]
-            contracted = sum(1 for v in recent if v < value) / len(recent) <= CONTRACTION_Q
-        history.append(value)
-        if i < blocked_until or not contracted or i < TREND_BARS:
-            continue
-        trend_up = closes[i] > closes[i - TREND_BARS]
-        window = closes[i - RANGE_BARS : i]
-        if not window:
-            continue
-        broke = closes[i] > max(window) if trend_up else closes[i] < min(window)
-        if broke:
-            triggers += 1
-            blocked_until = i + RANGE_BARS  # 같은 돌파를 여러 번 세지 않는다
-    return triggers
-
-
-def count_candidate_b(
-    times: list[int], closes: list[float], vol: list[float | None], oi: dict[int, float]
-) -> tuple[int, int]:
-    """급락/급등과 **동시에 미결제약정이 줄어든** 횟수. (트리거, 지표가용 봉)"""
-    triggers = 0
-    usable = 0
-    blocked_until = 0
-    for i in range(CASCADE_WINDOW, len(closes)):
-        value = vol[i]
-        if value is None or value <= 0.0:
-            continue
-        before_oi = oi.get(times[i - CASCADE_WINDOW])
-        now_oi = oi.get(times[i])
-        if before_oi is None or now_oi is None or before_oi <= 0.0:
-            continue
-        usable += 1
-        if i < blocked_until:
-            continue
-        prev_close = closes[i - CASCADE_WINDOW]
-        move = abs(closes[i] - prev_close) / prev_close
-        # 30분 변화를 5분 변동성과 비교하려면 √6 배로 환산한다
-        if move < CASCADE_MOVE_SD * value * CASCADE_WINDOW**0.5:
-            continue
-        if (now_oi - before_oi) / before_oi > -CASCADE_OI_DROP:
-            continue  # OI 가 줄지 않았으면 신규 투기이지 강제 청산이 아니다
-        triggers += 1
-        blocked_until = i + CASCADE_WINDOW * 2
-    return triggers, usable
 
 
 def main() -> int:
@@ -175,11 +92,12 @@ def main() -> int:
 
     vol = rolling_vol(closes)
 
-    a = count_candidate_a(closes, vol)
+    a = len(breakout_triggers(closes, contraction_flags(vol)))
     print(f"A 변동성 수축 후 구조 돌파 : {a:,}회 · 연 {a / years:.0f}회")
 
     oi = load_open_interest(conn, config.exchange)
-    b, usable = count_candidate_b(times, closes, vol, oi)
+    triggers_b, usable = cascade_triggers(times, closes, vol, oi)
+    b = len(triggers_b)
     oi_years = usable / (BARS_PER_HOUR * 24 * 365.25) if usable else 0.0
     rate_b = b / oi_years if oi_years else 0.0
     print(f"B 청산 캐스케이드 반전    : {b:,}회 · 연 {rate_b:.0f}회 (지표 가용 {oi_years:.1f}년)")
@@ -198,7 +116,7 @@ def main() -> int:
         "years": years,
         "note": "트리거 횟수만 측정. 수익률 미계산. 임계값은 사전등록 아님.",
         "parameters": {
-            "contraction_quantile": CONTRACTION_Q,
+            "contraction_quantile": CONTRACTION_QUANTILE,
             "range_bars": RANGE_BARS,
             "trend_bars": TREND_BARS,
             "cascade_move_sd": CASCADE_MOVE_SD,
