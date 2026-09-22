@@ -15,10 +15,11 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures as futures
 import json
+import sqlite3
 import sys
 from calendar import monthrange
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -31,9 +32,11 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
+from auto_trading.config.loader import load_config  # noqa: E402
 from auto_trading.core.errors import AutoTradingError  # noqa: E402
 from auto_trading.core.types import PerpMetrics  # noqa: E402
 from auto_trading.marketdata.archive import BinanceVisionClient, MetricsArchiveFile  # noqa: E402
+from auto_trading.marketdata.bulk import DEFAULT_BATCH, run_batched  # noqa: E402
 from auto_trading.marketdata.metrics import EARLIEST_AVAILABLE  # noqa: E402
 from auto_trading.storage.db import Database  # noqa: E402
 from auto_trading.storage.migrations import apply_migrations  # noqa: E402
@@ -88,42 +91,65 @@ def fetch_symbol(symbol: str, days: list[date]) -> tuple[str, list[PerpMetrics],
     return symbol, rows, missing
 
 
+def already_loaded(conn: sqlite3.Connection, exchange: str, symbol: str, days: list[date]) -> bool:
+    """이 심볼·달이 이미 적재됐는가. 재개용이며 하루라도 비면 다시 받는다."""
+    start = int(datetime.combine(days[0], datetime.min.time(), tzinfo=UTC).timestamp() * 1000)
+    end = int(datetime.combine(days[-1], datetime.max.time(), tzinfo=UTC).timestamp() * 1000)
+    row = conn.execute(
+        "SELECT COUNT(*) FROM perp_metrics WHERE exchange=? AND symbol=? AND at_ms BETWEEN ? AND ?",
+        (exchange, symbol, start, end),
+    ).fetchone()
+    # 하루 288개. 거래소 결측이 있으므로 95% 이상이면 받은 것으로 본다.
+    return bool(row) and row[0] >= len(days) * 288 * 0.95
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=16)
+    parser.add_argument("--batch", type=int, default=DEFAULT_BATCH)
     parser.add_argument("--until", default=None, help="이 달까지만 (YYYY-MM). 부분 수집용")
     args = parser.parse_args()
 
-    from auto_trading.config.loader import load_config
-
     config = load_config().config
     plan = needed_jobs(args.until)
-    total_days = sum(len(days) for _, days in plan)
     symbols = {symbol for symbol, _ in plan}
-    print(f"심볼 {len(symbols)}개 · 작업 {len(plan):,}개(심볼×월) · 받을 일수 {total_days:,}일")
+    print(f"심볼 {len(symbols)}개 · 작업 {len(plan):,}개(심볼×월)")
 
     with Database(REPO_ROOT / config.data.db_path) as db:
         apply_migrations(db.connection)
         repo = PerpMetricsRepository(db.connection, exchange=config.exchange)
-        before = sum(repo.count(symbol) for symbol in symbols)
-        written = missing_total = done = 0
-        with (
-            futures.ThreadPoolExecutor(max_workers=args.workers) as pool,
-            db.transaction(),
-        ):
-            jobs = [pool.submit(fetch_symbol, s, d) for s, d in plan]
-            for job in futures.as_completed(jobs):
-                symbol, rows, missing = job.result()
-                if rows:
-                    written += repo.upsert_many(symbol, rows)
-                missing_total += missing
-                done += 1
-                if done % 100 == 0:
-                    print(f"  {done}/{len(plan)} 작업 · {written:,}건", flush=True)
-        after = sum(repo.count(symbol) for symbol in symbols)
+        remaining = [
+            job
+            for job in plan
+            if not already_loaded(db.connection, config.exchange, job[0], job[1])
+        ]
+        print(f"이미 적재됨 {len(plan) - len(remaining):,}개 → 받을 작업 {len(remaining):,}개")
 
-    print(f"\n적재 {before:,} -> {after:,}건 (기록 {written:,})")
-    print(f"파일 없음/빈 파일: {missing_total:,}일")
+        stats = {"written": 0, "missing": 0}
+
+        def write(results: Iterable[tuple[str, list[PerpMetrics], int]]) -> None:
+            for symbol, rows, missing in results:
+                if rows:
+                    stats["written"] += repo.upsert_many(symbol, rows)
+                stats["missing"] += missing
+
+        def progress(done: int, total: int) -> None:
+            print(f"  {done}/{total} 작업 · {stats['written']:,}건", flush=True)
+
+        run_batched(
+            db,
+            remaining,
+            lambda job: fetch_symbol(*job),
+            write,
+            workers=args.workers,
+            batch_size=args.batch,
+            on_progress=progress,
+        )
+        total = sum(repo.count(symbol) for symbol in symbols)
+
+    print()
+    print(f"기록 {stats['written']:,}건 · 유니버스 지표 총 {total:,}건")
+    print(f"파일 없음/빈 파일: {stats['missing']:,}일")
     print(f"완료 {datetime.now(UTC):%Y-%m-%d %H:%M} UTC")
     return 0
 

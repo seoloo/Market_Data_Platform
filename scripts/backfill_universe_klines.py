@@ -12,9 +12,11 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures as futures
 import json
+import sqlite3
 import sys
+from calendar import monthrange
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -36,6 +38,7 @@ from auto_trading.marketdata.archive import (  # noqa: E402
     BinanceVisionClient,
     Granularity,
 )
+from auto_trading.marketdata.bulk import DEFAULT_BATCH, run_batched  # noqa: E402
 from auto_trading.storage.db import Database  # noqa: E402
 from auto_trading.storage.migrations import apply_migrations  # noqa: E402
 from auto_trading.storage.repositories.candles import CandleRepository  # noqa: E402
@@ -73,9 +76,23 @@ def fetch(symbol: str, month: date) -> tuple[str, list[Candle]]:
     return symbol, list(bars or ())
 
 
+def already_loaded(conn: sqlite3.Connection, exchange: str, symbol: str, month: date) -> bool:
+    """이 심볼·달의 5분봉이 이미 있는가 (재개용)."""
+    start = int(datetime(month.year, month.month, 1, tzinfo=UTC).timestamp() * 1000)
+    end = start + monthrange(month.year, month.month)[1] * 86_400_000
+    row = conn.execute(
+        "SELECT COUNT(*) FROM candles"
+        " WHERE exchange=? AND symbol=? AND timeframe='5m' AND open_ms >= ? AND open_ms < ?",
+        (exchange, symbol, start, end),
+    ).fetchone()
+    expected = monthrange(month.year, month.month)[1] * 288
+    return bool(row) and row[0] >= expected * 0.95
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--workers", type=int, default=12)
+    parser.add_argument("--batch", type=int, default=DEFAULT_BATCH)
     args = parser.parse_args()
 
     config = load_config().config
@@ -86,27 +103,41 @@ def main() -> int:
     with Database(REPO_ROOT / config.data.db_path) as db:
         apply_migrations(db.connection)
         repo = CandleRepository(db.connection, exchange=config.exchange)
+        remaining = [
+            job
+            for job in plan
+            if not already_loaded(db.connection, config.exchange, job[0], job[1])
+        ]
+        print(f"이미 적재됨 {len(plan) - len(remaining):,}개 → 받을 작업 {len(remaining):,}개")
+
         now_ms = int(datetime.now(UTC).timestamp() * 1000)
-        written = missing = done = 0
-        with (
-            futures.ThreadPoolExecutor(max_workers=args.workers) as pool,
-            db.transaction(),
-        ):
-            jobs = [pool.submit(fetch, s, m) for s, m in plan]
-            for job in futures.as_completed(jobs):
-                symbol, bars = job.result()
+        stats = {"written": 0, "missing": 0}
+
+        def write(results: Iterable[tuple[str, list[Candle]]]) -> None:
+            for symbol, bars in results:
                 if bars:
-                    written += repo.upsert_many(
+                    stats["written"] += repo.upsert_many(
                         symbol, Timeframe.M5, bars, source="bulk", ingested_ms=now_ms
                     )
                 else:
-                    missing += 1
-                done += 1
-                if done % 100 == 0:
-                    print(f"  {done}/{len(plan)} · {written:,}봉", flush=True)
+                    stats["missing"] += 1
+
+        def progress(done: int, total: int) -> None:
+            print(f"  {done}/{total} · {stats['written']:,}봉", flush=True)
+
+        run_batched(
+            db,
+            remaining,
+            lambda job: fetch(*job),
+            write,
+            workers=args.workers,
+            batch_size=args.batch,
+            on_progress=progress,
+        )
         total = sum(repo.count(symbol, Timeframe.M5) for symbol in symbols)
 
-    print(f"\n기록 {written:,}봉 · 파일 없음 {missing}개 · 유니버스 5분봉 총 {total:,}봉")
+    print()
+    print(f"기록 {stats['written']:,}봉 · 파일 없음 {stats['missing']}개 · 총 {total:,}봉")
     return 0
 
 
