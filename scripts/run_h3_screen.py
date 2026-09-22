@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sqlite3
 import sys
 from datetime import UTC, datetime
@@ -31,9 +30,14 @@ for _stream in (sys.stdout, sys.stderr):
         _reconfigure(encoding="utf-8", errors="replace")
 
 from auto_trading.backtest.crosssection import PanelObservation, evaluate_panel  # noqa: E402
+from auto_trading.backtest.signals_h3 import (  # noqa: E402
+    SIGNAL_NAMES,
+    Metrics,
+    Series,
+    build_cross_signals,
+)
 from auto_trading.config.loader import load_config  # noqa: E402
 from auto_trading.core.hashing import sha256_hex  # noqa: E402
-from auto_trading.features.normalize import causal_zscore_series  # noqa: E402
 
 # --- 23 §3·§5 에 사전 등록한 값 ---
 REQUIRED_EDGE_BPS = 22.0
@@ -45,16 +49,7 @@ BUCKETS = 5
 HORIZONS = {"2h": 24, "4h": 48, "6h": 72}
 """5분봉 개수."""
 
-SIGNALS = (
-    "X1_rel_funding",
-    "X2_rel_oi_change",
-    "X3_rel_taker",
-    "X4_rel_crowd_gap",
-    "X5_rel_reversal",
-)
-
-Z_LOOKBACK = 7 * 24 * 12
-"""7일 causal 창 (5분 스냅샷 기준)."""
+SIGNALS = SIGNAL_NAMES
 
 STEP_MS = 300_000
 
@@ -71,10 +66,6 @@ UNIVERSE = REPO_ROOT / "reports/phase4/universe.json"
 
 def month_of(at_ms: int) -> str:
     return datetime.fromtimestamp(at_ms / 1000, tz=UTC).strftime("%Y-%m")
-
-
-Series = dict[int, float]
-Metrics = dict[int, tuple[float, float, float, float]]
 
 
 def load_symbol(
@@ -107,60 +98,6 @@ def load_symbol(
         )
     }
     return closes, metrics, funding
-
-
-def signal_series(closes: Series, metrics: Metrics, funding: Series) -> dict[str, Series]:
-    """심볼 하나의 신호 5종. warm-up 미충족 구간은 아예 넣지 않는다."""
-    times = sorted(metrics)
-    if len(times) < Z_LOOKBACK + 13:
-        return {}
-    oi = [metrics[t][0] for t in times]
-    taker = [metrics[t][1] for t in times]
-    crowd = [metrics[t][2] for t in times]
-    top = [metrics[t][3] for t in times]
-
-    oi_change = [0.0] * len(times)
-    for i in range(12, len(times)):
-        before, now = oi[i - 12], oi[i]
-        if before > 0 and now > 0:
-            oi_change[i] = math.log(now / before)
-
-    taker_z = causal_zscore_series(taker, Z_LOOKBACK)
-    crowd_z = causal_zscore_series(crowd, Z_LOOKBACK)
-    top_z = causal_zscore_series(top, Z_LOOKBACK)
-    oi_z = causal_zscore_series(oi_change, Z_LOOKBACK)
-
-    funding_times = sorted(funding)
-    out: dict[str, dict[int, float]] = {name: {} for name in SIGNALS}
-    for i, at_ms in enumerate(times):
-        # X1 — 직전에 정산된 funding (causal)
-        idx = _last_before(funding_times, at_ms)
-        if idx is not None:
-            out["X1_rel_funding"][at_ms] = funding[funding_times[idx]]
-        oi_value, taker_value = oi_z[i], taker_z[i]
-        if oi_value is not None:
-            out["X2_rel_oi_change"][at_ms] = oi_value
-        if taker_value is not None:
-            out["X3_rel_taker"][at_ms] = taker_value
-        crowd_value, top_value = crowd_z[i], top_z[i]
-        if crowd_value is not None and top_value is not None:
-            out["X4_rel_crowd_gap"][at_ms] = crowd_value - top_value
-        past_close = closes.get(at_ms - 72 * STEP_MS)
-        last_close = closes.get(at_ms)
-        if past_close and last_close:
-            out["X5_rel_reversal"][at_ms] = (last_close - past_close) / past_close * 10_000
-    return out
-
-
-def _last_before(sorted_times: list[int], at_ms: int) -> int | None:
-    lo, hi = 0, len(sorted_times)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if sorted_times[mid] <= at_ms:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo - 1 if lo else None
 
 
 def _month_start_ms(year: int, month: int) -> int:
@@ -248,7 +185,7 @@ def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[Pan
             if not metrics or not closes:
                 continue
             closes_by_symbol[symbol] = closes
-            for name, values_by_time in signal_series(closes, metrics, funding).items():
+            for name, values_by_time in build_cross_signals(closes, metrics, funding).items():
                 signals[name][symbol] = values_by_time
 
         times = sorted(
