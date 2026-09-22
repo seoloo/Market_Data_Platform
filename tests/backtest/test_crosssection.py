@@ -247,3 +247,9 @@ class TestPreregisteredSignalVerdict:
                 required_bps=22.0,
                 min_samples=200,
             )
+
+    def test_cost_failure_does_not_claim_structure_failed(self) -> None:
+        results = [self._result(horizon, mean_bps=5.0) for horizon in ("2h", "4h", "6h")]
+        verdict = preregistered_signal_verdict(results, required_bps=22.0, min_samples=200)
+        assert not verdict.passes
+        assert verdict.failure_reasons == ("EDGE_OR_SAMPLE",)

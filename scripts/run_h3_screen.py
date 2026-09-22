@@ -271,22 +271,36 @@ def aggregate_verdict(results: list[CrossSectionResult]) -> dict[str, object]:
 
 def finalize_existing(source: Path, destination: Path) -> None:
     """구 실행기가 만든 수치 결과에 사전등록 종합 판정만 적용한다."""
+    if source.resolve() == destination.resolve() or (
+        destination.exists() and source.samefile(destination)
+    ):
+        raise SystemExit("원자료와 출력 경로는 달라야 한다")
     raw: dict[str, Any] = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise SystemExit("결과 파일은 JSON 객체여야 한다")
+    expected_digest = sha256_hex({key: value for key, value in raw.items() if key != "digest"})
+    if raw.get("digest") != expected_digest:
+        raise SystemExit("원자료 digest 불일치: 재판정을 중단한다")
+    if raw.get("required_edge_bps") != REQUIRED_EDGE_BPS or raw.get("min_samples") != MIN_SAMPLES:
+        raise SystemExit("원자료의 비용·표본 기준이 사전등록과 다르다")
     raw_signals = raw.get("signals")
-    if not isinstance(raw_signals, dict):
-        raise SystemExit(f"signals가 없는 결과 파일이다: {source}")
+    if not isinstance(raw_signals, dict) or set(raw_signals) != set(SIGNALS):
+        raise SystemExit("사전등록한 신호 5종이 모두 있어야 한다")
 
     signals: dict[str, list[dict[str, Any]]] = {}
     signal_verdicts: dict[str, dict[str, object]] = {}
     for name, untyped_rows in raw_signals.items():
         if not isinstance(untyped_rows, list):
             raise SystemExit(f"신호 결과 형식이 잘못됐다: {name}")
+        if (
+            len(untyped_rows) != len(HORIZONS)
+            or not all(isinstance(row, dict) for row in untyped_rows)
+            or {row.get("horizon") for row in untyped_rows} != set(HORIZONS)
+        ):
+            raise SystemExit(f"신호별 2h·4h·6h 결과가 각각 하나씩 필요하다: {name}")
         rows = [dict(row) for row in untyped_rows]
-        for row in rows:
-            if "passes" in row and "passes_numeric" not in row:
-                row["passes_numeric"] = row.pop("passes")
         results = [row_to_result(str(name), row) for row in rows]
-        signals[str(name)] = rows
+        signals[str(name)] = [result_to_row(result) for result in results]
         signal_verdicts[str(name)] = aggregate_verdict(results)
 
     payload = {
@@ -471,9 +485,9 @@ def main() -> int:
         )
         print()
 
-    verdict = "1개 이상 통과" if any_pass else "전부 실패 — H3 기각 (23 §6)"
-    print(f"판정: {verdict}")
-    payload["verdict"] = verdict
+    summary_verdict = "1개 이상 통과" if any_pass else "전부 실패 — H3 기각 (23 §6)"
+    print(f"판정: {summary_verdict}")
+    payload["verdict"] = summary_verdict
     payload["digest"] = sha256_hex(payload)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")

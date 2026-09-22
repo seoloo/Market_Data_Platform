@@ -188,9 +188,11 @@ def preregistered_signal_verdict(
         reasons.append("EDGE_OR_SAMPLE")
     if len(same_sign) < 2:
         reasons.append("HORIZON_SIGN")
-    if not any(result.is_monotone for result in results if result.horizon in numeric):
+    if numeric and not any(result.is_monotone for result in results if result.horizon in numeric):
         reasons.append("MONOTONICITY")
-    if not any(result.is_year_consistent for result in results if result.horizon in numeric):
+    if numeric and not any(
+        result.is_year_consistent for result in results if result.horizon in numeric
+    ):
         reasons.append("YEAR_SIGN")
     if numeric and same_sign and not qualifying and not reasons:
         reasons.append("CRITERIA_NOT_SAME_HORIZON")
