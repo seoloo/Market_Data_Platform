@@ -44,6 +44,17 @@ REQUIRED_EDGE_BPS = 22.0
 """알트 보수 기준. 18bps(BTC)도 함께 보고하되 판정은 이 값으로 한다."""
 
 REFERENCE_EDGE_BPS = 18.0
+
+MIN_SAMPLES = 200
+"""최소 독립 표본.
+
+23 §5 는 "검정력 계산에서 나온 필요 표본 이상" 이라고만 적었다. 그 요구는 사실
+``평균 − 2SE > 기준`` 검사가 이미 강제한다 — 표본이 적으면 SE 가 커져 통과하지
+못한다. 그래서 이 값의 역할은 **표본이 극히 적을 때의 우연**을 막는 것이고,
+H2 때와 같은 200 으로 둔다 (t 분포가 정규에 충분히 가까워지는 수준).
+
+⚠ 이 해석은 **결과를 보기 전에** 고정했다.
+"""
 LEG = 3
 BUCKETS = 5
 HORIZONS = {"2h": 24, "4h": 48, "6h": 72}
@@ -158,7 +169,57 @@ def load_window(
     return closes, metrics, funding
 
 
-def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[PanelObservation]]]:
+SOURCE_SIGNALS = {
+    "candles": ("X5_rel_reversal",),
+    "perp_metrics": ("X2_rel_oi_change", "X3_rel_taker", "X4_rel_crowd_gap"),
+    "funding_rates": ("X1_rel_funding",),
+}
+"""각 테이블이 없으면 **어느 신호가 측정 불가능해지는지**."""
+
+MIN_COVERAGE = 0.90
+"""이 비율 미만이면 선별을 시작하지 않는다.
+
+2026-09-22 에 ``funding_rates`` 가 BTCUSDT 하나뿐인 것을 발견했다. 그대로 돌렸다면
+X1 은 표본 0으로 "실패" 했을 것이고, 5개 전부 실패 → H3 기각 (23 §6) 으로 이어졌다.
+**없는 데이터를 없는 엣지로 읽는 것**이 이 프로젝트에서 가장 비싼 실수다.
+그래서 측정 전에 멈춘다.
+"""
+
+
+def coverage(conn: sqlite3.Connection, exchange: str, symbols: set[str]) -> dict[str, float]:
+    """테이블별로 유니버스 심볼 중 데이터가 있는 비율."""
+    out: dict[str, float] = {}
+    for table in SOURCE_SIGNALS:
+        present = {
+            row[0]
+            for row in conn.execute(
+                f"SELECT DISTINCT symbol FROM {table} WHERE exchange=?",
+                (exchange,),
+            )
+        }
+        out[table] = len(present & symbols) / len(symbols) if symbols else 0.0
+    return out
+
+
+def require_coverage(found: dict[str, float]) -> None:
+    """부족하면 측정하지 않고 멈춘다."""
+    short = {t: v for t, v in found.items() if v < MIN_COVERAGE}
+    for table, ratio in sorted(found.items()):
+        mark = "OK " if ratio >= MIN_COVERAGE else "부족"
+        print(f"  {mark} {table:<14} {ratio:5.1%}  → {', '.join(SOURCE_SIGNALS[table])}")
+    if not short:
+        return
+    blocked = sorted({s for t in short for s in SOURCE_SIGNALS[t]})
+    raise SystemExit(
+        f"\n[중단] 데이터가 부족해 {', '.join(blocked)} 을(를) 측정할 수 없다.\n"
+        f"       이 상태로 돌리면 '엣지 없음' 이 아니라 '데이터 없음' 을 기각으로 읽게 된다.\n"
+        f"       먼저 수집을 끝내라: scripts/backfill_universe_*.py"
+    )
+
+
+def build_panels(
+    from_month: str, to_month: str
+) -> tuple[dict[str, dict[str, list[PanelObservation]]], dict[str, float]]:
     """달 단위로 읽어 단면을 만든다. 달이 끝나면 그 달 데이터는 버린다."""
     config = load_config().config
     conn = sqlite3.connect(f"file:{REPO_ROOT / config.data.db_path}?mode=ro", uri=True)
@@ -170,8 +231,11 @@ def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[Pan
     panels: dict[str, dict[str, list[PanelObservation]]] = {
         name: {h: [] for h in HORIZONS} for name in SIGNALS
     }
-    print(f"유니버스 {len(universe)}개월 처리 중...")
-
+    every_symbol = {symbol for names in universe.values() for symbol in names}
+    print(f"데이터 점검 (유니버스 {len(every_symbol)}심볼):")
+    found = coverage(conn, config.exchange, every_symbol)
+    require_coverage(found)
+    print(f"\n유니버스 {len(universe)}개월 처리 중...")
     for index, (month, members) in enumerate(sorted(universe.items()), 1):
         load_from, month_from, month_to = month_window(month)
         year, mon = (int(part) for part in month.split("-"))
@@ -234,7 +298,7 @@ def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[Pan
         if index % 6 == 0:
             counts = len(panels["X4_rel_crowd_gap"]["6h"])
             print(f"  {index}/{len(universe)} ({month}) · 단면 {counts:,}", flush=True)
-    return panels
+    return panels, found
 
 
 def main() -> int:
@@ -244,12 +308,20 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "reports/phase4/h3_screen.json")
     args = parser.parse_args()
 
-    panels = build_panels(args.from_month, args.to_month)
+    panels, found = build_panels(args.from_month, args.to_month)
     print(f"\n구간 {args.from_month} ~ {args.to_month}")
-    print(f"판정 기준: 평균 − 2SE > {REQUIRED_EDGE_BPS}bps (참고 {REFERENCE_EDGE_BPS}bps)")
+    print(
+        f"판정 기준: 평균 − 2SE > {REQUIRED_EDGE_BPS}bps, n >= {MIN_SAMPLES}"
+        f" (참고 기준 {REFERENCE_EDGE_BPS}bps)"
+    )
     print(f"롱 {LEG} / 숏 {LEG} · embargo = horizon\n")
 
-    payload: dict[str, object] = {"required_edge_bps": REQUIRED_EDGE_BPS, "signals": {}}
+    payload: dict[str, object] = {
+        "required_edge_bps": REQUIRED_EDGE_BPS,
+        "min_samples": MIN_SAMPLES,
+        "coverage": found,
+        "signals": {},
+    }
     any_pass = False
     for name in SIGNALS:
         print(f"── {name}")
@@ -263,7 +335,7 @@ def main() -> int:
                 leg=LEG,
                 buckets=BUCKETS,
             )
-            passed = result.passes(REQUIRED_EDGE_BPS, 1)
+            passed = result.passes(REQUIRED_EDGE_BPS, MIN_SAMPLES)
             any_pass = any_pass or passed
             shape = " ".join(f"{v:+6.1f}" for v in result.quantile_means_bps)
             print(
