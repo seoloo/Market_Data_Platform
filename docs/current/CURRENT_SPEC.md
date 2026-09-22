@@ -13,6 +13,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 | [BACKTEST_AND_TESTING](BACKTEST_AND_TESTING.md) | 검증 기준·연구 절차·Phase 게이트·테스트 |
 | [OPERATIONS](OPERATIONS.md) | 데이터·외부 서비스·운영·보안·보존 정책 |
 | [RESEARCH_HISTORY](RESEARCH_HISTORY.md) | 연구 판정·근거·재시도 금지 사항 |
+| [진행 중 연구](../research/) | 아직 판정 전인 사전등록·후보 비교. 판정이 끝나면 RESEARCH_HISTORY 에 요약하고 원문은 Archive 로 옮긴다 |
 
 최신 사용자 결정이 우선한다. Current는 분야별 단일 기준이며, Archive와 옛 경로의 안내문은 현행 요구사항을 덮어쓰지 않는다.
 코드/config는 실제 실행 상태의 증거이지 요구사항 충돌을 자동 해소하는 근거가 아니다.
