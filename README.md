@@ -2,10 +2,43 @@
 
 BTC/USDT 무기한 선물 자동매매 시스템 (Binance USD-M)
 
-> **현재 Phase 1 (기반 구축) 진행 중. 실거래 기능은 없습니다.**
-> 개발 순서: 백테스트 → Paper Trading → Testnet → 소액 실거래 → 실거래
+> # ⛔ 종료된 프로젝트 (2026-09-22)
+>
+> **방향성 예측 접근을 종료했습니다.** 검증 결과 거래 비용을 넘는 통계적 우위를
+> 가용 데이터로 **증명할 수 없다**는 결론입니다.
+>
+> **실거래는 한 번도 하지 않았고, 실거래 코드 자체가 없습니다. 손실은 없습니다.**
+>
+> 전문: [docs/phase0/21-closure.md](docs/phase0/21-closure.md) · [PROGRESS.md](PROGRESS.md)
 
-## 목적
+## 결론 요약
+
+| 검증 대상 | 결과 |
+|---|---|
+| **H1** 4h 추세 + 15m 되돌림 + 5m 모멘텀 재개 | 기각 — 점수가 결과와 무관 (양수 비율 44~54%) |
+| **H2** 포지셔닝 쏠림 해소 (OI·funding·롱숏비) | 기각 — 5개 중 18bps 통과 0개, 재현 실패 |
+| **비용 절감** post-only 진입 | 닫힘 — 신호 시점 역선택이 수수료 절감을 압도 |
+
+종료 근거는 가설이 아니라 산수다.
+
+```
+효과 ~20bps · 비용 18bps · 6h 수익률 SD 123bps · 연간 독립표본 190개
+→ 2σ 로 분해하려면 1,814표본 = 9.5년.  가용 데이터 4.7년.
+```
+
+기준을 낮춘 적도, TEST 구간을 열어 전략을 고친 적도 없다. 게이트를 통과하지 못한 것이
+[설계 문서가 처음부터 정상이라고 적어둔 결과](docs/phase0/07-backtest.md)다.
+
+### 남은 자산
+
+- **데이터** `data/trading.db` — 캔들 414만봉 · funding 7,305건 · 포지셔닝 327,958건
+  (전량 SHA-256 검증 + 재집계 교차 검증 통과)
+- **코드** 995 테스트 · mypy strict · Pure Core 경계 강제 · 이벤트 기반 백테스트 엔진
+- **방법론** 사전 등록 선별 · 검정력 우선 계산 · embargo=horizon · 신호 시점 비용 측정
+
+---
+
+## 목적 (당시)
 
 이 시스템의 목적은 가격 예측이 아니다.
 
@@ -21,15 +54,20 @@ BTC/USDT 무기한 선물 자동매매 시스템 (Binance USD-M)
 | [PROGRESS.md](PROGRESS.md) | **현재 작업 현황** — 여기부터 읽는다 |
 | [AGENTS.md](AGENTS.md) | AI 에이전트 작업 규약 (Claude / Codex 공통) |
 | [docs/STRATEGY-CATALOG.md](docs/STRATEGY-CATALOG.md) | **매매 개념** — 어떤 지표로 언제 사고파는가 (사람용) |
-| [docs/phase0/](docs/phase0/) | 전체 설계 문서 15종 |
+| [docs/phase0/21-closure.md](docs/phase0/21-closure.md) | **종료 기록** — 무엇을 검증했고 왜 멈췄는가 |
+| [docs/phase0/15-h1-postmortem.md](docs/phase0/15-h1-postmortem.md) | H1 사후 분석 |
+| [docs/phase0/20-signal-time-fills.md](docs/phase0/20-signal-time-fills.md) | 비용 절감 경로가 닫힌 이유 |
+| [docs/phase0/](docs/phase0/) | 전체 설계 문서 21종 |
 | [docs/phase0/13-decisions.md](docs/phase0/13-decisions.md) | 확정 설정값 (최우선) |
 | [docs/phase0/12-critique.md](docs/phase0/12-critique.md) | 설계 판단 근거 |
 | [docs/phase0/14-ui-and-packaging.md](docs/phase0/14-ui-and-packaging.md) | 대시보드 · exe 배포 설계 |
 
-## 한 줄 요약
+## 검증했던 전략 (기각됨)
 
 > 4시간 추세 방향으로만, 15분 눌림목이 끝나는 자리에서, 거래량이 받쳐줄 때 진입한다.
 > 정상 변동성 구간에서만 거래하고, **한 번에 총액의 1%까지만 잃도록** 포지션 크기를 정한다.
+
+**이 전략은 2026-09-22 에 기각되었다.** 아래 표는 당시 확정값 기록이다.
 
 | 확정 사항 | 값 |
 |---|---|
