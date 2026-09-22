@@ -57,6 +57,15 @@ Z_LOOKBACK = 7 * 24 * 12
 """7일 causal 창 (5분 스냅샷 기준)."""
 
 STEP_MS = 300_000
+
+SAMPLE_BARS = 12
+"""단면을 만드는 간격 (5분봉 개수). 12 = 1시간.
+
+5분마다 만들면 44개월 × 15조합 = 1.7억 회 반복인데, embargo 가 최소 2시간이라
+그중 24분의 23 은 ``evaluate_panel`` 이 곧바로 버린다. 1시간 간격이면 가장 짧은
+horizon(2h) 에도 여유가 두 배라 표본이 줄지 않으면서 계산이 12배 싸진다.
+"""
+
 UNIVERSE = REPO_ROOT / "reports/phase4/universe.json"
 
 
@@ -246,29 +255,44 @@ def build_panels(from_month: str, to_month: str) -> dict[str, dict[str, list[Pan
             {t for by_time in signals["X4_rel_crowd_gap"].values() for t in by_time}
             | {t for by_time in signals["X5_rel_reversal"].values() for t in by_time}
         )
-        for at_ms in times:
-            if not month_from <= at_ms < month_to:
-                continue  # warm-up 구간의 시각은 관측으로 쓰지 않는다
+        sampled = [
+            at_ms
+            for at_ms in times
+            if month_from <= at_ms < month_to  # warm-up 시각은 관측으로 쓰지 않는다
+            and (at_ms // STEP_MS) % SAMPLE_BARS == 0
+        ]
+        for at_ms in sampled:
+            # 선행수익은 신호와 무관하므로 horizon 당 한 번만 계산한다.
+            forwards: dict[str, dict[str, float]] = {}
+            for horizon, bars in HORIZONS.items():
+                row: dict[str, float] = {}
+                for symbol in members:
+                    prices = closes_by_symbol.get(symbol)
+                    if prices is None:
+                        continue
+                    entry = prices.get(at_ms + STEP_MS)
+                    exit_ = prices.get(at_ms + STEP_MS + bars * STEP_MS)
+                    if entry and exit_:
+                        row[symbol] = (exit_ - entry) / entry * 10_000
+                forwards[horizon] = row
+
             for name in SIGNALS:
-                for horizon, bars in HORIZONS.items():
-                    values: dict[str, float] = {}
-                    forward: dict[str, float] = {}
-                    for symbol in members:
-                        value = signals[name].get(symbol, {}).get(at_ms)
-                        if value is None:
-                            continue
-                        prices = closes_by_symbol.get(symbol)
-                        if prices is None:
-                            continue
-                        entry = prices.get(at_ms + STEP_MS)
-                        exit_ = prices.get(at_ms + STEP_MS + bars * STEP_MS)
-                        if not entry or not exit_:
-                            continue
-                        values[symbol] = value
-                        forward[symbol] = (exit_ - entry) / entry * 10_000
+                by_symbol = signals[name]
+                for horizon in HORIZONS:
+                    row = forwards[horizon]
+                    values = {
+                        symbol: value
+                        for symbol in members
+                        if (value := by_symbol.get(symbol, {}).get(at_ms)) is not None
+                        and symbol in row
+                    }
                     if len(values) >= 2 * LEG:
                         panels[name][horizon].append(
-                            PanelObservation(at_ms=at_ms, values=values, forward_bps=forward)
+                            PanelObservation(
+                                at_ms=at_ms,
+                                values=values,
+                                forward_bps={s: row[s] for s in values},
+                            )
                         )
         if index % 6 == 0:
             counts = len(panels["X4_rel_crowd_gap"]["6h"])
