@@ -118,7 +118,7 @@ class TestModeOverlay:
 
 class TestEdgeTableOverlay:
     def _write_table(self, config_dir: Path) -> Path:
-        buckets = []
+        buckets: list[dict[str, object]] = []
         payload: dict[str, object] = {
             "symbol": "BTCUSDT",
             "source_config_hash": "a" * 64,
