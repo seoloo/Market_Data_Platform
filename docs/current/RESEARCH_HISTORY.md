@@ -121,6 +121,16 @@ Learned: (1) 일봉 OHLC로 당일 체결을 흉내 낼 때 **같은 날의 고�
 Do not retry: k·청산 시점·필터 추가로 같은 기간 재판정.
 근거: [17 후보 비교](../research/17-futures-long-short-candidates.md), [18 사전등록·§5~§7](../research/18-v-breakout-preregistration.md).
 
+## TA — REJECTED (2026-09-24)
+
+Hypothesis: 월별 유동성 상위 20 무기한에 T 표준형 추세(종목별 변동성 목표 1.5%, 총 명목 ≤ 2배, funding 반영)를 적용하면 BTC·ETH보다 위험 대비 수익이 낫다.
+판정 2020-06~2026-08 (6.25년, 1회): 일간 평균 0.018%, 2SE 하한 **−0.010%** → A1 실패 → **REJECT**. 두 절반 양수, MDD 18.9%, 청산 0.
+샤프 **0.52**, CAGR 6.0%. 롱 +8,248 · 숏 −628 · funding −1,507 · 비용 −1,693 (10,000 기준). 같은 규칙 BTC·ETH 2종목(보고) 샤프 0.77.
+Failure: 알트 추세 품질이 낮고 비용·funding·유니버스 교체가 커서, 높은 상관(독립 약 2개) 아래 분산 이득보다 손실이 컸다.
+Learned: 암호화폐에서 종목을 늘려도 추세 샤프가 오르지 않았다. 추세 수익은 BTC·ETH 롱 쪽에 몰려 있고, 시간이 갈수록 약해진다.
+Do not retry: 유니버스 크기·예산·상한·밴드·lookback 조정으로 같은 기간 재판정, 알트만 골라내기.
+근거: [19 후보 비교](../research/19-futures-next-candidates.md), [20 사전등록·§7 결과](../research/20-ta-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.

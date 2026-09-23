@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **2번 — TA 다종목 선물 추세 사전등록, 1회 판정** · T/v2 Paper 운영 중(작업 스케줄러 등록) · T/v1·F 전향 관찰.
+현재: **2번 — TA 기각, 다음 방향 사용자 결정 대기** · T/v2 Paper 운영 중(작업 스케줄러) · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — 2번: 새 선물 수익원)
@@ -10,7 +10,9 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - [19 후보 비교](docs/research/19-futures-next-candidates.md): A 다종목 선물 추세 · B 분기물 베이시스(BTC 23계약) · C 마진 간 funding(제외). 사용자 선택 A 기본안.
 - [20 TA 사전등록](docs/research/20-ta-preregistration.md): 상위 20 무기한(현물 조건 없음), 종목별 변동성 목표 1.5%, 총 명목 ≤ 2배,
   밴드 0.5%p, 알트 비용 0.145%, funding 반영, 2020-06~2026-08 1회. A1 평균−2SE>0 · A2 두 절반 양수 · A3 MDD ≤ 30% · 청산 0.
-  `scripts/ta_data.py`, `backtest/multi_trend.py`(테스트 8건), `scripts/run_ta.py`(테스트 9건). 적재율 일봉 99.8%·funding 99.6%.
+  `scripts/ta_data.py`, `backtest/multi_trend.py`(테스트 8건), `scripts/run_ta.py`(테스트 9건). 적재율 일봉 99.8%·funding 99.6%. 커밋 `ecebeb9`.
+- **TA 결과: REJECT.** 샤프 0.52, 하한 −0.010%/일(A1 실패), MDD 18.9%. 같은 규칙 BTC·ETH 2종목(보고) 샤프 0.77 — 분산이 오히려 해.
+  기록: 20 §7, RESEARCH_HISTORY TA 항목.
 
 ## 이전 작업 (Claude — T/v2 실행 인프라 착수)
 
