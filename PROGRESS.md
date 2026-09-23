@@ -1,10 +1,17 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **T/v2 현물 롱 등록(전향 2026-09~2027-08) → 다음: 선물 롱숏 연구 재개** · T/v1·F 전향 관찰 진행.
+현재: **V 변동성 돌파 — 사전등록 고정, 1회 판정** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
-## 이번 작업 (Claude — T/v2 현물 롱 등록)
+## 이번 작업 (Claude — 선물 롱숏 후보·V 사전등록)
+
+- [17 후보 비교](docs/research/17-futures-long-short-candidates.md): V 변동성 돌파 거래 4,104건·증명 가능 38.6bps(통과), 돈치안 111건(탈락).
+  레버리지는 우위를 만들지 않음. 사용자 선택 V.
+- [18 V 사전등록](docs/research/18-v-breakout-preregistration.md): k=0.5, 당일 종가 청산, 동시 돌파일 제외, 비용 24bps,
+  V1 평균−2SE>0 · V2 두 절반 양수. `backtest/vbreak.py`(테스트 6건), `scripts/run_v_breakout.py`(테스트 3건).
+
+## 이전 작업 (Claude — T/v2 현물 롱 등록)
 
 - 사용자 결정: 현물 롱 v2 진행, 이후 선물 롱숏 연구 계속. A1은 그대로 둔다(정정 재실행 안 함).
 - [16 T/v2](docs/research/16-t2-spot-long-registration.md): `TrendConfig(long_only=True)` 고정, 전향 2026-09~2027-08만 판단.
