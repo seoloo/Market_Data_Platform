@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **T/v2 실행 인프라 — Phase 5 1~3 완료, 읽기 전용 계좌 조회는 API 키 대기** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **T/v2 실행 인프라 — Phase 5-4 어댑터 완료, 실계좌 점검은 읽기 전용 새 키 대기** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — T/v2 실행 인프라 착수)
@@ -13,7 +13,10 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - Phase 5 1~3 완료: `exchange/spot.py`(계약)·`fake_spot.py`(장애 주입), `execution/spot_orders.py`(결정론적 ID·선기록·
   UNKNOWN은 조회로만 해소·거래소에 없으면 NOT_PLACED로 닫고 재전송 안 함·미해소 시 신규 주문 금지),
   `storage/sql/004_spot_orders.sql`·`repositories/spot_orders.py`. 테스트 16건: 100회 → 1건, 재시작 10회 복구, hypothesis 무작위 장애.
-- 다음: Phase 5-4 읽기 전용 계좌 조회(Binance 현물 어댑터) — 사용자가 읽기 전용 키를 `.env`에 넣은 뒤.
+- Phase 5-4: `config/secrets.py`(.env 로더, 값 가림), `exchange/binance_spot.py`(읽기 전용: 서명·시계 보정·잔고·필터·가격·
+  주문 조회·키 권한, 주문 전송 항상 거부), `scripts/check_spot_account.py`(읽기 외 권한·IP 미제한이면 중단). 테스트 12건.
+- 실계좌 점검 결과: 사용자 키에 **현물 거래·선물 권한이 켜져 있어** 스크립트가 중단(잔고 조회 안 함). 키·시크릿이 대화에
+  노출됨 → 사용자에게 키 삭제 후 읽기 전용 새 키 발급 요청. `.env.example`에 들어간 키는 `.env`로 옮기고 틀 복원(커밋 없음).
   그 다음 Phase 6 Paper 실행기(일 1회 결정·가상 체결·일일 보고).
 
 ## 이전 작업 (Claude — 선물 롱숏 후보·V 사전등록)
