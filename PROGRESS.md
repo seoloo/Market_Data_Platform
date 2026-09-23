@@ -1,8 +1,19 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Codex.
-현재: **Phase 0 — A1 사전등록 개정 승인 / Phase 1·3 G6 이벤트 데이터 준비 대기**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1·3 G6 원천 감사·DB 읽기 연결 진행**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
+
+## 이번 작업 (Codex — G6 공식 원천 1차 감사·DB 읽기 경로)
+
+- [05 원천 감사](docs/research/05-a1-macro-pit-source-audit.md)에 2021~2022
+  FOMC/CPI/NFP/PCE/POWELL 공식 일정의 **행사 시각 대 사전 공개 시각** 차이와
+  아직 입증되지 않은 판본·누락 범위를 기록했다. 연준 Powell 사전 공지의
+  행사 날짜 수정 사례도 확인했다. 어떤 원천도 아직 전체 기간 coverage로 인증하지 않았다.
+- `MacroEventRepository.schedule_revisions()` 추가: `vintage_ms` 상한을 SQL에서
+  적용하고 이벤트 키·원천 결측을 거부한다. 읽은 행만으로 `CalendarCoverage`를
+  만들지 않는다. 자료형은 Pure Core로 분리했다.
+- 시장 DB 삽입·삭제 없음, 실제 A1 TRAIN/VALIDATION/TEST 성과 미열람.
 
 ## 이번 작업 (Codex — 사전등록 개정 승인·G6 입력 감사)
 
@@ -15,8 +26,8 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
   같은 진입 기준 명목가로 재현할 수 있다. 체결 가격·손익 계산 자체는 유지.
 - [04 G6 준비 상태](docs/research/04-a1-g6-readiness.md): 승인 TRAIN의 가격봉
   1m/5m/1h은 기대 그리드 개수와 일치, 2021~2022 funding 2,190건이며
-  9시간 초과 공백 없음. 그러나 `macro_events` **0건**이고 엔진의 시점별
-  블랙아웃 연결도 없어, G6를 우회하지 않고 TRAIN을 **DATA_INSUFFICIENT**로 보류.
+  9시간 초과 공백 없음. 그러나 `macro_events` **0건**이고 검증된 coverage도 없어,
+  G6를 우회하지 않고 TRAIN을 **DATA_INSUFFICIENT**로 보류. 이후 순수 연결은 추가됨.
 - 합성 A1 통합 테스트에서 다음 1분 체결·2시간 청산·funding 결측·
   이벤트 일정 결측 fail-closed를 확인했다. 실제 TRAIN 손익은 실행하지 않았다.
 
@@ -121,10 +132,12 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 ## 다음 작업 — Phase 1 / Phase 3
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
-종류별 당시 공개 시각과 연속 구간을 검증한다. 현 DB의 `macro_events`는 비어 있다.
+종류별 당시 공개 시각과 연속 구간을 검증한다. 1차 원천 감사만 완료했으며
+현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
-DB 어댑터·기간별 coverage 감사·원천 provenance 확인을 완료해야 한다.
+DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenance 확인과
+실제 일정 데이터 삽입, 실행 스크립트의 달력 주입을 완료해야 한다.
 이 두 작업과 Phase 2 실제 피드 속도·인과성 검증 후 Phase 4 TRAIN 1회 실행.
 §3.3의 8개 파라미터 및 위험 한도는 변경하지 않는다.
 
@@ -148,11 +161,18 @@ DB 어댑터·기간별 coverage 감사·원천 provenance 확인을 완료해�
 - C7: D22 제외가 사용자 의도인지 미확인. 2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`.
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
-- A1-G6: **미해결** — `macro_events` 0건. 순수 연결은 완료했으나 PIT 일정·검증된 coverage·DB 어댑터 없이는 TRAIN 불가.
+- A1-G6: **미해결** — `macro_events` 0건. 순수 연결·DB 읽기는 완료했으나 PIT 일정·검증된 coverage 없이는 TRAIN 불가.
 - C1: **A1 에 직접 영향** — 2h 손절의 100% 가 WIDEN 된다. 현재 설정 그대로 사전등록했다.
 - C2·C4: **A1 범위에서 해소** (사전등록 §8). 다른 전략에는 재확정 필요.
 
 ## 검증 기록
+
+이번 작업 (G6 공식 원천 1차 감사·DB 읽기, 2026-09-23):
+
+- 원천 감사는 Fed/BLS/BEA 공식 자료로만 수행. TRAIN 손익·시장 DB 변경 없음.
+- 거시 일정 저장소 단위·인과성 테스트 5건 추가. 전체 pytest 통과,
+  leakage 마커 **44건** 통과, mypy strict **34개** 파일 통과,
+  ruff check·format --check **160개** 파일·import-linter 4/4 통과.
 
 이번 작업 (A1 사전등록 개정 및 G6 순수 연결, 2026-09-23):
 
