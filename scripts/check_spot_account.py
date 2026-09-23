@@ -46,10 +46,15 @@ def main() -> int:
         if not flags.get("enableReading"):
             print("⚠ 읽기 권한이 꺼져 있다.")
             return 2
-        if risky or not flags.get("ipRestrict"):
-            ip = flags.get("ipRestrict")
-            print(f"⚠ 읽기 전용 키가 아니다: 켜진 권한 {risky or '-'}, IP 제한 {ip}")
+        if risky:
+            print(f"⚠ 읽기 전용 키가 아니다: 켜진 권한 {risky}")
             print("  키를 삭제하고 Enable Reading만 켠 새 키를 .env에 넣은 뒤 다시 실행한다.")
+            return 2
+        if not flags.get("ipRestrict"):
+            print("⚠ 권한은 읽기 전용이지만 IP 제한이 없다.")
+            print(
+                "  Binance API 관리에서 이 키의 IP 제한(Restrict access to trusted IPs)을 켠 뒤 다시 실행한다."
+            )
             return 2
         print("✓ 읽기 전용 · IP 제한 키")
         print(f"서버 시계 차이: {ex.clock_offset_ms()} ms")
