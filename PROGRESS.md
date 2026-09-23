@@ -1,10 +1,21 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 종료 / 워뇨띠 탐색 v3 완료 — 정식 후보 비교(07) 전**.
+현재: **Phase 0 — 07 후보 비교 완료(WA·WB) — 후보 선택·위험 규칙 의미 결정 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 통계 미열람(거부 집계로 DD 정지 사실은 노출)**.
 
-## 이번 작업 (Claude — 워뇨띠 v3 시장 상태)
+## 이번 작업 (Claude — 07 워뇨띠 후보 비교)
+
+- [07 후보 비교](docs/research/07-w-candidate-comparison.md), `scripts/measure_w_candidates.py`(테스트 4건,
+  수익 평균 미열람). 상태 고정·방향은 TRAIN에서 읽는 설계: **WA 하락 뒤 7일 저점 부근**, **WB 큰 움직임 직후**.
+- 측정: 트리거 WA 949·WB 901(2020~2026), TRAIN 2023~24 각 256·271, 비용 대리치 15.8·18.4bps(1분 움직임 1.36·1.88배),
+  6h SD 212·239bps, G5 변동성 거부 10·8%.
+- 필요 효과(6h, 검정력 80%): WA TRAIN 53.4 / VALIDATION 53.0 / OOS100 76bps. WB 59.7 / 62.1 / 86bps.
+- **발견:** `same_direction_limit=2`는 반대 진입 전까지 초기화되지 않아 **한 방향 전략은 전 기간 2번만 진입 가능**.
+  원 설계에 초기화 기준·[확정] 표시 없음. 계좌 DD 정지와 우위 측정 분리도 사전 결정 필요(A1 교훈).
+- 권고 WA·6h(비용의 3.4배 문턱), **사용자 결정 대기**: 후보 선택·same_direction 의미·계좌 정지 분리 방식.
+
+## 이전 작업 (Claude — 워뇨띠 v3 시장 상태)
 
 - `explore_wonyotti_trips.py`에 진입 명목가·거래당 bps 추가(테스트 보강). `scripts/explore_wonyotti_context.py`
   (Binance 1분봉·funding 읽기 전용, 진입 이전 값만, 테스트 3건).
