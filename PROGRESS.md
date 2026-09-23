@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **T/v2 실행 인프라 — Phase 2 완료, 다음 Phase 5(거래소)** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **T/v2 실행 인프라 — Phase 5 1~3 완료, 읽기 전용 계좌 조회는 API 키 대기** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — T/v2 실행 인프라 착수)
@@ -10,7 +10,11 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - 발견: `exchange/`·`execution/` 패키지가 비어 있다 — 선물·현물 모두 주문 인프라가 없다. 1번 = 실행 인프라 신규 구축.
 - 사용자 승인: T/v2는 Phase 4 완전 통과 전 **Phase 5·6(Paper, 실제 돈 없음)** 진행 예외. 실거래는 별도 승인.
 - Phase 2 완료: `SpotTrendConfig`, `features/tsmom.py`, `strategy/spot_trend.py`(테스트 16건: 연구 일치·재현·누출·fail-closed·주문 계획).
-- 다음: Phase 5 — FakeExchange(현물) 주문 상태 전이·멱등 주문·재시작 복구, 읽기 전용 계좌 조회(API 키는 사용자가 직접 .env에).
+- Phase 5 1~3 완료: `exchange/spot.py`(계약)·`fake_spot.py`(장애 주입), `execution/spot_orders.py`(결정론적 ID·선기록·
+  UNKNOWN은 조회로만 해소·거래소에 없으면 NOT_PLACED로 닫고 재전송 안 함·미해소 시 신규 주문 금지),
+  `storage/sql/004_spot_orders.sql`·`repositories/spot_orders.py`. 테스트 16건: 100회 → 1건, 재시작 10회 복구, hypothesis 무작위 장애.
+- 다음: Phase 5-4 읽기 전용 계좌 조회(Binance 현물 어댑터) — 사용자가 읽기 전용 키를 `.env`에 넣은 뒤.
+  그 다음 Phase 6 Paper 실행기(일 1회 결정·가상 체결·일일 보고).
 
 ## 이전 작업 (Claude — 선물 롱숏 후보·V 사전등록)
 
