@@ -1,10 +1,21 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사·매니페스트 완료 — DB 적재 승인 대기**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 일정 101건 적재 완료 — Phase 3 실행 스크립트 연결 전**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
-## 이번 작업 (Claude — G6 달력 매니페스트·적재 dry-run)
+## 이번 작업 (Claude — G6 일정 DB 적재·외부 자료 접수)
+
+- 사용자 승인으로 `build_g6_calendar.py load --apply`: `data/trading.db`의 `macro_events`에 **101건 적재**
+  (한 트랜잭션, 적재 전 0건·프로세스 없음·WAL 0바이트 확인). 재 dry-run 동일 101·충돌 0,
+  저장소 읽기 결과 = 매니페스트 일정, 표본 달력 판정 9건 기대대로. 7.6GB DB 전체 백업은 하지 않았다.
+- **외부 자료 접수(분석 전):** 사용자가 워뇨띠 BitMEX 내보내기를 `data/external/wonyotti/`(gitignore)에 저장.
+  체결 CSV 4개(2018-03~2021-12, 약 149만 행, `transacttime` μs, XBTUSD·ETHUSD·선물·funding 행 혼재),
+  지갑 CSV(4,388행, 시각 열은 엑셀 손상·날짜 정상), 유튜브 요약·서한 txt(2차 자료). **형식만 확인, 손익 미열람.**
+  사용자 지시: A1 판정 후 연구. 분석 시 2018~2021은 해당 파생 가설의 **노출 구간**이 되므로
+  검증은 2023 이후·전향 구간에서 한다.
+
+## 이전 작업 (Claude — G6 달력 매니페스트·적재 dry-run)
 
 - 감사 CSV 4개를 `data/macro_sources/audits/`(gitignore)에 모으고, BEA 감사기에 원문 SHA-256 열 추가
   (재실행 23 MATCH·1 RESOLVED 동일).
@@ -178,7 +189,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-**5종 원천 대조·매니페스트 완료.** 남은 순서: `load --apply`(사용자 승인) → 실행 스크립트 DB 읽기·digest 대조·달력 주입 → TRAIN 1회.
+**5종 원천 대조·매니페스트·DB 적재(101건) 완료.** 남은 순서: A1 실행 스크립트(DB 읽기·digest 대조·달력 주입) → TRAIN 1회.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -207,7 +218,7 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C7: D22 제외가 사용자 의도인지 미확인. 2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`.
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
-- A1-G6: **미해결** — `macro_events` 0건(후보 CSV만, DB 미삽입).
+- A1-G6: **적재 완료·실행 연결 대기** — `macro_events` 101건(매니페스트 digest `aaa3de73…`).
   PCE 24·CPI 24·NFP 24·FOMC 16·POWELL 13 대조 완료, POWELL 3일은 승인된 공백(fail-closed).
   POWELL 설정 창(±15분)은 원 설계 "시작~종료+15분"보다 짧다(기록만, 한도 변경 없음). coverage 인증 없이는 TRAIN 불가.
 - A1-N: **해소** — 사용자 승인으로 주 arm 실제 거래 146건 미만이면 DATA_INSUFFICIENT (02 §11). 원 분석:
