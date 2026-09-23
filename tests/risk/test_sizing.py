@@ -144,6 +144,18 @@ class TestSizingVetoes:
         result = PositionSizingEngine(cfg).calculate(request(stop_price=D("99500")))
         assert result.verdict.reasons == (VetoReason.STOP_TOO_TIGHT,)
 
+    def test_tight_stop_can_keep_the_stop_and_reduce_position(self):
+        cfg = RiskConfig.model_validate({"tight_stop_action": "REDUCE_POSITION"})
+        request_at_half_percent = request(stop_price=D("99500"))
+        reduced = PositionSizingEngine(cfg).calculate(request_at_half_percent).plan
+        widened = PositionSizingEngine(RiskConfig()).calculate(request_at_half_percent).plan
+        assert reduced is not None and widened is not None
+        assert reduced.stop_price == D("99500")
+        assert reduced.stop_distance_pct == D("0.005")
+        assert not reduced.stop_widened
+        assert reduced.target_notional <= widened.target_notional
+        assert reduced.estimated_loss_at_stop < reduced.max_loss
+
     def test_leverage_cap_reduces_position(self):
         # 정상 로딩에서는 D9 정합성 검증이 이 조합을 차단한다. 런타임 설정 드리프트를
         # 장애 주입해 엔진의 2차 방어가 안전 방향으로 동작하는지 확인한다.

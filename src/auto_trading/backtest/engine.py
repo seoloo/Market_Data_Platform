@@ -41,6 +41,7 @@ from auto_trading.core.types import (
     Intent,
     MarketSnapshot,
 )
+from auto_trading.features.a1 import A1Observation, scan_a1
 from auto_trading.marketdata.snapshot import build_requirements
 from auto_trading.strategy.decision import DecisionContext, decide
 
@@ -106,6 +107,7 @@ class BacktestEngine:
     """봉 재생 오케스트레이터."""
 
     __slots__ = (
+        "_a1_events",
         "_cfg",
         "_context",
         "_decision_tf",
@@ -134,6 +136,14 @@ class BacktestEngine:
         self._funding_times = tuple(rate.funding_ms for rate in self._funding)
         self._decision_tf = _decision_timeframe(cfg)
         self._context = context
+        self._a1_events: dict[int, A1Observation] = (
+            scan_a1(
+                feed.all_candles(Timeframe.M5),
+                control_without_contraction=cfg.a1.control_without_contraction,
+            )
+            if cfg.strategy_id == "a1_v1" and cfg.a1 is not None
+            else {}
+        )
 
     @staticmethod
     def feed_windows(cfg: RootConfig) -> tuple[FeedWindow, ...]:
@@ -198,8 +208,22 @@ class BacktestEngine:
                 if portfolio.position is not None:
                     result.bars_in_position += 1
 
-            # 3) 결정 TF 가 마감됐으면 판단한다.
+            # A1 은 진입 체결 시각부터 120분 뒤에 닫는다. 5분 결정봉을 기다리면
+            # 보유 시간이 최대 4분 더 길어지므로 1분 재생에서도 같은 decide()를 호출한다.
             as_of = bar.open_ms + Timeframe.M1.ms - 1
+            if (
+                self._cfg.strategy_id == "a1_v1"
+                and self._cfg.a1 is not None
+                and portfolio.position is not None
+                and as_of - portfolio.position.entry_ms
+                >= self._cfg.a1.hold_minutes * Timeframe.M1.ms
+                and pending is None
+            ):
+                timed = self._evaluate(portfolio, risk_tracker, as_of, result)
+                if timed is not None and timed.intents:
+                    pending = timed
+
+            # 3) 결정 TF 가 마감됐으면 판단한다.
             close_ms = self._decision_close(as_of)
             if close_ms > last_decision_close and pending is None:
                 last_decision_close = close_ms
@@ -231,7 +255,7 @@ class BacktestEngine:
             return None
         result.decisions_evaluated += 1
         state = portfolio.to_state(snapshot.mark_price, close_ms)
-        decision = decide(snapshot, state, self._cfg, self._runtime(risk_tracker))
+        decision = decide(snapshot, state, self._cfg, self._runtime(risk_tracker, snapshot))
         for reason in decision.veto_reasons:
             _count(result.veto_counts, reason.value)
         if decision.action in (Action.OPEN_LONG, Action.OPEN_SHORT):
@@ -261,9 +285,13 @@ class BacktestEngine:
             data_quality=DataQuality(ok=True),
         )
 
-    def _runtime(self, risk_tracker: BacktestRiskTracker) -> DecisionContext:
+    def _runtime(
+        self, risk_tracker: BacktestRiskTracker, snapshot: MarketSnapshot
+    ) -> DecisionContext:
         base = self._context or DecisionContext()
         filters = self._filters
+        m5 = snapshot.get(Timeframe.M5) if self._cfg.strategy_id == "a1_v1" else None
+        a1_close_ms = m5.last.close_ms if m5 is not None and m5.last is not None else None
         return DecisionContext(
             system_state=base.system_state,
             risk_state=risk_tracker.to_state(),
@@ -284,6 +312,11 @@ class BacktestEngine:
             event_calendar_available=base.event_calendar_available,
             event_proximity=base.event_proximity,
             regime_stability=base.regime_stability,
+            a1_observation=self._a1_events.get(a1_close_ms) if a1_close_ms is not None else None,
+            a1_precomputed_at_ms=a1_close_ms,
+            research_unvalidated=(
+                self._cfg.strategy_id == "a1_v1" and self._cfg.mode is Mode.BACKTEST
+            ),
         )
 
     def _execute(
@@ -367,6 +400,8 @@ class BacktestEngine:
 
 def _decision_timeframe(cfg: RootConfig) -> Timeframe:
     """가장 빠른 Trigger TF 에서 판단한다. 그보다 자주 봐도 새 정보가 없다."""
+    if cfg.strategy_id == "a1_v1":
+        return Timeframe.M5
     return min(
         (
             cfg.features.t1_pullback.timeframe,

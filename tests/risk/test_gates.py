@@ -123,6 +123,19 @@ class TestHappyPathAndSafetyDirection:
     def test_none_action_does_not_create_a_trade(self):
         assert RiskGateEngine(RiskConfig()).evaluate(context(action=Action.NONE)).approved
 
+    def test_unvalidated_research_bypasses_edge_only_in_backtest(self):
+        research = context(
+            research_unvalidated=True, expected_edge_bps=None, required_edge_bps=D("5")
+        )
+        assert VetoReason.INSUFFICIENT_EDGE not in reasons(research)
+        live = context(
+            research_unvalidated=True,
+            expected_edge_bps=None,
+            required_edge_bps=D("5"),
+            snapshot=snapshot(mode=Mode.LIVE),
+        )
+        assert VetoReason.INSUFFICIENT_EDGE in reasons(live)
+
 
 class TestSystemGates:
     @pytest.mark.parametrize(

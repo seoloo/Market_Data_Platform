@@ -20,6 +20,7 @@ from auto_trading.config.schema import RootConfig
 from auto_trading.core.enums import Mode, Timeframe
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import DataQuality, MarketSnapshot, TimeframeSeries
+from auto_trading.features.a1 import RANGE_BARS, RANK_WINDOW_BARS, VOL_WINDOW_BARS
 from auto_trading.features.registry import build_feature_set
 from auto_trading.storage.repositories.candles import CandleRepository
 from auto_trading.storage.repositories.funding import FundingRateRepository
@@ -68,13 +69,21 @@ def build_requirements(cfg: RootConfig) -> tuple[TimeframeRequirement, ...]:
         if current is None or total > current[0]:
             needs[timeframe] = (total, reason)
 
-    for feature in build_feature_set(cfg.features).as_tuple():
-        require(feature.timeframe, feature.warmup_bars, feature.name)
+    if cfg.strategy_id == "a1_v1":
+        # 직전 30일 rank + 24시간 σ + 중복 차단에 필요한 2×6시간 선행 이력.
+        require(
+            Timeframe.M5,
+            VOL_WINDOW_BARS + RANK_WINDOW_BARS + 2 * RANGE_BARS + 1,
+            "a1.causal_breakout",
+        )
+    else:
+        for feature in build_feature_set(cfg.features).as_tuple():
+            require(feature.timeframe, feature.warmup_bars, feature.name)
 
-    stop = cfg.risk.stop
-    # Wilder ATR 은 시드 영향이 남으므로 period 의 4배를 확보한다 (indicators.py 참조).
-    require(stop.atr_timeframe, stop.atr_period * 4, "risk.stop.atr")
-    require(stop.atr_timeframe, SWING_LOOKBACK_BARS, "risk.stop.swing")
+        stop = cfg.risk.stop
+        # Wilder ATR 은 시드 영향이 남으므로 period 의 4배를 확보한다.
+        require(stop.atr_timeframe, stop.atr_period * 4, "risk.stop.atr")
+        require(stop.atr_timeframe, SWING_LOOKBACK_BARS, "risk.stop.swing")
 
     gate = cfg.risk.volatility_gate
     if gate.enabled:

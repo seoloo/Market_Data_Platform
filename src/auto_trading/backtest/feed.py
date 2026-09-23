@@ -87,6 +87,10 @@ class CandleFeed:
     def count(self, timeframe: Timeframe) -> int:
         return len(self._candles.get(timeframe, ()))
 
+    def all_candles(self, timeframe: Timeframe) -> tuple[Candle, ...]:
+        """사전 계산용 전체 봉. 신호 계산 자체는 각 봉 시점에 인과적이어야 한다."""
+        return self._candles.get(timeframe, ())
+
     def required_bars(self, timeframe: Timeframe) -> int:
         return self._windows[timeframe]
 

@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import importlib
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
 
-from auto_trading.config.schema import EdgeTableConfig, RootConfig
-from auto_trading.core.enums import Action, Mode, PositionSide, PositionState, Timeframe, VetoReason
+from auto_trading.config.schema import A1Config, EdgeTableConfig, RootConfig, TightStopAction
+from auto_trading.core.enums import (
+    Action,
+    Mode,
+    OrderPurpose,
+    PositionSide,
+    PositionState,
+    Timeframe,
+    VetoReason,
+)
 from auto_trading.core.hashing import sha256_hex
 from auto_trading.core.types import (
     Candle,
@@ -18,6 +27,7 @@ from auto_trading.core.types import (
     PositionSnapshot,
     TimeframeSeries,
 )
+from auto_trading.features.a1 import A1Observation
 from auto_trading.features.base import FeatureResult
 from auto_trading.strategy import DecisionContext, decide, evaluate_scores
 
@@ -308,3 +318,82 @@ def test_score_reversal_builds_reduce_only_exit_even_without_entry_context(
     assert len(result.intents) == 1
     assert result.intents[0].reduce_only
     assert result.intents[0].qty == D("0.01")
+
+
+def _a1_config() -> RootConfig:
+    original = config()
+    risk = original.risk.model_copy(
+        update={
+            "tight_stop_action": TightStopAction.REDUCE_POSITION,
+            "volatility_gate": original.risk.volatility_gate.model_copy(update={"enabled": False}),
+            "take_profit": original.risk.take_profit.model_copy(update={"enabled": False}),
+        }
+    )
+    return original.model_copy(update={"strategy_id": "a1_v1", "a1": A1Config(), "risk": risk})
+
+
+def _a1_context(*, signal: bool = True, research: bool = True) -> DecisionContext:
+    last = snapshot().require(Timeframe.M5).last
+    assert last is not None
+    return DecisionContext(
+        a1_precomputed_at_ms=last.close_ms,
+        a1_observation=(A1Observation(last.close_ms, last.close, 1, 0.0005) if signal else None),
+        qty_step=D("0.001"),
+        price_tick=D("0.1"),
+        min_qty=D("0.001"),
+        min_notional=D("5"),
+        maintenance_margin_rate=D("0.004"),
+        event_calendar_available=True,
+        research_unvalidated=research,
+    )
+
+
+def test_a1_entry_keeps_native_stop_and_has_no_take_profit() -> None:
+    snap = snapshot()
+    last = snap.require(Timeframe.M5).last
+    assert last is not None
+    snap = replace(snap, mark_price=last.close, last_price=last.close)
+    result = decide(snap, portfolio(), _a1_config(), _a1_context())
+    assert result.action is Action.OPEN_LONG
+    assert result.sizing is not None
+    assert not result.sizing.stop_widened
+    assert result.sizing.stop_distance_pct < D("0.01")
+    assert result.sizing.estimated_loss_at_stop <= result.sizing.max_loss
+    assert {i.purpose for i in result.intents} == {OrderPurpose.ENTRY, OrderPurpose.STOP}
+
+
+def test_a1_unvalidated_edge_bypass_is_explicit() -> None:
+    result = decide(snapshot(), portfolio(), _a1_config(), _a1_context(research=False))
+    assert VetoReason.INSUFFICIENT_EDGE in result.veto_reasons
+
+
+def test_a1_rejects_future_precomputed_signal() -> None:
+    context = replace(_a1_context(), a1_precomputed_at_ms=snapshot().as_of_ms + 1)
+    result = decide(snapshot(), portfolio(), _a1_config(), context)
+    assert result.veto_reasons == (VetoReason.DATA_QUALITY,)
+
+
+def test_a1_rejects_non_positive_long_stop() -> None:
+    original = _a1_context()
+    assert original.a1_observation is not None
+    context = replace(
+        original,
+        a1_observation=replace(original.a1_observation, sigma_5m=0.3),
+    )
+    result = decide(snapshot(), portfolio(), _a1_config(), context)
+    assert result.veto_reasons == (VetoReason.INVALID_STOP,)
+
+
+def test_a1_time_exit_survives_bad_market_data() -> None:
+    snap = replace(snapshot(), data_quality=DataQuality(ok=False))
+    pos = PositionSnapshot(
+        symbol=snap.symbol,
+        side=PositionSide.LONG,
+        state=PositionState.OPEN,
+        qty=D("0.01"),
+        entry_price=D("100"),
+        opened_ms=snap.as_of_ms - 120 * 60_000,
+    )
+    result = decide(snap, replace(portfolio(), position=pos), _a1_config())
+    assert result.action is Action.CLOSE
+    assert result.intents[0].purpose is OrderPurpose.EXIT

@@ -53,13 +53,20 @@ MS_PER_YEAR = 365.25 * 24 * 3_600_000
 MOMENTUM_HOLD_DAYS = 14
 
 
-def load_closes(conn: sqlite3.Connection, exchange: str) -> tuple[list[int], list[float]]:
+def load_closes(
+    conn: sqlite3.Connection, exchange: str
+) -> tuple[list[int], list[float], list[float], list[float]]:
     rows = conn.execute(
-        "SELECT open_ms, close FROM candles"
+        "SELECT open_ms, close, high, low FROM candles"
         " WHERE exchange=? AND symbol='BTCUSDT' AND timeframe='5m' ORDER BY open_ms",
         (exchange,),
     ).fetchall()
-    return [r[0] for r in rows], [float(r[1]) for r in rows]
+    return (
+        [int(r[0]) for r in rows],
+        [float(r[1]) for r in rows],
+        [float(r[2]) for r in rows],
+        [float(r[3]) for r in rows],
+    )
 
 
 def load_open_interest(conn: sqlite3.Connection, exchange: str) -> dict[int, float]:
@@ -79,7 +86,7 @@ def main() -> int:
 
     config = load_config().config
     conn = sqlite3.connect(f"file:{REPO_ROOT / config.data.db_path}?mode=ro", uri=True)
-    times, closes = load_closes(conn, config.exchange)
+    times, closes, highs, lows = load_closes(conn, config.exchange)
     if not closes:
         print("5분봉이 없다.")
         return 1
@@ -92,7 +99,7 @@ def main() -> int:
 
     vol = rolling_vol(closes)
 
-    a = len(breakout_triggers(closes, contraction_flags(vol)))
+    a = len(breakout_triggers(closes, highs, lows, contraction_flags(vol)))
     print(f"A 변동성 수축 후 구조 돌파 : {a:,}회 · 연 {a / years:.0f}회")
 
     oi = load_open_interest(conn, config.exchange)

@@ -157,21 +157,28 @@ class PositionSizingEngine:
         if stop_distance < self._cfg.min_stop_distance:
             if self._cfg.tight_stop_action is TightStopAction.SKIP:
                 return SizingResult.veto(VetoReason.STOP_TOO_TIGHT)
-            stop_widened = True
-            if request.side is PositionSide.LONG:
-                stop_price = request.entry_price * (ONE - self._cfg.min_stop_distance)
-            else:
-                stop_price = request.entry_price * (ONE + self._cfg.min_stop_distance)
-            stop_price = round_to_tick(stop_price, request.price_tick, rounding=rounding)
-            stop_distance = self._stop_distance(request.side, request.entry_price, stop_price)
+            if self._cfg.tight_stop_action is TightStopAction.WIDEN:
+                stop_widened = True
+                if request.side is PositionSide.LONG:
+                    stop_price = request.entry_price * (ONE - self._cfg.min_stop_distance)
+                else:
+                    stop_price = request.entry_price * (ONE + self._cfg.min_stop_distance)
+                stop_price = round_to_tick(stop_price, request.price_tick, rounding=rounding)
+                stop_distance = self._stop_distance(request.side, request.entry_price, stop_price)
 
         effective_risk = self._cfg.risk_per_trade * request.risk_scale
         max_loss = request.equity * effective_risk
         cost_in = self._cfg.cost.cost_rate_in
         cost_out = self._cfg.cost.cost_rate_out
         funding = self._funding_rate(request.expected_funding_rate)
-        denominator = stop_distance * (ONE + cost_out) + cost_in + cost_out + funding
-        target_notional = safe_div(max_loss, denominator)
+        actual_denominator = stop_distance * (ONE + cost_out) + cost_in + cost_out + funding
+        sizing_distance = (
+            max(stop_distance, self._cfg.min_stop_distance)
+            if self._cfg.tight_stop_action is TightStopAction.REDUCE_POSITION
+            else stop_distance
+        )
+        sizing_denominator = sizing_distance * (ONE + cost_out) + cost_in + cost_out + funding
+        target_notional = safe_div(max_loss, sizing_denominator)
         margin_cap = request.equity * self._cfg.margin_allocation
 
         required_leverage = self._ceil_ratio(target_notional, margin_cap)
@@ -202,7 +209,7 @@ class PositionSizingEngine:
         if liq_distance < self._cfg.liquidation_safety_buffer * stop_distance:
             return SizingResult.veto(VetoReason.LIQUIDATION_TOO_CLOSE)
 
-        estimated_loss = actual_notional * denominator
+        estimated_loss = actual_notional * actual_denominator
         margin_allocated = actual_notional / Decimal(exchange_leverage)
         effective_leverage = actual_notional / request.equity
         if request.side is PositionSide.LONG:

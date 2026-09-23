@@ -67,6 +67,7 @@ class GateContext:
     event_calendar_available: bool = True
     expected_edge_bps: Decimal | None = None
     required_edge_bps: Decimal | None = None
+    research_unvalidated: bool = False
 
 
 class RiskGateEngine:
@@ -267,6 +268,9 @@ class RiskGateEngine:
 
     @staticmethod
     def _cost_reasons(context: GateContext) -> list[VetoReason]:
+        if context.research_unvalidated and context.snapshot.mode is Mode.BACKTEST:
+            # 성과를 측정하기 전에는 edge 입력이 없다. 연구 백테스트에만 허용한다.
+            return []
         expected = context.expected_edge_bps
         required = context.required_edge_bps
         if expected is None or required is None or expected <= required:

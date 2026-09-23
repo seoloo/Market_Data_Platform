@@ -33,10 +33,12 @@ from auto_trading.core.types import (
     ScoreSet,
     SizingPlan,
 )
+from auto_trading.features.a1 import A1Observation, latest_a1_observation
 from auto_trading.features.base import FeatureResult
 from auto_trading.features.indicators import atr_series
 from auto_trading.features.registry import build_feature_set, int_param
 from auto_trading.features.structure import SwingKind, detect_swings
+from auto_trading.features.volatility import VolatilityRegimeFeature
 from auto_trading.risk.gates import GateContext, RiskGateEngine, RiskState
 from auto_trading.risk.sizing import PositionSizingEngine, SizingRequest, SizingResult
 from auto_trading.strategy.bias import compute_bias
@@ -80,6 +82,9 @@ class DecisionContext:
     event_calendar_available: bool = False
     event_proximity: float = 0.0
     regime_stability: float = 1.0
+    a1_observation: A1Observation | None = None
+    a1_precomputed_at_ms: int | None = None
+    research_unvalidated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +116,9 @@ def decide(
     runtime = context if context is not None else DecisionContext()
     if snapshot.symbol != cfg.symbol:
         raise ValueError(f"snapshot.symbol({snapshot.symbol}) != cfg.symbol({cfg.symbol})")
+
+    if cfg.strategy_id == "a1_v1":
+        return _decide_a1(snapshot, portfolio, cfg, runtime)
 
     if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
         return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
@@ -205,6 +213,152 @@ def decide(
         expected_edge_bps=float(edge.edge_bps),
         expected_cost_bps=float(cost.total_bps),
         required_edge_bps=float(required),
+    )
+
+
+def _decide_a1(
+    snapshot: MarketSnapshot,
+    portfolio: PortfolioState,
+    cfg: RootConfig,
+    runtime: DecisionContext,
+) -> Decision:
+    """사전등록 A1. 같은 함수가 연구 재생과 이후 실행에서 호출된다."""
+    a1 = cfg.a1
+    if a1 is None:  # pragma: no cover - schema 가 보장한다
+        raise ValueError("A1 설정이 없다")
+    neutral = ScoreSet.neutral()
+    position = portfolio.position
+    if position is not None and not position.is_flat:
+        if position.opened_ms is not None and position.holding_ms(snapshot.as_of_ms) >= (
+            a1.hold_minutes * 60_000
+        ):
+            return _decision(
+                snapshot,
+                Action.CLOSE,
+                neutral,
+                (),
+                intents=_exit_intents(snapshot, portfolio),
+                notes=("A1 2시간 보유 종료",),
+            )
+        return _decision(snapshot, Action.NONE, neutral, ())
+
+    if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
+        return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+    m5 = snapshot.get(Timeframe.M5)
+    if m5 is None or m5.last is None:
+        return _veto_decision(snapshot, VetoReason.WARMUP)
+    if runtime.a1_precomputed_at_ms is not None:
+        # 사전 계산값은 정확히 이 봉을 평가할 때만 유효하다. 미래 신호 주입을 차단한다.
+        if runtime.a1_precomputed_at_ms != m5.last.close_ms:
+            return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+        observation = runtime.a1_observation
+    else:
+        observation = latest_a1_observation(
+            m5.candles, control_without_contraction=a1.control_without_contraction
+        )
+    if observation is None:
+        return _decision(snapshot, Action.NONE, neutral, ())
+    if observation.as_of_ms != m5.last.close_ms or observation.close != m5.last.close:
+        return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+    if observation.sigma_5m <= 0:
+        return _veto_decision(snapshot, VetoReason.WARMUP)
+
+    side = PositionSide.LONG if observation.direction == 1 else PositionSide.SHORT
+    action = Action.OPEN_LONG if side is PositionSide.LONG else Action.OPEN_SHORT
+    scores = ScoreSet(
+        direction=float(observation.direction),
+        confidence_score=100.0,
+        risk_score=0.0,
+        bias_direction=observation.direction,
+        bias_multiplier=1.0,
+        agreement=1.0,
+        regime="a1_contraction_breakout",
+    )
+    stop_distance = Decimal(str(observation.sigma_5m)) * Decimal(24).sqrt() * a1.stop_sigma_multiple
+    if side is PositionSide.LONG and stop_distance >= Decimal(1):
+        return _decision(snapshot, action, scores, (), veto_reasons=(VetoReason.INVALID_STOP,))
+    stop = (
+        snapshot.mark_price * (Decimal(1) - stop_distance)
+        if side is PositionSide.LONG
+        else snapshot.mark_price * (Decimal(1) + stop_distance)
+    )
+    required_filters = (
+        runtime.qty_step,
+        runtime.price_tick,
+        runtime.min_qty,
+        runtime.min_notional,
+        runtime.maintenance_margin_rate,
+    )
+    sizing = (
+        SizingResult.veto(VetoReason.DATA_QUALITY)
+        if any(value is None for value in required_filters)
+        else PositionSizingEngine(cfg.risk).calculate(
+            SizingRequest(
+                side=side,
+                equity=portfolio.equity,
+                entry_price=snapshot.mark_price,
+                stop_price=stop,
+                stop_source="a1_2sigma_2h",
+                qty_step=cast(Decimal, runtime.qty_step),
+                price_tick=cast(Decimal, runtime.price_tick),
+                min_qty=cast(Decimal, runtime.min_qty),
+                min_notional=cast(Decimal, runtime.min_notional),
+                maintenance_margin_rate=cast(Decimal, runtime.maintenance_margin_rate),
+                expected_funding_rate=snapshot.funding_rate,
+            )
+        )
+    )
+    h1 = snapshot.get(cfg.risk.volatility_gate.timeframe)
+    volatility = (
+        VolatilityRegimeFeature(
+            timeframe=cfg.risk.volatility_gate.timeframe,
+            atr_period=cfg.risk.volatility_gate.atr_period,
+            lookback_days=cfg.risk.volatility_gate.lookback_days,
+        ).compute(h1)
+        if h1 is not None and cfg.risk.volatility_gate.enabled
+        else None
+    )
+    cost = estimate_cost(cfg.risk.cost, side=side, funding_rate=snapshot.funding_rate)
+    gate = RiskGateEngine(cfg.risk).evaluate(
+        GateContext(
+            action=action,
+            system_state=runtime.system_state,
+            portfolio=portfolio,
+            snapshot=snapshot,
+            risk_state=runtime.risk_state,
+            sizing=sizing.plan,
+            sizing_veto_reasons=sizing.verdict.reasons,
+            killswitch_active=runtime.killswitch_active,
+            code_dirty=runtime.code_dirty,
+            clock_drift_ms=runtime.clock_drift_ms,
+            reconcile_ok=runtime.reconcile_ok,
+            bad_price=runtime.bad_price,
+            volatility_percentile=volatility.normalized if volatility is not None else None,
+            recent_price_change_pct=_recent_price_change(snapshot, cfg),
+            event_blackout_active=runtime.event_blackout_active,
+            event_calendar_available=runtime.event_calendar_available,
+            expected_edge_bps=runtime.expected_edge_bps,
+            required_edge_bps=cost.total_bps,
+            research_unvalidated=runtime.research_unvalidated,
+        )
+    )
+    if not gate.approved or sizing.plan is None:
+        return _decision(
+            snapshot,
+            action,
+            scores,
+            (),
+            veto_reasons=gate.reasons or sizing.verdict.reasons,
+            expected_cost_bps=float(cost.total_bps),
+        )
+    return _decision(
+        snapshot,
+        action,
+        scores,
+        (),
+        sizing=sizing.plan,
+        intents=_entry_intents(snapshot, side, sizing.plan, cfg),
+        expected_cost_bps=float(cost.total_bps),
     )
 
 

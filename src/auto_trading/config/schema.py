@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
@@ -25,6 +25,7 @@ from auto_trading.core.enums import Mode, PositionSide, Timeframe
 from auto_trading.core.hashing import sha256_hex
 
 __all__ = [
+    "A1Config",
     "BlackoutWindow",
     "CostConfig",
     "EdgeAggregationMode",
@@ -100,6 +101,7 @@ class LeverageLimitAction(StrEnum):
 class TightStopAction(StrEnum):
     WIDEN = "WIDEN"
     SKIP = "SKIP"
+    REDUCE_POSITION = "REDUCE_POSITION"
 
 
 class StopMode(StrEnum):
@@ -613,12 +615,39 @@ class ExecutionConfig(_Base):
 # --------------------------------------------------------------------- 루트
 
 
+class A1Config(_Base):
+    """A1/v1 사전등록 값. 결과를 보고 바꿀 수 없도록 정확한 값만 허용한다."""
+
+    volatility_hours: Literal[24] = 24
+    rank_days: Literal[30] = 30
+    contraction_quantile_pct: Rate = Field(default=Decimal("0.30"), ge=0, le=1)
+    trend_hours: Literal[200] = 200
+    range_hours: Literal[6] = 6
+    hold_minutes: Literal[120] = 120
+    stop_sigma_multiple: Rate = Field(default=Decimal("2.0"), gt=0)
+    trigger_lock_minutes: Literal[360] = 360
+    control_without_contraction: bool = False
+
+    @model_validator(mode="after")
+    def _check_frozen_values(self) -> A1Config:
+        if self.contraction_quantile_pct != Decimal("0.30"):
+            raise ValueError("A1/v1 수축 분위는 0.30으로 사전등록됐다")
+        if self.stop_sigma_multiple != Decimal("2.0"):
+            raise ValueError("A1/v1 손절 배수는 2.0으로 사전등록됐다")
+        return self
+
+
+# --------------------------------------------------------------------- 루트
+
+
 class RootConfig(_Base):
     """전체 설정. 이 객체의 해시가 ``decisions.config_version_id`` 로 기록된다."""
 
     mode: Mode = Mode.BACKTEST
     symbol: str = Field(default="BTCUSDT", min_length=3, max_length=20)
     exchange: str = Field(default="binance_usdm", min_length=3, max_length=40)
+    strategy_id: Literal["h1", "a1_v1"] = "h1"
+    a1: A1Config | None = None
 
     risk: RiskConfig = Field(default_factory=RiskConfig)
     features: FeaturesConfig
@@ -669,6 +698,15 @@ class RootConfig(_Base):
     @model_validator(mode="after")
     def _check_live_guardrails(self) -> RootConfig:
         """실거래 모드에서만 적용되는 추가 제약."""
+        if self.strategy_id == "a1_v1":
+            if self.a1 is None:
+                raise ValueError("A1/v1 은 a1 설정이 필요하다")
+            if self.mode is not Mode.BACKTEST:
+                raise ValueError("미검증 A1/v1 은 현재 backtest 모드에서만 허용된다")
+            if self.risk.tight_stop_action is not TightStopAction.REDUCE_POSITION:
+                raise ValueError("A1/v1 은 손절 유지·포지션 축소 정책만 허용한다")
+            if self.risk.take_profit.enabled:
+                raise ValueError("A1/v1 은 목표가 주문을 만들지 않는다")
         if self.mode is not Mode.LIVE:
             return self
         if self.risk.killswitch.mode is KillswitchMode.FLATTEN:

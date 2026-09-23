@@ -76,6 +76,14 @@ class TestContractionFlags:
         vol: list[float | None] = [None] * (RANK_WINDOW_BARS + 10)
         assert not any(contraction_flags(vol))
 
+    def test_rank_uses_only_prior_valid_values_and_future_is_irrelevant(self) -> None:
+        vol: list[float | None] = [None, *([0.01, 0.02, 0.03] * (RANK_WINDOW_BARS // 3))]
+        vol.extend([0.001, 0.04, 0.02])
+        expected = contraction_flags(vol)
+        assert expected[-3]
+        assert not expected[-2]
+        assert contraction_flags([*vol, 99.0])[: len(vol)] == expected
+
 
 class TestBreakoutTriggers:
     def _prices(self) -> list[float]:
@@ -85,7 +93,7 @@ class TestBreakoutTriggers:
     def test_a_flat_range_never_breaks_out(self) -> None:
         prices = flat(TREND_BARS + RANGE_BARS + 200)
         flags = [True] * len(prices)
-        assert breakout_triggers(prices, flags) == []
+        assert breakout_triggers(prices, prices, prices, flags) == []
 
     def test_an_upside_break_in_an_uptrend_is_long(self) -> None:
         prices = self._prices()
@@ -93,7 +101,7 @@ class TestBreakoutTriggers:
         prices[at] = max(prices[at - RANGE_BARS : at]) * 1.05
         flags = [False] * len(prices)
         flags[at] = True
-        got = breakout_triggers(prices, flags)
+        got = breakout_triggers(prices, prices, prices, flags)
         assert [(t.index, t.direction) for t in got] == [(at, 1)]
 
     def test_a_downside_break_in_a_downtrend_is_short(self) -> None:
@@ -102,7 +110,7 @@ class TestBreakoutTriggers:
         prices[at] = min(prices[at - RANGE_BARS : at]) * 0.95
         flags = [False] * len(prices)
         flags[at] = True
-        got = breakout_triggers(prices, flags)
+        got = breakout_triggers(prices, prices, prices, flags)
         assert [(t.index, t.direction) for t in got] == [(at, -1)]
 
     def test_a_break_against_the_trend_is_ignored(self) -> None:
@@ -112,13 +120,23 @@ class TestBreakoutTriggers:
         prices[at] = min(prices[at - RANGE_BARS : at]) * 0.95
         flags = [False] * len(prices)
         flags[at] = True
-        assert breakout_triggers(prices, flags) == []
+        assert breakout_triggers(prices, prices, prices, flags) == []
+
+    def test_prior_wick_blocks_close_only_breakout(self) -> None:
+        prices = self._prices()
+        at = len(prices) - 1
+        prices[at] = max(prices[at - RANGE_BARS : at]) * 1.01
+        highs = prices.copy()
+        highs[at - 1] = prices[at] * 1.01
+        flags = [False] * len(prices)
+        flags[at] = True
+        assert breakout_triggers(prices, highs, prices, flags) == []
 
     def test_outside_contraction_nothing_triggers(self) -> None:
         prices = self._prices()
         at = len(prices) - 1
         prices[at] = max(prices[at - RANGE_BARS : at]) * 1.05
-        assert breakout_triggers(prices, [False] * len(prices)) == []
+        assert breakout_triggers(prices, prices, prices, [False] * len(prices)) == []
 
     def test_one_breakout_is_not_counted_many_times(self) -> None:
         """돌파 후 가격이 계속 높으면 매 봉이 '신고가' 다. 잠금이 없으면 표본이 부풀려진다."""
@@ -127,7 +145,7 @@ class TestBreakoutTriggers:
         for i in range(start, len(prices)):
             prices[i] = 200.0 + i * 0.001
         flags = [True] * len(prices)
-        got = breakout_triggers(prices, flags)
+        got = breakout_triggers(prices, prices, prices, flags)
         gaps = [b.index - a.index for a, b in pairwise(got)]
         assert all(gap >= RANGE_BARS for gap in gaps)
 

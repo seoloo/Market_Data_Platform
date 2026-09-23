@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -277,6 +278,17 @@ class TestRealConfigFiles:
         """Phase 8 출발값 (D9 §2)."""
         cfg = load_config("live", config_dir=CONFIG_DIR, apply_env=False).config
         assert cfg.risk.max_leverage == 3
+
+    def test_a1_overlay_is_backtest_only_and_has_no_h1_edge_table(self):
+        loaded = load_config("backtest", strategy="a1_v1", config_dir=CONFIG_DIR, apply_env=False)
+        assert loaded.config.strategy_id == "a1_v1"
+        assert loaded.config.a1 is not None
+        assert loaded.config.edge_table is None
+        assert loaded.config.risk.tight_stop_action.value == "REDUCE_POSITION"
+        assert loaded.config.risk.cost.slippage_entry_rate == Decimal("0.00055")
+        assert not loaded.config.risk.take_profit.enabled
+        with pytest.raises(ConfigError):
+            load_config("live", strategy="a1_v1", config_dir=CONFIG_DIR, apply_env=False)
 
     def test_ui_disabled_by_default_enabled_for_paper(self):
         assert not load_config("backtest", config_dir=CONFIG_DIR, apply_env=False).config.ui.enabled

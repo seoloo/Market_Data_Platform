@@ -136,6 +136,7 @@ def _env_overlay(environ: dict[str, str]) -> dict[str, Any]:
 def load_config(
     mode: Mode | str | None = None,
     *,
+    strategy: str | None = None,
     config_dir: Path | str = "config",
     environ: dict[str, str] | None = None,
     apply_env: bool = True,
@@ -148,8 +149,9 @@ def load_config(
 
     1. ``config/base.yaml``
     2. ``config/<mode>.yaml`` (있으면)
-    3. ``config/edge_table.yaml`` 또는 명시한 edge table 경로 (있으면)
-    4. 환경변수 ``AT_*`` (``apply_env=True`` 일 때)
+    3. 선택한 ``config/a1.yaml`` (A1 연구 실행에만)
+    4. ``config/edge_table.yaml`` 또는 명시한 edge table 경로 (있으면)
+    5. 환경변수 ``AT_*`` (``apply_env=True`` 일 때)
 
     Args:
         mode: 실행 모드. ``None`` 이면 ``AT_MODE`` 환경변수, 그것도 없으면 base.yaml 의 값.
@@ -177,6 +179,17 @@ def load_config(
         merged = merge_dicts(merged, _read_yaml(overlay_path))
         merged["mode"] = resolved_mode.value  # 오버레이가 mode 를 덮어쓰지 못하게 한다
         sources.append(str(overlay_path))
+
+    if strategy is not None:
+        if strategy != "a1_v1":
+            raise ConfigError(f"지원하지 않는 연구 전략: {strategy!r}")
+        strategy_path = directory / "a1.yaml"
+        merged = merge_dicts(merged, _read_yaml(strategy_path))
+        merged["mode"] = resolved_mode.value
+        sources.append(str(strategy_path))
+        if edge_table_path is None:
+            # 기존 H1 점수 버킷을 A1 사전등록에 섞지 않는다.
+            include_edge_table = False
 
     if include_edge_table:
         edge_path = (

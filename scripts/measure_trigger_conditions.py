@@ -42,6 +42,8 @@ for _stream in (sys.stdout, sys.stderr):
 from auto_trading.backtest.power import DEFAULT_POWER, detectable_effect_bps  # noqa: E402
 from auto_trading.backtest.triggers import (  # noqa: E402
     BARS_PER_HOUR,
+    RANK_WINDOW_BARS,
+    VOL_WINDOW_BARS,
     Trigger,
     breakout_triggers,
     cascade_triggers,
@@ -281,7 +283,7 @@ def main() -> int:
     config = load_config().config
     conn = sqlite3.connect(f"file:{REPO_ROOT / config.data.db_path}?mode=ro", uri=True)
     bars = load_5m(conn, config.exchange)
-    times, closes, _highs, _lows, ranges = bars
+    times, closes, highs, lows, ranges = bars
     if not closes:
         print("5분봉이 없다.")
         return 1
@@ -295,12 +297,15 @@ def main() -> int:
     minute_moves = load_1m_moves(conn, config.exchange)
     vol = rolling_vol(closes)
 
-    a = breakout_triggers(closes, contraction_flags(vol))
+    a = breakout_triggers(closes, highs, lows, contraction_flags(vol))
+    control_flags = [i >= VOL_WINDOW_BARS + RANK_WINDOW_BARS for i in range(len(vol))]
+    a_control = breakout_triggers(closes, highs, lows, control_flags)
     oi = load_open_interest(conn, config.exchange)
     b, usable = cascade_triggers(times, closes, vol, oi)
     b_years = usable / (BARS_PER_HOUR * 24 * 365.25) if usable else years
 
     cost_a = cost_proxy(times, ranges, minute_moves, a)
+    cost_a_control = cost_proxy(times, ranges, minute_moves, a_control)
     cost_b = cost_proxy(times, ranges, minute_moves, b)
 
     payload = {
@@ -313,6 +318,11 @@ def main() -> int:
         "A_volatility_contraction_breakout": report(
             "A 변동성 수축 돌파", bars, vol, a, years, cost_a, cost_of(cost_a)
         ),
+        "A_control_breakout": {
+            "triggers": len(a_control),
+            "cost": cost_a_control,
+            "cost_bps": cost_of(cost_a_control),
+        },
         "B_liquidation_cascade": report(
             "B 청산 캐스케이드 반전", bars, vol, b, b_years, cost_b, cost_of(cost_b)
         ),

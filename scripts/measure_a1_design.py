@@ -44,6 +44,8 @@ from auto_trading.backtest.power import (  # noqa: E402
 )
 from auto_trading.backtest.triggers import (  # noqa: E402
     BARS_PER_HOUR,
+    RANK_WINDOW_BARS,
+    VOL_WINDOW_BARS,
     Trigger,
     breakout_triggers,
     contraction_flags,
@@ -53,7 +55,10 @@ from auto_trading.config.loader import load_config  # noqa: E402
 
 HORIZON_HOURS = (2, 4, 6)
 STOP_MULTIPLE = 2.0
-"""손절 = max(2.0 × σ5m × √봉수, min_stop_distance).
+"""전략 손절 = 2.0 × σ5m × √봉수.
+
+기본 측정은 이전 WIDEN 가정을 재현한다. A1 수정안은
+``--preserve-stop`` 으로 실행해 전략 손절을 유지한다.
 
 2.0 을 쓰는 이유: 하한이 지배하는 2h 에서는 배수 선택이 SD 를 거의 바꾸지 않으므로
 (0.5σ 69.9 vs 2.0σ 72.5), 통계적으로 미세하게 유리한 쪽 대신 **고변동 국면에서
@@ -65,10 +70,13 @@ OOS_TRADES = 100
 
 FEE_BPS = 13.0
 SLIPPAGE_BPS = 5.0
-TRIGGER_MOVE_RATIO = 1.21
-"""트리거 시점 1분 움직임 배율 실측 (reports/phase0/trigger_conditions.json)."""
+TRIGGER_MOVE_RATIO = 1.381327932435883
+"""고가/저가 트리거 실측 (reports/phase0/trigger_conditions_highlow_corrected.json)."""
 
 MS_PER_YEAR = 365.25 * 24 * 3_600_000
+
+SPLIT_BOUNDS_MS = (1_577_836_800_000, 1_672_531_200_000, 1_735_689_600_000)
+"""2020-01-01, 2023-01-01, 2025-01-01 UTC. 결과 평균은 읽지 않는다."""
 
 
 def cost_bps() -> float:
@@ -136,6 +144,8 @@ def trade_pnl_sd(
     triggers: list[Trigger],
     horizon_bars: int,
     min_stop_distance: float,
+    *,
+    preserve_stop: bool = False,
 ) -> tuple[float, int, float]:
     """거래당 손익 SD, 표본 수, 손절 체결 비율. **평균은 돌려주지 않는다.**
 
@@ -148,7 +158,8 @@ def trade_pnl_sd(
         sigma = vol[index]
         if sigma is None or sigma <= 0.0 or index + horizon_bars >= len(closes):
             continue
-        distance = max(STOP_MULTIPLE * sigma * horizon_bars**0.5, min_stop_distance)
+        strategy_distance = STOP_MULTIPLE * sigma * horizon_bars**0.5
+        distance = strategy_distance if preserve_stop else max(strategy_distance, min_stop_distance)
         entry = closes[index]
         stop = entry * (1 - distance) if trigger.direction > 0 else entry * (1 + distance)
         outcome: float | None = None
@@ -170,6 +181,7 @@ def trade_pnl_sd(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "reports/phase0/a1_design.json")
+    parser.add_argument("--preserve-stop", action="store_true")
     args = parser.parse_args()
 
     config = load_config().config
@@ -198,7 +210,10 @@ def main() -> int:
     print("SD·표본·빈도만 읽는다. 방향별 수익 평균은 계산하지 않는다.\n")
 
     vol = rolling_vol(closes)
-    raw = breakout_triggers(closes, contraction_flags(vol))
+    main_flags = contraction_flags(vol)
+    control_flags = [i >= VOL_WINDOW_BARS + RANK_WINDOW_BARS for i in range(len(vol))]
+    raw = breakout_triggers(closes, highs, lows, main_flags)
+    raw_control = breakout_triggers(closes, highs, lows, control_flags)
     print(f"한도 적용 전 트리거 {len(raw):,}회 (연 {len(raw) / years:.0f}회)\n")
 
     header = (
@@ -208,6 +223,7 @@ def main() -> int:
     print(header)
     print("-" * len(header))
     rows = []
+    control_rows = []
     for hours in HORIZON_HOURS:
         bars = hours * BARS_PER_HOUR
         if bars < min_hold_bars:
@@ -221,7 +237,9 @@ def main() -> int:
             daily_limit=daily,
             cooldown_bars=cooldown_bars,
         )
-        sd, n, stop_rate = trade_pnl_sd(closes, highs, lows, vol, usable, bars, floor)
+        sd, n, stop_rate = trade_pnl_sd(
+            closes, highs, lows, vol, usable, bars, floor, preserve_stop=args.preserve_stop
+        )
         if n < 2:
             continue
         needed = detectable_effect_bps(sd, OOS_TRADES, cost)
@@ -244,6 +262,61 @@ def main() -> int:
                 "oos_years_to_100": OOS_TRADES / per_year,
             }
         )
+        control = apply_risk_limits(
+            times,
+            raw_control,
+            bars,
+            same_direction_limit=same_direction,
+            daily_limit=daily,
+            cooldown_bars=cooldown_bars,
+        )
+        control_sd, control_n, control_stops = trade_pnl_sd(
+            closes, highs, lows, vol, control, bars, floor, preserve_stop=args.preserve_stop
+        )
+        counts = []
+        control_counts = []
+        for start_ms, end_ms in zip(
+            SPLIT_BOUNDS_MS, (*SPLIT_BOUNDS_MS[1:], times[-1] + 1), strict=True
+        ):
+            counts.append(sum(start_ms <= times[t.index] < end_ms for t in usable))
+            control_counts.append(sum(start_ms <= times[t.index] < end_ms for t in control))
+        train_main = [
+            t for t in usable if SPLIT_BOUNDS_MS[0] <= times[t.index] < SPLIT_BOUNDS_MS[1]
+        ]
+        train_control = [
+            t for t in control if SPLIT_BOUNDS_MS[0] <= times[t.index] < SPLIT_BOUNDS_MS[1]
+        ]
+        train_sd, _, _ = trade_pnl_sd(
+            closes, highs, lows, vol, train_main, bars, floor, preserve_stop=args.preserve_stop
+        )
+        train_control_sd, _, _ = trade_pnl_sd(
+            closes,
+            highs,
+            lows,
+            vol,
+            train_control,
+            bars,
+            floor,
+            preserve_stop=args.preserve_stop,
+        )
+        difference_2se_bps = (
+            2 * (train_sd**2 / len(train_main) + train_control_sd**2 / len(train_control)) ** 0.5
+            if train_main and train_control
+            else None
+        )
+        rows[-1]["split_counts"] = counts
+        rows[-1]["train_trade_pnl_sd_bps"] = train_sd
+        rows[-1]["control_difference_2se_bps"] = difference_2se_bps
+        control_rows.append(
+            {
+                "horizon_hours": hours,
+                "tradeable": control_n,
+                "trade_pnl_sd_bps": control_sd,
+                "stop_rate": control_stops,
+                "split_counts": control_counts,
+                "train_trade_pnl_sd_bps": train_control_sd,
+            }
+        )
 
     print("\n'필요효과' = OOS 100거래로 확인 가능한 최소 총우위. C8 선택지 1 에 따라")
     print("이 값을 사전등록 기준으로 쓴다. TRAIN 이 아니라 OOS 가 구속조건이다.")
@@ -256,11 +329,15 @@ def main() -> int:
         "oos_min_trades": OOS_TRADES,
         "stop_multiple": STOP_MULTIPLE,
         "min_stop_distance": floor,
+        "stop_action": "REDUCE_POSITION" if args.preserve_stop else "WIDEN",
         "same_direction_limit": same_direction,
         "daily_limit": daily,
         "raw_triggers": len(raw),
+        "raw_control_triggers": len(raw_control),
+        "breakout_reference": "prior_6h_high_low_not_close_extrema",
         "note": "위험 한도·손절 하한 적용. SD/빈도만 측정하고 방향별 평균은 미계산.",
         "horizons": rows,
+        "control_horizons": control_rows,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
