@@ -145,6 +145,25 @@ CSV는 표준 출력으로만 냈고 DB에 넣지 않았다.
   발표를 모두 덮는다. `vintage_ms`는 직전 보도자료 공개 시각(약 한 달 전)이다.
 - 원본 HTML은 `data/macro_sources/bls/`(gitignore)에만 있다. 재현에는 파일별 SHA-256을 쓴다.
 
+## 2026-09-23 적재 준비 — G6 달력 매니페스트 (Claude)
+
+감사 CSV 4개(`data/macro_sources/audits/`, gitignore)를 `scripts/build_g6_calendar.py build`가
+검증해 **[매니페스트](../../config/macro_calendar/a1_train_g6_2021_2022.json)** 하나로 묶는다(Git 추적).
+BEA 감사기에도 원문 SHA-256 열을 추가해 5종 모두 원천 URL과 해시를 남긴다.
+
+- 범위: TRAIN `2021-01-03 00:00 ~ 2022-12-31 23:59:59.999 UTC`, 종류 5개(config 블랙아웃 키).
+- 항목(TRAIN 안): **FOMC 16 · CPI 24 · PCE 24 · NFP 24 · POWELL 13**, 공백 3일(POWELL).
+- 빌드 검사: 모든 항목의 `vintage_ms`가 그 종류의 블랙아웃 시작 이전, 월간 지표 연속,
+  FOMC = 연준 회의 16회, 기자회견 + 공백 = 회의 16회, 허용되지 않은 감사 상태 거부.
+- `CalendarManifest`(`backtest/calendar_manifest.py`)의 digest가
+  `CalendarCoverage.source_digest`가 된다. 파일의 digest가 내용과 다르면 읽기를 거부한다.
+  digest: `aaa3de7381947ced9ec3733c9a0c2755ef806f288afe87c83d677d1131ba6e97`.
+- `macro_events.source`에는 해시 열이 없으므로 `원천URL#sha256=<해시>`로 저장한다.
+- **적재 dry-run** (`load`, 읽기 전용): `data/trading.db`에 **추가 예정 101건**
+  (CPI 24·FOMC 16·NFP 24·PCE 24·POWELL 13), 이미 동일 0건, 충돌 0건. DB는 여전히 0건.
+  실제 쓰기는 `load --apply`이며 사용자 승인 전에는 실행하지 않는다. 같은 판본 키의
+  다른 내용이 이미 있으면 충돌로 중단한다.
+
 ## 다음 검증 순서
 
 1. ~~FOMC의 회의 날짜와 성명 발표 시각~~ — 완료(위).

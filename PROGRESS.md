@@ -1,10 +1,22 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 완료(PCE·CPI·NFP·FOMC·POWELL) — 적재·coverage 인증 전**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사·매니페스트 완료 — DB 적재 승인 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
-## 이번 작업 (Claude — A1 최소 거래 수 고정·BLS 로컬 감사기)
+## 이번 작업 (Claude — G6 달력 매니페스트·적재 dry-run)
+
+- 감사 CSV 4개를 `data/macro_sources/audits/`(gitignore)에 모으고, BEA 감사기에 원문 SHA-256 열 추가
+  (재실행 23 MATCH·1 RESOLVED 동일).
+- `src/auto_trading/backtest/calendar_manifest.py`: 항목·범위·공백을 고정하는 `CalendarManifest`,
+  digest = `CalendarCoverage.source_digest`, 파일 digest 불일치 시 거부. 테스트 5건.
+- `scripts/build_g6_calendar.py`: `build`(감사 규칙 검증 → [매니페스트](config/macro_calendar/a1_train_g6_2021_2022.json))
+  · `load`(기본 dry-run, `--apply`만 DB 쓰기). 테스트 5건.
+- 매니페스트: TRAIN 안 FOMC 16·CPI 24·PCE 24·NFP 24·POWELL 13 + 공백 3일,
+  digest `aaa3de73…6e97`. **dry-run: `data/trading.db`에 추가 예정 101건, 충돌 0, DB 변경 없음.**
+- **다음: 사용자 승인 후 `load --apply` → 실행 스크립트에서 DB 읽기 + 매니페스트 digest 대조 → 달력 주입.**
+
+## 이전 작업 (Claude — A1 최소 거래 수 고정·BLS 로컬 감사기)
 
 - 사용자 승인으로 [02 §11](docs/research/02-a1-preregistration.md)에 **TRAIN 주 arm 실제 거래
   146건 미만 → `DATA_INSUFFICIENT`**를 결과 열람 전에 고정. 거래 수를 먼저 확인하고 미달이면
@@ -166,7 +178,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-**5종 원천 대조 완료.** 남은 순서: 감사 CSV → `macro_events` 적재 도구(DB 쓰기는 사용자 승인 후) → coverage·공백 인증 → 실행 스크립트 달력 주입.
+**5종 원천 대조·매니페스트 완료.** 남은 순서: `load --apply`(사용자 승인) → 실행 스크립트 DB 읽기·digest 대조·달력 주입 → TRAIN 1회.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -209,7 +221,13 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 
 ## 검증 기록
 
-이번 작업 (Claude — A1 최소 거래 수·BLS 로컬 감사기, 2026-09-23):
+이번 작업 (Claude — G6 달력 매니페스트·적재 dry-run, 2026-09-23):
+
+- 매니페스트 빌드 2회 digest 동일. `load` dry-run 후 `macro_events` 0건 그대로(읽기 전용 확인).
+- 전체 pytest **1,186건**, leakage **44건**, mypy strict **147개** 파일,
+  ruff check·format --check **172개** 파일, import-linter 4/4, `git diff --check` 통과.
+
+이전 작업 (Claude — A1 최소 거래 수·BLS 로컬 감사기, 2026-09-23):
 
 - BLS 요청은 사용자 승인 1회만(403). 이후 네트워크 접근 없음.
 - 실데이터: FOMC 16/16 MATCH, BLS 로컬 CPI·NFP 48/48 MATCH, POWELL 13 ANNOUNCED·3 GAP(승인된 공백, 종료 0).

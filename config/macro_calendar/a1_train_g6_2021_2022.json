@@ -1,0 +1,950 @@
+{
+ "digest": "aaa3de7381947ced9ec3733c9a0c2755ef806f288afe87c83d677d1131ba6e97",
+ "entries": [
+  {
+   "event_key": "2020-12",
+   "indicator": "CPI",
+   "released_ms": 1610544600000,
+   "scheduled_ms": 1610544600000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_12102020.htm",
+   "source_sha256": "75802ca6cfaedbbf5d708430442d2c6d681afbb7185e7203d04678e58e84f3db",
+   "vintage_ms": 1607607000000
+  },
+  {
+   "event_key": "2021-01",
+   "indicator": "CPI",
+   "released_ms": 1612963800000,
+   "scheduled_ms": 1612963800000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_01132021.htm",
+   "source_sha256": "f7b6d7eca3581cc433cb22ab9ced35a312e7eef9e1d0f792c08e525ca815be24",
+   "vintage_ms": 1610544600000
+  },
+  {
+   "event_key": "2021-02",
+   "indicator": "CPI",
+   "released_ms": 1615383000000,
+   "scheduled_ms": 1615383000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_02102021.htm",
+   "source_sha256": "eaaef559ebf762734a493ba94b7bbf70aa46e8b677b93a3ac7fa945dc7c1bf24",
+   "vintage_ms": 1612963800000
+  },
+  {
+   "event_key": "2021-03",
+   "indicator": "CPI",
+   "released_ms": 1618317000000,
+   "scheduled_ms": 1618317000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_03102021.htm",
+   "source_sha256": "9eb097bc23c10e0ffba7fd92cd34ee0014411d2485f3d7bc2462c6ffbd9b7f6e",
+   "vintage_ms": 1615383000000
+  },
+  {
+   "event_key": "2021-04",
+   "indicator": "CPI",
+   "released_ms": 1620822600000,
+   "scheduled_ms": 1620822600000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_04132021.htm",
+   "source_sha256": "02b0a042b2f7cd949b5beea112e67c31ceeb62496304b6dd58a26c54946f52bf",
+   "vintage_ms": 1618317000000
+  },
+  {
+   "event_key": "2021-05",
+   "indicator": "CPI",
+   "released_ms": 1623328200000,
+   "scheduled_ms": 1623328200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_05122021.htm",
+   "source_sha256": "7a47157c7e3ccbe0e8df8d80c7962eae84efc897f944d2ac05658e389ab7c5f3",
+   "vintage_ms": 1620822600000
+  },
+  {
+   "event_key": "2021-06",
+   "indicator": "CPI",
+   "released_ms": 1626179400000,
+   "scheduled_ms": 1626179400000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_06102021.htm",
+   "source_sha256": "39a26c02dce23a052e8b90f2f4c32012ab954ce2b179c0eebd067f93a48813be",
+   "vintage_ms": 1623328200000
+  },
+  {
+   "event_key": "2021-07",
+   "indicator": "CPI",
+   "released_ms": 1628685000000,
+   "scheduled_ms": 1628685000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_07132021.htm",
+   "source_sha256": "97787ef2ecec12f6fa8a634552a448df29e83f69710f6d9b77b2f7e5dba3b318",
+   "vintage_ms": 1626179400000
+  },
+  {
+   "event_key": "2021-08",
+   "indicator": "CPI",
+   "released_ms": 1631622600000,
+   "scheduled_ms": 1631622600000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_08112021.htm",
+   "source_sha256": "3aae191db6782a7b5cbf24f4e91f7da4b644054ce97a38482bcf2b0d8db509df",
+   "vintage_ms": 1628685000000
+  },
+  {
+   "event_key": "2021-09",
+   "indicator": "CPI",
+   "released_ms": 1634128200000,
+   "scheduled_ms": 1634128200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_09142021.htm",
+   "source_sha256": "48f57344a9f457b40295444a531fb2888ddc8ab4414a20feaca8355f4d963c89",
+   "vintage_ms": 1631622600000
+  },
+  {
+   "event_key": "2021-10",
+   "indicator": "CPI",
+   "released_ms": 1636551000000,
+   "scheduled_ms": 1636551000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_10132021.htm",
+   "source_sha256": "781f454108ff26581b6e588f5ea7ef1bdb31a853cbe2d26f6d389d35492251ca",
+   "vintage_ms": 1634128200000
+  },
+  {
+   "event_key": "2021-11",
+   "indicator": "CPI",
+   "released_ms": 1639143000000,
+   "scheduled_ms": 1639143000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_11102021.htm",
+   "source_sha256": "7cd6e19b25801c6c0fc1ea47daada29ef2c1fc8f07cbc86cd6f305cb8fce684a",
+   "vintage_ms": 1636551000000
+  },
+  {
+   "event_key": "2021-12",
+   "indicator": "CPI",
+   "released_ms": 1641994200000,
+   "scheduled_ms": 1641994200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_12102021.htm",
+   "source_sha256": "af93439757010f85ae189def01776fd25c7464498a50a5f25fd9c2bc25645432",
+   "vintage_ms": 1639143000000
+  },
+  {
+   "event_key": "2022-01",
+   "indicator": "CPI",
+   "released_ms": 1644499800000,
+   "scheduled_ms": 1644499800000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_01122022.htm",
+   "source_sha256": "45ca364e1633fd50ab3a299a5da2abe5cf9086f36c8aecfe4dd9f4658df50174",
+   "vintage_ms": 1641994200000
+  },
+  {
+   "event_key": "2022-02",
+   "indicator": "CPI",
+   "released_ms": 1646919000000,
+   "scheduled_ms": 1646919000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_02102022.htm",
+   "source_sha256": "278ff1e8da6a2c199312427cba7e1dbd0102da6a31d2c0dd2264113834abbd1f",
+   "vintage_ms": 1644499800000
+  },
+  {
+   "event_key": "2022-03",
+   "indicator": "CPI",
+   "released_ms": 1649766600000,
+   "scheduled_ms": 1649766600000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_03102022.htm",
+   "source_sha256": "89ebc9016ab0ea900fefddf2f3f186b8bcbe7a00cf8684f8059c3363ea7dc35a",
+   "vintage_ms": 1646919000000
+  },
+  {
+   "event_key": "2022-04",
+   "indicator": "CPI",
+   "released_ms": 1652272200000,
+   "scheduled_ms": 1652272200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_04122022.htm",
+   "source_sha256": "7d654607289ed3e15ec297d2be342975a2121ce5d4c6deb25c61ec044785f18b",
+   "vintage_ms": 1649766600000
+  },
+  {
+   "event_key": "2022-05",
+   "indicator": "CPI",
+   "released_ms": 1654864200000,
+   "scheduled_ms": 1654864200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_05112022.htm",
+   "source_sha256": "d9d7eaa0508822501f09a3c5e691d64c23c9a9c1fbb48a1cc6d3fd5b2aa8c0eb",
+   "vintage_ms": 1652272200000
+  },
+  {
+   "event_key": "2022-06",
+   "indicator": "CPI",
+   "released_ms": 1657715400000,
+   "scheduled_ms": 1657715400000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_06102022.htm",
+   "source_sha256": "03658a0ce2c08701bb423cf232e8c255555abe84fc77ff802fe2e728927fc7d9",
+   "vintage_ms": 1654864200000
+  },
+  {
+   "event_key": "2022-07",
+   "indicator": "CPI",
+   "released_ms": 1660134600000,
+   "scheduled_ms": 1660134600000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_07132022.htm",
+   "source_sha256": "0e4feecbeb007b5271816feb7a6209b3becb651ec0a850d56dcdd3f7e9c8b8a6",
+   "vintage_ms": 1657715400000
+  },
+  {
+   "event_key": "2022-08",
+   "indicator": "CPI",
+   "released_ms": 1663072200000,
+   "scheduled_ms": 1663072200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_08102022.htm",
+   "source_sha256": "f613dce5a40c06f857fc4c92f181dac917405bb541d707fbdc7d123787feff38",
+   "vintage_ms": 1660134600000
+  },
+  {
+   "event_key": "2022-09",
+   "indicator": "CPI",
+   "released_ms": 1665664200000,
+   "scheduled_ms": 1665664200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_09132022.htm",
+   "source_sha256": "0fe793a6526f424fa85619b4283e172f0ae143ae94162f1a1910b968be1b97c3",
+   "vintage_ms": 1663072200000
+  },
+  {
+   "event_key": "2022-10",
+   "indicator": "CPI",
+   "released_ms": 1668087000000,
+   "scheduled_ms": 1668087000000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_10132022.htm",
+   "source_sha256": "10186f619f5b69fc3f0589a3953544ec72e730da62e0ac2593e89360889358a0",
+   "vintage_ms": 1665664200000
+  },
+  {
+   "event_key": "2022-11",
+   "indicator": "CPI",
+   "released_ms": 1670938200000,
+   "scheduled_ms": 1670938200000,
+   "source": "https://www.bls.gov/news.release/archives/cpi_11102022.htm",
+   "source_sha256": "003a8366cdc1ba4750dff3bf753d79ae3aba7b5965821dd0fb44581ed17d80f0",
+   "vintage_ms": 1668087000000
+  },
+  {
+   "event_key": "2021-01",
+   "indicator": "FOMC",
+   "released_ms": 1611774000000,
+   "scheduled_ms": 1611774000000,
+   "source": "https://web.archive.org/web/20210118172253id_/https://www.federalreserve.gov/newsevents/2021-january.htm",
+   "source_sha256": "237e50563ce68b29aefafc0c2b0f1a624c67ae123b941510b354483a9549ea79",
+   "vintage_ms": 1610990573000
+  },
+  {
+   "event_key": "2021-03",
+   "indicator": "FOMC",
+   "released_ms": 1616004000000,
+   "scheduled_ms": 1616004000000,
+   "source": "https://web.archive.org/web/20210304113454id_/https://www.federalreserve.gov/newsevents/2021-march.htm",
+   "source_sha256": "922e1f1e5fc827d19785a9e0453296d0c98cf9085602cf96c32a35a305b5bb86",
+   "vintage_ms": 1614857694000
+  },
+  {
+   "event_key": "2021-04",
+   "indicator": "FOMC",
+   "released_ms": 1619632800000,
+   "scheduled_ms": 1619632800000,
+   "source": "https://web.archive.org/web/20210417151044id_/https://www.federalreserve.gov/newsevents/2021-april.htm",
+   "source_sha256": "ccaefe6b63f32a4cd3d893d250671eb2e6810e6605cd4a64fce317d510edb6ee",
+   "vintage_ms": 1618672244000
+  },
+  {
+   "event_key": "2021-06",
+   "indicator": "FOMC",
+   "released_ms": 1623866400000,
+   "scheduled_ms": 1623866400000,
+   "source": "https://web.archive.org/web/20210605043804id_/https://www.federalreserve.gov/newsevents/2021-june.htm",
+   "source_sha256": "7e4b1cf0c17f35ad0b2cc6e29922832ef9ad7622dbbb14bf02b67805f9e62ba5",
+   "vintage_ms": 1622867884000
+  },
+  {
+   "event_key": "2021-07",
+   "indicator": "FOMC",
+   "released_ms": 1627495200000,
+   "scheduled_ms": 1627495200000,
+   "source": "https://web.archive.org/web/20210728015920id_/https://www.federalreserve.gov/newsevents/2021-july.htm",
+   "source_sha256": "49fef6bcceb0d4143374a86fd877600a2cd7b0ef5947fa21d3c017bd9607d03a",
+   "vintage_ms": 1627437560000
+  },
+  {
+   "event_key": "2021-09",
+   "indicator": "FOMC",
+   "released_ms": 1632333600000,
+   "scheduled_ms": 1632333600000,
+   "source": "https://web.archive.org/web/20210918083609id_/https://www.federalreserve.gov/newsevents/2021-september.htm",
+   "source_sha256": "689742765f0b358ddbd15fa24eec717af73252aa5e3cbc000bde680f58a60c10",
+   "vintage_ms": 1631954169000
+  },
+  {
+   "event_key": "2021-11",
+   "indicator": "FOMC",
+   "released_ms": 1635962400000,
+   "scheduled_ms": 1635962400000,
+   "source": "https://web.archive.org/web/20211020235819id_/https://www.federalreserve.gov/newsevents/2021-november.htm",
+   "source_sha256": "c71a31a845bb198596cef1dc7efd60dcb7d69b0ab87b903c609ddb431b1fbbed",
+   "vintage_ms": 1634774299000
+  },
+  {
+   "event_key": "2021-12",
+   "indicator": "FOMC",
+   "released_ms": 1639594800000,
+   "scheduled_ms": 1639594800000,
+   "source": "https://web.archive.org/web/20211129143006id_/https://www.federalreserve.gov/newsevents/2021-december.htm",
+   "source_sha256": "81d1717d75d159700c55064e10ee465203ef8872a9753d339de5bf8409a5fbc5",
+   "vintage_ms": 1638196206000
+  },
+  {
+   "event_key": "2022-01",
+   "indicator": "FOMC",
+   "released_ms": 1643223600000,
+   "scheduled_ms": 1643223600000,
+   "source": "https://web.archive.org/web/20220122061655id_/https://www.federalreserve.gov/newsevents/2022-january.htm",
+   "source_sha256": "049bcb0869042f7105e039eea14d64816b42ec716f83d5859fadfbe4391a8756",
+   "vintage_ms": 1642832215000
+  },
+  {
+   "event_key": "2022-03",
+   "indicator": "FOMC",
+   "released_ms": 1647453600000,
+   "scheduled_ms": 1647453600000,
+   "source": "https://web.archive.org/web/20220302210922id_/https://www.federalreserve.gov/newsevents/2022-march.htm",
+   "source_sha256": "a1cc20cf8d51440892572d5fefe544645f475f02d441b7a08d18db3ee31c7dd7",
+   "vintage_ms": 1646255362000
+  },
+  {
+   "event_key": "2022-05",
+   "indicator": "FOMC",
+   "released_ms": 1651687200000,
+   "scheduled_ms": 1651687200000,
+   "source": "https://web.archive.org/web/20220423050655id_/https://www.federalreserve.gov/newsevents/2022-may.htm",
+   "source_sha256": "110668a678dce7d8cca29af518ecebc3b24a0a2539bc17e4fca2ed53a35dbd49",
+   "vintage_ms": 1650690415000
+  },
+  {
+   "event_key": "2022-06",
+   "indicator": "FOMC",
+   "released_ms": 1655316000000,
+   "scheduled_ms": 1655316000000,
+   "source": "https://web.archive.org/web/20220605201604id_/https://www.federalreserve.gov/newsevents/2022-june.htm",
+   "source_sha256": "04298a21b78a4f26d121aea88d87ebfed8bde0e5393881acf614e7b1d5917169",
+   "vintage_ms": 1654460164000
+  },
+  {
+   "event_key": "2022-07",
+   "indicator": "FOMC",
+   "released_ms": 1658944800000,
+   "scheduled_ms": 1658944800000,
+   "source": "https://web.archive.org/web/20220605204102id_/https://www.federalreserve.gov/newsevents/2022-july.htm",
+   "source_sha256": "9256b85f760b5357013ee72187349cae7b27d3a2f3997ede9c8939a69f914068",
+   "vintage_ms": 1654461662000
+  },
+  {
+   "event_key": "2022-09",
+   "indicator": "FOMC",
+   "released_ms": 1663783200000,
+   "scheduled_ms": 1663783200000,
+   "source": "https://web.archive.org/web/20220917010548id_/https://www.federalreserve.gov/newsevents/2022-september.htm",
+   "source_sha256": "a544edbb0d0140832636eedf6f728dad37d43a927eb4f74f3fa37716138dee61",
+   "vintage_ms": 1663376748000
+  },
+  {
+   "event_key": "2022-11",
+   "indicator": "FOMC",
+   "released_ms": 1667412000000,
+   "scheduled_ms": 1667412000000,
+   "source": "https://web.archive.org/web/20221030233939id_/https://www.federalreserve.gov/newsevents/2022-november.htm",
+   "source_sha256": "b6de5ff5df662b5da3aaf3fe3649b84dd372be7a0a1a148e2a417a4843e70582",
+   "vintage_ms": 1667173179000
+  },
+  {
+   "event_key": "2022-12",
+   "indicator": "FOMC",
+   "released_ms": 1671044400000,
+   "scheduled_ms": 1671044400000,
+   "source": "https://web.archive.org/web/20221210084623id_/https://www.federalreserve.gov/newsevents/2022-december.htm",
+   "source_sha256": "bab12d995e59b6f00440cc8291e8a279418ac11e631874a387bc5f82f5221af8",
+   "vintage_ms": 1670661983000
+  },
+  {
+   "event_key": "2020-12",
+   "indicator": "NFP",
+   "released_ms": 1610112600000,
+   "scheduled_ms": 1610112600000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_12042020.htm",
+   "source_sha256": "e536819b0c577c89de40da8eafc93162abbddccf515da71b24b9e2f3e0a1a01f",
+   "vintage_ms": 1607088600000
+  },
+  {
+   "event_key": "2021-01",
+   "indicator": "NFP",
+   "released_ms": 1612531800000,
+   "scheduled_ms": 1612531800000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_01082021.htm",
+   "source_sha256": "72d16893c7b6a3826f87336e231fe7cbe9444e171fcec9ff3f8a150f66b2f9d8",
+   "vintage_ms": 1610112600000
+  },
+  {
+   "event_key": "2021-02",
+   "indicator": "NFP",
+   "released_ms": 1614951000000,
+   "scheduled_ms": 1614951000000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_02052021.htm",
+   "source_sha256": "903f01c73ee4cbb3fad1c32bb1dbb627dd7b17cb029f3b4a9bf8b5dcbbe882bb",
+   "vintage_ms": 1612531800000
+  },
+  {
+   "event_key": "2021-03",
+   "indicator": "NFP",
+   "released_ms": 1617366600000,
+   "scheduled_ms": 1617366600000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_03052021.htm",
+   "source_sha256": "c1b0b56b7011ed1c9b97161e0c0ee9f28f9bda3732950f09b8ea4e577ac76de4",
+   "vintage_ms": 1614951000000
+  },
+  {
+   "event_key": "2021-04",
+   "indicator": "NFP",
+   "released_ms": 1620390600000,
+   "scheduled_ms": 1620390600000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_04022021.htm",
+   "source_sha256": "d0ae8f292c87caf5355918e27af1f71e3be6df93706ae76fac6df04b799ebc51",
+   "vintage_ms": 1617366600000
+  },
+  {
+   "event_key": "2021-05",
+   "indicator": "NFP",
+   "released_ms": 1622809800000,
+   "scheduled_ms": 1622809800000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_05072021.htm",
+   "source_sha256": "db5cbd1bf2570ed0a89868927682351396edf7cfd48429a27533f2681b886381",
+   "vintage_ms": 1620390600000
+  },
+  {
+   "event_key": "2021-06",
+   "indicator": "NFP",
+   "released_ms": 1625229000000,
+   "scheduled_ms": 1625229000000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_06042021.htm",
+   "source_sha256": "f355824ca88a0b5ce4a9dabfc2cceb620da83d3f63962e19249f658521e21a41",
+   "vintage_ms": 1622809800000
+  },
+  {
+   "event_key": "2021-07",
+   "indicator": "NFP",
+   "released_ms": 1628253000000,
+   "scheduled_ms": 1628253000000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_07022021.htm",
+   "source_sha256": "563ab3af27964b5a2cbcb42b4ec307e857efbd2e96c324b48d9aaed82dd4d745",
+   "vintage_ms": 1625229000000
+  },
+  {
+   "event_key": "2021-08",
+   "indicator": "NFP",
+   "released_ms": 1630672200000,
+   "scheduled_ms": 1630672200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_08062021.htm",
+   "source_sha256": "46390305d15cde82f6461deba1e8879e4ffbfdfbeb65b5fddf940e08654304ab",
+   "vintage_ms": 1628253000000
+  },
+  {
+   "event_key": "2021-09",
+   "indicator": "NFP",
+   "released_ms": 1633696200000,
+   "scheduled_ms": 1633696200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_09032021.htm",
+   "source_sha256": "1b729495db55c1379972df2029ef491a1eddb87c2b97fd15c966519b338968d6",
+   "vintage_ms": 1630672200000
+  },
+  {
+   "event_key": "2021-10",
+   "indicator": "NFP",
+   "released_ms": 1636115400000,
+   "scheduled_ms": 1636115400000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_10082021.htm",
+   "source_sha256": "2f667249d6fcc1fbee381e2ff2d0f33d3cf64d9086842be337ed7a47391314bc",
+   "vintage_ms": 1633696200000
+  },
+  {
+   "event_key": "2021-11",
+   "indicator": "NFP",
+   "released_ms": 1638538200000,
+   "scheduled_ms": 1638538200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_11052021.htm",
+   "source_sha256": "44fc6d5dd204774f1e4da7d28fa1f2ac1e4c744a097c0698d737b5afaa6a18dd",
+   "vintage_ms": 1636115400000
+  },
+  {
+   "event_key": "2021-12",
+   "indicator": "NFP",
+   "released_ms": 1641562200000,
+   "scheduled_ms": 1641562200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_12032021.htm",
+   "source_sha256": "23a191b2db1e57c047976256737ab8dfce29af7109d87e08ce67307c64d85816",
+   "vintage_ms": 1638538200000
+  },
+  {
+   "event_key": "2022-01",
+   "indicator": "NFP",
+   "released_ms": 1643981400000,
+   "scheduled_ms": 1643981400000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_01072022.htm",
+   "source_sha256": "8fc82e94bf9a11ec64bce76ce2bf8cca889f4715b7d82094f969479bb6265b42",
+   "vintage_ms": 1641562200000
+  },
+  {
+   "event_key": "2022-02",
+   "indicator": "NFP",
+   "released_ms": 1646400600000,
+   "scheduled_ms": 1646400600000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_02042022.htm",
+   "source_sha256": "94bc65c6839082f18d0533033b043dd45c0195cae38faa608a48168c9b2c2bb1",
+   "vintage_ms": 1643981400000
+  },
+  {
+   "event_key": "2022-03",
+   "indicator": "NFP",
+   "released_ms": 1648816200000,
+   "scheduled_ms": 1648816200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_03042022.htm",
+   "source_sha256": "3397ad8077f04b56fbd6f7585d053485cc195e2adb7c0d941747809b344673fc",
+   "vintage_ms": 1646400600000
+  },
+  {
+   "event_key": "2022-04",
+   "indicator": "NFP",
+   "released_ms": 1651840200000,
+   "scheduled_ms": 1651840200000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_04012022.htm",
+   "source_sha256": "3dd32bba26bb8aa29232b135dfdb6be2c364d1254c2c38beb4dfb62777b3c921",
+   "vintage_ms": 1648816200000
+  },
+  {
+   "event_key": "2022-05",
+   "indicator": "NFP",
+   "released_ms": 1654259400000,
+   "scheduled_ms": 1654259400000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_05062022.htm",
+   "source_sha256": "da2f100555dfac5f714c54c7fa49d3c9946c1e69ac2aa393923f22ea7762c65e",
+   "vintage_ms": 1651840200000
+  },
+  {
+   "event_key": "2022-06",
+   "indicator": "NFP",
+   "released_ms": 1657283400000,
+   "scheduled_ms": 1657283400000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_06032022.htm",
+   "source_sha256": "0f4768dbdd68a2e6bda09567190b589769c2352f4bb09cb3a95a3ef49d96f15a",
+   "vintage_ms": 1654259400000
+  },
+  {
+   "event_key": "2022-07",
+   "indicator": "NFP",
+   "released_ms": 1659702600000,
+   "scheduled_ms": 1659702600000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_07082022.htm",
+   "source_sha256": "fffe30a28a0ccb5e322fce57f39d876ebc9dd67fcaf6651debc1d22022ab0d42",
+   "vintage_ms": 1657283400000
+  },
+  {
+   "event_key": "2022-08",
+   "indicator": "NFP",
+   "released_ms": 1662121800000,
+   "scheduled_ms": 1662121800000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_08052022.htm",
+   "source_sha256": "2b7e95da04b14736fbeaaad569af818174d3673fde0a5ea60357a5b8adad7636",
+   "vintage_ms": 1659702600000
+  },
+  {
+   "event_key": "2022-09",
+   "indicator": "NFP",
+   "released_ms": 1665145800000,
+   "scheduled_ms": 1665145800000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_09022022.htm",
+   "source_sha256": "9439a6ae786015c4d02c9991783e570609478e37959231ab8eeabdf578feb422",
+   "vintage_ms": 1662121800000
+  },
+  {
+   "event_key": "2022-10",
+   "indicator": "NFP",
+   "released_ms": 1667565000000,
+   "scheduled_ms": 1667565000000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_10072022.htm",
+   "source_sha256": "e6a1ffac59051c55b52a13a3570df09371ddac958dcfe09baa5503c3c97895bb",
+   "vintage_ms": 1665145800000
+  },
+  {
+   "event_key": "2022-11",
+   "indicator": "NFP",
+   "released_ms": 1669987800000,
+   "scheduled_ms": 1669987800000,
+   "source": "https://www.bls.gov/news.release/archives/empsit_11042022.htm",
+   "source_sha256": "b1b493d96f186fc8b61974b9f0f0b431f76c096f40a6cb7a5a37bec46e2fb132",
+   "vintage_ms": 1667565000000
+  },
+  {
+   "event_key": "2020-12",
+   "indicator": "PCE",
+   "released_ms": 1611927000000,
+   "scheduled_ms": 1611927000000,
+   "source": "https://www.bea.gov/news/2020/personal-income-and-outlays-november-2020",
+   "source_sha256": "ce677514eaa741d7dcf36c955a5ec1a46bd954146037d146977ac139715418f0",
+   "vintage_ms": 1608730200000
+  },
+  {
+   "event_key": "2021-01",
+   "indicator": "PCE",
+   "released_ms": 1614346200000,
+   "scheduled_ms": 1614346200000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-december-2020",
+   "source_sha256": "bd4700b2e483fdc8276ecf672c0577c6c3aaf7ae47f6f2a34ad2b62dcb3865b7",
+   "vintage_ms": 1611927000000
+  },
+  {
+   "event_key": "2021-02",
+   "indicator": "PCE",
+   "released_ms": 1616761800000,
+   "scheduled_ms": 1616761800000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-january-2021",
+   "source_sha256": "1c9d870c2d28a5b439013dae498832fae5e6a535729d372038ab82b25ecb5a9d",
+   "vintage_ms": 1614346200000
+  },
+  {
+   "event_key": "2021-03",
+   "indicator": "PCE",
+   "released_ms": 1619785800000,
+   "scheduled_ms": 1619785800000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-february-2021",
+   "source_sha256": "81bbfe0116262cdb66c91bba521c3511a92a9f74c9abe6681d88eaca1e57aae9",
+   "vintage_ms": 1616761800000
+  },
+  {
+   "event_key": "2021-04",
+   "indicator": "PCE",
+   "released_ms": 1622205000000,
+   "scheduled_ms": 1622205000000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-march-2021",
+   "source_sha256": "976c280caf19498ed9ed082e81db1223f81013cceb426074378ca25b0438e2cd",
+   "vintage_ms": 1619785800000
+  },
+  {
+   "event_key": "2021-05",
+   "indicator": "PCE",
+   "released_ms": 1624624200000,
+   "scheduled_ms": 1624624200000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-april-2021",
+   "source_sha256": "54fabfb8398893063115dd07ef082f6f34a41d7d97cefb1baa1266c613c9d2a7",
+   "vintage_ms": 1622205000000
+  },
+  {
+   "event_key": "2021-06",
+   "indicator": "PCE",
+   "released_ms": 1627648200000,
+   "scheduled_ms": 1627648200000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-may-2021",
+   "source_sha256": "f611e28338d8959544958e7830ad0891050187ace3f2f10548a3b66e8aecebf9",
+   "vintage_ms": 1624624200000
+  },
+  {
+   "event_key": "2021-07",
+   "indicator": "PCE",
+   "released_ms": 1630067400000,
+   "scheduled_ms": 1630067400000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-june-2021",
+   "source_sha256": "39bb7c9fdff26cd2cf7f049b5ce77d79521baf675e9c8ec48525fd8bd11932a4",
+   "vintage_ms": 1627648200000
+  },
+  {
+   "event_key": "2021-08",
+   "indicator": "PCE",
+   "released_ms": 1633091400000,
+   "scheduled_ms": 1633091400000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-july-2021",
+   "source_sha256": "cff68a45d95a73ea535c743a346b35f3c68d70c91228fad37389c665dbcf5991",
+   "vintage_ms": 1630067400000
+  },
+  {
+   "event_key": "2021-09",
+   "indicator": "PCE",
+   "released_ms": 1635510600000,
+   "scheduled_ms": 1635510600000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-august-2021",
+   "source_sha256": "3216f16287f9886f6eda238de21a4ebc08e60efc06e3ae27d9b61fe3eb1f586c",
+   "vintage_ms": 1633091400000
+  },
+  {
+   "event_key": "2021-10",
+   "indicator": "PCE",
+   "released_ms": 1637760600000,
+   "scheduled_ms": 1637766000000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-september-2021",
+   "source_sha256": "dd53f68fcb0ddbb8c35c4eb7576c35410460dd6301febb35a5a8cf9ec1e8bd47",
+   "vintage_ms": 1635510600000
+  },
+  {
+   "event_key": "2021-11",
+   "indicator": "PCE",
+   "released_ms": 1640266200000,
+   "scheduled_ms": 1640266200000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-october-2021",
+   "source_sha256": "5661d26a116912e90562544b65af48466dab7d856b922275747ebd54e5ca60f4",
+   "vintage_ms": 1637760600000
+  },
+  {
+   "event_key": "2021-12",
+   "indicator": "PCE",
+   "released_ms": 1643376600000,
+   "scheduled_ms": 1643376600000,
+   "source": "https://www.bea.gov/news/2021/personal-income-and-outlays-november-2021",
+   "source_sha256": "04be970999c6c7bddbb71f7c2ce97a31c2491c4a0068c404259703e4715d4190",
+   "vintage_ms": 1640266200000
+  },
+  {
+   "event_key": "2022-01",
+   "indicator": "PCE",
+   "released_ms": 1645795800000,
+   "scheduled_ms": 1645795800000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-december-2021",
+   "source_sha256": "efef0b1237a89b4f0b6d4ac3fbdedad74433728bfae96c7a69557abe1dcd2e87",
+   "vintage_ms": 1643376600000
+  },
+  {
+   "event_key": "2022-02",
+   "indicator": "PCE",
+   "released_ms": 1648729800000,
+   "scheduled_ms": 1648729800000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-january-2022",
+   "source_sha256": "5c4cead23b11e457dafdfb1c1652a605c8518a41cff5bdaddd7fd81f02898924",
+   "vintage_ms": 1645795800000
+  },
+  {
+   "event_key": "2022-03",
+   "indicator": "PCE",
+   "released_ms": 1651235400000,
+   "scheduled_ms": 1651235400000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-february-2022",
+   "source_sha256": "3198dd22f6d5efb4fa2747a7d26f96219ff4b2b7e431760b92042e0a58adbe7a",
+   "vintage_ms": 1648729800000
+  },
+  {
+   "event_key": "2022-04",
+   "indicator": "PCE",
+   "released_ms": 1653654600000,
+   "scheduled_ms": 1653654600000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-march-2022",
+   "source_sha256": "b7066045b90b80611c9b7ffd91bd04386854986a544c8674f8434cf678db5c0a",
+   "vintage_ms": 1651235400000
+  },
+  {
+   "event_key": "2022-05",
+   "indicator": "PCE",
+   "released_ms": 1656592200000,
+   "scheduled_ms": 1656592200000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-april-2022",
+   "source_sha256": "5608f1aba1c2b906440251364e416d1795a4b0c7ace708fba18f3b0eb6eef921",
+   "vintage_ms": 1653654600000
+  },
+  {
+   "event_key": "2022-06",
+   "indicator": "PCE",
+   "released_ms": 1659097800000,
+   "scheduled_ms": 1659097800000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-may-2022",
+   "source_sha256": "23c92e7c7e0c870f92e65d7e5a31e36a26320cd653ff5850827d04357e1c1856",
+   "vintage_ms": 1656592200000
+  },
+  {
+   "event_key": "2022-07",
+   "indicator": "PCE",
+   "released_ms": 1661517000000,
+   "scheduled_ms": 1661517000000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-june-2022",
+   "source_sha256": "c80a4ad144556c720aed20ab99512e60a8cf8686225b1a69b1b13d9e724ae33e",
+   "vintage_ms": 1659097800000
+  },
+  {
+   "event_key": "2022-08",
+   "indicator": "PCE",
+   "released_ms": 1664541000000,
+   "scheduled_ms": 1664541000000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-july-2022",
+   "source_sha256": "4ac5ed7cdf3b8bef90dbb58aa47df3dc70493beae86d5506ff2c58c65e0dc663",
+   "vintage_ms": 1661517000000
+  },
+  {
+   "event_key": "2022-09",
+   "indicator": "PCE",
+   "released_ms": 1666960200000,
+   "scheduled_ms": 1666960200000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-august-2022-and-annual-update",
+   "source_sha256": "77382a066cb88254fd6c5165842309a5c11c162d748934f2211695d1ab09e678",
+   "vintage_ms": 1664541000000
+  },
+  {
+   "event_key": "2022-10",
+   "indicator": "PCE",
+   "released_ms": 1669901400000,
+   "scheduled_ms": 1669901400000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-september-2022",
+   "source_sha256": "2074b959e679b936eb1016aa39253cf96f3c7806ec323143f0e7c14e334a8d25",
+   "vintage_ms": 1666960200000
+  },
+  {
+   "event_key": "2022-11",
+   "indicator": "PCE",
+   "released_ms": 1671802200000,
+   "scheduled_ms": 1671802200000,
+   "source": "https://www.bea.gov/news/2022/personal-income-and-outlays-october-2022",
+   "source_sha256": "9d7b8542d18456da83f217659c4818c7a8276eb6f56450e5b0665fee39e6c097",
+   "vintage_ms": 1669901400000
+  },
+  {
+   "event_key": "2021-03",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1616005800000,
+   "source": "https://web.archive.org/web/20210317153907id_/https://www.federalreserve.gov/",
+   "source_sha256": "074407e93b30e1dc75a3526344706348b811256a6036483cabcfa322324bf726",
+   "vintage_ms": 1615995547000
+  },
+  {
+   "event_key": "2021-04",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1619634600000,
+   "source": "https://web.archive.org/web/20210428172531id_/https://www.federalreserve.gov/",
+   "source_sha256": "b1d06e8aed0c66dbab0bc91515d98c12c0306e8620121014c9562f95afea790a",
+   "vintage_ms": 1619630731000
+  },
+  {
+   "event_key": "2021-07",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1627497000000,
+   "source": "https://web.archive.org/web/20210728150400id_/https://www.federalreserve.gov/",
+   "source_sha256": "69c9bf36815b11e02dced4df3c722d76fd69edc9e3d775f8c24841ed268854c3",
+   "vintage_ms": 1627484640000
+  },
+  {
+   "event_key": "2021-09",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1632335400000,
+   "source": "https://web.archive.org/web/20210922171256id_/https://www.federalreserve.gov/",
+   "source_sha256": "643a546c0340dd40a8a91b1b490dc22d847ecd1b51e395e57a05e7ef2c922901",
+   "vintage_ms": 1632330776000
+  },
+  {
+   "event_key": "2021-11",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1635964200000,
+   "source": "https://web.archive.org/web/20211103125349id_/https://www.federalreserve.gov/",
+   "source_sha256": "e60783b02cfdcb10407a17165a1b7989d806224893d7cac5fb4ad1c4bd5ebd48",
+   "vintage_ms": 1635944029000
+  },
+  {
+   "event_key": "2021-12",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1639596600000,
+   "source": "https://web.archive.org/web/20211215165649id_/https://www.federalreserve.gov/",
+   "source_sha256": "13e4921f99d62933faba62a1aeefd48dba001a932e720179ccf246b3b0eb392d",
+   "vintage_ms": 1639587409000
+  },
+  {
+   "event_key": "2022-01",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1643225400000,
+   "source": "https://web.archive.org/web/20220126152506id_/https://www.federalreserve.gov/",
+   "source_sha256": "210e3deacbc0fe3ec91cb68eb2b66f0c882dedf1a48978adccb098f87e747d4d",
+   "vintage_ms": 1643210706000
+  },
+  {
+   "event_key": "2022-03",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1647455400000,
+   "source": "https://web.archive.org/web/20220316180126id_/https://www.federalreserve.gov/",
+   "source_sha256": "4cb69949d7452982bea229ec045b8783c6e6c237239b67f9fe4761fc31f40624",
+   "vintage_ms": 1647453686000
+  },
+  {
+   "event_key": "2022-05",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1651689000000,
+   "source": "https://web.archive.org/web/20220504161112id_/https://www.federalreserve.gov/",
+   "source_sha256": "bae008b175f30349889db3d0341298d4e146b5a7606ee5b57b42b1275e415f87",
+   "vintage_ms": 1651680672000
+  },
+  {
+   "event_key": "2022-07",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1658946600000,
+   "source": "https://web.archive.org/web/20220727164935id_/https://www.federalreserve.gov/",
+   "source_sha256": "fb48862c5c79c1c87aa672ea094e90fcf1c0178b0914f61aef1c0ffe74d0da2c",
+   "vintage_ms": 1658940575000
+  },
+  {
+   "event_key": "2022-09",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1663785000000,
+   "source": "https://web.archive.org/web/20220921170752id_/https://www.federalreserve.gov/",
+   "source_sha256": "8d5c250660c42203a5deb0624c9b559bcda99cd72e1e27b27d7d41b4a05e7bae",
+   "vintage_ms": 1663780072000
+  },
+  {
+   "event_key": "2022-11",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1667413800000,
+   "source": "https://web.archive.org/web/20221102170836id_/https://www.federalreserve.gov/",
+   "source_sha256": "c16086658c9b32160f068a12126068782036f3db212e3538cf0e249f505c1c8e",
+   "vintage_ms": 1667408916000
+  },
+  {
+   "event_key": "2022-12",
+   "indicator": "POWELL",
+   "released_ms": null,
+   "scheduled_ms": 1671046200000,
+   "source": "https://web.archive.org/web/20221214185504id_/https://www.federalreserve.gov/",
+   "source_sha256": "fcdfa2ac40e21f9090a34fdaa4a57f25bfaec7c8d9b61e9b5fd482886f6f1355",
+   "vintage_ms": 1671044104000
+  }
+ ],
+ "from_ms": 1609632000000,
+ "gaps": [
+  {
+   "from_ms": 1611723600000,
+   "indicators": [
+    "POWELL"
+   ],
+   "reason": "기자회견 시각의 블랙아웃 전 공개 판본 없음 (2026-09-23 사용자 결정: 하루 fail-closed)",
+   "to_ms": 1611809999999
+  },
+  {
+   "from_ms": 1623816000000,
+   "indicators": [
+    "POWELL"
+   ],
+   "reason": "기자회견 시각의 블랙아웃 전 공개 판본 없음 (2026-09-23 사용자 결정: 하루 fail-closed)",
+   "to_ms": 1623902399999
+  },
+  {
+   "from_ms": 1655265600000,
+   "indicators": [
+    "POWELL"
+   ],
+   "reason": "기자회견 시각의 블랙아웃 전 공개 판본 없음 (2026-09-23 사용자 결정: 하루 fail-closed)",
+   "to_ms": 1655351999999
+  }
+ ],
+ "indicators": [
+  "CPI",
+  "FOMC",
+  "NFP",
+  "PCE",
+  "POWELL"
+ ],
+ "name": "a1_train_g6_2021_2022",
+ "to_ms": 1672531199999
+}

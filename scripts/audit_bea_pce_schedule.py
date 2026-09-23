@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import html
 import re
 import sys
@@ -66,6 +67,7 @@ class BEARelease:
     source_url: str
     release_ms: int
     next_release_ms: int
+    sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -77,6 +79,8 @@ class AuditRow:
     source: str
     verification_url: str
     resolution: Resolution | None = None
+    source_sha256: str = ""
+    verification_sha256: str = ""
 
     @property
     def status(self) -> str:
@@ -116,7 +120,7 @@ def _et_ms(fragment: str) -> int:
     return int(point.timestamp() * 1000)
 
 
-def parse_release(page: str, *, period: str, source_url: str) -> BEARelease:
+def parse_release(page: str, *, period: str, source_url: str, sha256: str = "") -> BEARelease:
     text = _page_text(page)
     header = re.search(r"EMBARGOED (?:UNTIL RELEASE AT|FOR RELEASE:)\s+(.{0,110})", text, re.I)
     next_release = re.search(r"Next release:\s+(.{0,110})", text, re.I)
@@ -126,7 +130,7 @@ def parse_release(page: str, *, period: str, source_url: str) -> BEARelease:
     next_ms = _et_ms(next_release.group(1))
     if next_ms <= release_ms:
         raise ValueError(f"BEA 다음 발표가 현재 발표보다 빠르다: {source_url}")
-    return BEARelease(period, source_url, release_ms, next_ms)
+    return BEARelease(period, source_url, release_ms, next_ms, sha256)
 
 
 def _periods() -> tuple[tuple[int, int], ...]:
@@ -161,6 +165,8 @@ def audit_releases(
             source=prior.source_url,
             verification_url=current.source_url,
             resolution=known.get(current.period),
+            source_sha256=prior.sha256,
+            verification_sha256=current.sha256,
         )
         for prior, current in pairwise(releases)
     )
@@ -174,7 +180,14 @@ def main() -> int:
             response = client.get(url)
             response.raise_for_status()
             period = f"{year}-{month:02d}"
-            releases.append(parse_release(response.text, period=period, source_url=url))
+            releases.append(
+                parse_release(
+                    response.text,
+                    period=period,
+                    source_url=url,
+                    sha256=hashlib.sha256(response.content).hexdigest(),
+                )
+            )
     rows = audit_releases(releases)
     writer = csv.writer(sys.stdout, lineterminator="\n")
     writer.writerow(
@@ -187,6 +200,8 @@ def main() -> int:
             "status",
             "source",
             "verification_url",
+            "source_sha256",
+            "verification_sha256",
         )
     )
     for row in rows:
@@ -200,6 +215,8 @@ def main() -> int:
                 row.status,
                 row.source,
                 row.verification_url,
+                row.source_sha256,
+                row.verification_sha256,
             )
         )
     return 2 if any(row.status == "DISCREPANCY" for row in rows) else 0
