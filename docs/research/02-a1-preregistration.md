@@ -263,9 +263,11 @@ A1 은 **현재 설정 그대로** 사전등록한다. 위 SD 76.9bps 와 필요
 - [x] 위험 한도 적용 후 표본 확인
 - [x] C1·C2·C4·C8 처리 기록
 - [x] 대조군 정의와 판정 기준 고정
-- [ ] 규칙을 `decide()` 경로로 구현 (Pure Core)
-- [ ] G6의 실제 PIT 일정·완전성 감사 및 백테스트 연결
-- [ ] TRAIN 실행
+- [x] 규칙을 `decide()` 경로로 구현 (Pure Core) — `features/a1.py`·`strategy/decision.py`
+- [x] G6의 실제 PIT 일정·완전성 감사 및 백테스트 연결 — [05](05-a1-macro-pit-source-audit.md),
+      `macro_events` 101건·매니페스트 digest 대조 후 주입(`scripts/run_a1_train.py`)
+- [x] 판정 코드 고정 — `backtest/a1_verdict.py` (거래 수 146 관문 → T1~T5·강제청산 0)
+- [ ] TRAIN 실행 (`scripts/run_a1_train.py run`, 1회)
 
 ---
 

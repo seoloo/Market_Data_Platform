@@ -1,10 +1,23 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 일정 101건 적재 완료 — Phase 3 실행 스크립트 연결 전**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 3 A1 TRAIN 실행 경로 완료 — TRAIN 1회 실행 승인 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
-## 이번 작업 (Claude — G6 일정 DB 적재·외부 자료 접수)
+## 이번 작업 (Claude — A1 TRAIN 판정·실행 스크립트)
+
+- `src/auto_trading/backtest/a1_verdict.py`: 02 §7·§11 판정을 상수로 고정. **주 arm 거래 146건 미만이면
+  통계 함수를 호출하지 않고 `DATA_INSUFFICIENT`**. 이상이면 T1(순손익 평균−2SE>0)·T2(비용 전 평균≥42.44)·
+  T3(대조군 대비 차이−2SE>0, Welch)·T4(2021·2022 각 평균>0)·T5(LONG·SHORT 각 평균>0 = 원문
+  "각각 부호 동일"을 T1과 결합한 동치)·강제청산 0 → `PASS`/`REJECT`. 테스트 7건.
+- `scripts/run_a1_train.py`: `run`은 dirty 트리·기존 판정 파일이 있으면 거부(TRAIN 1회),
+  DB `macro_events`가 매니페스트와 정확히 같을 때만 달력 주입, 주 arm·대조군 같은 엔진·데이터로 재생,
+  판정·메타데이터(git·config·매니페스트 digest·필터·veto)·원거래를 `reports/a1/train/`에 기록. 테스트 3건.
+  `smoke`는 달력 미주입(G6 fail-closed)으로 거래 0건을 확인하며 속도만 잰다.
+- smoke 7일: 판단 2,017회·16초(≈8ms/회) → **TRAIN arm당 약 28분, 두 arm 약 1시간** 예상. 거래 0건 확인.
+- **TRAIN은 아직 실행하지 않았다.** 사용자 확인 후 커밋된 깨끗한 트리에서 `run` 1회.
+
+## 이전 작업 (Claude — G6 일정 DB 적재·외부 자료 접수)
 
 - 사용자 승인으로 `build_g6_calendar.py load --apply`: `data/trading.db`의 `macro_events`에 **101건 적재**
   (한 트랜잭션, 적재 전 0건·프로세스 없음·WAL 0바이트 확인). 재 dry-run 동일 101·충돌 0,
@@ -189,7 +202,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-**5종 원천 대조·매니페스트·DB 적재(101건) 완료.** 남은 순서: A1 실행 스크립트(DB 읽기·digest 대조·달력 주입) → TRAIN 1회.
+**5종 원천 대조·매니페스트·DB 적재(101건)·실행 스크립트 완료.** 남은 순서: 커밋 → `run_a1_train.py run` 1회(사용자 승인).
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -218,7 +231,7 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C7: D22 제외가 사용자 의도인지 미확인. 2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`.
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
-- A1-G6: **적재 완료·실행 연결 대기** — `macro_events` 101건(매니페스트 digest `aaa3de73…`).
+- A1-G6: **해소** — `macro_events` 101건, 실행 시 매니페스트 digest 대조 후 주입.
   PCE 24·CPI 24·NFP 24·FOMC 16·POWELL 13 대조 완료, POWELL 3일은 승인된 공백(fail-closed).
   POWELL 설정 창(±15분)은 원 설계 "시작~종료+15분"보다 짧다(기록만, 한도 변경 없음). coverage 인증 없이는 TRAIN 불가.
 - A1-N: **해소** — 사용자 승인으로 주 arm 실제 거래 146건 미만이면 DATA_INSUFFICIENT (02 §11). 원 분석:
@@ -231,6 +244,12 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C2·C4: **A1 범위에서 해소** (사전등록 §8). 다른 전략에는 재확정 필요.
 
 ## 검증 기록
+
+이번 작업 (Claude — A1 TRAIN 판정·실행 스크립트, 2026-09-23):
+
+- smoke 7일: 거래 0건(G6 fail-closed) 확인, 16초. TRAIN 손익 미실행·미열람.
+- 전체 pytest **1,196건**, leakage **44건**, mypy strict **150개** 파일,
+  ruff check·format --check **176개** 파일, import-linter 4/4, `git diff --check` 통과.
 
 이번 작업 (Claude — G6 달력 매니페스트·적재 dry-run, 2026-09-23):
 
