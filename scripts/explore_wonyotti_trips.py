@@ -48,10 +48,16 @@ class Trip:
     cost_xbt: int = 0
     max_abs: int = 0
     open_price: float = 0.0
+    entry_btc: float = 0.0
+    """포지션을 늘린 체결의 명목가 합(BTC). 거래당 수익률의 분모."""
 
     @property
     def net_btc(self) -> float:
         return self.gross_btc - self.cost_xbt / _SATOSHI
+
+    @property
+    def net_bps(self) -> float:
+        return self.net_btc / self.entry_btc * 10_000 if self.entry_btc > 0 else 0.0
 
     @property
     def hours(self) -> float:
@@ -82,6 +88,8 @@ def _apply(book: _Book, at: datetime, qty: int, price: float, fee: int) -> None:
         _apply(book, at, qty - part, price, fee - share)
         return
     trip.gross_btc += qty / price
+    if not closing:
+        trip.entry_btc += abs(qty) / price
     trip.cost_xbt += fee
     book.position += qty
     trip.max_abs = max(trip.max_abs, abs(book.position))

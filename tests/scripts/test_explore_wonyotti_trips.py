@@ -27,6 +27,9 @@ def test_long_round_trip_inverse_pnl_and_costs() -> None:
     assert trip.side == 1
     assert trip.hours == pytest.approx(1.0)
     assert trip.max_abs == 10_000
+    assert trip.entry_btc == pytest.approx(1.0)
+    net = 0.2 - 250 / 100_000_000
+    assert trip.net_bps == pytest.approx(net / 1.0 * 10_000)
 
 
 def test_short_profits_when_price_falls() -> None:
@@ -59,6 +62,7 @@ def test_scaling_in_keeps_one_trip_until_flat() -> None:
     [trip] = build_trips(fills, [])
     assert trip.max_abs == 200
     assert trip.closed == _at(3)
+    assert trip.entry_btc == pytest.approx(100 / 100 + 100 / 110)
 
 
 def test_open_position_at_end_is_not_a_trip() -> None:
