@@ -202,6 +202,69 @@ def measure(
     }
 
 
+STOP_MULTIPLE = 2.0
+"""A1과 같은 손절 배수. 새 자유도를 만들지 않는다."""
+MIN_STOP = 0.01
+"""TRADING_CORE min_stop_distance. 사이징 분모 하한에만 쓴다(REDUCE_POSITION)."""
+
+
+def stop_distance(close: Sequence[float], i: int, horizon: int) -> float | None:
+    """직전 24개 1h 수익률 σ × √horizon × 2. 진입 시점까지 마감된 봉만 쓴다."""
+    if i < 25:
+        return None
+    steps = [close[k] / close[k - 1] - 1 for k in range(i - 23, i + 1)]
+    return STOP_MULTIPLE * statistics.stdev(steps) * math.sqrt(horizon)
+
+
+def stopped_return(
+    side: int, entry: float, stop: float, path: Sequence[tuple[float, float]], exit_price: float
+) -> tuple[float, bool]:
+    """(부호 반영 비용 전 수익률, 손절 여부). ``path``는 보유 중 1분봉 (고가, 저가)."""
+    level = entry * (1 - stop) if side > 0 else entry * (1 + stop)
+    for high, low in path:
+        if (side > 0 and low <= level) or (side < 0 and high >= level):
+            return -stop, True
+    return side * (exit_price / entry - 1), False
+
+
+def stop_applied_sd(
+    hours: Hours,
+    idx: Sequence[int],
+    horizon: int,
+    path: Callable[[int, int], list[tuple[float, float]]],
+) -> dict[str, float | int]:
+    """방향별 손절 적용 거래 수익률의 SD·손절 체결률. 평균은 계산하지 않는다."""
+    out: dict[str, float | int] = {}
+    stops = []
+    for side, name in ((1, "long"), (-1, "short")):
+        returns: list[float] = []
+        hits = 0
+        for i in idx:
+            if (
+                i + horizon >= len(hours.close)
+                or (d := stop_distance(hours.close, i, horizon)) is None
+            ):
+                continue
+            start = hours.open_ms[i] + _HOUR
+            value, hit = stopped_return(
+                side,
+                hours.close[i],
+                d,
+                path(start, start + horizon * _HOUR),
+                hours.close[i + horizon],
+            )
+            returns.append(value)
+            hits += hit
+            if side > 0:
+                stops.append(d)
+        out[f"{name}_sd_bps"] = statistics.stdev(returns) * 1e4
+        out[f"{name}_stop_hit_rate"] = hits / len(returns)
+        out["n"] = len(returns)
+    out["stop_median_bps"] = statistics.median(stops) * 1e4
+    out["share_stop_below_min"] = sum(d < MIN_STOP for d in stops) / len(stops)
+    return out
+
+
 def main() -> int:
     hours, first_move, funding = load(DB)
     ranks = abs_move_rank(hours.close)
@@ -215,9 +278,33 @@ def main() -> int:
         for h in _HORIZONS
     }
     results = []
-    for name, state in (("WA", state_wa), ("WB", state_wb)):
-        idx = triggers(hours, state, ranks, lock=12)
-        results.append(measure(name, hours, idx, first_move, atr_rank, funding, baseline_move))
+    uri = f"file:{DB.as_posix()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as conn:
+
+        def path(start_ms: int, end_ms: int) -> list[tuple[float, float]]:
+            rows = conn.execute(
+                "SELECT high, low FROM candles WHERE exchange = 'binance_usdm'"
+                " AND symbol = 'BTCUSDT' AND timeframe = '1m' AND open_ms >= ? AND open_ms < ?"
+                " ORDER BY open_ms",
+                (start_ms, end_ms),
+            ).fetchall()
+            return [(float(h), float(lo)) for h, lo in rows]
+
+        for name, state in (("WA", state_wa), ("WB", state_wb)):
+            idx = triggers(hours, state, ranks, lock=12)
+            measured = measure(name, hours, idx, first_move, atr_rank, funding, baseline_move)
+            stopped = stop_applied_sd(hours, idx, 6, path)
+            train = round(0.9 * len([i for i in idx if _year(hours.open_ms[i]) in (2023, 2024)]))
+            valid = round(0.9 * len([i for i in idx if _year(hours.open_ms[i]) >= 2025]))
+            sd = max(float(stopped["long_sd_bps"]), float(stopped["short_sd_bps"]))
+            cost = float(measured["cost_bps"])  # type: ignore[arg-type]
+            stopped["expected_trades_train(90%)"] = train
+            stopped["expected_trades_validation(90%)"] = valid
+            stopped["detectable_train_bps"] = detectable_effect_bps(sd, train, cost)
+            stopped["detectable_validation_bps"] = detectable_effect_bps(sd, valid, cost)
+            stopped["detectable_oos100_bps"] = detectable_effect_bps(sd, 100, cost)
+            measured["stop_applied_6h"] = stopped
+            results.append(measured)
     summary = {
         "hours": len(hours.close),
         "from": datetime.fromtimestamp(hours.open_ms[0] / 1000, tz=UTC).isoformat(),

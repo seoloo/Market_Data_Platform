@@ -9,6 +9,8 @@ from scripts.measure_w_candidates import (
     position_7d,
     state_wa,
     state_wb,
+    stop_distance,
+    stopped_return,
     triggers,
 )
 
@@ -56,3 +58,20 @@ def test_lock_blocks_retriggers() -> None:
     hours = _hours([1.0] * 30)
     always = triggers(hours, lambda _h, _i, _r: True, [], lock=12)
     assert always == [0, 12, 24]
+
+
+def test_stop_distance_uses_prior_hours_only() -> None:
+    closes = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
+    distance = stop_distance(closes, 29, 6)
+    assert distance is not None and distance > 0
+    assert stop_distance([*closes, 1_000.0], 29, 6) == distance
+    assert stop_distance(closes, 10, 6) is None
+
+
+def test_stopped_return_prefers_stop_and_respects_side() -> None:
+    path = [(101.0, 99.5), (103.0, 97.0)]
+    assert stopped_return(1, 100.0, 0.02, path, 105.0) == (-0.02, True)
+    assert stopped_return(-1, 100.0, 0.02, path, 105.0) == (-0.02, True)
+    calm = [(100.5, 99.5)]
+    value, hit = stopped_return(-1, 100.0, 0.02, calm, 99.0)
+    assert not hit and value == pytest.approx(0.01)

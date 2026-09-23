@@ -1,10 +1,21 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — 07 후보 비교 완료(WA·WB) — 후보 선택·위험 규칙 의미 결정 대기**.
+현재: **Phase 0 — WA 사전등록 초안(08) — 사용자 확인·G6 2023~2026 처리 결정 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 통계 미열람(거부 집계로 DD 정지 사실은 노출)**.
 
-## 이번 작업 (Claude — 07 워뇨띠 후보 비교)
+## 이번 작업 (Claude — 결정 반영·WA 사전등록 초안)
+
+- 사용자 결정: 후보 **WA**, 같은 방향 제한 **UTC 일 단위 초기화**, 우위 측정과 계좌 정지 **분리**.
+- `BacktestRiskTracker.advance`가 UTC 일자 변경 시 `same_direction_entries`·`last_entry_side` 초기화(테스트 추가),
+  [TRADING_CORE](docs/current/TRADING_CORE.md) 빈도 행에 정정 사유 기록. 종료된 A1은 재실행하지 않음.
+- 손절 적용 SD(2σ·√6, A1 배수 재사용): 롱 206.1·숏 200.7bps, 손절 체결률 롱 15.3%·숏 8.1% —
+  **비대칭이 방향 정보를 약하게 노출**했음을 08에 기록. 최소 효과 TRAIN 54.4·VALIDATION 53.9bps.
+- [08 WA 사전등록 초안](docs/research/08-wa-preregistration.md): 거래 < 176 → DATA_INSUFFICIENT, 방향은 TRAIN 부호,
+  T1·T2(비용 전 ≥60bps)·T3(무조건 같은 방향 대조군)·T4(2023·2024)·강제청산 0. 연구 모드는 계좌 정지 비적용.
+- **사용자 확인 대기:** 08 고정 여부, G6 2023~2026 데이터 처리 (a) 원천 감사 반복 / (b) 연구 모드에서 분리.
+
+## 이전 작업 (Claude — 07 워뇨띠 후보 비교)
 
 - [07 후보 비교](docs/research/07-w-candidate-comparison.md), `scripts/measure_w_candidates.py`(테스트 4건,
   수익 평균 미열람). 상태 고정·방향은 TRAIN에서 읽는 설계: **WA 하락 뒤 7일 저점 부근**, **WB 큰 움직임 직후**.
