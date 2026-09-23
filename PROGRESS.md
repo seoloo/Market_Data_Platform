@@ -1,10 +1,19 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: K 자율 진행·커밋·푸시).
-현재: **K 펀딩 캐리 VALIDATION `REJECT` — 다음 방향 사용자 결정 대기**.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA 기각, K 기각.
+최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
+현재: **M 다중 종목 캐리 — 사전등록 고정, TRAIN 1회 실행 / F 전향 관찰 등록**.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K 기각.
 
-## 이번 작업 (Claude — K 후보 선정·사전등록·시뮬레이터)
+## 이번 작업 (Claude — 레버리지 범위·M·F)
+
+- 레버리지 허용 범위 **1x~10x** 명시, 스키마 상한 20→10 (`cfc2b91`). 실거래 단계(3x·live 5x)는 유지.
+- [11 후보 비교](docs/research/11-post-k-candidate-comparison.md) → 사용자 선택 **M + F** (L 제외).
+- F: [12](docs/research/12-f-k-forward-registration.md), `scripts/run_k_forward.py` — K/v1 동결, 2026-09~2027-08, 12개월 뒤 판정 (`0e285f9`).
+- M: `scripts/m_data.py`(선물 1d 2019~2022 보강, 시점별 유니버스 상위 20·현물 필수, 필요한 달만 1h·funding 적재),
+  `backtest/multi_carry.py`(테스트 10건), `scripts/run_m_carry.py`(테스트 6건), [13 사전등록](docs/research/13-m-multi-carry-preregistration.md).
+  적재율 99.3~100%, 종목-달 funding SD 약 300~360bps → 검정력 여유 적음(결과 전 기록).
+
+## 이전 작업 (Claude — K 후보 선정·사전등록·시뮬레이터)
 
 - 원격 WA 커밋 3개에서 Claude 공동 작성자 줄 제거(트리 동일, `--force-with-lease`): `157082e`·`8b45853`·`95ab7e8`.
 - [09 후보 비교](docs/research/09-next-candidate-comparison.md): K 캐리 · L 지연 캐스케이드(60분, 비용 21bps, 2h 33bps 필요) · P 중단. 사용자 K 선택.
