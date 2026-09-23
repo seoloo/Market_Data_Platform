@@ -68,6 +68,8 @@ class GateContext:
     expected_edge_bps: Decimal | None = None
     required_edge_bps: Decimal | None = None
     research_unvalidated: bool = False
+    research_edge_mode: bool = False
+    """우위 측정 전용(08 WA §5): 계좌 수준 정지와 G6를 생략한다. BACKTEST에서만 효력이 있다."""
 
 
 class RiskGateEngine:
@@ -165,14 +167,22 @@ class RiskGateEngine:
         portfolio = context.portfolio
         day_base = state.day_start_equity if state.day_start_equity > ZERO else portfolio.equity
         day_pnl = state.day_realized_pnl + portfolio.unrealized_pnl
-        if day_base > ZERO and day_pnl <= -(day_base * self._cfg.daily_loss_limit_pct):
+        # 우위 측정 모드는 계좌 경로에 따른 정지를 표본 선택에서 뺀다(A1 교훈).
+        # 계좌 위험은 전체 규칙을 적용한 별도 재생으로 본다.
+        account_halts = not _research_edge(context)
+        if (
+            account_halts
+            and day_base > ZERO
+            and day_pnl <= -(day_base * self._cfg.daily_loss_limit_pct)
+        ):
             reasons.append(VetoReason.DAILY_LOSS_LIMIT)
-        if portfolio.drawdown_pct >= self._cfg.max_drawdown_pct:
+        if account_halts and portfolio.drawdown_pct >= self._cfg.max_drawdown_pct:
             reasons.append(VetoReason.MAX_DRAWDOWN)
-        if state.consecutive_losses >= self._cfg.consecutive_loss_limit:
+        if account_halts and state.consecutive_losses >= self._cfg.consecutive_loss_limit:
             reasons.append(VetoReason.CONSECUTIVE_LOSSES)
         if (
-            state.cooldown_until_ms is not None
+            account_halts
+            and state.cooldown_until_ms is not None
             and context.snapshot.as_of_ms < state.cooldown_until_ms
         ):
             reasons.append(VetoReason.COOLDOWN)
@@ -266,6 +276,8 @@ class RiskGateEngine:
 
     @staticmethod
     def _event_reasons(context: GateContext) -> list[VetoReason]:
+        if _research_edge(context):
+            return []
         if not context.event_calendar_available or context.event_blackout_active:
             return [VetoReason.EVENT_BLACKOUT]
         return []
@@ -288,3 +300,8 @@ class RiskGateEngine:
         if action is Action.OPEN_SHORT:
             return PositionSide.SHORT
         raise ValueError(f"진입 action 이 아니다: {action.value}")
+
+
+def _research_edge(context: GateContext) -> bool:
+    """우위 측정 모드는 BACKTEST에서만 인정한다. 다른 모드에서는 플래그를 무시한다."""
+    return context.research_edge_mode and context.snapshot.mode is Mode.BACKTEST

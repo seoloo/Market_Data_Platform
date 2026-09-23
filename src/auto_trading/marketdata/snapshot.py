@@ -76,6 +76,8 @@ def build_requirements(cfg: RootConfig) -> tuple[TimeframeRequirement, ...]:
             VOL_WINDOW_BARS + RANK_WINDOW_BARS + 2 * RANGE_BARS + 1,
             "a1.causal_breakout",
         )
+    elif cfg.strategy_id == "wa_v1" and cfg.wa is not None:
+        require(Timeframe.H1, cfg.wa.range_hours, "wa.range_and_volatility")
     else:
         for feature in build_feature_set(cfg.features).as_tuple():
             require(feature.timeframe, feature.warmup_bars, feature.name)

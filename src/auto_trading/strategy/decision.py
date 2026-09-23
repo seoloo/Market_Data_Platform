@@ -86,6 +86,7 @@ class DecisionContext:
     a1_observation: A1Observation | None = None
     a1_precomputed_at_ms: int | None = None
     research_unvalidated: bool = False
+    research_edge_mode: bool = False
     wa_state: WAState | None = None
 
 
@@ -427,6 +428,7 @@ def _fixed_horizon_entry(
             expected_edge_bps=runtime.expected_edge_bps,
             required_edge_bps=cost.total_bps,
             research_unvalidated=runtime.research_unvalidated,
+            research_edge_mode=runtime.research_edge_mode,
         )
     )
     if not gate.approved or sizing.plan is None:

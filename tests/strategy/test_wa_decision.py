@@ -7,8 +7,6 @@ import pytest
 from pydantic import ValidationError
 from tests.features.test_wa import falling_window
 
-from auto_trading.backtest.engine import BacktestEngine
-from auto_trading.backtest.feed import CandleFeed
 from auto_trading.config.loader import load_config
 from auto_trading.config.schema import RootConfig, WAConfig
 from auto_trading.core.enums import (
@@ -190,8 +188,3 @@ def test_frozen_values_reject_tuning(field: str, value: object) -> None:
 def test_direction_has_no_implicit_default() -> None:
     with pytest.raises(ValidationError):
         WAConfig.model_validate({})
-
-
-def test_engine_cannot_silently_use_legacy_cadence_before_wa_integration() -> None:
-    with pytest.raises(ValueError, match="아직 구현 전"):
-        BacktestEngine(config(), CandleFeed("BTCUSDT"))

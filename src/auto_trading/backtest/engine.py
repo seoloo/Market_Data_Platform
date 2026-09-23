@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import bisect
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from auto_trading.backtest.calendar import MacroCalendar
@@ -43,6 +43,7 @@ from auto_trading.core.types import (
     MarketSnapshot,
 )
 from auto_trading.features.a1 import A1Observation, scan_a1
+from auto_trading.features.wa import WAState, evaluate_wa
 from auto_trading.marketdata.snapshot import build_requirements
 from auto_trading.strategy.decision import DecisionContext, decide
 
@@ -79,6 +80,7 @@ class BacktestResult:
     close_reasons: dict[str, int] = field(default_factory=dict)
     bars_in_position: int = 0
     bars_total: int = 0
+    wa_state: WAState | None = None
 
     @property
     def liquidations(self) -> int:
@@ -117,7 +119,9 @@ class BacktestEngine:
         "_funding",
         "_funding_times",
         "_macro_calendar",
+        "_research_edge_mode",
         "_sim",
+        "_wa_state",
     )
 
     def __init__(
@@ -130,10 +134,13 @@ class BacktestEngine:
         slippage: SlippageModel | None = None,
         context: DecisionContext | None = None,
         macro_calendar: MacroCalendar | None = None,
+        research_edge_mode: bool = False,
     ) -> None:
-        if cfg.strategy_id == "wa_v1":
-            raise ValueError("WA 엔진의 1h 평가·트리거 상태·6h 체결 연결은 아직 구현 전이다")
+        if research_edge_mode and cfg.mode is not Mode.BACKTEST:
+            raise ValueError("우위 측정 모드는 BACKTEST 전용이다")
         self._cfg = cfg
+        self._research_edge_mode = research_edge_mode
+        self._wa_state = WAState()
         self._feed = feed
         self._filters = filters or ExchangeFilters()
         self._sim = FillSimulator(cfg.risk.cost, slippage)
@@ -163,6 +170,16 @@ class BacktestEngine:
 
     def run(self, *, from_ms: int, to_ms: int, initial_equity: Decimal) -> BacktestResult:
         """``[from_ms, to_ms]`` 를 재생한다."""
+        self._wa_state = (
+            self._context.wa_state
+            if self._context is not None and self._context.wa_state is not None
+            else WAState()
+        )
+        if self._cfg.strategy_id == "wa_v1" and any(
+            ms is not None and ms >= from_ms
+            for ms in (self._wa_state.last_evaluated_ms, self._wa_state.last_trigger_ms)
+        ):
+            raise ValueError("WA 복구 상태가 재생 시작 시각 이후다")
         portfolio = BacktestPortfolio(symbol=self._feed.symbol, initial_equity=initial_equity)
         base_risk_state = self._context.risk_state if self._context is not None else None
         risk_tracker = BacktestRiskTracker.start(from_ms, initial_equity, base_risk_state)
@@ -177,12 +194,20 @@ class BacktestEngine:
         protective: tuple[Intent, ...] = ()
         pending: Decision | None = None
         funding_index = 0
-        last_decision_close = -1
+        last_decision_close = (
+            self._decision_close(from_ms - 1) if self._cfg.strategy_id == "wa_v1" else -1
+        )
 
         for bar in minutes:
             result.bars_total += 1
             risk_tracker.advance(bar.open_ms, portfolio.equity(bar.open))
-            funding_index = self._settle_funding(portfolio, risk_tracker, bar, funding_index)
+            funding_index = self._settle_funding(
+                portfolio,
+                risk_tracker,
+                bar,
+                funding_index,
+                through_ms=bar.open_ms if self._cfg.strategy_id == "wa_v1" else None,
+            )
 
             # 1) 대기 중인 Intent 를 이 봉에서 체결한다 (신호 봉 다음 봉 = R-1).
             if pending is not None:
@@ -191,6 +216,12 @@ class BacktestEngine:
                     pending = None
                 elif bar.volume > ZERO:
                     pending = None  # 유동성이 있었는데 못 채웠으면 기회는 사라진 것이다
+
+            # WA의 6h 만기는 분봉 시가 시점에 이미 알려져 있다. 시가 갭 보호를
+            # 먼저 적용하고 시간 청산한다. 청산 이후의 봉 고저를 거꾸로 쓰지 않는다.
+            if self._wa_timed_exit(portfolio, risk_tracker, bar, protective, result):
+                protective = ()
+                pending = None
 
             # 2) 보유 중이면 보호주문·강제청산을 확인한다.
             if portfolio.position is not None:
@@ -217,6 +248,8 @@ class BacktestEngine:
             # A1 은 진입 체결 시각부터 120분 뒤에 닫는다. 5분 결정봉을 기다리면
             # 보유 시간이 최대 4분 더 길어지므로 1분 재생에서도 같은 decide()를 호출한다.
             as_of = bar.open_ms + Timeframe.M1.ms - 1
+            if self._cfg.strategy_id == "wa_v1":
+                funding_index = self._settle_funding(portfolio, risk_tracker, bar, funding_index)
             if (
                 self._cfg.strategy_id == "a1_v1"
                 and self._cfg.a1 is not None
@@ -231,7 +264,22 @@ class BacktestEngine:
 
             # 3) 결정 TF 가 마감됐으면 판단한다.
             close_ms = self._decision_close(as_of)
-            if close_ms > last_decision_close and pending is None:
+            if self._cfg.strategy_id == "wa_v1" and close_ms > last_decision_close:
+                # 누락된 1m 동안의 트리거도 소비하되 과거 신호를 뒤늦게 체결하지 않는다.
+                for hourly_close in range(
+                    last_decision_close + Timeframe.H1.ms, close_ms + 1, Timeframe.H1.ms
+                ):
+                    if hourly_close == as_of and pending is None:
+                        decision = self._evaluate(portfolio, risk_tracker, hourly_close, result)
+                        if decision is not None and decision.intents:
+                            pending = decision
+                    self._advance_wa(hourly_close)
+                last_decision_close = close_ms
+            elif (
+                self._cfg.strategy_id != "wa_v1"
+                and close_ms > last_decision_close
+                and pending is None
+            ):
                 last_decision_close = close_ms
                 decision = self._evaluate(portfolio, risk_tracker, close_ms, result)
                 if decision is not None and decision.intents:
@@ -240,9 +288,74 @@ class BacktestEngine:
 
         result.final_equity = portfolio.equity(minutes[-1].close) if minutes else initial_equity
         result.trades = portfolio.trades
+        if self._cfg.strategy_id == "wa_v1":
+            result.wa_state = self._wa_state
         return result
 
     # ----------------------------------------------------------- 내부
+
+    def _advance_wa(self, close_ms: int) -> None:
+        wa = self._cfg.wa
+        if wa is None or Timeframe.H1 not in self._feed.timeframes:
+            return
+        self._wa_state = evaluate_wa(
+            self._feed.series(Timeframe.H1, close_ms).candles,
+            as_of_ms=close_ms,
+            cfg=wa,
+            state=self._wa_state,
+        ).state
+
+    def _wa_timed_exit(
+        self,
+        portfolio: BacktestPortfolio,
+        tracker: BacktestRiskTracker,
+        bar: Candle,
+        protective: tuple[Intent, ...],
+        result: BacktestResult,
+    ) -> bool:
+        wa = self._cfg.wa
+        position = portfolio.position
+        if (
+            self._cfg.strategy_id != "wa_v1"
+            or wa is None
+            or position is None
+            or bar.open_ms - position.entry_ms < wa.hold_minutes * Timeframe.M1.ms
+        ):
+            return False
+        opening = replace(bar, high=bar.open, low=bar.open, close=bar.open)
+        if position.is_liquidated(opening):
+            trade = portfolio.liquidate(opening)
+            tracker.record_exit(trade, ZERO, self._cfg.risk)
+            _count(result.close_reasons, trade.close_reason.value)
+            return True
+        fired = self._sim.resolve_protective(protective, opening)
+        if fired is not None:
+            fill = self._sim.fill_protective(fired, opening, portfolio.protective_qty())
+            if fill is not None:
+                trade = portfolio.close(fill, portfolio.purpose_to_reason(fired.purpose))
+                tracker.record_exit(trade, fill.fee, self._cfg.risk)
+                _count(result.close_reasons, trade.close_reason.value)
+                return True
+        # 시간 청산에는 warmup·달력이 필요 없다. 현재 시가와 마감된 데이터만 제공한다.
+        snapshot = self._snapshot(bar.open_ms)
+        if snapshot is None:
+            snapshot = MarketSnapshot(
+                symbol=self._feed.symbol,
+                as_of_ms=bar.open_ms,
+                mode=Mode.BACKTEST,
+                series=(),
+                mark_price=bar.open,
+                data_quality=DataQuality(ok=False),
+            )
+        snapshot = replace(snapshot, mark_price=bar.open, last_price=bar.open)
+        decision = decide(
+            snapshot,
+            portfolio.to_state(bar.open, bar.open_ms),
+            self._cfg,
+            self._runtime(tracker, snapshot),
+        )
+        result.decisions_evaluated += 1
+        return self._execute(portfolio, tracker, decision, bar, result)
 
     def _decision_close(self, as_of_ms: int) -> int:
         """``as_of_ms`` 시점에 마지막으로 마감된 결정 TF 봉의 마감 시각."""
@@ -269,6 +382,8 @@ class BacktestEngine:
         return decision
 
     def _snapshot(self, close_ms: int) -> MarketSnapshot | None:
+        if self._cfg.strategy_id == "wa_v1":
+            return self._wa_snapshot(close_ms)
         series = []
         for tf in self._feed.timeframes:
             if not self._feed.has_warmup(tf, close_ms):
@@ -300,7 +415,7 @@ class BacktestEngine:
         a1_close_ms = m5.last.close_ms if m5 is not None and m5.last is not None else None
         calendar_available = base.event_calendar_available
         blackout_active = base.event_blackout_active
-        if self._cfg.strategy_id == "a1_v1":
+        if self._cfg.strategy_id in ("a1_v1", "wa_v1"):
             calendar_available, blackout_active = (
                 self._macro_calendar.status_at(snapshot.as_of_ms, self._cfg.risk.blackout)
                 if self._macro_calendar is not None
@@ -329,7 +444,48 @@ class BacktestEngine:
             a1_observation=self._a1_events.get(a1_close_ms) if a1_close_ms is not None else None,
             a1_precomputed_at_ms=a1_close_ms,
             research_unvalidated=(
-                self._cfg.strategy_id == "a1_v1" and self._cfg.mode is Mode.BACKTEST
+                self._cfg.strategy_id in ("a1_v1", "wa_v1") and self._cfg.mode is Mode.BACKTEST
+            ),
+            wa_state=self._wa_state if self._cfg.strategy_id == "wa_v1" else None,
+            research_edge_mode=self._research_edge_mode,
+        )
+
+    def _wa_snapshot(self, as_of_ms: int) -> MarketSnapshot | None:
+        series = []
+        missing, stale, gapped = [], [], []
+        for requirement in build_requirements(self._cfg):
+            tf = requirement.timeframe
+            if tf not in self._feed.timeframes:
+                missing.append(tf)
+                continue
+            window = self._feed.series(tf, as_of_ms)
+            series.append(window)
+            if len(window) < requirement.bars:
+                missing.append(tf)
+            if window.last is None or as_of_ms - window.last.close_ms >= tf.ms:
+                stale.append(tf)
+            if window.has_gaps():
+                gapped.append(tf)
+        mark = next((s.last for s in series if s.last is not None), None)
+        if mark is None:
+            return None
+        rate = self._funding_as_of(as_of_ms)
+        return MarketSnapshot(
+            symbol=self._feed.symbol,
+            as_of_ms=as_of_ms,
+            mode=Mode.BACKTEST,
+            series=tuple(series),
+            mark_price=mark.close,
+            last_price=mark.close,
+            funding_rate=None if rate is None else rate.rate,
+            next_funding_ms=None if rate is None else rate.next_funding_ms,
+            spread_bps=self._cfg.risk.max_spread_bps / Decimal(5),
+            data_quality=DataQuality(
+                ok=not (missing or stale or gapped),
+                warmup_ok=not missing,
+                missing_timeframes=tuple(missing),
+                stale_timeframes=tuple(stale),
+                gapped_timeframes=tuple(gapped),
             ),
         )
 
@@ -392,11 +548,16 @@ class BacktestEngine:
         risk_tracker: BacktestRiskTracker,
         bar: Candle,
         index: int,
+        *,
+        through_ms: int | None = None,
     ) -> int:
         """이 1분봉 안에 정산 시각이 들어오면 적용한다."""
-        end = bar.open_ms + Timeframe.M1.ms - 1
+        end = bar.open_ms + Timeframe.M1.ms - 1 if through_ms is None else through_ms
         while index < len(self._funding) and self._funding[index].funding_ms <= end:
-            payment = portfolio.settle_funding(self._funding[index], mark_price=bar.close)
+            payment = portfolio.settle_funding(
+                self._funding[index],
+                mark_price=bar.close if through_ms is None else bar.open,
+            )
             risk_tracker.record_funding(payment)
             index += 1
         return index
@@ -416,6 +577,8 @@ def _decision_timeframe(cfg: RootConfig) -> Timeframe:
     """가장 빠른 Trigger TF 에서 판단한다. 그보다 자주 봐도 새 정보가 없다."""
     if cfg.strategy_id == "a1_v1":
         return Timeframe.M5
+    if cfg.strategy_id == "wa_v1":
+        return Timeframe.H1
     return min(
         (
             cfg.features.t1_pullback.timeframe,

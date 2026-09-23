@@ -137,6 +137,58 @@ class TestHappyPathAndSafetyDirection:
         assert VetoReason.INSUFFICIENT_EDGE in reasons(live)
 
 
+class TestResearchEdgeMode:
+    """08 WA §5: 우위 측정 모드는 계좌 정지·G6만 생략하고 BACKTEST에서만 효력이 있다."""
+
+    @staticmethod
+    def _halted(**overrides: object) -> GateContext:
+        values: dict[str, object] = {
+            "portfolio": portfolio(equity=D("800"), equity_high_water=D("1000")),
+            "risk_state": RiskState(
+                day_start_equity=D("1000"),
+                day_realized_pnl=D("-50"),
+                consecutive_losses=9,
+                cooldown_until_ms=AS_OF_MS + 1,
+            ),
+            "event_calendar_available": False,
+            "event_blackout_active": True,
+        }
+        values.update(overrides)
+        return context(**values)
+
+    ACCOUNT_AND_EVENT = frozenset(
+        {
+            VetoReason.DAILY_LOSS_LIMIT,
+            VetoReason.MAX_DRAWDOWN,
+            VetoReason.CONSECUTIVE_LOSSES,
+            VetoReason.COOLDOWN,
+            VetoReason.EVENT_BLACKOUT,
+        }
+    )
+
+    def test_backtest_research_mode_skips_only_account_halts_and_g6(self):
+        normal = set(reasons(self._halted()))
+        assert normal >= self.ACCOUNT_AND_EVENT
+        research = set(reasons(self._halted(research_edge_mode=True)))
+        assert not research & self.ACCOUNT_AND_EVENT
+
+    def test_research_mode_keeps_market_exposure_and_margin_gates(self):
+        result = reasons(
+            self._halted(
+                research_edge_mode=True,
+                volatility_percentile=0.99,
+                portfolio=portfolio(available_balance=D("100")),
+            )
+        )
+        assert VetoReason.VOL_TOO_HIGH in result
+        assert VetoReason.INSUFFICIENT_MARGIN in result
+
+    @pytest.mark.parametrize("mode", [Mode.PAPER, Mode.TESTNET, Mode.LIVE])
+    def test_flag_is_ignored_outside_backtest(self, mode: Mode):
+        result = set(reasons(self._halted(research_edge_mode=True, snapshot=snapshot(mode=mode))))
+        assert result >= self.ACCOUNT_AND_EVENT
+
+
 class TestSystemGates:
     @pytest.mark.parametrize(
         ("changes", "expected"),
