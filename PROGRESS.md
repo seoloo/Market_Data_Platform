@@ -1,10 +1,18 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **M TRAIN `REJECT` · F 전향 관찰 진행(2027-08 판정) — 다음 방향 사용자 결정 대기**.
+현재: **T 추세 추종 — 사전등록 고정, 1회 판정** · F 전향 관찰 진행(2027-08 판정).
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
-## 이번 작업 (Claude — 레버리지 범위·M·F)
+## 이번 작업 (Claude — 추세 추종 검정력·T 사전등록)
+
+- [14 검정력 검토](docs/research/14-trend-power-review.md): 표본은 기간. 2년 → 최소 샤프 2.0, 현물 9년 → 0.95.
+  상위 20 선물 상관 0.38~0.63 → 유효 독립 약 2종목. 사용자 선택: 진행·롱숏·표준형.
+- 현물 BTC·ETH 1d 2017-08~2026-08, ETH funding 적재. `backtest/trend.py`(테스트 11건), `scripts/run_t_trend.py`(테스트 7건).
+- [15 T 사전등록](docs/research/15-t-trend-preregistration.md): 20·60·120 부호 평균 × min(15%/σ60, 0.5), 1일 지연, 밴드 5%p,
+  롱 현물·숏 선물 1x, 2018~2026-08 1회. T1 평균−2SE>0, T2 절반별 양수, 청산 0.
+
+## 이전 작업 (Claude — 레버리지 범위·M·F)
 
 - 레버리지 허용 범위 **1x~10x** 명시, 스키마 상한 20→10 (`cfc2b91`). 실거래 단계(3x·live 5x)는 유지.
 - [11 후보 비교](docs/research/11-post-k-candidate-comparison.md) → 사용자 선택 **M + F** (L 제외).
