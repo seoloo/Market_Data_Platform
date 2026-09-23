@@ -6,6 +6,8 @@ G6의 POWELL은 원 설계(05-risk-engine G6 "Powell 기자회견")와 2026-09-2
 Internet Archive 스냅샷을 판본으로 쓴다. 스냅샷은 POWELL 블랙아웃 시작
 (예정 시각 − ``before_min``)보다 앞서야 한다. 기자회견의 실제 시작 시각을 적은
 공식 기록은 찾지 못했으므로 ``status``는 예고 확인(``ANNOUNCED``)까지만 판정한다.
+판본이 없는 날은 사용자가 승인한 날(``APPROVED_GAP_DAYS``)만 ``GAP``이며, 그 동부시각
+하루를 달력 공백(``CoverageGap``)으로 낼 구간을 함께 출력한다. 그 밖의 미발견은 실패다.
 
 후보 CSV를 표준 출력으로만 내며 DB·파일은 쓰지 않고, coverage를 인증하지 않는다.
 """
@@ -43,6 +45,12 @@ _BANNERS = (
 _LOOKBACK = timedelta(days=14)
 _MAX_SNAPSHOTS = 8
 
+APPROVED_GAP_DAYS: frozenset[date] = frozenset(
+    # 2026-09-23 사용자 결정 (1): 블랙아웃 전 시각 판본을 찾지 못한 기자회견일은
+    # 관행(14:30)으로 채우지 않고 동부시각 하루 전체를 달력 사용 불가로 둔다.
+    {date(2021, 1, 27), date(2021, 6, 16), date(2022, 6, 15)}
+)
+
 
 @dataclass(frozen=True)
 class Announcement:
@@ -72,6 +80,13 @@ def banner_time_ms(page: str, day: date) -> int | None:
             )
             return int(point.timestamp() * 1000)
     return None
+
+
+def unknown_day_gap(day: date) -> tuple[int, int]:
+    """시각을 모르는 기자회견일의 공백 구간: 동부시각 그날 00:00 ~ 23:59:59.999."""
+    start = datetime(day.year, day.month, day.day, tzinfo=_EASTERN)
+    end = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=_EASTERN)
+    return int(start.timestamp() * 1000), int(end.timestamp() * 1000) - 1
 
 
 def is_before_blackout(announcement: Announcement, before_min: int) -> bool:
@@ -123,15 +138,40 @@ def main() -> int:
     before_min = load_config("backtest", apply_env=False).config.risk.blackout["POWELL"].before_min
     writer = csv.writer(sys.stdout, lineterminator="\n")
     writer.writerow(
-        ("indicator", "event_key", "scheduled_ms", "vintage_ms", "status", "snapshot_url", "sha256")
+        (
+            "indicator",
+            "event_key",
+            "scheduled_ms",
+            "vintage_ms",
+            "status",
+            "snapshot_url",
+            "sha256",
+            "gap_from_ms",
+            "gap_to_ms",
+        )
     )
     failed = False
     with httpx.Client(timeout=120, follow_redirects=True) as client:
         for day in STATEMENT_DATES:
             found = find_announcement(client, day, before_min)
             if found is None:
-                failed = True
-                writer.writerow(("POWELL", f"{day:%Y-%m}", "", "", "NOT_FOUND", "", ""))
+                # 승인된 공백일만 GAP이다. 그 밖의 미발견은 일시 장애일 수 있으므로 실패다.
+                approved = day in APPROVED_GAP_DAYS
+                failed = failed or not approved
+                gap_from, gap_to = unknown_day_gap(day)
+                writer.writerow(
+                    (
+                        "POWELL",
+                        f"{day:%Y-%m}",
+                        "",
+                        "",
+                        "GAP" if approved else "NOT_FOUND",
+                        "",
+                        "",
+                        gap_from if approved else "",
+                        gap_to if approved else "",
+                    )
+                )
             else:
                 ok = is_before_blackout(found, before_min)
                 failed = failed or not ok
@@ -144,6 +184,8 @@ def main() -> int:
                         "ANNOUNCED" if ok else "TOO_LATE",
                         found.snapshot_url,
                         found.snapshot_sha256,
+                        "",
+                        "",
                     )
                 )
             sys.stdout.flush()

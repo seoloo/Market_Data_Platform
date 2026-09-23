@@ -8,9 +8,29 @@ from dataclasses import dataclass
 from auto_trading.config.schema import BlackoutWindow
 from auto_trading.core.macro import ScheduledMacroEvent
 
-__all__ = ["CalendarCoverage", "MacroCalendar", "ScheduledMacroEvent"]
+__all__ = ["CalendarCoverage", "CoverageGap", "MacroCalendar", "ScheduledMacroEvent"]
 
 _MINUTE_MS = 60_000
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageGap:
+    """감사 범위 안에서 사전 공개 근거를 찾지 못한 구간. 이 구간은 달력 사용 불가다.
+
+    시각을 모르는 일정을 관행으로 채우면 사후 추론이 되므로, 그 구간 전체를
+    fail-closed로 둔다. 예: 기자회견 개최는 알려졌으나 시각의 사전 판본이 없는 날.
+    """
+
+    from_ms: int
+    to_ms: int
+    indicators: frozenset[str]
+    reason: str
+
+    def __post_init__(self) -> None:
+        if self.to_ms <= self.from_ms:
+            raise ValueError("달력 공백 구간이 유효하지 않다")
+        if not self.indicators or not self.reason:
+            raise ValueError("달력 공백에는 이벤트 종류와 사유가 필요하다")
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,12 +41,25 @@ class CalendarCoverage:
     to_ms: int
     indicators: frozenset[str]
     source_digest: str
+    gaps: tuple[CoverageGap, ...] = ()
 
     def __post_init__(self) -> None:
         if self.from_ms <= 0 or self.to_ms <= self.from_ms:
             raise ValueError("달력 감사 범위가 유효하지 않다")
         if not self.indicators or not self.source_digest:
             raise ValueError("감사한 이벤트 종류와 원천 digest가 필요하다")
+        for gap in self.gaps:
+            if not gap.indicators <= self.indicators:
+                raise ValueError("달력 공백의 이벤트 종류가 감사 범위에 없다")
+            if gap.from_ms < self.from_ms or gap.to_ms > self.to_ms:
+                raise ValueError("달력 공백이 감사 범위를 벗어난다")
+
+    def unavailable_at(self, as_of_ms: int, indicators: frozenset[str]) -> bool:
+        """``as_of_ms``가 요청한 종류의 공백 안이면 참이다. 경계는 포함한다."""
+        return any(
+            gap.from_ms <= as_of_ms <= gap.to_ms and not gap.indicators.isdisjoint(indicators)
+            for gap in self.gaps
+        )
 
 
 class MacroCalendar:
@@ -49,6 +82,7 @@ class MacroCalendar:
             coverage is None
             or not coverage.from_ms <= as_of_ms <= coverage.to_ms
             or not set(windows).issubset(coverage.indicators)
+            or coverage.unavailable_at(as_of_ms, frozenset(windows))
         ):
             return False, False
 

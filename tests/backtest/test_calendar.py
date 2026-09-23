@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from auto_trading.backtest.calendar import CalendarCoverage, MacroCalendar, ScheduledMacroEvent
+import pytest
+
+from auto_trading.backtest.calendar import (
+    CalendarCoverage,
+    CoverageGap,
+    MacroCalendar,
+    ScheduledMacroEvent,
+)
 from auto_trading.config.schema import BlackoutWindow
 
 MIN = 60_000
@@ -51,3 +58,34 @@ def test_schedule_revision_uses_latest_known_vintage_only() -> None:
 def test_future_event_with_known_schedule_is_visible_before_release() -> None:
     calendar = MacroCalendar((_event(),), _coverage())
     assert calendar.status_at(26 * MIN, WINDOWS) == (True, True)
+
+
+def test_gap_makes_calendar_unavailable_with_inclusive_bounds() -> None:
+    gap = CoverageGap(50 * MIN, 60 * MIN, frozenset({"CPI"}), "사전 시각 판본 없음")
+    coverage = CalendarCoverage(1, 100 * MIN, frozenset({"CPI"}), "audited-source", (gap,))
+    calendar = MacroCalendar((_event(),), coverage)
+    assert calendar.status_at(50 * MIN - 1, WINDOWS) == (True, False)
+    assert calendar.status_at(50 * MIN, WINDOWS) == (False, False)
+    assert calendar.status_at(60 * MIN, WINDOWS) == (False, False)
+    assert calendar.status_at(60 * MIN + 1, WINDOWS) == (True, False)
+
+
+def test_gap_of_unrequested_indicator_is_ignored() -> None:
+    gap = CoverageGap(50 * MIN, 60 * MIN, frozenset({"POWELL"}), "사전 시각 판본 없음")
+    coverage = CalendarCoverage(
+        1, 100 * MIN, frozenset({"CPI", "POWELL"}), "audited-source", (gap,)
+    )
+    assert MacroCalendar((_event(),), coverage).status_at(55 * MIN, WINDOWS) == (True, False)
+
+
+def test_invalid_gaps_are_rejected() -> None:
+    with pytest.raises(ValueError, match="구간"):
+        CoverageGap(60 * MIN, 50 * MIN, frozenset({"CPI"}), "x")
+    with pytest.raises(ValueError, match="사유"):
+        CoverageGap(50 * MIN, 60 * MIN, frozenset({"CPI"}), "")
+    outside_kind = CoverageGap(50 * MIN, 60 * MIN, frozenset({"FOMC"}), "x")
+    with pytest.raises(ValueError, match="종류"):
+        CalendarCoverage(1, 100 * MIN, frozenset({"CPI"}), "audited", (outside_kind,))
+    outside_range = CoverageGap(90 * MIN, 110 * MIN, frozenset({"CPI"}), "x")
+    with pytest.raises(ValueError, match="벗어"):
+        CalendarCoverage(1, 100 * MIN, frozenset({"CPI"}), "audited", (outside_range,))

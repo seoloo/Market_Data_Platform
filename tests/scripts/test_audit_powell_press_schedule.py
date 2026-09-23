@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from scripts.audit_powell_press_schedule import Announcement, banner_time_ms, is_before_blackout
+from scripts.audit_powell_press_schedule import (
+    APPROVED_GAP_DAYS,
+    Announcement,
+    banner_time_ms,
+    is_before_blackout,
+    unknown_day_gap,
+)
 
 BANNER = (
     "<h3>FOMC Press Conference</h3><p>Watch Chair Powell's press conference live on&nbsp;"
@@ -49,3 +55,21 @@ def test_vintage_must_precede_blackout_start() -> None:
     assert is_before_blackout(early, 15)
     assert is_before_blackout(boundary, 15)
     assert not is_before_blackout(late, 15)
+
+
+def test_unknown_day_gap_covers_whole_eastern_day() -> None:
+    assert unknown_day_gap(date(2021, 1, 27)) == (
+        _utc_ms(2021, 1, 27, 5, 0),
+        _utc_ms(2021, 1, 28, 5, 0) - 1,
+    )
+    assert unknown_day_gap(date(2022, 6, 15)) == (
+        _utc_ms(2022, 6, 15, 4, 0),
+        _utc_ms(2022, 6, 16, 4, 0) - 1,
+    )
+
+
+def test_approved_gap_days_are_the_three_unannounced_press_conferences() -> None:
+    assert date(2021, 1, 27) in APPROVED_GAP_DAYS
+    assert date(2021, 6, 16) in APPROVED_GAP_DAYS
+    assert date(2022, 6, 15) in APPROVED_GAP_DAYS
+    assert len(APPROVED_GAP_DAYS) == 3

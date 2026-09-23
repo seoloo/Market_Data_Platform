@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 — PCE·CPI·NFP·FOMC 완료, POWELL 13/16(3건 결정 대기)**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 완료(PCE·CPI·NFP·FOMC·POWELL) — 적재·coverage 인증 전**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
 ## 이번 작업 (Claude — A1 최소 거래 수 고정·BLS 로컬 감사기)
@@ -20,7 +20,9 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
   G6 FOMC = 정책 성명(원 설계), 의사록 제외. 테스트 8건.
 - **POWELL (사용자 결정 A: FOMC 기자회견만):** `scripts/audit_powell_press_schedule.py` — 연준 홈페이지
   배너 스냅샷이 블랙아웃 시작 전 시각을 알렸는지 확인. **13/16 ANNOUNCED(모두 14:30 ET)**,
-  **3건 NOT_FOUND**(2021-01-27, 2021-06-16, 2022-06-15) — 처리 방식 사용자 결정 대기. 테스트 6건.
+  **3건 판본 없음**(2021-01-27, 2021-06-16, 2022-06-15) → 사용자 결정 (1): 그날 동부시각 하루 전체
+  fail-closed. `CoverageGap`/`CalendarCoverage.gaps` 추가(달력 사용 불가 → `EVENT_BLACKOUT`),
+  감사기는 승인된 3일만 `GAP`과 공백 구간 출력, 그 밖의 미발견은 실패. 테스트: 달력 3·엔진 1·감사기 8건.
 
 ## 이전 작업 (Claude — sol 인계, BEA PCE 일정 감사 완료)
 
@@ -164,7 +166,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-**CPI·NFP·FOMC 완료.** 남은 순서: POWELL 3건 처리 결정 → 원천 CSV/DB 적재 설계 → coverage 인증.
+**5종 원천 대조 완료.** 남은 순서: 감사 CSV → `macro_events` 적재 도구(DB 쓰기는 사용자 승인 후) → coverage·공백 인증 → 실행 스크립트 달력 주입.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -194,7 +196,7 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
 - A1-G6: **미해결** — `macro_events` 0건(후보 CSV만, DB 미삽입).
-  PCE 24·CPI 24·NFP 24·FOMC 16 대조 완료, POWELL 13/16(NOT_FOUND 3건 결정 대기).
+  PCE 24·CPI 24·NFP 24·FOMC 16·POWELL 13 대조 완료, POWELL 3일은 승인된 공백(fail-closed).
   POWELL 설정 창(±15분)은 원 설계 "시작~종료+15분"보다 짧다(기록만, 한도 변경 없음). coverage 인증 없이는 TRAIN 불가.
 - A1-N: **해소** — 사용자 승인으로 주 arm 실제 거래 146건 미만이면 DATA_INSUFFICIENT (02 §11). 원 분석:
   개정 입력(TRAIN SD 95.64·비용 19.91·효과 42.44bps·검정력 80%)으로 재계산하면 필요 ≈146건,
@@ -210,8 +212,8 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 이번 작업 (Claude — A1 최소 거래 수·BLS 로컬 감사기, 2026-09-23):
 
 - BLS 요청은 사용자 승인 1회만(403). 이후 네트워크 접근 없음.
-- 실데이터: FOMC 16/16 MATCH, BLS 로컬 CPI·NFP 48/48 MATCH, POWELL 13 ANNOUNCED·3 NOT_FOUND(종료 2).
-- 전체 pytest **1,170건**(스크립트 테스트 31건), leakage **44건**, mypy strict **144개** 파일,
+- 실데이터: FOMC 16/16 MATCH, BLS 로컬 CPI·NFP 48/48 MATCH, POWELL 13 ANNOUNCED·3 GAP(승인된 공백, 종료 0).
+- 전체 pytest **1,176건**(스크립트 33·달력/엔진 공백 4건 포함), leakage **44건**, mypy strict **144개** 파일,
   ruff check·format --check **168개** 파일, import-linter 4/4, `git diff --check` 통과.
 
 이전 작업 (Claude — BEA PCE 감사 인계·완료, 2026-09-23):

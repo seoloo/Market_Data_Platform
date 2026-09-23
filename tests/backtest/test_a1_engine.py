@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from auto_trading.backtest.calendar import CalendarCoverage, MacroCalendar
+from auto_trading.backtest.calendar import CalendarCoverage, CoverageGap, MacroCalendar
 from auto_trading.backtest.engine import BacktestEngine
 from auto_trading.backtest.feed import CandleFeed
 from auto_trading.config.loader import load_config
@@ -152,6 +152,43 @@ def test_a1_engine_fails_closed_without_macro_calendar(monkeypatch: pytest.Monke
         _feed(),
         funding=(FundingRate(funding_ms=Timeframe.M1.ms, rate=D("0")),),
         context=DecisionContext(event_calendar_available=True),
+    )
+    result = engine.run(
+        from_ms=11 * Timeframe.M5.ms,
+        to_ms=399 * Timeframe.M1.ms,
+        initial_equity=D("10000"),
+    )
+    assert result.entries_signalled > 0
+    assert not result.trades
+    assert result.veto_counts.get("EVENT_BLACKOUT", 0) > 0
+
+
+def test_a1_engine_fails_closed_inside_calendar_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(a1, "VOL_WINDOW_BARS", 4)
+    monkeypatch.setattr(a1, "RANK_WINDOW_BARS", 5)
+    monkeypatch.setattr(a1, "TREND_BARS", 8)
+    monkeypatch.setattr(a1, "RANGE_BARS", 6)
+    cfg = _config()
+    gap = CoverageGap(
+        from_ms=Timeframe.M1.ms,
+        to_ms=400 * Timeframe.M1.ms,
+        indicators=frozenset({"POWELL"}),
+        reason="합성: 기자회견 시각의 사전 판본 없음",
+    )
+    calendar = MacroCalendar(
+        coverage=CalendarCoverage(
+            from_ms=Timeframe.M1.ms,
+            to_ms=400 * Timeframe.M1.ms,
+            indicators=frozenset(cfg.risk.blackout),
+            source_digest="synthetic-fixture",
+            gaps=(gap,),
+        )
+    )
+    engine = BacktestEngine(
+        cfg,
+        _feed(),
+        funding=(FundingRate(funding_ms=Timeframe.M1.ms, rate=D("0")),),
+        macro_calendar=calendar,
     )
     result = engine.run(
         from_ms=11 * Timeframe.M5.ms,
