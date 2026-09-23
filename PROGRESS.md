@@ -1,10 +1,23 @@
 # 작업 현황
 
-최종 갱신: 2026-09-23 · 작성: Codex.
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1·3 G6 원천 감사·DB 읽기 연결 진행**.
+최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 — PCE 완료, CPI·NFP·FOMC·POWELL 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
-## 이번 작업 (Codex — G6 공식 원천 1차 감사·DB 읽기 경로)
+## 이번 작업 (Claude — sol 인계, BEA PCE 일정 감사 완료)
+
+- sol이 토큰 한도로 멈춘 미커밋 작업을 이어받았다: `scripts/audit_bea_pce_schedule.py`,
+  `tests/scripts/`, 05 문서 추가분, `tzdata`(Windows) 의존성.
+- 2021-11-24 PCE 불일치를 독립 확인했다. BEA 2021 연간 일정표(2021-02-09 수정본)·
+  직전 보도자료 예고·공식 PDF가 모두 **10:00 EST**이고 현재 웹 머리말만 08:30이다.
+  감사기에 근거 URL과 함께 `RESOLVED`로 기록했다(해결 기록과 시각이 다르면 계속 실패).
+  재실행: **23 MATCH / 1 RESOLVED / 0 DISCREPANCY**. TRAIN 내 PCE 발표 24건 전부 대조 완료.
+- ruff 규약 정리(로캘 의존 `strptime` 제거, `pairwise`), 테스트 5 → 8건.
+- 직전 커밋 `de957ad`의 `tests/storage/test_macro_events.py` fixture 반환 타입을
+  `Iterator`로 정정(mypy strict 실패 해소, 동작 변경 없음).
+- 시장 DB 삽입·coverage 인증·TRAIN 실행 없음.
+
+## 이전 작업 (Codex — G6 공식 원천 1차 감사·DB 읽기 경로)
 
 - [05 원천 감사](docs/research/05-a1-macro-pit-source-audit.md)에 2021~2022
   FOMC/CPI/NFP/PCE/POWELL 공식 일정의 **행사 시각 대 사전 공개 시각** 차이와
@@ -15,7 +28,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
   만들지 않는다. 자료형은 Pure Core로 분리했다.
 - 시장 DB 삽입·삭제 없음, 실제 A1 TRAIN/VALIDATION/TEST 성과 미열람.
 
-## 이번 작업 (Codex — 사전등록 개정 승인·G6 입력 감사)
+## 이전 작업 (Codex — 사전등록 개정 승인·G6 입력 감사)
 
 - 사용자 승인으로 [02 §11](docs/research/02-a1-preregistration.md)에 **T2 비용 전
   42.44bps**, TRAIN `2021-01-03~2022-12-31`, T4 `2021·2022`를 결과 열람 전에
@@ -132,7 +145,8 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 ## 다음 작업 — Phase 1 / Phase 3
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
-종류별 당시 공개 시각과 연속 구간을 검증한다. 1차 원천 감사만 완료했으며
+종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
+남은 순서: CPI·NFP(BLS 수집 방식 결정 후) → FOMC 성명 시각 → POWELL 범위 정의.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -161,13 +175,28 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C7: D22 제외가 사용자 의도인지 미확인. 2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`.
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
-- A1-G6: **미해결** — `macro_events` 0건. 순수 연결·DB 읽기는 완료했으나 PIT 일정·검증된 coverage 없이는 TRAIN 불가.
+- A1-G6: **미해결** — `macro_events` 0건. PCE 24건 대조 완료(후보, DB 미삽입).
+  CPI·NFP(BLS 스크립트 접근 403 — 수집 방식 사용자 결정 대기), FOMC 성명 시각,
+  POWELL 범위 정의가 남았다. coverage 인증 없이는 TRAIN 불가.
+- A1-N (2026-09-23 Claude 분석): 02 §11의 "표본 부족 시 DATA_INSUFFICIENT"에 **수치 기준이 없다**.
+  개정 입력(TRAIN SD 95.64·비용 19.91·효과 42.44bps·검정력 80%)으로 재계산하면 필요 ≈146건,
+  예상 162건은 G1~G7 적용 전이다(G5 VOL_TOO_LOW가 수축 국면과 겹침). **TRAIN 전에 사용자 확정 필요.**
+- A1-P (2026-09-23 Claude 분석): 트리거 6시간 잠금은 과거 트리거에 의존한다. 백테스트는 전체 구간
+  사전 스캔, 라이브 경로는 9,123봉 창 재스캔이라 창 시작점에 따라 달라질 수 있다. 현 테스트는 미래 봉
+  추가만 검사. A1은 backtest 전용이라 TRAIN 영향은 없으나 Phase 6 parity 전에 해결 필요.
 - C1: **A1 에 직접 영향** — 2h 손절의 100% 가 WIDEN 된다. 현재 설정 그대로 사전등록했다.
 - C2·C4: **A1 범위에서 해소** (사전등록 §8). 다른 전략에는 재확정 필요.
 
 ## 검증 기록
 
-이번 작업 (G6 공식 원천 1차 감사·DB 읽기, 2026-09-23):
+이번 작업 (Claude — BEA PCE 감사 인계·완료, 2026-09-23):
+
+- 감사기 실데이터 재실행 2회: 수정 전 23 MATCH / 1 DISCREPANCY(sol 결과 재현),
+  해결 기록 후 23 MATCH / 1 RESOLVED / 0 DISCREPANCY, 종료 코드 0. 출력은 표준 출력만 사용.
+- 전체 pytest **1,147건** 통과, leakage 마커 **44건** 통과, mypy strict **141개** 파일 통과,
+  ruff check·format --check **162개** 파일, import-linter 4/4, `git diff --check` 통과.
+
+이전 작업 (G6 공식 원천 1차 감사·DB 읽기, 2026-09-23):
 
 - 원천 감사는 Fed/BLS/BEA 공식 자료로만 수행. TRAIN 손익·시장 DB 변경 없음.
 - 거시 일정 저장소 단위·인과성 테스트 5건 추가. 전체 pytest 통과,
