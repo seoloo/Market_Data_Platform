@@ -40,12 +40,16 @@ class Fill:
     fee: Decimal
     slippage_bps: Decimal
     is_maker: bool = False
+    reference_price: Decimal | None = None
+    """슬리피지 적용 전 체결 기준가. 실제 체결가는 ``price``다."""
 
     def __post_init__(self) -> None:
         if self.price <= ZERO:
             raise ValueError(f"체결가가 0 이하: {self.price}")
         if self.qty <= ZERO:
             raise ValueError(f"체결 수량이 0 이하: {self.qty}")
+        if self.reference_price is not None and self.reference_price <= ZERO:
+            raise ValueError(f"기준가가 0 이하: {self.reference_price}")
 
     @property
     def notional(self) -> Decimal:
@@ -128,6 +132,7 @@ class FillSimulator:
             qty=amount,
             fee=price * amount * self._cost.taker_fee_rate,
             slippage_bps=bps,
+            reference_price=bar.open,
         )
 
     # ------------------------------------------------------- 보호 주문
@@ -180,6 +185,7 @@ class FillSimulator:
             qty=qty,
             fee=price * qty * self._cost.taker_fee_rate,
             slippage_bps=bps,
+            reference_price=reference,
         )
 
     def resolve_protective(

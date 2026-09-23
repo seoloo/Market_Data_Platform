@@ -20,6 +20,7 @@ import bisect
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from auto_trading.backtest.calendar import MacroCalendar
 from auto_trading.backtest.feed import CandleFeed, FeedWindow
 from auto_trading.backtest.fills import FillSimulator, SlippageModel
 from auto_trading.backtest.portfolio import BacktestPortfolio, BacktestRiskTracker, BacktestTrade
@@ -115,6 +116,7 @@ class BacktestEngine:
         "_filters",
         "_funding",
         "_funding_times",
+        "_macro_calendar",
         "_sim",
     )
 
@@ -127,6 +129,7 @@ class BacktestEngine:
         filters: ExchangeFilters | None = None,
         slippage: SlippageModel | None = None,
         context: DecisionContext | None = None,
+        macro_calendar: MacroCalendar | None = None,
     ) -> None:
         self._cfg = cfg
         self._feed = feed
@@ -136,6 +139,7 @@ class BacktestEngine:
         self._funding_times = tuple(rate.funding_ms for rate in self._funding)
         self._decision_tf = _decision_timeframe(cfg)
         self._context = context
+        self._macro_calendar = macro_calendar
         self._a1_events: dict[int, A1Observation] = (
             scan_a1(
                 feed.all_candles(Timeframe.M5),
@@ -292,6 +296,14 @@ class BacktestEngine:
         filters = self._filters
         m5 = snapshot.get(Timeframe.M5) if self._cfg.strategy_id == "a1_v1" else None
         a1_close_ms = m5.last.close_ms if m5 is not None and m5.last is not None else None
+        calendar_available = base.event_calendar_available
+        blackout_active = base.event_blackout_active
+        if self._cfg.strategy_id == "a1_v1":
+            calendar_available, blackout_active = (
+                self._macro_calendar.status_at(snapshot.as_of_ms, self._cfg.risk.blackout)
+                if self._macro_calendar is not None
+                else (False, False)
+            )
         return DecisionContext(
             system_state=base.system_state,
             risk_state=risk_tracker.to_state(),
@@ -308,8 +320,8 @@ class BacktestEngine:
             clock_drift_ms=base.clock_drift_ms,
             reconcile_ok=base.reconcile_ok,
             bad_price=base.bad_price,
-            event_blackout_active=base.event_blackout_active,
-            event_calendar_available=base.event_calendar_available,
+            event_blackout_active=blackout_active,
+            event_calendar_available=calendar_available,
             event_proximity=base.event_proximity,
             regime_stability=base.regime_stability,
             a1_observation=self._a1_events.get(a1_close_ms) if a1_close_ms is not None else None,

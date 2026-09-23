@@ -91,6 +91,7 @@ class TestMarketFill:
         assert fill is not None
         assert fill.price > D("100")  # 시가 + 슬리피지
         assert fill.price < D("100.5")  # 종가(105) 와는 무관하다
+        assert fill.reference_price == D("100")
 
     def test_zero_volume_bar_does_not_fill(self, sim: FillSimulator) -> None:
         """Binance 1m 아카이브는 체결 없는 분을 직전가로 채운다 (07 §2 실측)."""
@@ -169,11 +170,13 @@ class TestProtectiveFill:
         fill = sim.fill_protective(stop_order(Side.SELL, "98"), gapped, D("1"))
         assert fill is not None
         assert fill.price < D("90")  # 시가 90 에서 추가 슬리피지
+        assert fill.reference_price == D("90")
 
     def test_normal_stop_fills_near_stop_price(self, sim: FillSimulator) -> None:
         fill = sim.fill_protective(stop_order(Side.SELL, "98"), bar(low="97.5"), D("1"))
         assert fill is not None
         assert D("97") < fill.price <= D("98")
+        assert fill.reference_price == D("98")
 
     def test_stop_slippage_exceeds_market_slippage(self, sim: FillSimulator) -> None:
         """스톱은 연쇄 청산 구간에서 체결되므로 더 불리하다."""

@@ -50,6 +50,29 @@ class BacktestTrade:
     """최대 역행폭 (가격 단위, 양수). 손절폭이 적정한지 판단하는 근거."""
     mfe: Decimal
     """최대 순행폭 (가격 단위, 양수). 익절폭이 적정한지 판단하는 근거."""
+    entry_reference_price: Decimal | None = None
+    exit_reference_price: Decimal | None = None
+
+    @property
+    def pre_cost_pnl(self) -> Decimal | None:
+        """다음 1분 체결 시점 기준, 슬리피지·수수료·펀딩 전 가격손익."""
+        if self.entry_reference_price is None or self.exit_reference_price is None:
+            return None
+        return (self.exit_reference_price - self.entry_reference_price) * self.qty * self.side.sign
+
+    @property
+    def pre_cost_bps(self) -> Decimal | None:
+        pnl = self.pre_cost_pnl
+        if pnl is None or self.entry_reference_price is None:
+            return None
+        return safe_div(pnl, self.entry_reference_price * self.qty) * Decimal(10_000)
+
+    @property
+    def net_bps(self) -> Decimal | None:
+        """T1용: T2와 같은 진입 기준 명목가로 환산한 비용 후 손익."""
+        if self.entry_reference_price is None:
+            return None
+        return safe_div(self.net_pnl, self.entry_reference_price * self.qty) * Decimal(10_000)
 
     @property
     def net_pnl(self) -> Decimal:
@@ -78,6 +101,7 @@ class OpenPosition:
     planned_risk: Decimal
     leverage: int
     liquidation_price: Decimal
+    entry_reference_price: Decimal | None = None
     fees: Decimal = ZERO
     funding_paid: Decimal = ZERO
     mae: Decimal = ZERO
@@ -296,6 +320,7 @@ class BacktestPortfolio:
             planned_risk=planned_risk,
             leverage=leverage,
             liquidation_price=liquidation_price,
+            entry_reference_price=fill.reference_price,
             fees=fill.fee,
         )
 
@@ -322,6 +347,8 @@ class BacktestPortfolio:
             leverage=position.leverage,
             mae=position.mae,
             mfe=position.mfe,
+            entry_reference_price=position.entry_reference_price,
+            exit_reference_price=fill.reference_price,
         )
         self.trades.append(trade)
         self.position = None

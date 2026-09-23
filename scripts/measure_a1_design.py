@@ -78,9 +78,25 @@ MS_PER_YEAR = 365.25 * 24 * 3_600_000
 SPLIT_BOUNDS_MS = (1_577_836_800_000, 1_672_531_200_000, 1_735_689_600_000)
 """2020-01-01, 2023-01-01, 2025-01-01 UTC. 결과 평균은 읽지 않는다."""
 
+PROPOSED_TRAIN_START_MS = int(datetime(2021, 1, 3, tzinfo=UTC).timestamp() * 1000)
+"""G5 8,824개 1h 봉 warm-up 이후의 첫 온전한 UTC 날짜."""
+
 
 def cost_bps() -> float:
     return FEE_BPS + SLIPPAGE_BPS * TRIGGER_MOVE_RATIO
+
+
+def annual_counts(times: list[int], triggers: list[Trigger]) -> dict[str, int]:
+    """성과를 열지 않고 UTC 연도별 예상 거래 수만 센다."""
+    boundaries = {
+        year: int(datetime(year, 1, 1, tzinfo=UTC).timestamp() * 1000) for year in range(2020, 2028)
+    }
+    return {
+        str(year): sum(
+            boundaries[year] <= times[trigger.index] < boundaries[year + 1] for trigger in triggers
+        )
+        for year in range(2020, 2027)
+    }
 
 
 def load_bars(
@@ -305,6 +321,10 @@ def main() -> int:
             else None
         )
         rows[-1]["split_counts"] = counts
+        rows[-1]["annual_counts"] = annual_counts(times, usable)
+        rows[-1]["post_warmup_train_count"] = sum(
+            PROPOSED_TRAIN_START_MS <= times[t.index] < SPLIT_BOUNDS_MS[1] for t in usable
+        )
         rows[-1]["train_trade_pnl_sd_bps"] = train_sd
         rows[-1]["control_difference_2se_bps"] = difference_2se_bps
         control_rows.append(
@@ -314,6 +334,10 @@ def main() -> int:
                 "trade_pnl_sd_bps": control_sd,
                 "stop_rate": control_stops,
                 "split_counts": control_counts,
+                "annual_counts": annual_counts(times, control),
+                "post_warmup_train_count": sum(
+                    PROPOSED_TRAIN_START_MS <= times[t.index] < SPLIT_BOUNDS_MS[1] for t in control
+                ),
                 "train_trade_pnl_sd_bps": train_control_sd,
             }
         )
