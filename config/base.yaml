@@ -55,9 +55,9 @@ risk:
     r_multiple: 2.0                 # 잠정 — Phase 4 에서 결정
 
   # --- 손실 한도 ---------------------------------------------------------
-  daily_loss_limit_pct: 0.02        # [확정] 손절 2회분
-  max_drawdown_pct: 0.10            # [확정] 누적 DD -> HALTED (자동 해제 없음)
-  consecutive_loss_limit: 4
+  daily_loss_limit_pct: 0.02        # 손절 2회분. 원문에 없던 값, 2026-09-24 사용자 확인으로 유지
+  max_drawdown_pct: 0.30            # 계좌 누적 DD -> HALTED (자동 해제 없음). 2026-09-24 사용자 정정 10% -> 30%
+  consecutive_loss_limit: 4         # 원문에 없던 값, 2026-09-24 사용자 확인으로 유지
   cooldown_after_losses_min: 240
 
   # --- 거래 빈도 / 보유 (D2: 보유기간 2~24h) -----------------------------

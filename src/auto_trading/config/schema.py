@@ -406,7 +406,11 @@ class RiskConfig(_Base):
 
     # --- 손실 한도 ---
     daily_loss_limit_pct: Rate = Field(default=Decimal("0.02"), gt=0, le=Decimal("0.2"))
-    max_drawdown_pct: Rate = Field(default=Decimal("0.10"), gt=0, le=Decimal("0.5"))
+    max_drawdown_pct: Rate = Field(default=Decimal("0.30"), gt=0, le=Decimal("0.5"))
+    """계좌 누적 DD 안전장치 → HALTED(자동 해제 없음, 사용자 확인 후 재개).
+
+    2026-09-24 사용자 정정: 사용자가 말한 "10%"는 **포지션당**(증거금 10%, 손절 −10% → 계좌 1%)이며
+    계좌 누적 정지가 아니었다. 계좌 안전장치는 남기되 수준을 30%로 조정했다(사용자 선택)."""
     consecutive_loss_limit: int = Field(default=4, ge=1, le=50)
     cooldown_after_losses_min: int = Field(default=240, ge=0, le=10_080)
 

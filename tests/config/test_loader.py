@@ -275,7 +275,7 @@ class TestRealConfigFiles:
         assert cfg.risk.min_stop_distance == Decimal("0.01")
         assert cfg.risk.daily_trade_limit is None
         assert cfg.risk.same_direction_limit is None
-        assert cfg.risk.max_drawdown_pct == Decimal("0.10")
+        assert cfg.risk.max_drawdown_pct == Decimal("0.30")  # 2026-09-24 사용자 정정
 
     def test_live_starts_at_leverage_three(self):
         """Phase 8 출발값 (D9 §2)."""

@@ -143,7 +143,7 @@ class TestResearchEdgeMode:
     @staticmethod
     def _halted(**overrides: object) -> GateContext:
         values: dict[str, object] = {
-            "portfolio": portfolio(equity=D("800"), equity_high_water=D("1000")),
+            "portfolio": portfolio(equity=D("650"), equity_high_water=D("1000")),
             "risk_state": RiskState(
                 day_start_equity=D("1000"),
                 day_realized_pnl=D("-50"),
@@ -264,8 +264,13 @@ class TestAccountGates:
         assert VetoReason.DAILY_LOSS_LIMIT in reasons(context(risk_state=state))
 
     def test_drawdown_boundary_vetoes(self):
-        pf = portfolio(equity=D("900"), equity_high_water=D("1000"))
+        pf = portfolio(equity=D("700"), equity_high_water=D("1000"))
         assert VetoReason.MAX_DRAWDOWN in reasons(context(portfolio=pf))
+
+    def test_ten_percent_drawdown_no_longer_halts(self):
+        """사용자가 말한 10%는 포지션당 손실이었다. 계좌 정지는 30% (2026-09-24 정정)."""
+        pf = portfolio(equity=D("900"), equity_high_water=D("1000"))
+        assert VetoReason.MAX_DRAWDOWN not in reasons(context(portfolio=pf))
 
     def test_consecutive_loss_boundary_vetoes(self):
         state = RiskState(day_start_equity=D("1000"), consecutive_losses=4)
