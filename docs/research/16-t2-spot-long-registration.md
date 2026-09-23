@@ -46,5 +46,5 @@ CURRENT_SPEC 범위 변경(현물 거래) 승인.
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | Phase 2 | `SpotTrendConfig`(고정값 검증), `features/tsmom.py`, `strategy/spot_trend.py`(목표 비중·주문 계획, fail-closed). 연구 시뮬레이터와 목표 비중 일치(1e-9), 1,000회 결정 재현, 미래 무관성 테스트 | **완료** |
-| Phase 5 | FakeSpotExchange 상태 전이·장애 주입, 멱등 주문(동일 의도 100회 → 1건), 선기록·재시작 10회 복구, UNKNOWN 추정 재주문 금지, 무작위 장애 성질 테스트 (`exchange/spot.py`·`fake_spot.py`, `execution/spot_orders.py`, `spot_orders` 테이블 004) | **1~3 완료** · 읽기 전용 계좌 조회는 사용자 API 키 대기 |
+| Phase 5 | FakeSpotExchange 상태 전이·장애 주입, 멱등 주문(동일 의도 100회 → 1건), 선기록·재시작 10회 복구, UNKNOWN 추정 재주문 금지, 무작위 장애 성질 테스트 (`exchange/spot.py`·`fake_spot.py`, `execution/spot_orders.py`, `spot_orders` 테이블 004) | **완료 (2026-09-24)** · 읽기 전용 어댑터로 실계좌 조회 성공(권한 읽기 전용·IP 제한 확인, 서버 시계 차이 보정, BTC·ETH 주문 규칙 조회) |
 | Phase 6 | mainnet 시세 + 가상 체결 Paper 최소 4주, 일일 보고·watchdog. 전향 관찰 겸함 | 이후 |
