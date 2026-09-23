@@ -53,7 +53,7 @@ def main() -> int:
         if not flags.get("ipRestrict"):
             print("⚠ 권한은 읽기 전용이지만 IP 제한이 없다.")
             print(
-                "  Binance API 관리에서 이 키의 IP 제한(Restrict access to trusted IPs)을 켠 뒤 다시 실행한다."
+                "  Binance API 관리 → 이 키 → Restrict access to trusted IPs 를 켠 뒤 다시 실행한다."
             )
             return 2
         print("✓ 읽기 전용 · IP 제한 키")
