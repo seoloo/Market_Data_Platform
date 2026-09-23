@@ -390,8 +390,9 @@ class RiskConfig(_Base):
     """거래당 최대 손실 = equity × 이 비율. 5% 초과는 스키마 단계에서 거부한다."""
     margin_allocation: Rate = Field(default=Decimal("0.10"), gt=0, le=1)
     """증거금 **상한** (목표 아님). 청산가 거리를 결정한다 (05 §3.3)."""
-    max_leverage: int = Field(default=10, ge=1, le=20)
-    """설계상 천장. Phase 8 은 3 으로 시작한다. 20 초과는 거부."""
+    max_leverage: int = Field(default=10, ge=1, le=10)
+    """허용 범위 **1x ~ 10x** (사용자 지정). 레버리지는 손절 역산의 결과값이며 이 값은 천장이다.
+    live 는 별도 검증으로 5 이하, Phase 8 은 3 으로 시작한다. 10 초과는 거부."""
     min_stop_distance: Rate = Field(default=Decimal("0.01"), gt=0, le=Decimal("0.5"))
     max_rounding_error: Rate = Field(default=Decimal("0.05"), gt=0, le=Decimal("0.5"))
     liquidation_safety_buffer: Rate = Field(default=Decimal("2.0"), ge=1, le=20)

@@ -132,6 +132,7 @@ class TestRangeValidation:
             ("risk_per_trade", 0),
             ("risk_per_trade", -0.01),
             ("max_leverage", 100),  # 명세 예시에 있던 위험한 값
+            ("max_leverage", 11),  # 사용자 지정 범위 1x ~ 10x 초과
             ("max_leverage", 0),
             ("margin_allocation", 1.5),
             ("max_drawdown_pct", 0.9),
@@ -187,7 +188,6 @@ class TestD9LeverageConsistency:
             (3, 0.035),  # live.yaml 조합
             (5, 0.02),
             (10, 0.01),  # base.yaml 조합
-            (20, 0.005),
         ],
     )
     def test_documented_combinations_are_valid(self, max_leverage, min_stop):
@@ -199,7 +199,7 @@ class TestD9LeverageConsistency:
 
     def test_widening_leverage_relaxes_constraint(self):
         """레버리지를 올리면 더 좁은 손절이 허용된다."""
-        loose = RiskConfig.model_validate({"max_leverage": 20, "min_stop_distance": 0.005})
+        loose = RiskConfig.model_validate({"max_leverage": 10, "min_stop_distance": 0.01})
         tight = RiskConfig.model_validate({"max_leverage": 3, "min_stop_distance": 0.035})
         assert loose.implied_min_stop_distance < tight.implied_min_stop_distance
 
@@ -237,8 +237,8 @@ class TestStopEconomics:
         with pytest.raises(ValidationError, match="거래비용이"):
             RiskConfig.model_validate(
                 {
-                    "margin_allocation": 0.20,
-                    "max_leverage": 20,
+                    "margin_allocation": 0.40,
+                    "max_leverage": 10,
                     "min_stop_distance": 0.0025,
                 }
             )

@@ -18,7 +18,7 @@ risk:
   sizing_mode: risk_based           # [확정]
   risk_per_trade: 0.01              # [확정] 거래당 최대 손실 = equity × 1%
   margin_allocation: 0.10           # [확정] 증거금 "상한" (목표 아님)
-  max_leverage: 10                  # [확정] 설계 천장. live 모드는 5 이하로 강제됨
+  max_leverage: 10                  # [확정] 허용 범위 1x~10x(사용자 지정)의 천장. live 모드는 5 이하로 강제됨
   min_stop_distance: 0.01           # [확정] 캡 발동선 0.85% 바로 위
   max_rounding_error: 0.05          # [확정] 초과 시 SIZING_RESOLUTION veto
   liquidation_safety_buffer: 2.0    # [확정] 청산거리 >= 2 × 손절거리
