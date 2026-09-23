@@ -1,10 +1,21 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (astra 인계, 사용자 위임으로 WA 자율 진행).
-현재: **Phase 3→4 — WA 실행 경로 완료·사전등록 고정, TRAIN 1회 실행**.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT).
+현재: **WA TRAIN `REJECT` — 다음 연구 후보 선정 대기** (사용자 결정 필요).
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA 기각.
 
-## 이번 작업 (Claude — WA 엔진 인계·우위 측정 모드·판정·실행기)
+## 이번 작업 (Claude — WA TRAIN 1회 실행·판정 기록)
+
+- 커밋 `f7f5c6b`에서 `scripts/run_wa_train.py run` 1회 실행(우위 측정 모드, 2023~2024, 재생 4회).
+- 거래 롱 210·숏 240(관문 176 통과). 롱 비용 전 −4.05bps → 방향 숏.
+  숏 순평균 −23.23bps(하한 −39.74), 비용 전 −4.18bps, 대조군 대비 −1.78bps, 2023·2024 모두 음수.
+  **T1~T4 실패, 강제청산 0 → `REJECT`.** 계좌 재생 NOT_RUN. VALIDATION 미실행(규칙상 불필요).
+- 롱·숏 모두 비용 전 ±4bps: 상태 조건에 6h 방향 정보 없음. 실제 비용 약 20bps(대리치 15.8보다 큼).
+- 기록: [08 §10](docs/research/08-wa-preregistration.md), [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md) WA 항목,
+  CURRENT_SPEC 상태. 원자료 `reports/wa/train/`(미추적). 푸시하지 않음.
+- 다음: 새 수익원 후보 탐색은 사용자와 방향을 정한 뒤 진행. WA 파라미터 조정·WA2는 금지(08 §7).
+
+## 이전 작업 (Claude — WA 엔진 인계·우위 측정 모드·판정·실행기)
 
 - 사용자 위임(2026-09-24): WA는 승인 없이 커밋·진행, 결정은 최선/차선 선택. 푸시는 하지 않는다.
 - astra의 미커밋 엔진 연결(1h 평가·다음 1분 체결·6h 시가 만기·시가 갭 손절 우선·WAState)을 점검해 이어받음.
