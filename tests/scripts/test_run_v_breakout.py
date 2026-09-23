@@ -42,3 +42,15 @@ def test_judge_requires_lower_bound_and_both_halves() -> None:
     assert run_v_breakout.judge(weak_second)["status"] == "REJECT"
     noisy = _trades([500.0, -480.0] * 20, [500.0, -480.0] * 20)
     assert run_v_breakout.judge(noisy)["status"] == "REJECT"
+
+
+def test_v11_existing_verdict_and_dirty_tree_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(run_v_breakout, "load", _must_not_load)
+    monkeypatch.setattr(run_v_breakout, "load_hours", _must_not_load)
+    monkeypatch.setattr(run_v_breakout, "git_state", lambda: ("abc", True))
+    assert run_v_breakout.run_v11(tmp_path) == 3
+    (tmp_path / "run_v11").mkdir()
+    (tmp_path / "run_v11" / "verdict.json").write_text("{}", encoding="utf-8")
+    assert run_v_breakout.run_v11(tmp_path) == 3

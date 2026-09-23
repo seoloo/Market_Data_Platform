@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **V 변동성 돌파 — 사전등록 고정, 1회 판정** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **V/v1 무효(미래 정보 결함) → V/v1.1 수정판 1회 판정** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — 선물 롱숏 후보·V 사전등록)
@@ -9,7 +9,9 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - [17 후보 비교](docs/research/17-futures-long-short-candidates.md): V 변동성 돌파 거래 4,104건·증명 가능 38.6bps(통과), 돈치안 111건(탈락).
   레버리지는 우위를 만들지 않음. 사용자 선택 V.
 - [18 V 사전등록](docs/research/18-v-breakout-preregistration.md): k=0.5, 당일 종가 청산, 동시 돌파일 제외, 비용 24bps,
-  V1 평균−2SE>0 · V2 두 절반 양수. `backtest/vbreak.py`(테스트 6건), `scripts/run_v_breakout.py`(테스트 3건).
+  V1 평균−2SE>0 · V2 두 절반 양수. `backtest/vbreak.py`(테스트 6건), `scripts/run_v_breakout.py`(테스트 3건). 커밋 `d3de043`.
+- V/v1 표면 PASS(+56.5bps)는 **무효**: 양방향 돌파일 제외가 그날 전체 고저를 보는 미래 정보였다(18 §5).
+  V/v1.1: 1시간봉으로 먼저 닿은 쪽 진입, 판별 불가 시 나쁜 쪽 결과. 현물 1h 2017-08~ 적재, 테스트 추가(18 §6).
 
 ## 이전 작업 (Claude — T/v2 현물 롱 등록)
 
