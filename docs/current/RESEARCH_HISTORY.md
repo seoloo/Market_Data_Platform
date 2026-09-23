@@ -110,6 +110,17 @@ Learned: 기간을 늘린 설계로 처음 판정 가능해졌다. 추세 추종
 Do not retry: lookback·변동성 목표·밴드·자산 조정으로 같은 기간 재판정. 롱 전용 전환은 새 사전등록 + 전향 확인으로만.
 근거: [14 검정력 검토](../research/14-trend-power-review.md), [15 사전등록·§7 결과](../research/15-t-trend-preregistration.md).
 
+## V — REJECTED (2026-09-24, V/v1 무효 → V/v1.1 판정)
+
+Hypothesis: BTC·ETH 당일 시가 ± 0.5×전날 폭 돌파 방향으로 진입해 당일 종가 청산하면 비용(24bps) 후 거래당 순손익 > 0.
+V/v1: 표면 PASS(+56.5bps)였으나 **무효** — "양방향 동시 돌파일 제외"가 그날 전체 고저를 보는 미래 정보로, 손실 거래를 체계적으로 뺐다(사전등록 설계 오류).
+V/v1.1 (1시간봉으로 먼저 닿은 쪽 진입, 판별 불가 시 나쁜 쪽): 거래 4,722건, 순손익 **−0.5bps**(하한 −10.9), 2017~2021 +10.2 · 2022~2026 −10.4 → **REJECT**.
+비용 전 +23.5bps ≈ 비용. 롱 +20.6 / 숏 −20.8.
+Learned: (1) 일봉 OHLC로 당일 체결을 흉내 낼 때 **같은 날의 고저로 거래를 거르면 미래 정보**가 된다 — 사전등록 검토 항목으로 추가.
+(2) 당일 돌파 모멘텀도 비용을 넘지 못한다(H1·A1·WA와 같은 결론).
+Do not retry: k·청산 시점·필터 추가로 같은 기간 재판정.
+근거: [17 후보 비교](../research/17-futures-long-short-candidates.md), [18 사전등록·§5~§7](../research/18-v-breakout-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
