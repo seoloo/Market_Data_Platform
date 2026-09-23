@@ -1,10 +1,18 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **V 기각(V/v1.1 순 −0.5bps) — 다음 방향 사용자 결정 대기** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **T/v2 실행 인프라 — Phase 2 완료, 다음 Phase 5(거래소)** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
-## 이번 작업 (Claude — 선물 롱숏 후보·V 사전등록)
+## 이번 작업 (Claude — T/v2 실행 인프라 착수)
+
+- 사용자 결정: T/v2 전향 관찰 + 현물 주문 기능 준비(1번) 먼저, 끝나면 새 선물 연구(2번).
+- 발견: `exchange/`·`execution/` 패키지가 비어 있다 — 선물·현물 모두 주문 인프라가 없다. 1번 = 실행 인프라 신규 구축.
+- 사용자 승인: T/v2는 Phase 4 완전 통과 전 **Phase 5·6(Paper, 실제 돈 없음)** 진행 예외. 실거래는 별도 승인.
+- Phase 2 완료: `SpotTrendConfig`, `features/tsmom.py`, `strategy/spot_trend.py`(테스트 16건: 연구 일치·재현·누출·fail-closed·주문 계획).
+- 다음: Phase 5 — FakeExchange(현물) 주문 상태 전이·멱등 주문·재시작 복구, 읽기 전용 계좌 조회(API 키는 사용자가 직접 .env에).
+
+## 이전 작업 (Claude — 선물 롱숏 후보·V 사전등록)
 
 - [17 후보 비교](docs/research/17-futures-long-short-candidates.md): V 변동성 돌파 거래 4,104건·증명 가능 38.6bps(통과), 돈치안 111건(탈락).
   레버리지는 우위를 만들지 않음. 사용자 선택 V.

@@ -667,6 +667,35 @@ class WAConfig(_Base):
         return self
 
 
+class SpotTrendConfig(_Base):
+    """T/v2-long 현물 롱 전용 추세 규칙 (docs/research/16). 등록 후 고정값.
+
+    RootConfig에는 아직 넣지 않는다 — 기존 설정 해시를 바꾸지 않기 위해 Paper 실행기(Phase 6)가
+    이 모델을 따로 읽는다.
+    """
+
+    symbols: tuple[str, ...] = ("BTCUSDT", "ETHUSDT")
+    lookbacks: tuple[int, ...] = (20, 60, 120)
+    vol_days: Literal[60] = 60
+    target_vol: Rate = Decimal("0.15")
+    max_weight: Rate = Decimal("0.5")
+    band: Rate = Decimal("0.05")
+
+    @model_validator(mode="after")
+    def _check_frozen_values(self) -> SpotTrendConfig:
+        if self.lookbacks != (20, 60, 120):
+            raise ValueError("T/v2 lookback은 20·60·120일이다")
+        if (self.target_vol, self.max_weight, self.band) != (
+            Decimal("0.15"),
+            Decimal("0.5"),
+            Decimal("0.05"),
+        ):
+            raise ValueError("T/v2 변동성 목표 15%·비중 상한 0.5·밴드 5%p는 고정값이다")
+        if len(self.symbols) * self.max_weight > 1:
+            raise ValueError("현물 비중 합계가 자본을 넘으면 레버리지가 생긴다")
+        return self
+
+
 class RootConfig(_Base):
     """전체 설정. 이 객체의 해시가 ``decisions.config_version_id`` 로 기록된다."""
 
