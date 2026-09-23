@@ -1,10 +1,20 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 3 A1 TRAIN 실행 경로 완료 — TRAIN 1회 실행 승인 대기**.
-D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
+현재: **Phase 4 — A1 TRAIN 1회 실행 완료: `DATA_INSUFFICIENT`(102/146) — 후속 결정 대기**.
+D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 통계 미열람(거부 집계로 DD 정지 사실은 노출)**.
 
-## 이번 작업 (Claude — A1 TRAIN 판정·실행 스크립트)
+## 이번 작업 (Claude — A1 TRAIN 1회 실행)
+
+- 사용자 승인으로 커밋 `916bbf2`의 깨끗한 트리에서 `run_a1_train.py run` 1회 실행(주 arm 34분·대조군 39분).
+- **결과: `DATA_INSUFFICIENT`** — 주 arm 실제 거래 **102건** < 146(§11), 대조군 45건. T1~T5 미계산·미열람.
+- 거부 사유 집계(판정 파일)만 확인: 주 arm `SAME_DIRECTION_LIMIT` 194·`VOL_TOO_LOW` 153·**`MAX_DRAWDOWN` 125**,
+  대조군 **`MAX_DRAWDOWN` 1,014**·`SAME_DIRECTION_LIMIT` 637. → **두 arm 모두 누적 DD 10% 정지로 표본이 잘렸다.**
+  이 집계가 성과 방향을 간접 노출했음을 [02 §12](docs/research/02-a1-preregistration.md)에 기록.
+- 원인: 예상 표본(162)이 계좌 수준 정지를 반영하지 않은 설계 결함. `reports/a1/train/`(gitignore)에 판정·원거래 보관.
+- **A1 후속 방향은 사용자 결정 대기.**
+
+## 이전 작업 (Claude — A1 TRAIN 판정·실행 스크립트)
 
 - `src/auto_trading/backtest/a1_verdict.py`: 02 §7·§11 판정을 상수로 고정. **주 arm 거래 146건 미만이면
   통계 함수를 호출하지 않고 `DATA_INSUFFICIENT`**. 이상이면 T1(순손익 평균−2SE>0)·T2(비용 전 평균≥42.44)·
