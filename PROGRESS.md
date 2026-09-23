@@ -1,8 +1,8 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: K 자율 진행·커밋·푸시).
-현재: **K 펀딩 캐리 — 사전등록 고정, TRAIN 1회 실행**.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA 기각.
+현재: **K 펀딩 캐리 VALIDATION `REJECT` — 다음 방향 사용자 결정 대기**.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA 기각, K 기각.
 
 ## 이번 작업 (Claude — K 후보 선정·사전등록·시뮬레이터)
 
@@ -12,7 +12,12 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
   `ArchiveFile.market`(기본 선물) 추가.
 - [10 K 사전등록](docs/research/10-k-carry-preregistration.md) 고정: 2배·현물 2/3, 21회 평균 ≥0.005% 진입·<0 해제,
   T+1h 체결, ±20% 재조정, K1 연 5%·K2 월간·K3 연도별·K4 MDD 5%·청산 0. funding 평균 미열람(SD만).
-- `backtest/carry.py` 순수 시뮬레이터(테스트 14건), `scripts/run_k_carry.py`(1회·순서 안전장치, 테스트 5건).
+- `backtest/carry.py` 순수 시뮬레이터(테스트 14건), `scripts/run_k_carry.py`(1회·순서 안전장치, 테스트 5건). 커밋 `d8ec352`.
+- **결과:** TRAIN 연 6.28%·MDD 1.4% → PASS. VALIDATION 연 **1.97%** < 5% → **REJECT**(K2~K4·안전 통과).
+  STRESS 2020~2022 연 11.1%·MDD 2.3%·청산 0. 수익은 funding 국면에 비례(2021 23% → 2025~26 2~3%).
+- 안전 발견: 상시 보유 대조군이 2021-07-26 선물 1h +31% 급등에 2배 숏 청산. 실거래라면 1배/포트폴리오 마진 필요.
+- 기록: 10 §10, RESEARCH_HISTORY K 항목, CURRENT_SPEC. 원자료 `reports/k/`(미추적).
+- 다음: 사용자 결정. 임계·레버리지 조정으로 K 재판정은 금지(10 §4).
 
 ## 이전 작업 (Claude — WA TRAIN 1회 실행·판정 기록)
 

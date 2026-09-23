@@ -76,6 +76,18 @@ Learned: 재량 트레이더의 진입 **맥락**(하락 뒤 진입)을 기계�
 Do not retry: 창(24h·7일)·경계(20%)·보유(6h/12h)·손절 배수 조정, 방향 반전, WA2 생성, 같은 TRAIN으로 G6 적용 재판정.
 근거: [06 탐색](../research/06-wonyotti-exploration.md), [07 후보 비교](../research/07-w-candidate-comparison.md), [08 사전등록 §10](../research/08-wa-preregistration.md).
 
+## K — REJECTED (VALIDATION, 2026-09-24)
+
+Hypothesis: 현물 BTC 롱 + USD-M 숏(같은 수량, 선물 2배) 델타 중립으로 funding을 받으면 비용 후 연 5% 이상. 7일 평균 funding ≥0.005% 진입·<0 해제.
+TRAIN 2023~2024: 연환산 **6.28%**(2023 4.76·2024 7.83), 월평균 하한 +0.32%, MDD 1.40%, 청산 0 → PASS.
+VALIDATION 2025~2026-08: 연환산 **1.97%** < 5% → **REJECT**(K2·K3·K4·안전은 통과). STRESS 2020~2022: 11.11%, MDD 2.34%, 청산 0.
+Net: funding이 수익의 거의 전부, 비용은 진입·해제·재조정 합계 funding의 8~31%, 베이시스 영향 무시 가능. PF: 해당 없음(연속 보유).
+Failure: funding 국면 축소. 과열기(2021) 연 23% → 2023~2024 연 5~8% → 2025~2026 연 2~3%. 최근은 현금성 자산보다 낮다.
+Safety: 상시 보유 대조군이 2021-07-26 선물 1h +31% 급등에 2배 숏 청산 → 2배는 불충분, 실거래라면 1배 또는 포트폴리오 마진.
+Learned: 방향 예측이 아닌 구조적 수익원은 실제로 존재했고 비용 후에도 양수였다. 다만 크기가 국면에 따라 한 자릿수 %로 줄어든다.
+Do not retry: 진입·해제 임계·신호 창·레버리지를 바꿔 같은 VALIDATION 재판정, 결과를 본 뒤 기간 자르기.
+근거: [09 후보 비교](../research/09-next-candidate-comparison.md), [10 사전등록·§10 결과](../research/10-k-carry-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
