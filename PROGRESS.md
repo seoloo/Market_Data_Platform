@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **T/v2 실행 인프라 — Phase 5 완료, 다음 Phase 6 Paper 실행기** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **T/v2 Phase 6 Paper 운영 시작(최소 4주, 매일 09:05 KST 실행)** · T/v1·T/v2·F 전향 관찰 진행.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — T/v2 실행 인프라 착수)
@@ -19,7 +19,10 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
   노출됨 → 사용자에게 키 삭제 후 읽기 전용 새 키 발급 요청. `.env.example`에 들어간 키는 `.env`로 옮기고 틀 복원(커밋 없음).
 - 새 키(읽기 전용·IP 제한) 점검 통과: 실계좌 잔고·BTCUSDT/ETHUSDT 규칙(step·최소 수량·최소 주문 5 USDT) 조회 성공,
   PC 시계가 서버보다 약 1.5초 차이 → 어댑터가 보정. **Phase 5 게이트 항목 전부 충족(현물).**
-- 다음: Phase 6 Paper 실행기 — 매일 00:00 UTC 이후 마감 일봉으로 결정, FakeSpotExchange 가상 체결(실시세), 일일 보고, 최소 4주.
+- Phase 6 Paper 실행기: `execution/paper_t2.py`, `storage/sql/005_paper_days.sql`·`repositories/paper_days.py`,
+  `scripts/run_paper_t2.py run·status`, `BinanceSpotReadOnly.closed_daily`(공개 시세, 키 불필요). 테스트 6건(연구 일치 포함).
+  첫 실행: 결정일 2026-09-22, NO_PRIOR_DECISION, 다음 목표 BTC 0.353·ETH 0.256, 가상 자본 10,000 USDT.
+- 다음: 사용자가 작업 스케줄러 등록 → 매일 실행·주 1회 `status` 점검 4주. 그 뒤 1번 마무리 → 2번(새 선물 아이디어) 연구.
   그 다음 Phase 6 Paper 실행기(일 1회 결정·가상 체결·일일 보고).
 
 ## 이전 작업 (Claude — 선물 롱숏 후보·V 사전등록)

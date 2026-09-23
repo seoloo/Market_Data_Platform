@@ -18,7 +18,9 @@ from urllib.parse import urlencode
 import httpx
 
 from auto_trading.config.secrets import BinanceCredentials
+from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import ExchangeError, RateLimitError
+from auto_trading.core.types import Candle
 from auto_trading.exchange.spot import OrderStatus, SpotFilters, SpotOrderResult
 
 __all__ = ["BASE_URL", "BinanceSpotReadOnly", "sign"]
@@ -37,7 +39,7 @@ class BinanceSpotReadOnly:
 
     def __init__(
         self,
-        credentials: BinanceCredentials,
+        credentials: BinanceCredentials | None,
         *,
         client: httpx.Client | None = None,
         base_url: str = BASE_URL,
@@ -57,6 +59,8 @@ class BinanceSpotReadOnly:
         query = dict(params or {})
         headers = {}
         if signed:
+            if self._creds is None:
+                raise ExchangeError(f"서명 요청에 API 키가 필요하다: {path}")
             query["recvWindow"] = _RECV_WINDOW_MS
             query["timestamp"] = self._clock() + self.clock_offset_ms()
             encoded = urlencode(query)
@@ -117,6 +121,32 @@ class BinanceSpotReadOnly:
 
     def last_price(self, symbol: str) -> Decimal:
         return Decimal(self._request("/api/v3/ticker/price", {"symbol": symbol})["price"])
+
+    def closed_daily(self, symbol: str, as_of_ms: int, limit: int = 200) -> list[Candle]:
+        """``as_of_ms`` 까지 **마감된** 일봉 (공개 API, 키 불필요). 진행 중인 봉은 버린다."""
+        rows = self._request(
+            "/api/v3/klines",
+            {"symbol": symbol, "interval": "1d", "endTime": as_of_ms, "limit": limit},
+        )
+        out = []
+        for row in rows:
+            open_ms, close_ms = int(row[0]), int(row[6])
+            if close_ms > as_of_ms or close_ms != open_ms + Timeframe.D1.ms - 1:
+                continue
+            out.append(
+                Candle(
+                    open_ms=open_ms,
+                    close_ms=close_ms,
+                    open=Decimal(row[1]),
+                    high=Decimal(row[2]),
+                    low=Decimal(row[3]),
+                    close=Decimal(row[4]),
+                    volume=Decimal(row[5]),
+                    quote_volume=Decimal(row[7]),
+                    trade_count=int(row[8]),
+                )
+            )
+        return out
 
     def get_order(self, symbol: str, client_order_id: str) -> SpotOrderResult | None:
         try:
