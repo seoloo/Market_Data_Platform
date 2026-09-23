@@ -1,6 +1,6 @@
 # 현재 시스템 명세
 
-기준일: 2026-09-23 · 상태: Phase 0 문서 재정리 / 다음 연구 선정 전.
+기준일: 2026-09-23 · 상태: A1 종료(DATA_INSUFFICIENT) / 다음 연구 탐색(워뇨띠 거래 내역) 중.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
 ## 읽기 순서와 권위
@@ -25,7 +25,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 |---|---|---|---|
 | BTCUSDT, Binance USD-M, One-way, Isolated | 유지: 실제 운용 대상. 타 심볼 데이터는 과거 연구 자산이며 다중 종목 실거래 승인 아님 | 기존 기반 유지, 2026-09-23 정리 | exchange/config |
 | 기존 데이터·Risk·Backtest 기반 보존 | 유지: 재현성·실행 안전성 재사용 | D22 직전 비교 기준 96fc771 | core/storage/backtest/risk |
-| 새 전략 미선정 | 후보 최대 3개 비교 후 사용자가 고른 하나만 구현/검증 | 새 사용자 지침 | strategy/research |
+| 새 전략 미선정 | 후보 최대 3개 비교 후 사용자가 고른 하나만 구현/검증. A1은 TRAIN `DATA_INSUFFICIENT`로 종료 | 새 사용자 지침, A1 2026-09-23 | strategy/research |
 | D22 | INCOMPLETE / EXCLUDED: 현재 전략·점수·로드맵·연구 방향에서 제외 | 2026-09-23 정리 | [보관 초안](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
 | Elliott/JEV/News AI | Optional Shadow만 허용. 초기 실제 주문·차단·사이징에 영향 없음 | 새 사용자 지침 | ai |
 | 자본·새 전략 수치 | 미정: 결과를 본 뒤 임의 확정 금지 | Phase 0 대기 | config/research |

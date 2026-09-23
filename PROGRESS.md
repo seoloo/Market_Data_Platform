@@ -1,10 +1,24 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 4 — A1 TRAIN 1회 실행 완료: `DATA_INSUFFICIENT`(102/146) — 후속 결정 대기**.
+현재: **Phase 0 — A1 종료(DATA_INSUFFICIENT) / 다음 연구 탐색: 워뇨띠 거래 내역(v1 완료)**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 통계 미열람(거부 집계로 DD 정지 사실은 노출)**.
 
-## 이번 작업 (Claude — A1 TRAIN 1회 실행)
+## 이번 작업 (Claude — A1 종료·워뇨띠 탐색 시작)
+
+- **A1 종료 (사용자 결정 1):** [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md)에 A1 `DATA_INSUFFICIENT` 기록
+  (계좌 DD 10% 정지로 표본 절단, 손익 통계 미열람, 재시도 금지 사항). [BACKTEST_AND_TESTING](docs/current/BACKTEST_AND_TESTING.md)에
+  "예상 표본에 계좌 정지·G5 상호작용 포함" 교훈 절 추가. CURRENT_SPEC 상태 갱신. 02 상태 `종료`.
+- **워뇨띠 탐색 시작:** [06 탐색 문서](docs/research/06-wonyotti-exploration.md) — 목적(가설 생성, 복제 금지),
+  파일 SHA-256, 노출 기록(2018-03~2021-12), `90일 서한` 연구 제외.
+- `scripts/explore_wonyotti.py`(표준 라이브러리, 11초, 테스트 2건): 유튜브 요약 주장 재현 —
+  실현손익 3,537.32 BTC·37/46개월·상위 20일 62.4%·상위 50일 제외 −245 BTC·지정가 97.2%·시장가 5회·스톱 43·
+  출금 2,814.5 BTC **일치**. "2019 이후 청산 0회"는 **부정확**(XBTUSD 소액 청산 2019-09-24·2020-03-12).
+  요약에 없던 사실: 2018~2020 체결의 절반 이상이 테이커(편도 7.5bps), 수수료 순지출 35.6·24.1·40.2 BTC,
+  2021만 리베이트 우위 −22 BTC.
+- 다음: v2 XBTUSD 포지션 재구성(보유시간·배율·롱숏 손익·손절 행동) → v3 시장 상태 결합 → 가설 후보 최대 3개 비교.
+
+## 이전 작업 (Claude — A1 TRAIN 1회 실행)
 
 - 사용자 승인으로 커밋 `916bbf2`의 깨끗한 트리에서 `run_a1_train.py run` 1회 실행(주 arm 34분·대조군 39분).
 - **결과: `DATA_INSUFFICIENT`** — 주 arm 실제 거래 **102건** < 146(§11), 대조군 45건. T1~T5 미계산·미열람.

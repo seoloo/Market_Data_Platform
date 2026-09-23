@@ -13,7 +13,7 @@
 | | |
 |---|---|
 | ID / version | **A1 / v1** |
-| 상태 | **TRAIN 1회 실행 (2026-09-23) → `DATA_INSUFFICIENT`** (주 arm 102건 < 146). 후속 결정 대기 |
+| 상태 | **종료** — TRAIN 1회 `DATA_INSUFFICIENT`(102 < 146), 사용자 결정 (1)로 재판정 없이 종료 ([RESEARCH_HISTORY](../current/RESEARCH_HISTORY.md)) |
 | 선행 | [01 후보 비교](01-candidate-comparison.md) · [검정력 게이트](../current/BACKTEST_AND_TESTING.md) |
 | 사용자 결정 | 후보 **A** 선택 · C8 **선택지 1** (필요 효과를 OOS 기준으로 상향) |
 | 원자료 | [a1_design.json](../../reports/phase0/a1_design.json) |

@@ -48,6 +48,21 @@ Learned: 양의 표본평균만으로 비용 후 우위를 주장할 수 없다.
 Do not retry: 7/14/28일 lookback·leg 크기 탐색 또는 방향 반전으로 같은 연구를 살리기.
 근거: [25 방향 검토](../archive/research/25-research-direction-review.md), [26 사전등록](../archive/research/26-r1-preregistration.md), [27 결과](../archive/research/27-r1-screen-result.md).
 
+## A1 — DATA_INSUFFICIENT (사용자 결정으로 종료, 2026-09-23)
+
+Hypothesis: 변동성 수축(24h σ가 30일 하위 30%) 뒤 200h 추세 방향 6h 레인지 돌파는 2h 보유로 비용 전 42.44bps 이상 번다.
+TRAIN: 2021-01-03~2022-12-31, 대조군(수축 조건 제거) 동시 실행, 같은 `decide()`·Risk·G6 달력.
+Result: 주 arm 실제 거래 **102건 < 사전등록 최소 146건 → `DATA_INSUFFICIENT`**. 대조군 45건.
+T1~T5 손익 통계는 규칙대로 계산·열람하지 않았다. PF/MDD/Net expectancy: 미측정.
+Failure: 두 arm 모두 계좌 누적 DD 10% 정지(`MAX_DRAWDOWN`, 자동 해제 없음)에 걸려 표본이 잘렸다
+(거부 주 arm 125·대조군 1,014). 이 집계가 성과 방향(10% 이상 하락)을 간접 노출했다.
+`VOL_TOO_LOW`(1h ATR 연 하위 5%)도 수축 국면 진입 153건을 막았다.
+Learned: 예상 표본은 빈도 한도뿐 아니라 **계좌 수준 정지(DD·일 손실·연패 쿨다운)와 G5 게이트의 상호작용**까지
+포함해 추정해야 한다. 전략 우위 측정과 계좌 위험 규칙 적용을 설계 단계에서 분리해 등록한다.
+Do not retry: 같은 TRAIN으로 계좌 정지만 끄고 A1을 재판정하기(노출 후 규칙 변경), 파라미터 8개 조정, A2 생성.
+근거: [02 사전등록 §11·§12](../research/02-a1-preregistration.md), [03 감사](../research/03-a1-pretrain-audit.md),
+[05 G6 원천](../research/05-a1-macro-pit-source-audit.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
