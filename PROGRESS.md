@@ -1,10 +1,18 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **T/v2 Phase 6 Paper 운영 시작(최소 4주, 매일 09:05 KST 실행)** · T/v1·T/v2·F 전향 관찰 진행.
+현재: **2번 — TA 다종목 선물 추세 사전등록, 1회 판정** · T/v2 Paper 운영 중(작업 스케줄러 등록) · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
-## 이번 작업 (Claude — T/v2 실행 인프라 착수)
+## 이번 작업 (Claude — 2번: 새 선물 수익원)
+
+- 작업 스케줄러 `AutoTrading_Paper_T2` 등록 확인(매일 09:05 KST). PowerShell에서는 `.\.venv\Scripts\python.exe` 문법.
+- [19 후보 비교](docs/research/19-futures-next-candidates.md): A 다종목 선물 추세 · B 분기물 베이시스(BTC 23계약) · C 마진 간 funding(제외). 사용자 선택 A 기본안.
+- [20 TA 사전등록](docs/research/20-ta-preregistration.md): 상위 20 무기한(현물 조건 없음), 종목별 변동성 목표 1.5%, 총 명목 ≤ 2배,
+  밴드 0.5%p, 알트 비용 0.145%, funding 반영, 2020-06~2026-08 1회. A1 평균−2SE>0 · A2 두 절반 양수 · A3 MDD ≤ 30% · 청산 0.
+  `scripts/ta_data.py`, `backtest/multi_trend.py`(테스트 8건), `scripts/run_ta.py`(테스트 9건). 적재율 일봉 99.8%·funding 99.6%.
+
+## 이전 작업 (Claude — T/v2 실행 인프라 착수)
 
 - 사용자 결정: T/v2 전향 관찰 + 현물 주문 기능 준비(1번) 먼저, 끝나면 새 선물 연구(2번).
 - 발견: `exchange/`·`execution/` 패키지가 비어 있다 — 선물·현물 모두 주문 인프라가 없다. 1번 = 실행 인프라 신규 구축.
