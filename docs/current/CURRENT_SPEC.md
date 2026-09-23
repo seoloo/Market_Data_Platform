@@ -1,6 +1,6 @@
 # 현재 시스템 명세
 
-기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT`(2026-09-24). 승인된 전략 없음.
+기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / **K 펀딩 캐리 연구 중**(2026-09-24). 승인된 전략 없음.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
 ## 읽기 순서와 권위
@@ -26,6 +26,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 | BTCUSDT, Binance USD-M, One-way, Isolated | 유지: 실제 운용 대상. 타 심볼 데이터는 과거 연구 자산이며 다중 종목 실거래 승인 아님 | 기존 기반 유지, 2026-09-23 정리 | exchange/config |
 | 기존 데이터·Risk·Backtest 기반 보존 | 유지: 재현성·실행 안전성 재사용 | D22 직전 비교 기준 96fc771 | core/storage/backtest/risk |
 | WA 선택 | A1은 TRAIN `DATA_INSUFFICIENT`로 종료. WA는 TRAIN 1회 실행 결과 `REJECT`(08 §10). 코드는 재현용으로 유지 | 2026-09-23 선택, 09-24 기각 | strategy/research |
+| K 펀딩 캐리 연구 | 현물 BTCUSDT 롱 + USD-M 숏 델타 중립. **연구(백테스트) 범위만 승인.** 현물 캔들은 `exchange='binance_spot'`으로 분리 적재, 실거래 경로는 읽지 않음. 현물 주문·지갑 이체·두 다리 체결은 별도 승인 전 구현 금지 | 2026-09-24 사용자 선택 (09·10) | backtest/research |
 | 거래 횟수 | 하루 거래·같은 방향 연속 진입 횟수 제한 없음. 설정 기본값 `null` | 2026-09-24 사용자 명시 정정 | config/risk |
 | WA 연구 G6 | 선택 (b): 거래당 우위 측정에서는 G6 비적용. 전체 규칙 계좌 재생·실거래에는 적용. 연구 결과를 운용 가능 판정으로 취급하지 않음 | 2026-09-24 사용자 선택 | backtest/research |
 | D22 | INCOMPLETE / EXCLUDED: 현재 전략·점수·로드맵·연구 방향에서 제외 | 2026-09-23 정리 | [보관 초안](../archive/drafts/D22-btc-multitimeframe-strategy.md) |

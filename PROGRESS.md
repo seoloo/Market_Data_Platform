@@ -1,12 +1,22 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Claude (astra 인계, 사용자 위임으로 WA 자율 진행).
-현재: **WA TRAIN `REJECT` — 다음 연구 후보 선정 대기** (사용자 결정 필요).
+최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: K 자율 진행·커밋·푸시).
+현재: **K 펀딩 캐리 — 사전등록 고정, TRAIN 1회 실행**.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA 기각.
 
-## 이번 작업 (Claude — WA TRAIN 1회 실행·판정 기록)
+## 이번 작업 (Claude — K 후보 선정·사전등록·시뮬레이터)
 
-- 커밋 `f7f5c6b`에서 `scripts/run_wa_train.py run` 1회 실행(우위 측정 모드, 2023~2024, 재생 4회).
+- 원격 WA 커밋 3개에서 Claude 공동 작성자 줄 제거(트리 동일, `--force-with-lease`): `157082e`·`8b45853`·`95ab7e8`.
+- [09 후보 비교](docs/research/09-next-candidate-comparison.md): K 캐리 · L 지연 캐스케이드(60분, 비용 21bps, 2h 33bps 필요) · P 중단. 사용자 K 선택.
+- 현물 BTCUSDT 1h 58,401봉 적재(`scripts/backfill_spot.py`, `binance_spot`, 점검으로 잘린 봉 제외 → 16개 짧은 결측).
+  `ArchiveFile.market`(기본 선물) 추가.
+- [10 K 사전등록](docs/research/10-k-carry-preregistration.md) 고정: 2배·현물 2/3, 21회 평균 ≥0.005% 진입·<0 해제,
+  T+1h 체결, ±20% 재조정, K1 연 5%·K2 월간·K3 연도별·K4 MDD 5%·청산 0. funding 평균 미열람(SD만).
+- `backtest/carry.py` 순수 시뮬레이터(테스트 14건), `scripts/run_k_carry.py`(1회·순서 안전장치, 테스트 5건).
+
+## 이전 작업 (Claude — WA TRAIN 1회 실행·판정 기록)
+
+- 커밋 `8b45853`(당시 `f7f5c6b`, 트리 동일)에서 `scripts/run_wa_train.py run` 1회 실행(우위 측정 모드, 2023~2024, 재생 4회).
 - 거래 롱 210·숏 240(관문 176 통과). 롱 비용 전 −4.05bps → 방향 숏.
   숏 순평균 −23.23bps(하한 −39.74), 비용 전 −4.18bps, 대조군 대비 −1.78bps, 2023·2024 모두 음수.
   **T1~T4 실패, 강제청산 0 → `REJECT`.** 계좌 재생 NOT_RUN. VALIDATION 미실행(규칙상 불필요).
@@ -20,7 +30,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - 사용자 위임(2026-09-24): WA는 승인 없이 커밋·진행, 결정은 최선/차선 선택. 푸시는 하지 않는다.
 - astra의 미커밋 엔진 연결(1h 평가·다음 1분 체결·6h 시가 만기·시가 갭 손절 우선·WAState)을 점검해 이어받음.
 - BACKTEST 전용 **우위 측정 모드**: 계좌 정지(DD·일 손실·연패·쿨다운)와 G6만 생략, 나머지 게이트 유지.
-  다른 모드에서는 무시, 엔진은 BACKTEST가 아니면 거부. 커밋 `1ffc9d5`.
+  다른 모드에서는 무시, 엔진은 BACKTEST가 아니면 거부. 커밋 `157082e`.
 - `backtest/wa_verdict.py`(관문→방향→T1~T4·안전, 테스트 5건), `scripts/run_wa_train.py`(재생 4회, 테스트 3건).
 - [08](docs/research/08-wa-preregistration.md) 고정 + §9 위임 결정 기록. 스모크: 90일 신호 33건(전부 달력 부재 G6 차단).
 

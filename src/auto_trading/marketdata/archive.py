@@ -86,6 +86,8 @@ class ArchiveFile:
     timeframe: Timeframe
     period: date
     granularity: Granularity
+    market: str = "futures/um"
+    """아카이브 시장 경로. USD-M 선물이 기본이고, 현물은 ``"spot"`` (K 캐리 연구의 베이시스용)."""
 
     @property
     def stem(self) -> str:
@@ -99,7 +101,7 @@ class ArchiveFile:
 
     def url(self, base_url: str = BASE_URL) -> str:
         return (
-            f"{base_url}/data/futures/um/{self.granularity.value}/klines/"
+            f"{base_url}/data/{self.market}/{self.granularity.value}/klines/"
             f"{self.symbol}/{self.timeframe.value}/{self.filename}"
         )
 

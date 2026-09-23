@@ -46,6 +46,12 @@ class TestArchiveFile:
         """현물이 아니라 USD-M 선물 경로여야 한다."""
         assert "/futures/um/" in ArchiveFile(SYMBOL, TF, JAN, Granularity.MONTHLY).url()
 
+    def test_spot_path_is_explicit(self):
+        """현물은 명시적으로 요청할 때만 쓴다 (K 캐리 연구의 베이시스)."""
+        f = ArchiveFile(SYMBOL, TF, JAN, Granularity.MONTHLY, market="spot")
+        assert f.url().endswith("/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01.zip")
+        assert "/futures/" not in f.url()
+
 
 class TestDateHelpers:
     def test_months_between_spans_year(self):
