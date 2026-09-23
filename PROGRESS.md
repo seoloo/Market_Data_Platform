@@ -1,10 +1,21 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 종료(DATA_INSUFFICIENT) / 다음 연구 탐색: 워뇨띠 거래 내역(v1 완료)**.
+현재: **Phase 0 — A1 종료(DATA_INSUFFICIENT) / 다음 연구 탐색: 워뇨띠 거래 내역(v2 완료)**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 통계 미열람(거부 집계로 DD 정지 사실은 노출)**.
 
-## 이번 작업 (Claude — A1 종료·워뇨띠 탐색 시작)
+## 이번 작업 (Claude — 워뇨띠 v2 왕복 재구성)
+
+- `scripts/explore_wonyotti_trips.py`(테스트 5건): XBTUSD 체결 941,007건 → 왕복 2,589건.
+  재구성 순손익 2,007.99 BTC vs 지갑 XBTUSD 실현손익 2,007.08 BTC(차이 0.05%)로 재구성 검증.
+- 연도별: 보유 중앙값 12분(2018) → 15.5시간(2021), 잔고 대비 배율 중앙값 3.8 → 0.72배, 2배 초과 64% → 5.6%.
+  XBTUSD 숏 1,263 · 롱 745 BTC(2021 숏 663 vs 롱 114). 4배 초과 구간 누적 −368 BTC.
+- 요약 주장 대부분 재현. 불일치: 최다 수익 배율 구간(요약 1~2배, 실제 2~4배), 승·패 보유 수치(방향만 일치).
+  2021-05-19 −44%는 일일 정산 때문에 5/20 행에 기록됨. 2018 청산은 (날짜·상품) 24건·3월 9건.
+- 지갑 잔고 열 18%가 스프레드시트 지수 표기로 정밀도 손실(배율은 근사). [06 §4](docs/research/06-wonyotti-exploration.md).
+- 다음: v3 — 진입 직전 시장 상태(움직임·변동성·funding)와 거래당 bps 수익, 2020~2021 역행폭(Binance 1분봉).
+
+## 이전 작업 (Claude — A1 종료·워뇨띠 탐색 시작)
 
 - **A1 종료 (사용자 결정 1):** [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md)에 A1 `DATA_INSUFFICIENT` 기록
   (계좌 DD 10% 정지로 표본 절단, 손익 통계 미열람, 재시도 금지 사항). [BACKTEST_AND_TESTING](docs/current/BACKTEST_AND_TESTING.md)에
