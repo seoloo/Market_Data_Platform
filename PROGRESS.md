@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-23 · 작성: Claude (Codex/sol 작업 인계).
-현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 — PCE 완료, CPI·NFP·FOMC·POWELL 대기**.
+현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 — PCE·CPI·NFP·FOMC 완료, POWELL 13/16(3건 결정 대기)**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
 ## 이번 작업 (Claude — A1 최소 거래 수 고정·BLS 로컬 감사기)
@@ -12,7 +12,15 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 - BLS: 사용자 승인으로 신원을 밝힌 User-Agent를 1회 시험 → 403, 차단 본문에 "이용 정책 외 bot 금지".
   우회하지 않고 사용자 수동 저장 방식으로 전환. `scripts/audit_bls_schedule.py`(네트워크 없음,
   파일별 SHA-256) + 테스트 8건. 저장 폴더 `data/macro_sources/bls/`(gitignore)를 만들었다.
-- **사용자 작업 대기:** `--print-urls`의 BLS 보도자료 50개를 위 폴더에 HTML로 저장.
+- **CPI·NFP 완료:** 사용자가 저장한 BLS HTML 50개를 로컬 감사. 파일명을 내용의 엠바고 날짜로
+  `cpi_/empsit_MMDDYYYY.htm`로 정리(SHA-256 불변, 안내 목록 50개와 일치). 고용보고서 엠바고 문장의
+  보도자료 번호(`USDL-21-0582`)를 파서가 허용하도록 보정·테스트. **CPI 24/24, NFP 24/24 MATCH**.
+- **FOMC 완료:** `scripts/audit_fomc_schedule.py` — 회의 전 Internet Archive 스냅샷의 연준 월별
+  캘린더 시각(판본)과 성명 보도자료 `For release at`(실제)을 대조, **16/16 MATCH**. 2021·2022 임시회의 없음.
+  G6 FOMC = 정책 성명(원 설계), 의사록 제외. 테스트 8건.
+- **POWELL (사용자 결정 A: FOMC 기자회견만):** `scripts/audit_powell_press_schedule.py` — 연준 홈페이지
+  배너 스냅샷이 블랙아웃 시작 전 시각을 알렸는지 확인. **13/16 ANNOUNCED(모두 14:30 ET)**,
+  **3건 NOT_FOUND**(2021-01-27, 2021-06-16, 2022-06-15) — 처리 방식 사용자 결정 대기. 테스트 6건.
 
 ## 이전 작업 (Claude — sol 인계, BEA PCE 일정 감사 완료)
 
@@ -156,7 +164,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-남은 순서: CPI·NFP(사용자 HTML 저장 후 로컬 감사) → FOMC 성명 시각 → POWELL 범위 정의.
+**CPI·NFP·FOMC 완료.** 남은 순서: POWELL 3건 처리 결정 → 원천 CSV/DB 적재 설계 → coverage 인증.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -185,9 +193,9 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C7: D22 제외가 사용자 의도인지 미확인. 2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`.
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
-- A1-G6: **미해결** — `macro_events` 0건. PCE 24건 대조 완료(후보, DB 미삽입).
-  CPI·NFP(BLS 봇 금지 → 사용자 수동 저장 대기, 로컬 감사기 준비됨), FOMC 성명 시각,
-  POWELL 범위 정의가 남았다. coverage 인증 없이는 TRAIN 불가.
+- A1-G6: **미해결** — `macro_events` 0건(후보 CSV만, DB 미삽입).
+  PCE 24·CPI 24·NFP 24·FOMC 16 대조 완료, POWELL 13/16(NOT_FOUND 3건 결정 대기).
+  POWELL 설정 창(±15분)은 원 설계 "시작~종료+15분"보다 짧다(기록만, 한도 변경 없음). coverage 인증 없이는 TRAIN 불가.
 - A1-N: **해소** — 사용자 승인으로 주 arm 실제 거래 146건 미만이면 DATA_INSUFFICIENT (02 §11). 원 분석:
   개정 입력(TRAIN SD 95.64·비용 19.91·효과 42.44bps·검정력 80%)으로 재계산하면 필요 ≈146건,
   예상 162건은 G1~G7 적용 전이다(G5 VOL_TOO_LOW가 수축 국면과 겹침).
@@ -202,8 +210,9 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 이번 작업 (Claude — A1 최소 거래 수·BLS 로컬 감사기, 2026-09-23):
 
 - BLS 요청은 사용자 승인 1회만(403). 이후 네트워크 접근 없음.
-- 전체 pytest **1,155건** 통과(스크립트 테스트 16건), leakage **44건**, mypy strict **142개** 파일,
-  ruff check·format --check **164개** 파일, import-linter 4/4, `git diff --check` 통과.
+- 실데이터: FOMC 16/16 MATCH, BLS 로컬 CPI·NFP 48/48 MATCH, POWELL 13 ANNOUNCED·3 NOT_FOUND(종료 2).
+- 전체 pytest **1,170건**(스크립트 테스트 31건), leakage **44건**, mypy strict **144개** 파일,
+  ruff check·format --check **168개** 파일, import-linter 4/4, `git diff --check` 통과.
 
 이전 작업 (Claude — BEA PCE 감사 인계·완료, 2026-09-23):
 

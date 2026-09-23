@@ -34,7 +34,8 @@ _WEEKDAY = r"(?:[A-Za-z]+,\s+)?"
 _DATE = r"([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})"
 _CLOCK = r"(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\.?"
 _EMBARGO = re.compile(
-    rf"embargoed until\s+{_CLOCK}\s*\(ET\),?\s*{_WEEKDAY}{_DATE}",
+    # 고용보고서는 시각 앞에 보도자료 번호(USDL-21-0582)가 끼어 있다.
+    rf"embargoed until\s+(?:USDL-[\d-]+\s+)?{_CLOCK}\s*\(ET\),?\s*{_WEEKDAY}{_DATE}",
     re.I,
 )
 _NEXT = re.compile(

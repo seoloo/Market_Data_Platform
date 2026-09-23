@@ -49,6 +49,18 @@ def test_employment_situation_uses_daylight_time_and_infers_period_year() -> Non
     assert release.next_period == "2021-06"
 
 
+def test_employment_release_number_between_embargo_and_time() -> None:
+    page = (
+        "Transmission of material in this news release is embargoed until USDL-21-0582 "
+        "8:30 a.m. (ET) Friday, April 2, 2021 Technical information: ..."
+        "The Employment Situation for April is scheduled to be released on Friday, "
+        "May 7, 2021, at 8:30 a.m. (ET)."
+    )
+    release = parse_release(page, source_file="04022021.html", sha256="e")
+    assert release.release_ms == _utc_ms(2021, 4, 2, 12, 30)
+    assert release.next_release_ms == _utc_ms(2021, 5, 7, 12, 30)
+
+
 def test_december_period_announced_in_january_belongs_to_previous_year() -> None:
     page = EMPSIT_MAY_2021.replace("June 4, 2021", "December 3, 2021").replace(
         "for June is scheduled to be released on Friday, July 2, 2021",
