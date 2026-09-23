@@ -3,7 +3,7 @@
 사용 예::
 
     python scripts/run_t_trend.py run       # 2018-01-01 ~ 2026-08-31 1회 판정
-    python scripts/run_t_trend.py forward   # 2026-09-01 이후 전향 보고 (판정 없음)
+    python scripts/run_t_trend.py forward   # 2026-09-01 이후 v1·v2(현물 롱) 전향 보고 (16)
 
 run은 작업 트리가 깨끗해야 하고, 이미 판정 파일이 있으면 거부한다.
 """
@@ -90,9 +90,11 @@ def stats(days: list[int], returns: list[float]) -> dict[str, Any]:
     }
 
 
-def buy_and_hold(bars: dict[str, dict[int, DailyBar]]) -> dict[str, Any]:
+def buy_and_hold(
+    bars: dict[str, dict[int, DailyBar]], from_ms: int = FROM_MS, to_ms: int = TO_MS
+) -> dict[str, Any]:
     """보고용: BTC·ETH 50/50 매일 재조정 보유."""
-    days = list(range(FROM_MS, TO_MS + 1, _DAY))
+    days = list(range(from_ms, to_ms + 1, _DAY))
     returns = [
         statistics.fmean(bars[s][d].close / bars[s][d - _DAY].close - 1 for s in SYMBOLS)
         for d in days
@@ -206,23 +208,34 @@ def run(output: Path) -> int:
     return 0
 
 
+V2_STOP_MDD = 0.25
+"""T/v2-long 전향 관찰 중단·재검토 선 (16 §3)."""
+
+
 def forward(output: Path) -> int:
+    """v1(롱숏)·v2(현물 롱 전용)·50/50 보유를 2026-09-01부터 보고한다. 판정은 16 §3 시점에만."""
     bars, funding = load()
     last = min(max(b) for b in bars.values())
     if last < FORWARD_FROM:
         print("전향 구간 데이터가 아직 없다 (2026-09 이후 현물 1일봉 필요).")
         return 0
-    result = simulate_trend(
-        bars,
-        funding,
-        from_ms=FORWARD_FROM,
-        to_ms=last,
-        initial_equity=INITIAL_EQUITY,
-        cfg=TrendConfig(),
-    )
+    reports: dict[str, Any] = {}
+    for name, cfg in (
+        ("v1_long_short", TrendConfig()),
+        ("v2_spot_long", TrendConfig(long_only=True)),
+    ):
+        result = simulate_trend(
+            bars, funding, from_ms=FORWARD_FROM, to_ms=last, initial_equity=INITIAL_EQUITY, cfg=cfg
+        )
+        reports[name] = stats(result.days, result.returns)
+    reports["buy_and_hold_50_50"] = buy_and_hold(bars, FORWARD_FROM, last)
+    reports["v2_stop_triggered"] = reports["v2_spot_long"]["mdd"] >= V2_STOP_MDD
     stamp = datetime.fromtimestamp(last / 1000, tz=UTC).strftime("%Y-%m-%d")
-    _write(output / "forward" / f"{stamp}.json", {"report": stats(result.days, result.returns)})
-    print(f"전향 보고: {stamp}")
+    _write(output / "forward" / f"{stamp}.json", reports)
+    print(
+        f"전향 보고: {stamp}"
+        + (" — v2 MDD 25% 도달, 관찰 중단·재검토" if reports["v2_stop_triggered"] else "")
+    )
     return 0
 
 

@@ -53,3 +53,14 @@ def test_period_and_halves_cover_the_same_span() -> None:
     assert run_t_trend.HALVES[0][0] == run_t_trend.FROM_MS
     assert run_t_trend.HALVES[1][1] == run_t_trend.TO_MS + 86_400_000
     assert run_t_trend.HALVES[0][1] == run_t_trend.HALVES[1][0]
+
+
+def test_forward_without_new_data_reports_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.backtest.trend import DailyBar
+
+    old = {run_t_trend.FORWARD_FROM - 86_400_000: DailyBar(1.0, 1.0)}
+    monkeypatch.setattr(run_t_trend, "load", lambda: ({"BTCUSDT": old, "ETHUSDT": old}, {}))
+    assert run_t_trend.forward(tmp_path) == 0
+    assert not (tmp_path / "forward").exists()
