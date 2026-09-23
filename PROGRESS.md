@@ -4,7 +4,17 @@
 현재: **Phase 0 — A1 사전등록 고정 / Phase 1 G6 원천 감사 — PCE 완료, CPI·NFP·FOMC·POWELL 대기**.
 D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 미열람**.
 
-## 이번 작업 (Claude — sol 인계, BEA PCE 일정 감사 완료)
+## 이번 작업 (Claude — A1 최소 거래 수 고정·BLS 로컬 감사기)
+
+- 사용자 승인으로 [02 §11](docs/research/02-a1-preregistration.md)에 **TRAIN 주 arm 실제 거래
+  146건 미만 → `DATA_INSUFFICIENT`**를 결과 열람 전에 고정. 거래 수를 먼저 확인하고 미달이면
+  손익 통계를 계산·열람하지 않는다. 표본을 늘리려고 파라미터·게이트·기간을 바꾸지 않는다.
+- BLS: 사용자 승인으로 신원을 밝힌 User-Agent를 1회 시험 → 403, 차단 본문에 "이용 정책 외 bot 금지".
+  우회하지 않고 사용자 수동 저장 방식으로 전환. `scripts/audit_bls_schedule.py`(네트워크 없음,
+  파일별 SHA-256) + 테스트 8건. 저장 폴더 `data/macro_sources/bls/`(gitignore)를 만들었다.
+- **사용자 작업 대기:** `--print-urls`의 BLS 보도자료 50개를 위 폴더에 HTML로 저장.
+
+## 이전 작업 (Claude — sol 인계, BEA PCE 일정 감사 완료)
 
 - sol이 토큰 한도로 멈춘 미커밋 작업을 이어받았다: `scripts/audit_bea_pce_schedule.py`,
   `tests/scripts/`, 05 문서 추가분, `tzdata`(Windows) 의존성.
@@ -146,7 +156,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. **A1 TRAIN 손익 결과 
 
 **Phase 1 — 2021~2022 PIT 이벤트 일정 확보·품질 감사:** FOMC/CPI/PCE/NFP/POWELL
 종류별 당시 공개 시각과 연속 구간을 검증한다. **PCE 완료**(24건, 05 문서).
-남은 순서: CPI·NFP(BLS 수집 방식 결정 후) → FOMC 성명 시각 → POWELL 범위 정의.
+남은 순서: CPI·NFP(사용자 HTML 저장 후 로컬 감사) → FOMC 성명 시각 → POWELL 범위 정의.
 현 DB의 `macro_events`는 비어 있다.
 **Phase 3 — 백테스트 G6 실데이터 연결:** 시점별 `calendar_available`과
 `event_blackout_active`를 기존 Risk 경로에 전달하는 순수 로직은 추가했다.
@@ -176,11 +186,11 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 - C8: **해소** — 사용자 승인으로 T2를 비용 전 42.44bps로 개정.
 - A1-G5: **해소** — 2020년 T4 표본 0 확인 후, 사용자 승인으로 2021~2022 TRAIN/T4 재등록. G5 완화 없음.
 - A1-G6: **미해결** — `macro_events` 0건. PCE 24건 대조 완료(후보, DB 미삽입).
-  CPI·NFP(BLS 스크립트 접근 403 — 수집 방식 사용자 결정 대기), FOMC 성명 시각,
+  CPI·NFP(BLS 봇 금지 → 사용자 수동 저장 대기, 로컬 감사기 준비됨), FOMC 성명 시각,
   POWELL 범위 정의가 남았다. coverage 인증 없이는 TRAIN 불가.
-- A1-N (2026-09-23 Claude 분석): 02 §11의 "표본 부족 시 DATA_INSUFFICIENT"에 **수치 기준이 없다**.
+- A1-N: **해소** — 사용자 승인으로 주 arm 실제 거래 146건 미만이면 DATA_INSUFFICIENT (02 §11). 원 분석:
   개정 입력(TRAIN SD 95.64·비용 19.91·효과 42.44bps·검정력 80%)으로 재계산하면 필요 ≈146건,
-  예상 162건은 G1~G7 적용 전이다(G5 VOL_TOO_LOW가 수축 국면과 겹침). **TRAIN 전에 사용자 확정 필요.**
+  예상 162건은 G1~G7 적용 전이다(G5 VOL_TOO_LOW가 수축 국면과 겹침).
 - A1-P (2026-09-23 Claude 분석): 트리거 6시간 잠금은 과거 트리거에 의존한다. 백테스트는 전체 구간
   사전 스캔, 라이브 경로는 9,123봉 창 재스캔이라 창 시작점에 따라 달라질 수 있다. 현 테스트는 미래 봉
   추가만 검사. A1은 backtest 전용이라 TRAIN 영향은 없으나 Phase 6 parity 전에 해결 필요.
@@ -189,7 +199,13 @@ DB 읽기 어댑터는 추가했다. 기간별 coverage 감사·원천 provenanc
 
 ## 검증 기록
 
-이번 작업 (Claude — BEA PCE 감사 인계·완료, 2026-09-23):
+이번 작업 (Claude — A1 최소 거래 수·BLS 로컬 감사기, 2026-09-23):
+
+- BLS 요청은 사용자 승인 1회만(403). 이후 네트워크 접근 없음.
+- 전체 pytest **1,155건** 통과(스크립트 테스트 16건), leakage **44건**, mypy strict **142개** 파일,
+  ruff check·format --check **164개** 파일, import-linter 4/4, `git diff --check` 통과.
+
+이전 작업 (Claude — BEA PCE 감사 인계·완료, 2026-09-23):
 
 - 감사기 실데이터 재실행 2회: 수정 전 23 MATCH / 1 DISCREPANCY(sol 결과 재현),
   해결 기록 후 23 MATCH / 1 RESOLVED / 0 DISCREPANCY, 종료 코드 0. 출력은 표준 출력만 사용.
