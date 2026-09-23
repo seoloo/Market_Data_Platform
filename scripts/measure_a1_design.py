@@ -121,8 +121,8 @@ def apply_risk_limits(
     triggers: list[Trigger],
     horizon_bars: int,
     *,
-    same_direction_limit: int,
-    daily_limit: int,
+    same_direction_limit: int | None,
+    daily_limit: int | None,
     cooldown_bars: int,
 ) -> list[Trigger]:
     """TRADING_CORE 빈도 한도와 보유·대기 구간을 적용한 **실제 거래 가능** 부분집합.
@@ -144,7 +144,9 @@ def apply_risk_limits(
             day, today = stamp, 0
         streak = streak + 1 if trigger.direction == previous else 1
         previous = trigger.direction
-        if streak > same_direction_limit or today >= daily_limit:
+        if (same_direction_limit is not None and streak > same_direction_limit) or (
+            daily_limit is not None and today >= daily_limit
+        ):
             continue
         today += 1
         out.append(trigger)
@@ -203,8 +205,8 @@ def main() -> int:
     config = load_config().config
     risk = config.risk
     floor = float(risk.min_stop_distance)
-    same_direction = int(risk.same_direction_limit)
-    daily = int(risk.daily_trade_limit)
+    same_direction = risk.same_direction_limit
+    daily = risk.daily_trade_limit
     cooldown_bars = int(risk.reentry_cooldown_minutes) // 5
     min_hold_bars = int(risk.min_hold_minutes) // 5
 

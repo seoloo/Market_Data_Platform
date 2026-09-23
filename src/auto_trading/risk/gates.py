@@ -176,7 +176,10 @@ class RiskGateEngine:
             and context.snapshot.as_of_ms < state.cooldown_until_ms
         ):
             reasons.append(VetoReason.COOLDOWN)
-        if state.day_trade_count >= self._cfg.daily_trade_limit:
+        if (
+            self._cfg.daily_trade_limit is not None
+            and state.day_trade_count >= self._cfg.daily_trade_limit
+        ):
             reasons.append(VetoReason.DAILY_TRADE_LIMIT)
         if context.sizing is not None:
             required = context.sizing.margin_allocated * self._cfg.margin_availability_buffer
@@ -219,7 +222,8 @@ class RiskGateEngine:
             if context.snapshot.as_of_ms - state.last_exit_ms < cooldown_ms:
                 reasons.append(VetoReason.REENTRY_COOLDOWN)
         if (
-            state.last_entry_side is entry_side
+            self._cfg.same_direction_limit is not None
+            and state.last_entry_side is entry_side
             and state.same_direction_entries >= self._cfg.same_direction_limit
         ):
             reasons.append(VetoReason.SAME_DIRECTION_LIMIT)

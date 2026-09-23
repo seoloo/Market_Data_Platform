@@ -261,6 +261,8 @@ class TestRealConfigFiles:
     def test_all_modes_load(self, mode: str):
         loaded = load_config(mode, config_dir=CONFIG_DIR, apply_env=False)
         assert loaded.config.mode.value == mode
+        assert loaded.config.risk.daily_trade_limit is None
+        assert loaded.config.risk.same_direction_limit is None
 
     def test_base_matches_confirmed_values(self):
         """13-decisions.md D9 확정값과 base.yaml 이 일치하는지 확인한다."""
@@ -271,7 +273,8 @@ class TestRealConfigFiles:
         assert cfg.risk.margin_allocation == Decimal("0.10")
         assert cfg.risk.max_leverage == 10
         assert cfg.risk.min_stop_distance == Decimal("0.01")
-        assert cfg.risk.daily_trade_limit == 2
+        assert cfg.risk.daily_trade_limit is None
+        assert cfg.risk.same_direction_limit is None
         assert cfg.risk.max_drawdown_pct == Decimal("0.10")
 
     def test_live_starts_at_leverage_three(self):

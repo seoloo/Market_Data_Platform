@@ -61,10 +61,10 @@ risk:
   cooldown_after_losses_min: 240
 
   # --- 거래 빈도 / 보유 (D2: 보유기간 2~24h) -----------------------------
-  daily_trade_limit: 2              # [확정] 한도는 이상 동작 탐지용이다
+  daily_trade_limit: null           # 2026-09-24 사용자 정정: 횟수 제한 없음
   min_hold_minutes: 120             # [확정]
   reentry_cooldown_minutes: 60      # [확정]
-  same_direction_limit: 2
+  same_direction_limit: null        # 2026-09-24 사용자 정정: 연속 방향 제한 없음
   max_unprotected_ms: 5000          # 초과 시 포지션 강제 청산
 
   # --- 하드 게이트 임계값 (G2/G3/G5) -----------------------------------

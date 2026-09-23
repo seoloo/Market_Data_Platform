@@ -409,10 +409,10 @@ class RiskConfig(_Base):
     cooldown_after_losses_min: int = Field(default=240, ge=0, le=10_080)
 
     # --- 거래 빈도 / 보유 ---
-    daily_trade_limit: int = Field(default=2, ge=1, le=100)
+    daily_trade_limit: int | None = Field(default=None, ge=1, le=100)
     min_hold_minutes: int = Field(default=120, ge=0, le=10_080)
     reentry_cooldown_minutes: int = Field(default=60, ge=0, le=10_080)
-    same_direction_limit: int = Field(default=2, ge=1, le=50)
+    same_direction_limit: int | None = Field(default=None, ge=1, le=50)
     max_unprotected_ms: int = Field(default=5000, ge=100, le=60_000)
 
     # --- 하드 게이트 임계값 ---
@@ -729,6 +729,9 @@ class RootConfig(_Base):
         설정이 의도와 다른 상태로 돌아가는 것을 사람이 눈으로 잡을 마지막 기회다.
         """
         r = self.risk
+        daily_trade_limit = (
+            f"{r.daily_trade_limit}회" if r.daily_trade_limit is not None else "없음"
+        )
         return (
             f"mode={self.mode.value} symbol={self.symbol}",
             f"거래당 최대손실={r.risk_per_trade:.2%} "
@@ -739,7 +742,7 @@ class RootConfig(_Base):
             f"명목가상한=equity×{r.max_notional_multiple:.2f}",
             f"일일손실한도={r.daily_loss_limit_pct:.1%} "
             f"누적DD한도={r.max_drawdown_pct:.1%} "
-            f"일일거래한도={r.daily_trade_limit}회",
+            f"일일거래한도={daily_trade_limit}",
             f"진입={self.policy.long_entry_threshold:.0f} "
             "청산=반대점수 역전 "
             f"활성feature={len(self.features.enabled_names)}개",

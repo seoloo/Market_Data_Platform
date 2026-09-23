@@ -225,9 +225,11 @@ class TestAccountGates:
         assert VetoReason.COOLDOWN in reasons(context(risk_state=active))
         assert VetoReason.COOLDOWN not in reasons(context(risk_state=expired))
 
-    def test_daily_trade_limit_boundary_vetoes(self):
-        state = RiskState(day_start_equity=D("1000"), day_trade_count=2)
-        assert VetoReason.DAILY_TRADE_LIMIT in reasons(context(risk_state=state))
+    @pytest.mark.parametrize("count, blocked", [(1, False), (2, True), (3, True)])
+    def test_daily_trade_limit_boundary_vetoes(self, count: int, blocked: bool):
+        state = RiskState(day_start_equity=D("1000"), day_trade_count=count)
+        result = reasons(context(risk_state=state), RiskConfig(daily_trade_limit=2))
+        assert (VetoReason.DAILY_TRADE_LIMIT in result) is blocked
 
     def test_insufficient_margin_includes_buffer(self):
         assert VetoReason.INSUFFICIENT_MARGIN in reasons(
@@ -256,13 +258,28 @@ class TestExposureGates:
         assert VetoReason.REENTRY_COOLDOWN in reasons(context(risk_state=active))
         assert VetoReason.REENTRY_COOLDOWN not in reasons(context(risk_state=expired))
 
-    def test_same_direction_limit(self):
+    @pytest.mark.parametrize("count, blocked", [(1, False), (2, True), (3, True)])
+    def test_same_direction_limit(self, count: int, blocked: bool):
         state = RiskState(
             day_start_equity=D("1000"),
             last_entry_side=PositionSide.LONG,
-            same_direction_entries=2,
+            same_direction_entries=count,
         )
-        assert VetoReason.SAME_DIRECTION_LIMIT in reasons(context(risk_state=state))
+        result = reasons(context(risk_state=state), RiskConfig(same_direction_limit=2))
+        assert (VetoReason.SAME_DIRECTION_LIMIT in result) is blocked
+
+    @pytest.mark.parametrize("mode", list(Mode))
+    def test_default_frequency_limits_are_disabled_without_disabling_loss_limits(self, mode: Mode):
+        state = RiskState(
+            day_start_equity=D("1000"),
+            day_trade_count=1000,
+            last_entry_side=PositionSide.LONG,
+            same_direction_entries=1000,
+        )
+        snap = snapshot(mode=mode)
+        assert reasons(context(risk_state=state, snapshot=snap)) == ()
+        loss_state = replace(state, day_realized_pnl=D("-20"))
+        assert VetoReason.DAILY_LOSS_LIMIT in reasons(context(risk_state=loss_state, snapshot=snap))
 
     @pytest.mark.parametrize(
         "sizing_reason",

@@ -58,6 +58,9 @@ def config() -> RootConfig:
             },
             "data": {"warmup_safety_bars": 0},
             "risk": {
+                # 이 회귀 fixture는 명시적으로 제한을 켠 경우를 검증한다.
+                "daily_trade_limit": 2,
+                "same_direction_limit": 2,
                 # 손절 TF 를 15m 으로 낮춘다. 1h 이면 스윙 창 720봉(30일)이 필요해
                 # 합성 구간이 한 달을 넘어야 하고 테스트가 분 단위로 느려진다.
                 "stop": {"atr_timeframe": "15m", "atr_period": 3},
@@ -200,9 +203,9 @@ class TestEngineRuns:
 
     def test_daily_entry_limit_is_enforced_in_replay(self, result) -> None:
         entries_per_utc_day = Counter(trade.entry_ms // 86_400_000 for trade in result.trades)
-        assert all(
-            count <= config().risk.daily_trade_limit for count in entries_per_utc_day.values()
-        )
+        limit = config().risk.daily_trade_limit
+        assert limit is not None
+        assert all(count <= limit for count in entries_per_utc_day.values())
 
 
 class TestDeterminism:
