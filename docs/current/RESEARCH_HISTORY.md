@@ -88,6 +88,17 @@ Learned: 방향 예측이 아닌 구조적 수익원은 실제로 존재했고 �
 Do not retry: 진입·해제 임계·신호 창·레버리지를 바꿔 같은 VALIDATION 재판정, 결과를 본 뒤 기간 자르기.
 근거: [09 후보 비교](../research/09-next-candidate-comparison.md), [10 사전등록·§10 결과](../research/10-k-carry-preregistration.md).
 
+## M — REJECTED (TRAIN, 2026-09-24)
+
+Hypothesis: 월별 유동성 상위 20(현물 페어 필수, 폐지 포함 목록) 중 7일 funding 상위 최대 4종목을 선물 1x 델타 중립으로 보유하면 비용 후 연 5% 이상.
+TRAIN 2023~2024: 연환산 **3.65%** < 5% → **REJECT**. 월평균 하한 +0.09%, 2023 1.96%·2024 5.37%, MDD 1.25%, 청산·강제 정리 0.
+Net: funding 1,225 − 비용 505(41%) + 베이시스 24. 거래대금 순 대조군 3.08%. 진입 72·재조정 63, 보유 종목 55.
+VALIDATION/STRESS: 미실행.
+Failure: 알트 캐리(현물 명목 대비 연 약 12%)가 BTC(약 10.6%)보다 크게 높지 않았고, 교체·재조정 비용과 1x의 자본 효율(50%)이 수익을 절반 이하로 줄였다.
+Learned: 캐리 계열은 실재하지만(K·M 모두 모든 연도 양수, 월간 하한 양수) 안전한 레버리지에서 자본 대비 연 2~5% 수준이다. 종목 선택은 크기를 거의 키우지 못했다.
+Do not retry: 슬롯 수·문턱·유니버스 크기·레버리지·재조정 폭 조정으로 같은 TRAIN 재판정.
+근거: [11 후보 비교](../research/11-post-k-candidate-comparison.md), [13 사전등록·§10 결과](../research/13-m-multi-carry-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.

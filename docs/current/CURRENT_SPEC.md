@@ -1,6 +1,6 @@
 # 현재 시스템 명세
 
-기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / K VALIDATION `REJECT` / **M 다중 종목 캐리 연구 중 · F 전향 관찰 등록**(2026-09-24). 승인된 전략 없음.
+기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / K VALIDATION `REJECT` / M TRAIN `REJECT` / **F 전향 관찰 진행**(2026-09-24). 승인된 전략 없음.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
 ## 읽기 순서와 권위
@@ -27,7 +27,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 | 기존 데이터·Risk·Backtest 기반 보존 | 유지: 재현성·실행 안전성 재사용 | D22 직전 비교 기준 96fc771 | core/storage/backtest/risk |
 | WA 선택 | A1은 TRAIN `DATA_INSUFFICIENT`로 종료. WA는 TRAIN 1회 실행 결과 `REJECT`(08 §10). 코드는 재현용으로 유지 | 2026-09-23 선택, 09-24 기각 | strategy/research |
 | K 펀딩 캐리 연구 | 현물 BTCUSDT 롱 + USD-M 숏 델타 중립. **연구(백테스트) 범위만 승인.** 결과 VALIDATION `REJECT`(연 1.97% < 5%, 10 §10). 현물 캔들은 `exchange='binance_spot'`으로 분리 적재, 실거래 경로는 읽지 않음. 현물 주문·지갑 이체·두 다리 체결은 별도 승인 전 구현 금지 | 2026-09-24 사용자 선택 (09·10) | backtest/research |
-| M 다중 종목 캐리 연구 | 월별 유동성 상위 20(현물 페어 필수) 중 funding 상위 최대 4종목, 선물 1x. **연구 범위만 승인**, 알트 실거래는 별도 승인 (13) | 2026-09-24 사용자 선택 M+F | backtest/research |
+| M 다중 종목 캐리 연구 | 월별 유동성 상위 20(현물 페어 필수) 중 funding 상위 최대 4종목, 선물 1x. **연구 범위만 승인**, 알트 실거래는 별도 승인 (13). 결과 TRAIN `REJECT`(연 3.65% < 5%) | 2026-09-24 사용자 선택 M+F | backtest/research |
 | F K 전향 관찰 | K/v1 동결, 2026-09 ~ 2027-08 월별 보고, 12개월 뒤 1회 판정 (12) | 2026-09-24 | research |
 | 레버리지 범위 | **1x ~ 10x** (사용자 지정). 손절 역산 결과값, 스키마가 10 초과 거부. 실거래는 3x 시작·live 상한 5x, 10x까지 상향은 실측 뒤 승인 | 2026-09-24 사용자 확인·스키마 20→10 | config/risk |
 | 거래 횟수 | 하루 거래·같은 방향 연속 진입 횟수 제한 없음. 설정 기본값 `null` | 2026-09-24 사용자 명시 정정 | config/risk |

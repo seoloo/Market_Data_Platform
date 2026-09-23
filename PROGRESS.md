@@ -1,8 +1,8 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **M 다중 종목 캐리 — 사전등록 고정, TRAIN 1회 실행 / F 전향 관찰 등록**.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K 기각.
+현재: **M TRAIN `REJECT` · F 전향 관찰 진행(2027-08 판정) — 다음 방향 사용자 결정 대기**.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — 레버리지 범위·M·F)
 
@@ -11,7 +11,10 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - F: [12](docs/research/12-f-k-forward-registration.md), `scripts/run_k_forward.py` — K/v1 동결, 2026-09~2027-08, 12개월 뒤 판정 (`0e285f9`).
 - M: `scripts/m_data.py`(선물 1d 2019~2022 보강, 시점별 유니버스 상위 20·현물 필수, 필요한 달만 1h·funding 적재),
   `backtest/multi_carry.py`(테스트 10건), `scripts/run_m_carry.py`(테스트 6건), [13 사전등록](docs/research/13-m-multi-carry-preregistration.md).
-  적재율 99.3~100%, 종목-달 funding SD 약 300~360bps → 검정력 여유 적음(결과 전 기록).
+  적재율 99.3~100%, 종목-달 funding SD 약 300~360bps → 검정력 여유 적음(결과 전 기록). 커밋 `2197fc2`.
+- **M 결과:** TRAIN 연 **3.65%** < 5% → **REJECT**(월간 하한·연도별·MDD 1.25%·청산 0은 통과). funding 1,225 − 비용 505(41%).
+  거래대금 순 대조군 3.08%. VALIDATION·STRESS 미실행. 기록: 13 §10, RESEARCH_HISTORY M 항목.
+- 캐리 계열 정리: 실재하지만 안전한 레버리지에서 자본 대비 연 2~5%. F는 매달 `scripts/run_k_forward.py`로 갱신.
 
 ## 이전 작업 (Claude — K 후보 선정·사전등록·시뮬레이터)
 
