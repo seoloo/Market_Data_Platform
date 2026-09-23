@@ -268,6 +268,20 @@ class TestRiskTracker:
         assert state.day_realized_pnl == D(0)
         assert state.consecutive_losses == 2
 
+    def test_same_direction_count_resets_at_utc_day_boundary(self) -> None:
+        tracker = BacktestRiskTracker.start(0, D("1000"))
+        fill = entry_fill("100")
+        tracker.record_entry(fill, PositionSide.LONG)
+        tracker.record_entry(fill, PositionSide.LONG)
+        tracker.advance(86_400_000 - 1, D("1000"))
+        assert tracker.to_state().same_direction_entries == 2  # 같은 날에는 유지
+        tracker.advance(86_400_000, D("1000"))
+        state = tracker.to_state()
+        assert state.same_direction_entries == 0
+        assert state.last_entry_side is None
+        tracker.record_entry(fill, PositionSide.LONG)
+        assert tracker.to_state().same_direction_entries == 1
+
     def test_consecutive_loss_cooldown_expires_deterministically(self) -> None:
         cfg = RiskConfig()
         tracker = BacktestRiskTracker.start(0, D("1000"))

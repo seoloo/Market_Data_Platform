@@ -176,13 +176,20 @@ class BacktestRiskTracker:
         )
 
     def advance(self, as_of_ms: int, equity: Decimal) -> None:
-        """UTC 일자 변경과 연속 손실 쿨다운 만료를 반영한다."""
+        """UTC 일자 변경과 연속 손실 쿨다운 만료를 반영한다.
+
+        같은 방향 연속 진입 횟수도 UTC 일자 단위로 초기화한다 (2026-09-23 사용자 확정,
+        TRADING_CORE 빈도 한도). 이전에는 반대 방향 진입 전까지 초기화되지 않아 한 방향
+        전략은 전 기간 2번만 진입할 수 있었다.
+        """
         current_day = as_of_ms // _DAY_MS
         if current_day != self.day_index:
             self.day_index = current_day
             self.day_start_equity = equity
             self.day_realized_pnl = ZERO
             self.day_trade_count = 0
+            self.last_entry_side = None
+            self.same_direction_entries = 0
         if self.cooldown_until_ms is not None and as_of_ms >= self.cooldown_until_ms:
             self.cooldown_until_ms = None
             self.consecutive_losses = 0
