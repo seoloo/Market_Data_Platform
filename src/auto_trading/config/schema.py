@@ -45,6 +45,7 @@ __all__ = [
     "TightStopAction",
     "UiConfig",
     "VolatilityGateConfig",
+    "WAConfig",
 ]
 
 
@@ -640,14 +641,36 @@ class A1Config(_Base):
 # --------------------------------------------------------------------- 루트
 
 
+class WAConfig(_Base):
+    """WA/v1 고정 규칙. 방향은 TRAIN 선택 또는 합성 검사용 명시 입력이다."""
+
+    return_hours: Literal[24] = 24
+    range_hours: Literal[168] = 168
+    range_position_pct: Rate = Decimal("0.20")
+    hold_minutes: Literal[360] = 360
+    trigger_lock_minutes: Literal[720] = 720
+    stop_sigma_multiple: Rate = Decimal("2.0")
+    direction: Literal["long", "short"]
+    control_without_state: bool = False
+
+    @model_validator(mode="after")
+    def _check_frozen_values(self) -> WAConfig:
+        if self.range_position_pct != Decimal("0.20"):
+            raise ValueError("WA/v1 범위 경계는 0.20이다")
+        if self.stop_sigma_multiple != Decimal("2.0"):
+            raise ValueError("WA/v1 손절 배수는 2.0이다")
+        return self
+
+
 class RootConfig(_Base):
     """전체 설정. 이 객체의 해시가 ``decisions.config_version_id`` 로 기록된다."""
 
     mode: Mode = Mode.BACKTEST
     symbol: str = Field(default="BTCUSDT", min_length=3, max_length=20)
     exchange: str = Field(default="binance_usdm", min_length=3, max_length=40)
-    strategy_id: Literal["h1", "a1_v1"] = "h1"
+    strategy_id: Literal["h1", "a1_v1", "wa_v1"] = "h1"
     a1: A1Config | None = None
+    wa: WAConfig | None = None
 
     risk: RiskConfig = Field(default_factory=RiskConfig)
     features: FeaturesConfig
@@ -698,6 +721,17 @@ class RootConfig(_Base):
     @model_validator(mode="after")
     def _check_live_guardrails(self) -> RootConfig:
         """실거래 모드에서만 적용되는 추가 제약."""
+        if self.strategy_id == "wa_v1":
+            if self.wa is None:
+                raise ValueError("WA/v1 은 wa 설정이 필요하다")
+            if self.mode is not Mode.BACKTEST:
+                raise ValueError("미검증 WA/v1 은 backtest 전용이다")
+            if self.risk.tight_stop_action is not TightStopAction.REDUCE_POSITION:
+                raise ValueError("WA/v1 은 REDUCE_POSITION만 허용한다")
+            if self.risk.take_profit.enabled:
+                raise ValueError("WA/v1 은 목표가를 사용하지 않는다")
+            if Timeframe.H1 not in self.data.timeframes:
+                raise ValueError("WA/v1 은 1시간봉이 필요하다")
         if self.strategy_id == "a1_v1":
             if self.a1 is None:
                 raise ValueError("A1/v1 은 a1 설정이 필요하다")

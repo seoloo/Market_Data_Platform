@@ -46,7 +46,7 @@ D22의 다중 시간대 대량 점수, 패턴 결합, 15분봉 재평가, 뉴스
 |---|---|
 | core/config | 불변 타입·금액·시각·해시, 설정 검증/버전: 구현 |
 | storage/marketdata | SQLite 마이그레이션·조회, 백필·funding·causal snapshot: 구현 |
-| features/strategy/risk | 기존 H1 지표·정책·결정과 리스크: 구현, 새 전략은 없음 |
+| features/strategy/risk | H1/A1 재현 기반 유지. WA 순수 상태·방향별 손절·6h 청산 구현(2026-09-24), 엔진/연구 모드 연결 및 검증 대기 |
 | backtest | feed/fills/portfolio/engine, 보고서·기준선·연구 선별: 구현 |
 | exchange/execution | 주문·보호주문·reconciliation: 설계, 실거래 구현/검증 대기 |
 | ai/notify/ui | 분석 보조·알림·읽기 전용 대시보드: 계획, 완료로 표시하지 않음 |

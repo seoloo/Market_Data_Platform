@@ -131,6 +131,8 @@ class BacktestEngine:
         context: DecisionContext | None = None,
         macro_calendar: MacroCalendar | None = None,
     ) -> None:
+        if cfg.strategy_id == "wa_v1":
+            raise ValueError("WA 엔진의 1h 평가·트리거 상태·6h 체결 연결은 아직 구현 전이다")
         self._cfg = cfg
         self._feed = feed
         self._filters = filters or ExchangeFilters()

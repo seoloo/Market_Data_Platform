@@ -39,6 +39,7 @@ from auto_trading.features.indicators import atr_series
 from auto_trading.features.registry import build_feature_set, int_param
 from auto_trading.features.structure import SwingKind, detect_swings
 from auto_trading.features.volatility import VolatilityRegimeFeature
+from auto_trading.features.wa import WAState, evaluate_wa
 from auto_trading.risk.gates import GateContext, RiskGateEngine, RiskState
 from auto_trading.risk.sizing import PositionSizingEngine, SizingRequest, SizingResult
 from auto_trading.strategy.bias import compute_bias
@@ -85,6 +86,7 @@ class DecisionContext:
     a1_observation: A1Observation | None = None
     a1_precomputed_at_ms: int | None = None
     research_unvalidated: bool = False
+    wa_state: WAState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +121,8 @@ def decide(
 
     if cfg.strategy_id == "a1_v1":
         return _decide_a1(snapshot, portfolio, cfg, runtime)
+    if cfg.strategy_id == "wa_v1":
+        return _decide_wa(snapshot, portfolio, cfg, runtime)
 
     if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
         return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
@@ -264,17 +268,100 @@ def _decide_a1(
         return _veto_decision(snapshot, VetoReason.WARMUP)
 
     side = PositionSide.LONG if observation.direction == 1 else PositionSide.SHORT
+    stop_distance = Decimal(str(observation.sigma_5m)) * Decimal(24).sqrt() * a1.stop_sigma_multiple
+    return _fixed_horizon_entry(
+        snapshot,
+        portfolio,
+        cfg,
+        runtime,
+        side,
+        stop_distance,
+        regime="a1_contraction_breakout",
+        stop_source="a1_2sigma_2h",
+    )
+
+
+def _decide_wa(
+    snapshot: MarketSnapshot,
+    portfolio: PortfolioState,
+    cfg: RootConfig,
+    runtime: DecisionContext,
+) -> Decision:
+    """WA 코어. 어댑터는 evaluate_wa의 반환 상태를 매 평가 후 저장해야 한다."""
+    wa = cfg.wa
+    if wa is None:  # pragma: no cover - schema 보장
+        raise ValueError("WA 설정이 없다")
+    neutral = ScoreSet.neutral()
+    position = portfolio.position
+    if position is not None and not position.is_flat:
+        if position.opened_ms is not None and position.holding_ms(snapshot.as_of_ms) >= (
+            wa.hold_minutes * Timeframe.M1.ms
+        ):
+            return _decision(
+                snapshot,
+                Action.CLOSE,
+                neutral,
+                (),
+                intents=_exit_intents(snapshot, portfolio),
+                notes=("WA 6시간 보유 종료",),
+            )
+        return _decision(snapshot, Action.NONE, neutral, ())
+    if not snapshot.data_quality.ok or not snapshot.data_quality.warmup_ok:
+        return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+    if runtime.wa_state is None:
+        return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+    h1 = snapshot.get(Timeframe.H1)
+    if h1 is None:
+        return _veto_decision(snapshot, VetoReason.WARMUP)
+    observation = evaluate_wa(
+        h1.candles,
+        as_of_ms=snapshot.as_of_ms,
+        cfg=wa,
+        state=runtime.wa_state,
+    )
+    if not observation.available:
+        return _veto_decision(snapshot, VetoReason.DATA_QUALITY)
+    if not observation.triggered:
+        return _decision(snapshot, Action.NONE, neutral, ())
+    if observation.sigma_1h is None or observation.sigma_1h <= ZERO:
+        return _veto_decision(snapshot, VetoReason.WARMUP)
+    side = PositionSide.LONG if wa.direction == "long" else PositionSide.SHORT
+    distance = observation.sigma_1h * Decimal(wa.hold_minutes // 60).sqrt() * wa.stop_sigma_multiple
+    return _fixed_horizon_entry(
+        snapshot,
+        portfolio,
+        cfg,
+        runtime,
+        side,
+        distance,
+        regime="wa_control" if wa.control_without_state else "wa_decline_near_low",
+        stop_source="wa_2sigma_6h",
+    )
+
+
+def _fixed_horizon_entry(
+    snapshot: MarketSnapshot,
+    portfolio: PortfolioState,
+    cfg: RootConfig,
+    runtime: DecisionContext,
+    side: PositionSide,
+    stop_distance: Decimal,
+    *,
+    regime: str,
+    stop_source: str,
+) -> Decision:
+    """A1/WA 공통 비용·사이징·위험·보호주문 경로."""
+    direction = 1 if side is PositionSide.LONG else -1
     action = Action.OPEN_LONG if side is PositionSide.LONG else Action.OPEN_SHORT
     scores = ScoreSet(
-        direction=float(observation.direction),
+        direction=float(direction),
         confidence_score=100.0,
         risk_score=0.0,
-        bias_direction=observation.direction,
+        bias_direction=direction,
         bias_multiplier=1.0,
         agreement=1.0,
-        regime="a1_contraction_breakout",
+        regime=regime,
     )
-    stop_distance = Decimal(str(observation.sigma_5m)) * Decimal(24).sqrt() * a1.stop_sigma_multiple
     if side is PositionSide.LONG and stop_distance >= Decimal(1):
         return _decision(snapshot, action, scores, (), veto_reasons=(VetoReason.INVALID_STOP,))
     stop = (
@@ -298,7 +385,7 @@ def _decide_a1(
                 equity=portfolio.equity,
                 entry_price=snapshot.mark_price,
                 stop_price=stop,
-                stop_source="a1_2sigma_2h",
+                stop_source=stop_source,
                 qty_step=cast(Decimal, runtime.qty_step),
                 price_tick=cast(Decimal, runtime.price_tick),
                 min_qty=cast(Decimal, runtime.min_qty),
