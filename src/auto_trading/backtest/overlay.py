@@ -86,6 +86,9 @@ class OverlayConfig:
     ≥ 이 값 × σ(T/v2 60일)이면 다음 체결에서 그 종목 노출 배수를 1.0 으로 둔다(선물 추가분 0).
     ``None``이면 없음(O/v2)."""
     vol_spike_days: int = 10
+    vol_spike_adverse_only: bool = False
+    """True 면 급등이면서 최근 ``vol_spike_days``일 가격이 내렸을 때만 끈다(43 §6 B′).
+    변동성이 커도 방향(롱)이 맞으면 선물 추가분을 유지한다."""
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -414,7 +417,9 @@ def vol_spikes(closes: Mapping[str, Sequence[float]], cfg: OverlayConfig) -> fro
         steps = [math.log(series[-k] / series[-k - 1]) for k in range(1, long_days + 1)]
         long_vol = statistics.stdev(steps)
         short_vol = statistics.stdev(steps[: cfg.vol_spike_days])
-        if long_vol > 0 and short_vol >= ratio * long_vol:
+        adverse = series[-1] < series[-1 - cfg.vol_spike_days]
+        spike = long_vol > 0 and short_vol >= ratio * long_vol
+        if spike and (adverse or not cfg.vol_spike_adverse_only):
             out.add(s)
     return frozenset(out)
 

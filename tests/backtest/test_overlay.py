@@ -303,3 +303,19 @@ class TestVolSpike:
         assert fut["AUSDT"] == pytest.approx(0.0)
         assert spot["AUSDT"] == pytest.approx(0.4)
         assert fut["BUSDT"] == pytest.approx(0.25)
+
+    def test_adverse_only_keeps_futures_when_spike_is_a_rally(self) -> None:
+        from auto_trading.backtest.overlay import vol_spikes
+
+        calm = wave(200, 0.002)
+        rally = calm[:-10] + [
+            calm[-11] * (1.10 if k % 2 else 0.97) ** ((k + 1) / 2) for k in range(10)
+        ]
+        crash = calm[:-10] + [
+            calm[-11] * (0.90 if k % 2 else 1.03) ** ((k + 1) / 2) for k in range(10)
+        ]
+        both = OverlayConfig(vol_spike_ratio=1.5)
+        down = replace(both, vol_spike_adverse_only=True)
+        assert rally[-1] > rally[-11] and crash[-1] < crash[-11]
+        assert vol_spikes({"R": rally, "C": crash}, both) == frozenset({"R", "C"})
+        assert vol_spikes({"R": rally, "C": crash}, down) == frozenset({"C"})

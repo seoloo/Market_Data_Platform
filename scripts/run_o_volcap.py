@@ -1,4 +1,4 @@
-"""문서 43 — O/v2 + 변동성 급등 끄기.
+"""문서 43 — O/v2 + 변동성 급등 끄기 (§6 B′: 가격이 내린 급등에서만).
 
 사용 예::
 
@@ -46,8 +46,11 @@ _DAY = 86_400_000
 def measure() -> dict[str, Any]:
     spot, _, _ = load()
     out: dict[str, Any] = {}
-    for ratio in CANDIDATES:
-        cfg = replace(O2_STOP, vol_spike_ratio=ratio)
+    variants = [(str(r), replace(O2_STOP, vol_spike_ratio=r)) for r in CANDIDATES]
+    variants.append(
+        ("1.5_adverse", replace(O2_STOP, vol_spike_ratio=1.5, vol_spike_adverse_only=True))
+    )
+    for label, cfg in variants:
         held = spiked = 0
         by_symbol: dict[str, list[int]] = {}
         spike_dates: dict[str, list[str]] = {}
@@ -71,7 +74,7 @@ def measure() -> dict[str, Any]:
                     spike_dates.setdefault(s, []).append(
                         datetime.fromtimestamp(d / 1000, UTC).strftime("%Y-%m-%d")
                     )
-        out[str(ratio)] = {
+        out[label] = {
             "held_symbol_days": held,
             "spike_symbol_days": spiked,
             "share": round(spiked / held, 4) if held else None,
@@ -137,14 +140,14 @@ def run(output: Path) -> int:
         return 3
     spot, perp, funding = load()
     kwargs: dict[str, Any] = {"from_ms": FROM_MS, "to_ms": TO_MS, "initial_equity": INITIAL}
-    bv_cfg = replace(O2_STOP, vol_spike_ratio=K)
+    bv_cfg = replace(O2_STOP, vol_spike_ratio=K, vol_spike_adverse_only=True)
     runs: dict[str, tuple[OverlayConfig, OverlayResult]] = {}
     for name, cfg in (
         ("a_t2_alone", T2_ALONE),
         ("b2_o2", O2_STOP),
         ("bv_o2_volcap", bv_cfg),
         ("ref_o3_2x", O3_2X),
-        ("ref_o3_2x_volcap", replace(O3_2X, vol_spike_ratio=K)),
+        ("ref_o3_2x_volcap", replace(O3_2X, vol_spike_ratio=K, vol_spike_adverse_only=True)),
     ):
         runs[name] = (cfg, simulate_overlay(spot, perp, funding, cfg=cfg, **kwargs))
     reports: dict[str, Any] = {}
