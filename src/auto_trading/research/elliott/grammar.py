@@ -44,6 +44,23 @@ class LegSubdivision(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class ProofSource(StrEnum):
+    SYNTHETIC_FIXTURE = "SYNTHETIC_FIXTURE"
+
+
+@dataclass(frozen=True, slots=True)
+class LegSubdivisionProof:
+    """하위파 표식의 구간·가용 시각. 현재는 합성 fixture만 인증한다."""
+
+    shape: LegSubdivision
+    start_four_hour_open_ms: int
+    end_four_hour_open_ms: int
+    available_at_ms: int
+    timeframe: Timeframe
+    source: ProofSource
+    source_id: str
+
+
 class ParentRole(StrEnum):
     WAVE5 = "WAVE5"
     C = "C"
@@ -57,7 +74,7 @@ class GrammarScenario:
     pattern: WavePattern
     direction: int  # +1 상승, -1 하락
     evidence: tuple[FourHourEvidence, ...]
-    subdivisions: tuple[LegSubdivision, ...] = ()
+    subdivisions: tuple[LegSubdivisionProof, ...] = ()
     parent_role: ParentRole = ParentRole.UNKNOWN
 
 
@@ -145,6 +162,24 @@ def validate_scenario(
             ("UNKNOWN_EVIDENCE_IN_WINDOW",),
             as_of_ms,
         )
+    if scenario.subdivisions:
+        if len(scenario.subdivisions) != len(anchors) - 1:
+            raise DataIntegrityError("하위파 증거 수가 후보 다리 수와 다르다")
+        for index, proof in enumerate(scenario.subdivisions):
+            if (
+                not isinstance(proof, LegSubdivisionProof)
+                or not isinstance(proof.shape, LegSubdivision)
+                or proof.shape is LegSubdivision.UNKNOWN
+                or proof.timeframe is not Timeframe.H4
+                or proof.source is not ProofSource.SYNTHETIC_FIXTURE
+                or not proof.source_id
+                or proof.start_four_hour_open_ms != anchors[index].extreme_four_hour_open_ms
+                or proof.end_four_hour_open_ms != anchors[index + 1].extreme_four_hour_open_ms
+                or not anchors[index + 1].confirmed_four_hour_close_ms
+                <= proof.available_at_ms
+                <= as_of_ms
+            ):
+                raise DataIntegrityError("하위파 증거의 출처·4h 구간·가용 시각이 유효하지 않다")
     required = 4 if scenario.pattern is WavePattern.ZIGZAG else 6
     if len(anchors) < required:
         return _assessment(
@@ -164,9 +199,6 @@ def validate_scenario(
             (),
             as_of_ms,
         )
-    if scenario.subdivisions and len(scenario.subdivisions) != required - 1:
-        raise DataIntegrityError("내부 하위파 표식 수가 다리 수와 다르다")
-
     failures = _anchor_failures(anchors, scenario.direction)
     pending: list[str] = []
     expected_subdivisions: tuple[LegSubdivision, ...]
@@ -199,7 +231,9 @@ def validate_scenario(
         GrammarStatus.FAIL if failures else GrammarStatus.PENDING if pending else GrammarStatus.PASS
     )
 
-    supplied = scenario.subdivisions or (LegSubdivision.UNKNOWN,) * (required - 1)
+    supplied = tuple(proof.shape for proof in scenario.subdivisions) or (
+        LegSubdivision.UNKNOWN,
+    ) * (required - 1)
     for index, (actual, expected_shape) in enumerate(
         zip(supplied, expected_subdivisions, strict=True), 1
     ):

@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 엄격 문법의 순수 합성 검증, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 하위파 출처·bounded 후보 snapshot의 합성 검증, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 엄격 문법)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 후보·출처 계약)
+
+- [grammar.py](src/auto_trading/research/elliott/grammar.py): 하위파 표식을 출처·4h 다리 양 끝·확인 가용 시각이 붙은 `LegSubdivisionProof`로 교체. 현재 **합성 fixture만** 인증하고 4h 미만·미래 시각·잘못된 다리는 거부. 하위파 미제공이면 `PENDING` 유지.
+- [candidates.py](src/auto_trading/research/elliott/candidates.py): 마지막 `UNKNOWN` 뒤 마지막 6개/4개 후보의 고정 rolling 창으로 impulse·일반 zigzag·ending diagonal 각 하나, 최대 세 가설만 생성. 미보정 confidence·확률 없음; `UNKNOWN` 이전 극값을 새 구간에 연결하지 않음. 마지막 꼭짓점 이후 재연장 시 종료 가설 무효화 시각·가격을 **분석 전용**으로 기록.
+- [합성 테스트](tests/research/test_elliott_grammar.py)와 [33 §11](docs/research/33-elliott-phase0-data-and-profile.md): 출처·시각 경계, 제한된 후보, `UNKNOWN` 재시작, 미래 prefix 불변, 분석용 무효화. 시장 681 후보·WA 방향/PnL 미입력, 기존 전략·Paper·DB·스케줄 불변. `NOT_READY_FOR_WA_TEST` 유지.
+- 검증: 전체 pytest·leakage, strict mypy **258개 소스**, ruff check/format **316파일**, import-linter **5계약** 통과. `git diff --check` 확인.
+- 다음: 고정 규칙의 **WA 결과 비열람** 시장 품질/coverage 감사와 4h 하위 degree 파서의 출처 계약 구현 가능성 검토. BitMEX 원시장 결측·실측 하위파 미검증이므로 WA 결합 금지.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 엄격 문법)
 
 - [grammar.py](src/auto_trading/research/elliott/grammar.py): 최소 마감 4h 후보 증거의 **연속 구간**에서 strict impulse·일반 zigzag·수렴 ending diagonal의 기하학/하위파 문법만 순수 판정. `PASS/FAIL/PENDING/UNKNOWN`과 위반·미검증 사유를 분리하고 복수 시나리오를 선택·확률화 없이 모두 반환. 추가 피벗 건너뛰기 금지, 4h wick·부모 위치·시간-가격 수렴 검사.
 - [합성 테스트](tests/research/test_elliott_grammar.py): 상승/하락 대칭, 2파 경계·3파 최단·4파 wick/봉 내부 불명, 3파 generic motive 거부, zigzag B 경계, ending 부모/수렴, UNKNOWN·미완성·미검증 하위파, 복수 시나리오·미래 prefix 불변. 문서 [33 §10](docs/research/33-elliott-phase0-data-and-profile.md)에 조건부 `PASS`의 한계 기록.

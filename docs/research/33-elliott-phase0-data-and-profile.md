@@ -257,6 +257,37 @@ ending 부모·수렴, 복수 시나리오 보존·추가 꼭짓점 건너뛰기
 보고하지 않는다. 다음은 하위파 검증·후보 생성의 고정 탐색 창·UNKNOWN 정책을 설계하고
 블라인드 synthetic/시장 품질 검증을 거쳐야 한다.
 
+## 11. 하위파 출처 계약·bounded 후보 생성 — 합성 검증만
+
+[문법 검사기](../../src/auto_trading/research/elliott/grammar.py)의 하위파 입력은 이제
+`LegSubdivisionProof(shape, start_four_hour_open_ms, end_four_hour_open_ms,
+available_at_ms, timeframe, source, source_id)`다. 증거의 양 끝은 연속된 4h 후보와
+일치하고, 가용 시각은 끝 후보의 **확정 마감 이후~평가 시점 이내**여야 한다.
+현재 허용 출처는 `SYNTHETIC_FIXTURE` 하나뿐이며 `timeframe=H4`만 받는다.
+즉 합성 문법의 `PASS`를 시장에서 검증된 하위파 `PASS`로 옮길 수 없다.
+실제 4h 하위 degree 파서와 출처 검증은 별도 연구 항목이다.
+
+[후보 생성기](../../src/auto_trading/research/elliott/candidates.py)는 시점별로 완성 4h
+봉과 일대일 대응하는 증거만 받는다. 마지막 `UNKNOWN` 이후의 구간에서, 건너뛰지 않은
+마지막 6개 후보를 impulse·ending diagonal에, 마지막 4개를 일반 zigzag에 사용한다.
+두 후보도 없으면 시나리오를 만들지 않는다. 패턴별 하나, **최대 세 가설**만 만들며
+score·순위·선택·보정 확률은 없다. 최신 창 밖의 다른 가능한 카운트는 탐색하지 않으므로
+이 가설 집합은 완전한 Elliott count 목록이 아니다. 하위파 증거는 생성하지 않아서
+완성된 모양이라도 실측 `PASS`로 올라갈 수 없다.
+
+완성 기하학 가설의 마지막 꼭짓점이 확인된 뒤 같은 방향으로 더 높은 고점/낮은 저점이
+나오면 **그 종료 가설만** `ENDING_INVALIDATED`로 기록한다. 경계값·첫 침범 4h 마감은
+`ANALYSIS_ONLY`이며 거래소 보호주문, 매매 손절, 가격 예측으로 쓰지 않는다.
+`UNKNOWN`은 연결성을 끊고 뒤에서 새 창을 시작한다. `confidence`는
+`UNCALIBRATED_RULE_SUPPORT_ONLY`, `probability=None`으로 고정한다.
+새 구간에서 확인된 후보라도 극값 4h가 `UNKNOWN` 경계 이전이면 입력 오류로 거부한다.
+
+[합성 테스트](../../tests/research/test_elliott_grammar.py)는 최대 세 가설·미검증 하위파,
+4h 출처/가용 시각 거부, `UNKNOWN` 재시작, 끝점 재연장 기록, 미래 봉 추가 시 과거
+snapshot 불변을 검사한다. **시장 681 후보·WA 체결/방향/PnL은 이 생성기에 입력하지
+않았다.** 다음 게이트는 규칙을 고정한 상태에서 결과를 가린 시장 품질/coverage 감사와
+BitMEX 원시장·하위파 인과적 파서의 준비 여부다. `NOT_READY_FOR_WA_TEST` 유지.
+
 지금의 판정은 **`NOT_READY_FOR_WA_TEST`**다. 이는 Elliott 패턴의 부재나 유용성 기각이 아니라
 동일 시장 자료·분류기·검정 설계의 미완료를 뜻한다. 독립 순수
 [가격 피벗·RSI adapter](../../src/auto_trading/research/elliott/divergence.py)와
