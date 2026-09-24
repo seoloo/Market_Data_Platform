@@ -113,6 +113,10 @@ class WaveParser:
     def extremal(self, i: int, j: int) -> bool:
         return j in self._ends[i]
 
+    def relaxed_span(self, i: int, j: int) -> bool:
+        """시작 극단(i 를 넘어 되돌아가는 꼭짓점이 없음) 구간인가 — EW-3d′ 후보의 전체 구간 조건."""
+        return j in self._relaxed[i]
+
     def _motive_ok(self, i: int, j: int) -> Label | None:
         labels = self.labels(i, j)
         if Label.IMPULSE in labels:
