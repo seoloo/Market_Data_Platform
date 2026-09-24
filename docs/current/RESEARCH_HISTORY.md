@@ -142,6 +142,16 @@ Learned: 시장 중립 상대 추세도 비용을 넘지 못했다(R1과 같은 
 Do not retry: 다른 코인 쌍(SOL/BTC 등), lookback·밴드·목표 변동성 조정.
 근거: [21 후보 비교](../research/21-futures-candidates-3.md), [22 사전등록·§5 결과](../research/22-p1-pair-preregistration.md).
 
+## O/v1 — PASS (2026-09-24, 비용·위험 판정)
+
+Hypothesis: T/v2 목표 비중 × 1.5 총 노출(추가분 USD-M 무기한 롱, 선물 ≤ 3 × 선물 지갑, 추세 신호 청산)이 funding·비용·위험 한도를 반영해도 T/v2 단독보다 계좌 순수익을 늘린다.
+판정 2020-03~2026-08 (1회): 정지 0 · 청산 0 · MDD 23.1% ≤ 25% · CAGR 33.3% > 23.4% · 두 절반 모두 B > A → **PASS**.
+샤프 1.22(A 1.27). 선물 가격 +22,037 · funding −4,749 · 비용 −6,632(A 3,342). 일 손실 발동 105일. 2025~2026은 A·B 모두 연 2~4%.
+Learned: 우위가 있는 수익원(T 롱)에는 레버리지가 수익을 늘린다 — 캐리(K)와 다르다. 다만 샤프는 오르지 않았고(funding·비용), MDD가 비례해 커져 25%에 가깝다.
+통계 증명 아님: 증분 샤프 1.10, 6.5년 최소 검출 1.11(24 §4). 이미 본 구간 → OOS 아님.
+Do not retry: 2배·다른 레버리지 상한·일 손실 처리 변경으로 재판정.
+근거: [23 검토](../research/23-t2-futures-overlay-review.md), [24 사전등록·§9 결과](../research/24-o-overlay-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
