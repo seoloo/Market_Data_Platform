@@ -48,7 +48,7 @@ def test_triggers_and_results_never_depend_on_later_bars() -> None:
 
 
 def test_scenario_list_top_agrees_with_top1_and_ranks_pessimistically() -> None:
-    from auto_trading.research.elliott.scanner import scenario_list
+    from auto_trading.research.elliott.scanner import SCENARIO_SET_SIZE, scenario_list
 
     path = build_path(random.Random(5), "IMPULSE", 0.5, 0.04, 0.001)
     triggers, hours = _scan(path.minutes, path.four_hour)
@@ -65,6 +65,6 @@ def test_scenario_list_top_agrees_with_top1_and_ranks_pessimistically() -> None:
         first = scen.ranked[0][0]
         ties = sum(1 for _, k in scen.ranked if k == best_key)
         assert scen.pessimistic_rank(first) == ties
-        assert len(scen.top) == min(10, scen.total)
+        assert len(scen.top) == min(SCENARIO_SET_SIZE, scen.total)
         checked += 1
     assert checked > 0

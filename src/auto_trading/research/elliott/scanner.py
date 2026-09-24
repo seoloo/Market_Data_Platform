@@ -39,8 +39,8 @@ __all__ = [
 
 LOOKBACK_BARS = 360
 """시작 후보는 E 의 4h 봉에서 360 봉(60일) 이내 (문서 34 §3)."""
-SCENARIO_SET_SIZE = 10
-"""JEV 에 넘길 시나리오 묶음 크기 (문서 39 §2)."""
+SCENARIO_SET_SIZE = 50
+"""JEV 에 넘길 시나리오 묶음 크기 — 연구용 기본값, 최종 아님 (문서 39 §6)."""
 
 
 @dataclass(frozen=True, slots=True)

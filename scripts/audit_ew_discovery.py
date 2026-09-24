@@ -30,7 +30,8 @@ from auto_trading.research.elliott.synthetic import SyntheticPath, build_path  #
 
 SEEDS = {"dev": 20260924, "holdout": 20260926}
 RESERVED_FOR_JEV = 20260927
-KS = (1, 3, 10)
+KS = (1, 3, 10, 20, 30, 50, 100)
+GATE_N = 50  # 문서 39 §6
 
 
 def _one(path: SyntheticPath) -> dict[str, object]:
@@ -83,8 +84,10 @@ def _summary(rows: list[dict[str, object]]) -> dict[str, object]:
         "inclusion_full_list": round(len(included) / total, 4),
         "candidates_median": median(ns) if ns else None,
         "candidates_p90": quantiles(ns, n=10)[-1] if len(ns) >= 2 else None,
-        "span_match_top10": round(
-            sum(1 for r in rows if r["span_rank"] is not None and int(str(r["span_rank"])) <= 10)
+        "span_match_top50": round(
+            sum(
+                1 for r in rows if r["span_rank"] is not None and int(str(r["span_rank"])) <= GATE_N
+            )
             / total,
             4,
         ),
@@ -121,8 +124,8 @@ def main(argv: list[str]) -> int:
             **s,
             "gate_pass": all(
                 float(str(v["inclusion_full_list"])) >= 0.8
-                and float(str(v["top10"])) >= 0.5
-                and float(str(v["top10"])) >= 2 * float(str(v["random_top10"]))
+                and float(str(v[f"top{GATE_N}"])) >= 0.5
+                and float(str(v[f"top{GATE_N}"])) >= 2 * float(str(v[f"random_top{GATE_N}"]))
                 for v in s.values()
             ),
         }
