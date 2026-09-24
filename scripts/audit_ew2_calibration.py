@@ -134,7 +134,13 @@ def _synthetic_one(path: SyntheticPath, degree_id: str, parent_index: int) -> di
                 degree_id=degree_id, child_degree_id="EW2", child_levels=cut,
             )  # fmt: skip
             pattern = WavePattern(path.pattern)
-            record = next(r for r in snap.records if r.scenario.pattern is pattern)
+            record = next((r for r in snap.records if r.scenario.pattern is pattern), None)
+            if record is None:  # 마지막 UNKNOWN 뒤 후보 부족 등 — 사유를 상태로 기록
+                return {
+                    "detected": detected,
+                    "legs": legs,
+                    "scenario": {"evaluated": True, "status": str(snap.reason)},
+                }
             expected = EXPECTED_SUBDIVISIONS[pattern]
             proofs = record.scenario.subdivisions
             ok = (
