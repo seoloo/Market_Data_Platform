@@ -1,0 +1,14 @@
+# 유휴 현금 이자 — Paper 보고용 가정 (docs/research/29 C1). 실제 예치·주문은 없다.
+#
+# Binance Simple Earn USDT 유동형(Flexible) 이자율을 사용자가 앱에서 확인한 날짜와 함께 적는다.
+# 이자율이 바뀌면 아래에 새 항목을 **추가**한다 (지난 항목은 고치지 않는다 — 과거 계산이 바뀌지 않게).
+# 첫 항목 이전 날짜에는 첫 항목을 쓴다.
+#
+# 선물 원장(O/v1·O/v2)은 선물 명목의 절반(margin_reserve)을 선물 지갑에 남기고 나머지만 유휴로 본다.
+margin_reserve: 0.5
+rates:
+  - from: 2026-09-24
+    source: "사용자 확인 (Binance 앱, Simple Earn USDT 유동형)"
+    tiers:
+      - {up_to: 1000, apr: 0.0708}   # 소액 우대 구간 — 기간 한정일 수 있다
+      - {up_to: null, apr: 0.0308}

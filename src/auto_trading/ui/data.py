@@ -1,6 +1,7 @@
 """대시보드 데이터 — DB 를 **읽기 전용**으로 열고 보고서 파일을 읽는다. 쓰지 않는다.
 
-import 는 core·storage 만 한다(import-linter 계약). 그래서 원장 재계산·판정은 하지 않고,
+import 는 core·storage 만 한다(import-linter 계약). 설정은 YAML 파일을
+직접 읽는다. 그래서 원장 재계산·판정은 하지 않고,
 그 결과를 남긴 곳(일일 점검 JSON, 훈련 보고서, 연구 기록)을 읽어 보여 준다.
 
 읽다가 실패한 부분은 ``errors`` 에 적고 나머지를 계속 보여 준다 — 화면이 통째로 죽지 않게.
@@ -13,11 +14,14 @@ import json
 import re
 import sqlite3
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from auto_trading.core.cash_yield import RateSchedule, Tier, with_cash_yield
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.storage.db import connect_read_only
 from auto_trading.storage.repositories.paper_days import PaperDay, PaperDayRepository
@@ -77,6 +81,10 @@ class LedgerView:
     stop_hits: int = 0
     liquidations: int = 0
     halted: bool = False
+    idle: tuple[float, ...] = ()
+    """날마다 마감 뒤 유휴 현금 / 자본 (이자 가정의 근거)."""
+    with_yield: tuple[Point, ...] = ()
+    """유휴 현금 이자를 더한 가정 경로 (config/cash_yield.yaml). 원장이 아니다."""
 
     @property
     def equity(self) -> float:
@@ -148,6 +156,8 @@ class DashboardData:
     research: tuple[ResearchEntry, ...]
     backtests: tuple[BacktestRow, ...]
     errors: tuple[str, ...] = field(default_factory=tuple)
+    cash_yield: str = ""
+    """이자 가정 설명 (없으면 빈 문자열)."""
 
 
 def _day(decision_ms: int) -> int:
@@ -177,11 +187,20 @@ def _t2_view(rows: Sequence[PaperDay]) -> LedgerView:
         exposure=sum(h.weight for h in holdings),
         holdings=tuple(holdings),
         trades_today=len(last.executed),
+        idle=tuple(float(r.holdings.get("USDT", "0")) / float(r.equity) for r in rows),
     )
 
 
+def _overlay_idle(row: OverlayPaperDay, reserve: float) -> float:
+    """선물 지갑 현금 − 선물 명목 × reserve (증거금으로 남길 몫) = 예치할 수 있는 현금."""
+    futures = sum(
+        float(q) * float(row.market["perp"][s][1]) for s, q in row.state["fut_qty"].items()
+    )
+    return max(float(row.state["wallet"]) - reserve * futures, 0.0) / row.equity
+
+
 def _overlay_view(
-    key: str, name: str, subtitle: str, rows: Sequence[OverlayPaperDay]
+    key: str, name: str, subtitle: str, rows: Sequence[OverlayPaperDay], reserve: float
 ) -> LedgerView:
     points = tuple(Point(_day(r.decision_ms), r.equity) for r in rows)
     last = rows[-1]
@@ -214,6 +233,7 @@ def _overlay_view(
         stop_hits=sum(int(r.tally.get("stop_hits", 0)) for r in rows),
         liquidations=sum(int(r.tally.get("liquidations", 0)) for r in rows),
         halted=last.state.get("halted_day") is not None,
+        idle=tuple(_overlay_idle(r, reserve) for r in rows),
     )
 
 
@@ -365,11 +385,48 @@ def _backtests(reports: Path, errors: list[str]) -> tuple[BacktestRow, ...]:
     return tuple(rows)
 
 
+def _schedule(path: Path, errors: list[str]) -> tuple[RateSchedule | None, float, str]:
+    """``config/cash_yield.yaml`` → (이자율 일정, 선물 증거금 남길 비율, 설명)."""
+    if not path.is_file():
+        return None, 0.5, ""
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        entries = []
+        for item in doc["rates"]:
+            start = datetime.fromisoformat(str(item["from"])).replace(tzinfo=UTC)
+            tiers = tuple(
+                Tier(None if t["up_to"] is None else float(t["up_to"]), float(t["apr"]))
+                for t in item["tiers"]
+            )
+            entries.append((int(start.timestamp() * 1000), tiers))
+        schedule = RateSchedule(tuple(entries))
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
+        errors.append(f"이자 가정 읽기 실패: {type(exc).__name__}")
+        return None, 0.5, ""
+    latest = doc["rates"][-1]
+    tiers = " · ".join(
+        f"{t['apr'] * 100:.2f}%" + (f"(≤{t['up_to']:,} USDT)" if t["up_to"] is not None else "")
+        for t in latest["tiers"]
+    )
+    return schedule, float(doc.get("margin_reserve", 0.5)), f"{tiers} · {latest['from']} 확인"
+
+
+def _apply_yield(view: LedgerView, schedule: RateSchedule) -> LedgerView:
+    path = with_cash_yield(
+        [p.day_ms for p in view.points], [p.equity for p in view.points], view.idle, schedule
+    )
+    return replace(
+        view,
+        with_yield=tuple(Point(p.day_ms, e) for p, e in zip(view.points, path, strict=True)),
+    )
+
+
 def load_dashboard(root: Path, now_ms: int) -> DashboardData:
     """저장소 루트 아래의 DB·보고서를 읽는다. 쓰기 없음."""
     errors: list[str] = []
     ledgers: list[LedgerView] = []
     benchmark: tuple[Point, ...] = ()
+    schedule, reserve, yield_note = _schedule(root / "config" / "cash_yield.yaml", errors)
     db = root / "data" / "trading.db"
     try:
         conn = connect_read_only(db)
@@ -383,15 +440,17 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
             overlay = OverlayPaperDayRepository(conn)
             o1 = overlay.all("o1_overlay")
             if o1:
-                ledgers.append(_overlay_view("o1", "O/v1", "추가 노출", o1))
+                ledgers.append(_overlay_view("o1", "O/v1", "추가 노출", o1, reserve))
                 benchmark = _benchmark(o1)
             o2 = overlay.all("o2_stop")
             if o2:
-                ledgers.append(_overlay_view("o2", "O/v2", "추가 노출 + 비상 스톱", o2))
+                ledgers.append(_overlay_view("o2", "O/v2", "추가 노출 + 비상 스톱", o2, reserve))
         except (sqlite3.Error, KeyError, ValueError, TypeError) as exc:
             errors.append(f"원장 읽기 실패: {type(exc).__name__}: {exc}")
         finally:
             conn.close()
+    if schedule is not None:
+        ledgers = [_apply_yield(lg, schedule) for lg in ledgers]
     reports = root / "reports"
     return DashboardData(
         now_ms=now_ms,
@@ -402,4 +461,5 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
         research=_research(root / "docs" / "current" / "RESEARCH_HISTORY.md", errors),
         backtests=_backtests(reports, errors),
         errors=tuple(errors),
+        cash_yield=yield_note,
     )

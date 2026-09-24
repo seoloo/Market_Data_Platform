@@ -50,6 +50,20 @@ def _pct(x: float | None, digits: int = 2) -> str:
     return f'<span class="{cls}">{x * 100:+.{digits}f}%</span>'
 
 
+def _money2(x: float | None) -> str:
+    return "—" if x is None else f"{x:,.2f}"
+
+
+def _yield_note(data: DashboardData) -> str:
+    if not data.cash_yield:
+        return ""
+    return (
+        f'<div class="foot">현금 이자 가정: 쉬는 현금을 USDT 유동형 예치에 둔다고 보고 계산한 값 '
+        f"({escape(data.cash_yield)}, config/cash_yield.yaml). 선물 원장은 선물 명목의 절반을 "
+        "증거금으로 남긴다. 원장이 아니며 실제 예치는 없다.</div>"
+    )
+
+
 def _money(x: float | None) -> str:
     return "" if x is None else f"{x:,.0f}"
 
@@ -160,7 +174,17 @@ def _ledger_card(lg: LedgerView) -> str:
         f'<div class="big">{lg.equity:,.2f} <span class="sub">USDT</span></div>'
         f"<div>{_pct(lg.change)} "
         f'<span class="mute">시작 대비 · 노출 {lg.exposure:.2f}배</span></div>'
-        f'<div class="sub">{extra}</div></div>'
+        f'<div class="sub">{extra}</div>{_yield_line(lg)}</div>'
+    )
+
+
+def _yield_line(lg: LedgerView) -> str:
+    if not lg.with_yield:
+        return ""
+    gain = lg.with_yield[-1].equity - lg.equity
+    return (
+        f'<div class="sub">현금 이자 가정 시 {lg.with_yield[-1].equity:,.2f} '
+        f'<span class="pos">({gain:+,.2f})</span></div>'
     )
 
 
@@ -319,7 +343,8 @@ def _compare(data: DashboardData) -> str:
     fw = "".join(
         f"<tr><td>{escape(lg.name)}</td><td class='num'>{len(lg.points)}</td>"
         f"<td class='num'>{lg.equity:,.2f}</td><td class='num'>{_pct(lg.change)}</td>"
-        f"<td class='num'>{lg.drawdown * 100:.1f}%</td></tr>"
+        f"<td class='num'>{lg.drawdown * 100:.1f}%</td>"
+        f"<td class='num'>{_money2(lg.with_yield[-1].equity if lg.with_yield else None)}</td></tr>"
         for lg in data.ledgers
     )
     if data.benchmark:
@@ -328,7 +353,7 @@ def _compare(data: DashboardData) -> str:
             f"<tr><td>현물 50/50 보유</td><td class='num'>{len(b)}</td>"
             f"<td class='num'>{b[-1].equity:,.2f}</td>"
             f"<td class='num'>{_pct(b[-1].equity / b[0].equity - 1)}</td>"
-            "<td class='num'>—</td></tr>"
+            "<td class='num'>—</td><td class='num'>—</td></tr>"
         )
     insurance = ""
     if "o1" in by_key and "o2" in by_key:
@@ -341,7 +366,8 @@ def _compare(data: DashboardData) -> str:
         f"{_chart_panel(data)}"
         '<div class="panel"><h2>전향 관찰 (Paper, 처음 보는 데이터)</h2><table><tr><th>원장</th>'
         "<th class='num'>일수</th><th class='num'>가상 자산</th><th class='num'>시작 대비</th>"
-        f"<th class='num'>고점 대비</th></tr>{fw}</table>{insurance}</div>"
+        f"<th class='num'>고점 대비</th><th class='num'>현금 이자 가정</th></tr>{fw}</table>"
+        f"{insurance}{_yield_note(data)}</div>"
         '<div class="panel"><h2>백테스트 (2020-03 ~ 2026-08, 1회 판정 · 이미 본 구간)</h2><table>'
         "<tr><th>전략</th><th class='num'>연 수익률</th><th class='num'>최대 낙폭</th>"
         f"<th class='num'>샤프</th><th class='num'>최종 (시작 10,000)</th></tr>{bt}</table>"

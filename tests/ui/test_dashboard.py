@@ -87,6 +87,17 @@ def build_root(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "cash_yield.yaml").write_text(
+        "margin_reserve: 0.5\n"
+        "rates:\n"
+        "  - from: 2020-01-01\n"
+        "    source: test\n"
+        "    tiers:\n"
+        "      - {up_to: 1000, apr: 0.0708}\n"
+        "      - {up_to: null, apr: 0.0308}\n",
+        encoding="utf-8",
+    )
     docs = tmp_path / "docs" / "current"
     docs.mkdir(parents=True)
     (docs / "RESEARCH_HISTORY.md").write_text(
@@ -124,6 +135,22 @@ class TestData:
         ]
         assert data.research[0].summary == "판정 통과"  # 마크다운 기호 제거
         assert any("stream-broken.json" in e for e in data.errors)  # 손상 파일은 건너뛰고 알린다
+
+    def test_cash_yield_assumption_is_added_beside_the_ledger(self, root: Path) -> None:
+        data = load_dashboard(root, P0 + 11 * D)
+        assert "3.08%" in data.cash_yield
+        for lg in data.ledgers:
+            assert len(lg.with_yield) == len(lg.points)
+            assert lg.with_yield[0].equity == lg.points[0].equity  # 첫날은 원장과 같다
+            assert lg.with_yield[-1].equity > lg.points[-1].equity  # 유휴 현금이 있었다
+            assert all(0.0 <= x <= 1.0 for x in lg.idle)
+        html = render_page(data, "compare")
+        assert "현금 이자 가정" in html and "실제 예치는 없다" in html
+
+    def test_no_cash_yield_file_means_no_assumption(self, root: Path) -> None:
+        (root / "config" / "cash_yield.yaml").unlink()
+        data = load_dashboard(root, P0 + 11 * D)
+        assert data.cash_yield == "" and all(not lg.with_yield for lg in data.ledgers)
 
     def test_missing_db_is_reported_not_created(self, tmp_path: Path) -> None:
         data = load_dashboard(tmp_path, 0)
