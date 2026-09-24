@@ -46,11 +46,14 @@ class LegSubdivision(StrEnum):
 
 class ProofSource(StrEnum):
     SYNTHETIC_FIXTURE = "SYNTHETIC_FIXTURE"
+    H4_DEGREE_LADDER = "H4_DEGREE_LADDER"
+    """바로 아래 degree 의 4h 후보 증거로 읽은 하위 구조 (33 §16). 해상도 한계 때문에
+    불일치는 FAIL 이 아니라 보류(CONFLICT)이고, 읽지 못하면 UNKNOWN 모양을 허용한다."""
 
 
 @dataclass(frozen=True, slots=True)
 class LegSubdivisionProof:
-    """하위파 표식의 구간·가용 시각. 현재는 합성 fixture만 인증한다."""
+    """하위파 표식의 구간·가용 시각. 합성 fixture 또는 4h degree 사다리 출처만 인증한다."""
 
     shape: LegSubdivision
     start_four_hour_open_ms: int
@@ -59,6 +62,10 @@ class LegSubdivisionProof:
     timeframe: Timeframe
     source: ProofSource
     source_id: str
+    child_leg_count: int | None = None
+    """사다리 출처: 바로 아래 degree 에서 보이는 하위 다리 수 (정렬 실패면 None)."""
+    reason: str | None = None
+    """사다리 출처에서 모양이 UNKNOWN 인 이유 (33 §16)."""
 
 
 class ParentRole(StrEnum):
@@ -169,9 +176,12 @@ def validate_scenario(
             if (
                 not isinstance(proof, LegSubdivisionProof)
                 or not isinstance(proof.shape, LegSubdivision)
-                or proof.shape is LegSubdivision.UNKNOWN
+                or not isinstance(proof.source, ProofSource)
+                or (
+                    proof.shape is LegSubdivision.UNKNOWN
+                    and (proof.source is not ProofSource.H4_DEGREE_LADDER or not proof.reason)
+                )
                 or proof.timeframe is not Timeframe.H4
-                or proof.source is not ProofSource.SYNTHETIC_FIXTURE
                 or not proof.source_id
                 or proof.start_four_hour_open_ms != anchors[index].extreme_four_hour_open_ms
                 or proof.end_four_hour_open_ms != anchors[index + 1].extreme_four_hour_open_ms
@@ -181,6 +191,7 @@ def validate_scenario(
             ):
                 raise DataIntegrityError("하위파 증거의 출처·4h 구간·가용 시각이 유효하지 않다")
     required = 4 if scenario.pattern is WavePattern.ZIGZAG else 6
+    expected_subdivisions = EXPECTED_SUBDIVISIONS[scenario.pattern]
     if len(anchors) < required:
         return _assessment(
             scenario,
@@ -201,26 +212,12 @@ def validate_scenario(
         )
     failures = _anchor_failures(anchors, scenario.direction)
     pending: list[str] = []
-    expected_subdivisions: tuple[LegSubdivision, ...]
     if scenario.pattern is WavePattern.IMPULSE:
-        shape_failures, shape_pending = _impulse(anchors, closed, scenario.direction)
-        expected_subdivisions = (
-            LegSubdivision.MOTIVE_FIVE,
-            LegSubdivision.CORRECTIVE_THREE,
-            LegSubdivision.IMPULSE_FIVE,
-            LegSubdivision.CORRECTIVE_THREE,
-            LegSubdivision.MOTIVE_FIVE,
-        )
+        shape_failures, shape_pending = impulse_rules(anchors, closed, scenario.direction)
     elif scenario.pattern is WavePattern.ZIGZAG:
         shape_failures, shape_pending = _zigzag(anchors, scenario.direction)
-        expected_subdivisions = (
-            LegSubdivision.MOTIVE_FIVE,
-            LegSubdivision.CORRECTIVE_THREE,
-            LegSubdivision.MOTIVE_FIVE,
-        )
     else:
-        shape_failures, shape_pending = _ending_diagonal(anchors, scenario.direction)
-        expected_subdivisions = (LegSubdivision.CORRECTIVE_THREE,) * 5
+        shape_failures, shape_pending = ending_diagonal_rules(anchors, scenario.direction)
         if scenario.parent_role is ParentRole.OTHER:
             shape_failures.append("ENDING_PARENT_NOT_5_OR_C")
         elif scenario.parent_role is ParentRole.UNKNOWN:
@@ -231,18 +228,21 @@ def validate_scenario(
         GrammarStatus.FAIL if failures else GrammarStatus.PENDING if pending else GrammarStatus.PASS
     )
 
-    supplied = tuple(proof.shape for proof in scenario.subdivisions) or (
-        LegSubdivision.UNKNOWN,
-    ) * (required - 1)
-    for index, (actual, expected_shape) in enumerate(
+    supplied: tuple[LegSubdivisionProof | None, ...] = scenario.subdivisions or (None,) * (
+        required - 1
+    )
+    for index, (supplied_proof, expected_shape) in enumerate(
         zip(supplied, expected_subdivisions, strict=True), 1
     ):
+        actual = LegSubdivision.UNKNOWN if supplied_proof is None else supplied_proof.shape
         if actual is LegSubdivision.UNKNOWN:
             pending.append(f"LEG_{index}_SUBDIVISION_UNVERIFIED")
-        elif actual is not expected_shape and not (
-            expected_shape is LegSubdivision.MOTIVE_FIVE and actual is LegSubdivision.IMPULSE_FIVE
-        ):
-            failures.append(f"LEG_{index}_SUBDIVISION_MISMATCH")
+        elif not subdivision_matches(expected_shape, actual):
+            assert supplied_proof is not None
+            if supplied_proof.source is ProofSource.H4_DEGREE_LADDER:
+                pending.append(f"LEG_{index}_SUBDIVISION_CONFLICT")
+            else:
+                failures.append(f"LEG_{index}_SUBDIVISION_MISMATCH")
     status = (
         GrammarStatus.FAIL if failures else GrammarStatus.PENDING if pending else GrammarStatus.PASS
     )
@@ -268,6 +268,38 @@ def _assessment(
     )
 
 
+EXPECTED_SUBDIVISIONS: dict[WavePattern, tuple[LegSubdivision, ...]] = {
+    WavePattern.IMPULSE: (
+        LegSubdivision.MOTIVE_FIVE,
+        LegSubdivision.CORRECTIVE_THREE,
+        LegSubdivision.IMPULSE_FIVE,
+        LegSubdivision.CORRECTIVE_THREE,
+        LegSubdivision.MOTIVE_FIVE,
+    ),
+    WavePattern.ZIGZAG: (
+        LegSubdivision.MOTIVE_FIVE,
+        LegSubdivision.CORRECTIVE_THREE,
+        LegSubdivision.MOTIVE_FIVE,
+    ),
+    WavePattern.ENDING_DIAGONAL: (LegSubdivision.CORRECTIVE_THREE,) * 5,
+}
+"""패턴별 각 다리에 요구되는 하위파 모양."""
+
+
+def subdivision_matches(expected: LegSubdivision, actual: LegSubdivision) -> bool:
+    """motive 자리에는 impulse 도 허용한다. UNKNOWN 은 일치가 아니다."""
+    if actual is LegSubdivision.UNKNOWN:
+        return False
+    return actual is expected or (
+        expected is LegSubdivision.MOTIVE_FIVE and actual is LegSubdivision.IMPULSE_FIVE
+    )
+
+
+def anchor_failures(anchors: list[FourHourPivotEvidence], direction: int) -> list[str]:
+    """꼭짓점 시작 종류·시간 순서·고저 교대 검사 (하위 degree 읽기에서도 재사용)."""
+    return _anchor_failures(anchors, direction)
+
+
 def _anchor_failures(anchors: list[FourHourPivotEvidence], direction: int) -> list[str]:
     first_kind = SwingKind.LOW if direction > 0 else SwingKind.HIGH
     failures: list[str] = []
@@ -284,9 +316,10 @@ def _anchor_failures(anchors: list[FourHourPivotEvidence], direction: int) -> li
     return failures
 
 
-def _impulse(
-    anchors: list[FourHourPivotEvidence], bars: tuple[Candle, ...], direction: int
+def impulse_rules(
+    anchors: list[FourHourPivotEvidence], bars: Sequence[Candle], direction: int
 ) -> tuple[list[str], list[str]]:
+    """여섯 꼭짓점 impulse 엄격 규칙 (실패, 보류). 하위 degree 읽기에서도 같은 규칙을 쓴다."""
     q = [direction * anchor.price for anchor in anchors]
     lengths = [abs(q[index] - q[index - 1]) for index in range(1, 6)]
     failures: list[str] = []
@@ -331,9 +364,10 @@ def _zigzag(anchors: list[FourHourPivotEvidence], direction: int) -> tuple[list[
     return failures, []
 
 
-def _ending_diagonal(
+def ending_diagonal_rules(
     anchors: list[FourHourPivotEvidence], direction: int
 ) -> tuple[list[str], list[str]]:
+    """여섯 꼭짓점 수렴 대각선 기하 (실패, 보류)."""
     q = [direction * anchor.price for anchor in anchors]
     lengths = [abs(q[index] - q[index - 1]) for index in range(1, 6)]
     failures: list[str] = []

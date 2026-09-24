@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from auto_trading.core.enums import Timeframe
+from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
 from auto_trading.research.elliott.intrabar import (
@@ -19,6 +20,7 @@ from auto_trading.research.elliott.intrabar import (
     audit_intrabar_extrema,
 )
 from auto_trading.research.elliott.pivots import (
+    EW0_THRESHOLD_PCT,
     GuardedExtremaState,
     closed_ew0_candles,
 )
@@ -78,9 +80,27 @@ def replay_minute_groups(
     모든 Elliott 라벨은 4h 이상으로 제한된다. 이 반환값은 분봉의
     경로·품질 감사 사건일 뿐 1m 파동 판단이나 실거래 입력이 아니다.
     """
+    return replay_minute_groups_ladder(
+        four_hour_candles, minute_groups, as_of_ms, (EW0_THRESHOLD_PCT,)
+    )[0]
+
+
+def replay_minute_groups_ladder(
+    four_hour_candles: Sequence[Candle],
+    minute_groups: Iterable[Sequence[Candle]],
+    as_of_ms: int,
+    thresholds: Sequence[Decimal],
+) -> tuple[MinutePathReplay, ...]:
+    """같은 1m 경로를 여러 반전 임계(degree 사다리)로 한 번에 재생한다.
+
+    4h 품질 차단은 임계와 무관하게 모든 degree 에 똑같이 적용한다. 분 단위 모호함은
+    임계마다 다르므로 상태 기계별로 따로 기록한다. 순서는 ``thresholds`` 와 같다.
+    """
+    if not thresholds or list(thresholds) != sorted(set(thresholds)):
+        raise DataIntegrityError("degree 임계는 비어 있지 않은 오름차순이어야 한다")
     closed = closed_ew0_candles(four_hour_candles, as_of_ms)
     supplied_groups = iter(minute_groups)
-    state = GuardedExtremaState()
+    states = [GuardedExtremaState(threshold) for threshold in thresholds]
     blocked: list[BlockedFourHour] = []
     for outer in closed:
         supplied = next(supplied_groups, ())
@@ -88,29 +108,36 @@ def replay_minute_groups(
         if audit.order is ExtremumOrder.UNKNOWN:
             assert audit.reason is not None
             blocked.append(BlockedFourHour(outer.open_ms, audit.reason))
-            state.break_segment()
+            for state in states:
+                state.break_segment()
             continue
         for minute in supplied:
             if outer.open_ms <= minute.open_ms < outer.open_ms + Timeframe.H4.ms:
-                state.feed(minute)
+                for state in states:
+                    state.feed(minute)
 
-    swing_segments, ambiguous_minutes = state.snapshot()
-    segments = tuple(
-        tuple(
-            MinutePathPivot(
-                kind=swing.kind,
-                price=swing.price,
-                extreme_minute_ms=swing.at_ms,
-                confirmation_minute_close_ms=swing.confirmed_at_ms,
-                available_at_ms=Timeframe.H4.close_ms_of(swing.confirmed_at_ms),
+    replays: list[MinutePathReplay] = []
+    for state in states:
+        swing_segments, ambiguous_minutes = state.snapshot()
+        segments = tuple(
+            tuple(
+                MinutePathPivot(
+                    kind=swing.kind,
+                    price=swing.price,
+                    extreme_minute_ms=swing.at_ms,
+                    confirmation_minute_close_ms=swing.confirmed_at_ms,
+                    available_at_ms=Timeframe.H4.close_ms_of(swing.confirmed_at_ms),
+                )
+                for swing in swing_segment.swings
             )
-            for swing in swing_segment.swings
+            for swing_segment in swing_segments
         )
-        for swing_segment in swing_segments
-    )
-    return MinutePathReplay(
-        segments=segments,
-        ambiguous_minute_open_ms=ambiguous_minutes,
-        blocked_four_hours=tuple(blocked),
-        as_of_ms=as_of_ms,
-    )
+        replays.append(
+            MinutePathReplay(
+                segments=segments,
+                ambiguous_minute_open_ms=ambiguous_minutes,
+                blocked_four_hours=tuple(blocked),
+                as_of_ms=as_of_ms,
+            )
+        )
+    return tuple(replays)

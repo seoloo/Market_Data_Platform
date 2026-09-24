@@ -1,7 +1,7 @@
 """4h 증거의 고정 rolling 창에서 최대 세 문법 가설만 만든다.
 
-시장 하위파 parser가 없으므로 생성 가설에는 증명된 subdivision이 없다.
-이 출력은 연구용 분석 기록이며 주문·손절·확률이 아니다.
+하위 degree 증거(33 §16)를 주면 각 다리의 하위 구조를 읽어 붙이고, 주지 않으면
+하위파는 미검증으로 남는다. 이 출력은 연구용 분석 기록이며 주문·손절·확률이 아니다.
 """
 
 from __future__ import annotations
@@ -10,14 +10,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from itertools import pairwise
 
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
+from auto_trading.research.elliott.degrees import check_aligned, leg_proof, read_leg
 from auto_trading.research.elliott.grammar import (
     GrammarAssessment,
     GrammarScenario,
     GrammarStatus,
+    LegSubdivisionProof,
     WavePattern,
     validate_scenarios,
 )
@@ -59,18 +62,27 @@ class CandidateSnapshot:
     reason: str | None
     confidence: str = "UNCALIBRATED_RULE_SUPPORT_ONLY"
     probability: None = None
+    degree_id: str = "EW0"
+    child_degree_id: str | None = None
 
 
 def generate_bounded_candidates(
     four_hour_candles: Sequence[Candle],
     evidence: Sequence[FourHourEvidence],
     as_of_ms: int,
+    *,
+    degree_id: str = "EW0",
+    child_evidence: Sequence[FourHourEvidence] | None = None,
+    child_degree_id: str | None = None,
 ) -> CandidateSnapshot:
     """최신 연속 구간의 마지막 N개 후보만 쓰며, 패턴당 가설은 하나다.
 
     N=6(impulse/ending), N=4(zigzag). 중간 후보 선택·생략이나
     성과에 따른 검색은 하지 않는다. UNKNOWN은 새 구간 경계다.
+    ``child_evidence`` 는 바로 아래 degree 의 같은 4h 격자 증거다.
     """
+    if (child_evidence is None) != (child_degree_id is None):
+        raise DataIntegrityError("하위 degree 증거와 ID 는 함께 줘야 한다")
     closed = closed_ew0_candles(four_hour_candles, as_of_ms)
     if not closed or closed[-1].close_ms != as_of_ms:
         raise DataIntegrityError("마지막 완성 4h 마감에서만 후보를 생성한다")
@@ -102,8 +114,13 @@ def generate_bounded_candidates(
     ]
     if len(candidate_indices) < 2:
         return CandidateSnapshot(
-            as_of_ms, (), last_unknown_close_ms, len(candidate_indices), "INSUFFICIENT_ANCHORS"
-        )
+            as_of_ms, (), last_unknown_close_ms, len(candidate_indices), "INSUFFICIENT_ANCHORS",
+            degree_id=degree_id, child_degree_id=child_degree_id,
+        )  # fmt: skip
+    child_prefix: tuple[FourHourEvidence, ...] | None = None
+    if child_evidence is not None:
+        child_prefix = tuple(item for item in child_evidence if item.close_ms <= as_of_ms)
+        check_aligned(closed, child_prefix)
 
     scenarios: list[GrammarScenario] = []
     for pattern, required in (
@@ -117,13 +134,20 @@ def generate_bounded_candidates(
         if first is None:
             raise DataIntegrityError("CANDIDATE의 피벗 증거가 없다")
         direction = 1 if first.kind is SwingKind.LOW else -1
+        proofs: tuple[LegSubdivisionProof, ...] = ()
+        if child_prefix is not None and child_degree_id is not None:
+            legs = [item.candidate for item in window if item.candidate is not None]
+            proofs = tuple(
+                leg_proof(read_leg(closed, child_prefix, a, b, as_of_ms), a, b, child_degree_id)
+                for a, b in pairwise(legs)
+            )
         scenarios.append(
             GrammarScenario(
-                scenario_id=f"EW0:{pattern.value}:{window[0].close_ms}:{as_of_ms}",
+                scenario_id=f"{degree_id}:{pattern.value}:{window[0].close_ms}:{as_of_ms}",
                 pattern=pattern,
                 direction=direction,
                 evidence=window,
-                subdivisions=(),
+                subdivisions=proofs,
             )
         )
     assessments = validate_scenarios(closed, scenarios, as_of_ms)
@@ -165,5 +189,6 @@ def generate_bounded_candidates(
             )
         records.append(CandidateRecord(scenario, assessment, state, invalidation))
     return CandidateSnapshot(
-        as_of_ms, tuple(records), last_unknown_close_ms, len(candidate_indices), None
-    )
+        as_of_ms, tuple(records), last_unknown_close_ms, len(candidate_indices), None,
+        degree_id=degree_id, child_degree_id=child_degree_id,
+    )  # fmt: skip

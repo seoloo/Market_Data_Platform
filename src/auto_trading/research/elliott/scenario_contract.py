@@ -27,7 +27,14 @@ from auto_trading.research.elliott.candidates import (
     CandidateSnapshot,
     HypothesisStatus,
 )
-from auto_trading.research.elliott.grammar import GrammarStatus, WavePattern
+from auto_trading.research.elliott.grammar import (
+    EXPECTED_SUBDIVISIONS,
+    GrammarStatus,
+    LegSubdivision,
+    ProofSource,
+    WavePattern,
+    subdivision_matches,
+)
 from auto_trading.research.elliott.h4_evidence import EvidenceStatus, FourHourPivotEvidence
 
 __all__ = [
@@ -323,15 +330,77 @@ def _invalidations(
     return levels
 
 
+def _is_leg_subdivision_rule(rule: str) -> bool:
+    return rule.startswith("LEG_") and "_SUBDIVISION_" in rule
+
+
+def _leg_checks(record: CandidateRecord) -> list[HardCheck]:
+    """다리별 하위파 판정. 문법의 조기 반환(꼭짓점 미완성)과 무관하게 증거에서 직접 계산한다."""
+    scenario = record.scenario
+    expected = EXPECTED_SUBDIVISIONS[scenario.pattern]
+    checks: list[HardCheck] = []
+    for index, proof in enumerate(scenario.subdivisions[: len(expected)], 1):
+        if proof.shape is LegSubdivision.UNKNOWN:
+            checks.append(HardCheck(f"LEG_{index}_SUBDIVISION", CheckStatus.UNVERIFIED))
+        elif subdivision_matches(expected[index - 1], proof.shape):
+            checks.append(HardCheck(f"LEG_{index}_SUBDIVISION", CheckStatus.PASS))
+        elif proof.source is ProofSource.H4_DEGREE_LADDER:
+            checks.append(HardCheck(f"LEG_{index}_SUBDIVISION_CONFLICT", CheckStatus.PENDING))
+        else:
+            checks.append(HardCheck(f"LEG_{index}_SUBDIVISION_MISMATCH", CheckStatus.FAIL))
+    return checks
+
+
 def _hard_checks(record: CandidateRecord) -> list[HardCheck]:
     a = record.assessment
-    checks = [HardCheck(rule, CheckStatus.FAIL) for rule in a.failures]
-    checks += [HardCheck(rule, CheckStatus.PENDING) for rule in a.pending]
+    checks = [HardCheck(r, CheckStatus.FAIL) for r in a.failures if not _is_leg_subdivision_rule(r)]
+    checks += [
+        HardCheck(r, CheckStatus.PENDING) for r in a.pending if not _is_leg_subdivision_rule(r)
+    ]
     if a.geometry_status is GrammarStatus.PASS:
         checks.append(HardCheck("GEOMETRY", CheckStatus.PASS))
-    if not record.scenario.subdivisions:
+    if record.scenario.subdivisions:
+        checks += _leg_checks(record)
+    else:
         checks.append(HardCheck("SUBDIVISIONS", CheckStatus.UNVERIFIED))
     return checks
+
+
+def _subdivision_status(record: CandidateRecord) -> str:
+    legs = _leg_checks(record)
+    required = len(EXPECTED_SUBDIVISIONS[record.scenario.pattern])
+    passed = sum(check.status is CheckStatus.PASS for check in legs)
+    if legs and passed == required:
+        return "VERIFIED"
+    return "PARTIAL" if passed else "UNVERIFIED"
+
+
+def _subdivision_evidence(
+    record: CandidateRecord, child_degree_id: str | None
+) -> list[EvidenceItem]:
+    """다리별 보이는 하위 다리 수 (33 §16). 하위 degree 가 없으면 NOT_COMPUTED."""
+    if not record.scenario.subdivisions:
+        return [
+            EvidenceItem(
+                "SUBDIVISION", "child_leg_counts", EvidenceState.NOT_COMPUTED, layer="HARD_RULE"
+            )
+        ]
+    items: list[EvidenceItem] = []
+    for index, proof in enumerate(record.scenario.subdivisions, 1):
+        items.append(
+            EvidenceItem(
+                "SUBDIVISION",
+                f"leg_{index}_child_legs",
+                EvidenceState.OBSERVED
+                if proof.child_leg_count is not None
+                else EvidenceState.INSUFFICIENT_ANCHORS,
+                None if proof.child_leg_count is None else float(proof.child_leg_count),
+                source=f"{child_degree_id}: {proof.shape.value}"
+                + ("" if proof.reason is None else f" ({proof.reason})"),
+                layer="HARD_RULE",
+            )
+        )
+    return items
 
 
 def from_candidate_snapshot(
@@ -361,14 +430,16 @@ def from_candidate_snapshot(
         ]
         labels = _LABELS[pattern]
         checks = _hard_checks(record)
-        evidence = _evidence(pattern, anchors)
-        evaluated = [e for e in evidence if e.in_band is not None]
+        evidence = _evidence(pattern, anchors) + _subdivision_evidence(
+            record, snapshot.child_degree_id
+        )
+        evaluated = [e for e in evidence if e.layer == "GUIDELINE" and e.in_band is not None]
         scenarios.append(
             WaveScenario(
                 scenario_id=record.scenario.scenario_id,
                 pattern=pattern.value,
                 direction=record.scenario.direction,
-                degree_id="H4:EW0",
+                degree_id=f"H4:{snapshot.degree_id}",
                 parent_id=None,
                 wave_count=labels,
                 current_state=_state(pattern, record, len(anchors)),
@@ -388,7 +459,7 @@ def from_candidate_snapshot(
                     _invalidations(pattern, record.scenario.direction, anchors, record)
                 ),
                 uncertainty=Uncertainty(
-                    "VERIFIED" if record.scenario.subdivisions else "UNVERIFIED",
+                    _subdivision_status(record),
                     len(snapshot.records),
                     common_flags,
                 ),

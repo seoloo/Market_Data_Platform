@@ -81,7 +81,10 @@ class GuardedExtremaState:
     결측/모호한 상위 봉의 경계에만 사용하며, 과거 피벗은 수정하지 않는다.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, threshold_pct: Decimal = EW0_THRESHOLD_PCT) -> None:
+        if not Decimal(0) < threshold_pct < Decimal(1):
+            raise DataIntegrityError("반전 임계는 0과 1 사이여야 한다")
+        self._threshold = threshold_pct
         self._segments: list[list[Swing]] = [[]]
         self._ambiguous_open_ms: list[int] = []
         self._direction = 0  # 0: 첫 피벗 미정, +1: 고점 탐색, -1: 저점 탐색
@@ -104,7 +107,8 @@ class GuardedExtremaState:
         low = self._low
         direction = self._direction
         if high is None or low is None:
-            if _drops(candle.high, candle.low) or _rises(candle.low, candle.high):
+            t = self._threshold
+            if _drops(candle.high, candle.low, t) or _rises(candle.low, candle.high, t):
                 self._ambiguous_open_ms.append(candle.open_ms)
                 self.break_segment()
                 return
@@ -112,12 +116,13 @@ class GuardedExtremaState:
             self._low = (candle.low, candle.open_ms)
             return
 
+        t = self._threshold
         new_high = candle.high > high[0]
         new_low = candle.low < low[0]
-        high_then_low_possible = new_high and _drops(candle.high, candle.low)
-        low_then_high_possible = new_low and _rises(candle.low, candle.high)
-        confirms_high = _drops(high[0], candle.low)
-        confirms_low = _rises(low[0], candle.high)
+        high_then_low_possible = new_high and _drops(candle.high, candle.low, t)
+        low_then_high_possible = new_low and _rises(candle.low, candle.high, t)
+        confirms_high = _drops(high[0], candle.low, t)
+        confirms_low = _rises(low[0], candle.high, t)
 
         if direction == 0:
             ambiguous = (
@@ -167,16 +172,16 @@ class GuardedExtremaState:
         """현재까지 확정된 사건만 반환한다. 미확정 극값은 포함하지 않는다."""
         return (
             tuple(
-                SwingSeries(swings=tuple(swings), threshold_pct=EW0_THRESHOLD_PCT)
+                SwingSeries(swings=tuple(swings), threshold_pct=self._threshold)
                 for swings in self._segments
             ),
             tuple(self._ambiguous_open_ms),
         )
 
 
-def _drops(high: Decimal, low: Decimal) -> bool:
-    return low <= high * (Decimal(1) - EW0_THRESHOLD_PCT)
+def _drops(high: Decimal, low: Decimal, threshold: Decimal = EW0_THRESHOLD_PCT) -> bool:
+    return low <= high * (Decimal(1) - threshold)
 
 
-def _rises(low: Decimal, high: Decimal) -> bool:
-    return high >= low * (Decimal(1) + EW0_THRESHOLD_PCT)
+def _rises(low: Decimal, high: Decimal, threshold: Decimal = EW0_THRESHOLD_PCT) -> bool:
+    return high >= low * (Decimal(1) + threshold)
