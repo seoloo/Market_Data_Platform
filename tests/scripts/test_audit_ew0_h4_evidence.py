@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from auto_trading.core.enums import Timeframe
+from scripts import audit_ew0_candidate_coverage as candidate_audit
 from scripts import audit_ew0_h4_evidence as audit_script
 
 
@@ -86,10 +87,21 @@ def test_h4_coverage_audit_is_read_only_and_excludes_wa_tables(
     assert result["candidate_kinds"] == {"low": 1}
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
 
+    monkeypatch.setattr(candidate_audit, "DB_PATH", path)
+    assert candidate_audit.main() == 0
+    window_result = json.loads(capsys.readouterr().out)
+    assert window_result["coverage"]["four_hour_bars"] == 2
+    assert window_result["coverage"]["bars_with_two_anchors"] == 0
+    assert len(window_result["mapped_evidence_sha256"]) == 64
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == before
+
 
 def test_missing_database_is_not_created(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     missing = tmp_path / "missing.db"
     monkeypatch.setattr(audit_script, "DB_PATH", missing)
     with pytest.raises(FileNotFoundError):
         audit_script.main()
+    monkeypatch.setattr(candidate_audit, "DB_PATH", missing)
+    with pytest.raises(FileNotFoundError):
+        candidate_audit.main()
     assert not missing.exists()

@@ -1,6 +1,6 @@
 # Elliott Wave 분석 체계와 독립 연구 설계
 
-작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 / 4h 엄격 문법 합성 검증, 시장 파동 판정 미실시**.
+작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 / 4h 후보 창 가용성 감사, 시장 파동 판정 미실시**.
 최초 기반 점검 기준 커밋: `c01bee7`. 본 문서는 거래 전략이나 수익성 판정이 아니다.
 
 ## 1. 목적과 변경하지 않는 경계
@@ -17,8 +17,8 @@
 - 연구 출력은 Shadow 전용. 주문·veto·사이징·보호주문에 영향 없음. 유의한 결과도 새 가설 제안까지만 허용한다.
 - 실거래에서 Elliott 파동 분석·판정은 **최소 마감된 4h 봉 이상**으로 한다. 1m은 4h 내부 사건의
   순서·자료 품질만 감사하며, 1m 파동 카운트/진입 신호/주문 판단을 생성하지 않는다.
-- 문헌 정리 후 가드 피벗 검출·RSI 다이버전스 adapter·1m 전역 고저 감사 및 시간순 경로 재생을 추가했다. 원자료 CSV 재분석,
-  파동 후보 생성, WA 결합, 가설 검정은 하지 않았다.
+- 문헌 정리 후 가드 피벗·RSI 다이버전스·1m 경로 재생, 4h 증거·합성 문법·제한된 후보 창 감사까지 추가했다.
+  **시장 파동 count**, WA 결합·가설 검정은 하지 않았다.
 
 ## 2. Opus 작업 인계와 재사용 가능 기반
 
@@ -446,7 +446,7 @@ Flat·Triangle은 혼동 대안/미지원 상태로 남기고, 학파 예외·co
 |---|---|---|
 | A. Phase 0 후속 | source conflict 표 승인, 규칙 프로파일·피벗 척도·시간대·UNKNOWN 정책·분석 가족·검정력 설계 확정 | 실제 거래와 라벨 결합 전 |
 | B. Phase 1 | 원자료 provenance, 시장 구간·TF 재집계·warmup·사건 재구성 감사 | DB read-only, 별도 연구 산출물. 운영 테이블 migration 없음 |
-| C. Phase 2에 준하는 순수 연구 코어 | 4h OHLC 가드 피벗·확정 피벗 RSI adapter·1m 전역 고저/경로 감사 구현. 고정된 1m→4h 후보 증거의 적용률 감사 완료(681/4,386; 파동 라벨 아님). Impulse·일반 zigzag·수렴 ending의 **엄격 문법 합성 테스트만** 구현. 하위 degree parser·bounded candidate search·시장 count·snapshot 기록은 대기 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
+| C. Phase 2에 준하는 순수 연구 코어 | 4h 피벗·RSI adapter·1m 경로·4h 증거 구현. 엄격 문법은 합성 검증, bounded 후보 생성도 합성 검증. 시장에서는 **후보 창 가용성만** 감사(33 §13). 실측 하위 degree parser·시장 count·WA snapshot 결합은 대기 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
 | D. 인식 검증 | 합성 기대값·불변성·블라인드 차트 검토, coverage/지연/UNKNOWN 보고 | PnL이나 WA 진입점 표시 없이 검토, 분석가 불일치도 보존 |
 | E. 별도 결합 승인 뒤 | WA event join·대조군·집중도 분석·사후 결과 기술 통계 | 이번 단계 밖. 거래 백테스트나 전체 Phase 4 통과로 부르지 않음 |
 
@@ -455,10 +455,12 @@ Flat·Triangle은 혼동 대안/미지원 상태로 남기고, 학파 예외·co
 [intrabar.py](../../src/auto_trading/research/elliott/intrabar.py),
 [minute_path.py](../../src/auto_trading/research/elliott/minute_path.py),
 [h4_evidence.py](../../src/auto_trading/research/elliott/h4_evidence.py),
-[grammar.py](../../src/auto_trading/research/elliott/grammar.py)다.
-경로 자료 감사·4h 투영 규칙·적용률·합성 문법 한계는
-[33 §7~10](33-elliott-phase0-data-and-profile.md)에 기록했다.
-다음 예상 모듈 경계(경로·API는 후속 구현 때 확정): pure `research/elliott/{types,rules,candidates}.py`,
+[grammar.py](../../src/auto_trading/research/elliott/grammar.py),
+[candidates.py](../../src/auto_trading/research/elliott/candidates.py),
+[coverage.py](../../src/auto_trading/research/elliott/coverage.py)다.
+경로 자료 감사·4h 투영 규칙·적용률·합성 문법·시장 창 가용성 한계는
+[33 §7~13](33-elliott-phase0-data-and-profile.md)에 기록했다.
+다음 예상 모듈 경계(경로·API는 후속 구현 때 확정): pure `research/elliott/{types,rules,child_degree}.py`,
 I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에 분리.
 분류기는 시장자료만 읽고, 거래 join runner는 고정된 snapshot을 받아 읽는다. 양방향 피드백 없음.
 

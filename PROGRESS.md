@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 하위파 출처·bounded 후보 snapshot의 합성 검증, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 후보 창의 시장 입력 가용성 감사, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 후보·출처 계약)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 시장 창 가용성)
+
+- [33 §12~13](docs/research/33-elliott-phase0-data-and-profile.md)에 **WA 결과 열람 전** 4h 후보 창 가용성 집계 단위·차단 규칙을 고정한 뒤, [읽기 전용 감사](scripts/audit_ew0_candidate_coverage.py)를 2020~2021 Binance USD-M BTCUSDT 대용 4h/1m에 실행. 기존 `mode=ro`·`query_only=ON` 시장 로더만 사용했고 WA 체결·PnL/운영 DB·Paper·전략을 건드리지 않음.
+- 4,386개 4h 마감 중 후보 ≥2/≥4/≥6 창은 **882/369/147개 마감**. `UNKNOWN` 1,229개, 비-UNKNOWN 구간 542개, 4/6 후보에 도달한 구간 29/11개. 같은 창의 반복 마감이며 독립 파동·검정 표본 수 아님.
+- `UNKNOWN` 이전 극값을 참조하는 뒤쪽 후보 **147개**, 이후 다음 `UNKNOWN`까지 **714개 마감 차단**. 기존 후보 매핑·2% 임계·창 길이를 결과에 맞춰 바꾸지 않음. 실측 하위 degree parser도 없어 시장 문법 `PASS`·WA 결합 불가. `NOT_READY_FOR_WA_TEST` 유지.
+- [coverage.py](src/auto_trading/research/elliott/coverage.py) 순수 집계와 [합성·읽기 전용 테스트](tests/research/test_elliott_coverage.py) 추가. 동일 감사 재실행 수치·매핑 증거 SHA-256 일치. 검증: 전체 pytest **1,811건**·leakage **65건**·strict mypy **260개 소스**(새 스크립트 포함 별도 135개)·ruff check/format **319파일**·import-linter **5계약** 통과; `git diff --check`.
+- 다음: 교차-UNKNOWN 147건의 원인을 **시장 결과·WA 비열람**으로 분류하고, 4h 이상 자식 degree의 출처/확정 시각 계약을 별도 사전 명세. 기존 규칙 변경은 설계·회귀 검증 뒤 결정.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 후보·출처 계약)
 
 - [grammar.py](src/auto_trading/research/elliott/grammar.py): 하위파 표식을 출처·4h 다리 양 끝·확인 가용 시각이 붙은 `LegSubdivisionProof`로 교체. 현재 **합성 fixture만** 인증하고 4h 미만·미래 시각·잘못된 다리는 거부. 하위파 미제공이면 `PENDING` 유지.
 - [candidates.py](src/auto_trading/research/elliott/candidates.py): 마지막 `UNKNOWN` 뒤 마지막 6개/4개 후보의 고정 rolling 창으로 impulse·일반 zigzag·ending diagonal 각 하나, 최대 세 가설만 생성. 미보정 confidence·확률 없음; `UNKNOWN` 이전 극값을 새 구간에 연결하지 않음. 마지막 꼭짓점 이후 재연장 시 종료 가설 무효화 시각·가격을 **분석 전용**으로 기록.
