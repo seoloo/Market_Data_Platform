@@ -1,6 +1,6 @@
 # Elliott Wave 분석 체계와 독립 연구 설계
 
-작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 초안 / 구현·결합 분석·검정력 미실행**.
+작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 / 피벗 입력·RSI 다이버전스 순수 adapter만 구현**.
 점검 기준 커밋: `c01bee7`. 본 문서는 거래 전략이나 수익성 판정이 아니다.
 
 ## 1. 목적과 변경하지 않는 경계
@@ -15,7 +15,8 @@
 - `WA_strategy`는 [08의 기각 전략](08-wa-preregistration.md), `WA_trades`는 워뇨띠 실제 체결 자료를 뜻한다.
   두 대상을 이름·테이블·보고서에서 분리한다. WA 전략을 Elliott 조건으로 재튜닝하지 않는다.
 - 연구 출력은 Shadow 전용. 주문·veto·사이징·보호주문에 영향 없음. 유의한 결과도 새 가설 제안까지만 허용한다.
-- 이번 단계는 문헌 정리와 구현·분석 계획까지다. 원자료 CSV 재분석, 파동 생성, 가설 검정은 하지 않았다.
+- 문헌 정리 후 확정 피벗·RSI 다이버전스 adapter와 합성 테스트만 추가했다. 원자료 CSV 재분석,
+  파동 후보 생성, WA 결합, 가설 검정은 하지 않았다.
 
 ## 2. Opus 작업 인계와 재사용 가능 기반
 
@@ -433,9 +434,9 @@ size·holding·PnL·MFE·MAE는 이차 분석이며, 평균·중앙값·꼬리�
 - 2018~2021 탐색에서 유의해도 워뇨띠의 사용 의도·인과·자동매매 수익을 입증하지 않는다.
   새 전략은 경제적 가설·현실 비용·별도 사전등록·미열람 검증과 사용자 승인을 다시 거쳐야 한다.
 
-## 9. 구현 순서와 테스트 계획 (이번에는 구현하지 않음)
+## 9. 구현 순서와 테스트 계획
 
-첫 구현은 복잡한 모든 패턴을 해결하려 하지 않고 **strict impulse·일반 zigzag·수렴 ending diagonal**에 집중한다.
+파동 후보 구현은 복잡한 모든 패턴을 해결하려 하지 않고 **strict impulse·일반 zigzag·수렴 ending diagonal**에 집중한다.
 Flat·Triangle은 혼동 대안/미지원 상태로 남기고, 학파 예외·complex·truncation 자동 확정은 나중의 별도 버전이다.
 미지원 패턴을 무효로 간주하거나 모든 가격 구간을 셋 중 하나로 강제하지 않는다.
 
@@ -443,11 +444,12 @@ Flat·Triangle은 혼동 대안/미지원 상태로 남기고, 학파 예외·co
 |---|---|---|
 | A. Phase 0 후속 | source conflict 표 승인, 규칙 프로파일·피벗 척도·시간대·UNKNOWN 정책·분석 가족·검정력 설계 확정 | 실제 거래와 라벨 결합 전 |
 | B. Phase 1 | 원자료 provenance, 시장 구간·TF 재집계·warmup·사건 재구성 감사 | DB read-only, 별도 연구 산출물. 운영 테이블 migration 없음 |
-| C. Phase 2에 준하는 순수 연구 코어 | 자료형 → 피벗 adapter → 문법 validator → bounded candidate search → snapshot 기록 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
+| C. Phase 2에 준하는 순수 연구 코어 | 확정 피벗 입력·RSI 다이버전스 adapter만 구현. 피벗 원천 감사 → 문법 validator → bounded candidate search → snapshot 기록은 대기 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
 | D. 인식 검증 | 합성 기대값·불변성·블라인드 차트 검토, coverage/지연/UNKNOWN 보고 | PnL이나 WA 진입점 표시 없이 검토, 분석가 불일치도 보존 |
 | E. 별도 결합 승인 뒤 | WA event join·대조군·집중도 분석·사후 결과 기술 통계 | 이번 단계 밖. 거래 백테스트나 전체 Phase 4 통과로 부르지 않음 |
 
-예상 모듈 경계(경로·API는 후속 구현 때 확정): pure `research/elliott/{types,pivots,rules,candidates}.py`,
+현재 순수 구성요소는 [divergence.py](../../src/auto_trading/research/elliott/divergence.py)다.
+다음 예상 모듈 경계(경로·API는 후속 구현 때 확정): pure `research/elliott/{types,pivots,rules,candidates}.py`,
 I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에 분리.
 분류기는 시장자료만 읽고, 거래 join runner는 고정된 snapshot을 받아 읽는다. 양방향 피드백 없음.
 
@@ -464,7 +466,7 @@ I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에
 9. 다이버전스 합성 예시: 저점 100→95·RSI 25→32는 상승형, 고점 110→115·RSI 75→68은 하락형
    (각 차이가 설정 epsilon을 초과하는 테스트 설정). 같은 방향 변화·동률·문턱 경계·다른 TF·결측은 각각 NONE/거부/UNKNOWN 기대값 검사.
    피벗 확정 전 미노출, 지표 warmup·초기화, expiry, 미래 봉 추가 후 기존 사건 불변, 새 극값 이후 과거 기록 보존을 검사한다.
-10. 구현 변경 시 프로젝트 전체 pytest·leakage·mypy strict·ruff·import 계약 검사. 문서만인 이번에는 해당 테스트 미실행.
+10. 구현 변경 시 프로젝트 전체 pytest·leakage·mypy strict·ruff·import 계약 검사.
 
 ## 10. 다음 결정과 완료 조건
 
@@ -476,9 +478,10 @@ I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에
 이것은 WA 결합 분석의 사전등록이나 검정력 통과가 아니다.
 
 미확정: Elliott 후보 탐색 깊이·endpoint window, 다이버전스 노출 TTL·최소/최대 간격,
-RSI 계산 context·시장 가격 단위 감사,
+시장 가격 단위 감사,
 endpoint 확인·최근 구간 정의, profile 세부 예외,
 동일 거래소 데이터 확보, 통계적 최소 효과·군집/대조군 수·검정력. 결과를 보기 전에 별도 확정해야 한다.
-따라서 본 문서는 사전등록 완료도, 코딩 착수/WA 실제 결합 분석 완료도 아니다.
+따라서 본 문서는 사전등록 완료도, Elliott 파동 판정기·WA 실제 결합 분석 완료도 아니다.
 
-문서 검증: 출처·로컬 링크·요구 주제·변경 범위 검사. PDF 원본 보존. 기존 전략/코드/config/DB/스케줄 변경 없음.
+문서 검증: 출처·로컬 링크·요구 주제·변경 범위 검사. PDF 원본 보존.
+후속 구현에서 독립 연구 모듈·테스트·import 계약만 추가했으며 기존 전략/DB/스케줄 변경 없음.

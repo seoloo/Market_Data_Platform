@@ -180,3 +180,18 @@ forbidden_modules = [
     "auto_trading.risk",
     "auto_trading.config",
 ]
+
+# Elliott 는 독립 Shadow 연구다. 운영/매매 판단 경로가 연구 모듈을 끌어오지 않는다.
+[[tool.importlinter.contracts]]
+name = "Elliott 연구는 매매 경로에서 import 하지 않는다"
+type = "forbidden"
+source_modules = [
+    "auto_trading.core",
+    "auto_trading.features",
+    "auto_trading.strategy",
+    "auto_trading.risk",
+    "auto_trading.execution",
+    "auto_trading.exchange",
+    "auto_trading.app",
+]
+forbidden_modules = ["auto_trading.research.elliott"]

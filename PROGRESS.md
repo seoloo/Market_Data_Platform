@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott Phase 0 데이터·규칙 감사, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 순수 다이버전스 adapter, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 후속)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 순수 판정 경계)
+
+- `src/auto_trading/research/elliott/divergence.py`: EW-0 확정 가격 피벗·4h 종가 RSI(14) 일반 상승/하락 다이버전스 사건 판정. 피벗 가격/확정 봉·연속성·격자·거래량 0 검증, RSI warmup/같은 봉 발생·확정은 UNKNOWN, 미래 봉·미확정 피벗 비노출. Decimal 계산 context 고정.
+- `tests/research/test_elliott_divergence.py`: 합성 방향 대칭·확정 지연·미래 변형·prefix 일치·warmup·동일 봉 모호함·결측/역순/잘못된 가격/임계 거부·Decimal context 검증.
+- `pyproject.toml` import 계약으로 Elliott 연구 모듈을 기존 매매 경로에서 참조하지 못하도록 제한. Paper/전략/DB/스케줄 변경 없음.
+- 이 adapter는 **피벗 자체를 생성하지 않으며**, 기존 ZigZag의 동일 봉 고저 경로를 완전히 검증하지 않는다. 파동 시나리오·WA 실제 거래 결합·성과 판정 미실행. `NOT_READY_FOR_WA_TEST` 유지.
+- 검증: 전체 pytest·leakage·strict mypy·ruff check/format·import-linter 통과. 다음: 원천 피벗 검출의 장중 순서 모호함을 해소하는 독립 연구 detector와 인과성 테스트.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 후속)
 
 - SQLite 시장 DB를 `mode=ro`로 감사. 2020~2021 Binance BTCUSDT 1m 1,052,640·1h 17,544·4h 4,386·1d 731봉은 시각 격자가 채워져 있음. 12h·1w 미저장, 1m 거래량 0은 61봉. BitMEX XBTUSD 시장 봉은 없음.
 - [33 데이터·규칙 감사](docs/research/33-elliott-phase0-data-and-profile.md)에 개발용 `EW-0`(4h·기존 2% 확정 피벗·RSI14·일반 다이버전스 엄격 비교)과 Binance 대용 자료 경계 기록.
