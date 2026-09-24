@@ -4,7 +4,20 @@
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Claude — O/v1 별도 원장 Paper 착수)
+## 이번 작업 (Claude — Paper 일일 점검·알림, Phase 6 게이트)
+
+- 스케줄러 `AutoTrading_Paper_O1` 등록 확인(사용자): Ready, 다음 09-25 09:10. 수동 1회 실행 결과 0 — 작업 폴더 없이도 정상, 오늘 행 중복 없음.
+- 발견: Phase 6 게이트의 **"알림·일일보고·watchdog 정상"** 이 없었다(`notify/` 비어 있음). 스케줄 실행이 실패해도 `status`를 치기 전엔 알 수 없었다.
+- `ops/paper_watch.py`(순수 판정): 두 원장의 실행 누락·DEGRADED·기록 빈 날·누락 보정·O/v1 청산/정지·**원장 재계산(verify)**·낙폭(경고 20%·중단 25% — 16 §3·25 §3).
+  기준은 전향 등록에서 가져왔고 새로 만들지 않았다. 20% 는 조기 경보 운영값.
+- `notify/channels.py`: 로컬 기록(항상) + 텔레그램(`.env` 설정 시). 토큰은 repr·예외·traceback 어디에도 싣지 않는다(`from None`, 설명문 치환).
+- `config/secrets.py`: `load_telegram_credentials` — 둘 중 하나라도 비면 None(텔레그램 끔). 현재 `.env` 텔레그램 값은 **비어 있다**.
+- `scripts/paper_watchdog.py`: DB **읽기 전용**, `reports/watchdog/<날짜>.txt`·`outbox.log`, 종료 코드 0/1/2, `--no-send`·`--test-telegram`.
+  실데이터 첫 점검: 이상 없음 (T/v2 9,990.87 · 2일 · 오늘 2건 체결 / O/v1 10,000 · 1일).
+- 테스트 26건(판정 규칙 16 · 채널 10: 토큰 비노출·잘림·ok=false 실패 포함). 전체 pytest **1,519건**, mypy 210파일, ruff, import 계약 4/4 통과.
+- **남은 일(사용자)**: ① watchdog 스케줄 등록(09:20) ② 텔레그램 봇 만들기(선택) — 명령은 응답 참조.
+
+## 이전 작업 (Claude — O/v1 별도 원장 Paper 착수)
 
 - 사용자 승인: 24 §9 뒤 제안한 **O/v1 전용 별도 Paper 원장** 진행("그대로 이어서 작업"). T/v2 Paper·신호·설정·스케줄 변경 없음.
 - **하루 규칙 공용화**: `backtest/overlay.py`의 루프 본문을 `step_overlay_day`로 분리 — 연구 재생과 Paper 가 같은 함수를 부른다.
@@ -469,7 +482,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 
 ## 다음 작업 — Phase 6 운영
 
-1. 작업 스케줄러 `AutoTrading_Paper_O1` 등록(사용자) → 매일 09:10 KST `run_paper_o1.py run`.
+1. 작업 스케줄러 `AutoTrading_Paper_Watchdog` 등록(사용자) → 매일 09:20 KST `paper_watchdog.py`. 텔레그램 봇은 선택.
 2. 매주 `run_paper_t2.py status`·`run_paper_o1.py status`, 매달 `run_paper_o1.py verify`.
 3. **2026-10-24 4주 점검**: 두 Paper 누락·DEGRADED·MISSED, 연구 일치, T/v1·T/v2·F 월간 갱신, Phase 6 게이트 판정.
 4. 실거래 전 필요(미착수): 선물 주문 인프라(Phase 5), 선물 계좌 읽기 조회, '거래소 보호주문 필수' vs O/v1 '가격 손절 없음' 해소, CURRENT_SPEC 범위 승인.
@@ -491,7 +504,8 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 
 - O/v1-L: 실거래 시 TRADING_CORE '거래소 측 보호주문 필수'와 O/v1 '가격 손절 없음(추세 신호 청산)' 충돌 — 24 §7 은 연구 한정 예외.
 - O/v1-I: 선물 주문 인프라·선물 계좌 조회 없음(Paper 는 가상 원장). 실거래 전 Phase 5 선물 필요.
-- O/v1-S: 작업 스케줄러 등록 대기(사용자).
+- O/v1-S: **해소** — `AutoTrading_Paper_O1` 등록·수동 실행 0 확인.
+- W-S: watchdog 스케줄 등록 대기(사용자). 텔레그램 미설정(로컬 기록만).
 - C1: A1에는 손절 유지/위험 축소 적용. H1 기본 WIDEN은 그대로이며 전략별 정합성 검토 필요.
 - C2: 지연 검사 1일/1봉과 유지/소멸 판정 충돌. 게이트 완화 없이 사전 확정 필요.
 - C3: 과거 기반 완료 표시와 데이터 시작점/계좌 snapshot 게이트 불일치 감사.

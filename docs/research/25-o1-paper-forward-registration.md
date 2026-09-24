@@ -92,8 +92,14 @@ Register-ScheduledTask -TaskName "AutoTrading_Paper_O1" -Action $a -Trigger (New
 
 점검: 매주 `run_paper_o1.py status`, 매달 `run_paper_o1.py verify`. 실패한 날은 종료 코드 1 — 다음 실행이 자동으로 다시 계산한다.
 
+**일일 자동 점검** (2026-09-24 추가, Phase 6 게이트 '알림·일일보고·watchdog'): `scripts/paper_watchdog.py` 를 매일 09:20 KST 실행한다.
+실행기와 독립이며 DB를 읽기 전용으로 연다. §3 의 즉시·매달 중단 기준(청산·정지·MDD 25%·`verify` 불일치)을 **매일** 판정하고,
+T/v2 원장(실행 누락·DEGRADED·Paper 자본 낙폭)도 함께 본다. 결과는 `reports/watchdog/` 에 남고 텔레그램이 설정돼 있으면 보낸다.
+종료 코드 0 이상 없음 · 1 경고 · 2 조치 필요 — 작업 스케줄러 '마지막 결과'로 보인다.
+
 ## 7. 기록
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-24 | 스케줄러 `AutoTrading_Paper_O1` 등록 확인(사용자), 수동 실행 결과 0. 일일 점검 `paper_watchdog.py` 추가 — 첫 점검 이상 없음 |
 | 2026-09-24 | 등록·구현. **첫 실행**(01:20 UTC): 결정일 2026-09-23 · `NO_PRIOR_DECISION` · 자본 10,000 · 내일 목표 BTC 0.3487 / ETH 0.2538 (같은 날 T/v2 Paper 목표와 차이 1.1e-16) · 재실행 멱등 · `verify` 일치 |

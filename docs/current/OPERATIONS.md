@@ -30,7 +30,8 @@ temperature=0만으로 재현성이 보장되지는 않는다. 저장된 응답�
 - 대시보드는 Phase 6: 별도 프로세스·로컬 127.0.0.1·SQLite mode=ro/query_only, 쓰기 endpoint 0개. 엔진 중단 권한 없음.
 - PyInstaller는 대시보드 및 backtest/paper 한정. schema 버전 불일치는 명확히 거부한다.
 - API 키는 출금 권한 없이 최소 권한·IP 제한. .env/환경변수 사용, Git/로그/보고서에 키·토큰·개인계정 응답을 노출하지 않는다.
-- Telegram critical/위험/일일 보고, JSONL 구조화 로그, WS 지연·마지막 봉·잔고·보호주문·디스크·DB 오류 관찰은 구현/운영 검증 대기.
+- **Paper 일일 점검(2026-09-24 구현)**: `scripts/paper_watchdog.py` 매일 09:20 KST. 두 Paper 원장의 실행 누락·DEGRADED·누락 보정·청산/정지·낙폭(경고 20%·중단 25%)·O/v1 원장 재계산을 판정, `reports/watchdog/` 기록 + 텔레그램(`.env` 설정 시). 종료 코드 0/1/2로 스케줄러에 드러난다.
+- 실거래 경로의 Telegram critical/위험 알림, JSONL 구조화 로그, WS 지연·마지막 봉·잔고·보호주문·디스크·DB 오류 관찰은 구현/운영 검증 대기.
 - 일별 회계와 위험 초기화는 UTC. 표시 시간대가 위험 계산 기준을 바꾸면 안 된다.
 
 ## 저장 공간 진단 기준점
