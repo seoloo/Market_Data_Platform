@@ -11,7 +11,11 @@ from statistics import median
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
-from auto_trading.research.elliott.h4_evidence import EvidenceStatus, FourHourEvidence
+from auto_trading.research.elliott.h4_evidence import (
+    EvidenceStatus,
+    EvidenceUnknownReason,
+    FourHourEvidence,
+)
 from auto_trading.research.elliott.pivots import closed_ew0_candles
 
 
@@ -155,3 +159,64 @@ def summarize_window_coverage(
             for year, counts in sorted(yearly.items())
         ),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class CrossUnknownCase:
+    """UNKNOWN 경계 이전(또는 경계 봉 자체)의 극값을 참조한 후보 하나 (33 §14)."""
+
+    confirmed_close_ms: int
+    kind: SwingKind
+    boundary_reason: EvidenceUnknownReason | None
+    extreme_offset_bars: int
+    """(경계 UNKNOWN 봉 open − 극값 봉 open) / 4h. 0 이면 극값이 경계 봉 자체."""
+    confirm_lag_bars: int
+    """(확정 봉 close − 극값 봉 close) / 4h."""
+    first_in_segment: bool
+
+
+def classify_cross_unknown(
+    four_hour_candles: Sequence[Candle], evidence: Sequence[FourHourEvidence]
+) -> tuple[CrossUnknownCase, ...]:
+    """§13 의 교차-UNKNOWN 후보를 시장 입력만으로 기술한다. 규칙을 바꾸지 않는다.
+
+    ``summarize_window_coverage`` 와 같은 순서·같은 판정으로 훑으므로 건수가 같다.
+    """
+    if not four_hour_candles:
+        raise DataIntegrityError("4h 봉이 없다")
+    closed = closed_ew0_candles(four_hour_candles, four_hour_candles[-1].close_ms)
+    if len(evidence) != len(closed):
+        raise DataIntegrityError("4h 봉과 증거 수가 다르다")
+    h4_ms = closed[0].close_ms + 1 - closed[0].open_ms
+    cases: list[CrossUnknownCase] = []
+    last_unknown: FourHourEvidence | None = None
+    anchors_in_segment = 0
+    for bar, item in zip(closed, evidence, strict=True):
+        if item.close_ms != bar.close_ms:
+            raise DataIntegrityError("4h 증거 시각이 봉과 대응하지 않는다")
+        if item.status is EvidenceStatus.UNKNOWN:
+            last_unknown = item
+            anchors_in_segment = 0
+            continue
+        if item.status is not EvidenceStatus.CANDIDATE or item.candidate is None:
+            continue
+        candidate = item.candidate
+        if (
+            last_unknown is not None
+            and candidate.extreme_four_hour_open_ms <= last_unknown.close_ms
+        ):
+            boundary_open_ms = last_unknown.close_ms + 1 - h4_ms
+            extreme_close_ms = candidate.extreme_four_hour_open_ms + h4_ms - 1
+            cases.append(
+                CrossUnknownCase(
+                    confirmed_close_ms=item.close_ms,
+                    kind=candidate.kind,
+                    boundary_reason=last_unknown.reason,
+                    extreme_offset_bars=(boundary_open_ms - candidate.extreme_four_hour_open_ms)
+                    // h4_ms,
+                    confirm_lag_bars=(item.close_ms - extreme_close_ms) // h4_ms,
+                    first_in_segment=anchors_in_segment == 0,
+                )
+            )
+        anchors_in_segment += 1
+    return tuple(cases)

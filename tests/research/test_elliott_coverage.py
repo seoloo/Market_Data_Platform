@@ -11,9 +11,10 @@ from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
-from auto_trading.research.elliott.coverage import summarize_window_coverage
+from auto_trading.research.elliott.coverage import classify_cross_unknown, summarize_window_coverage
 from auto_trading.research.elliott.h4_evidence import (
     EvidenceStatus,
+    EvidenceUnknownReason,
     FourHourEvidence,
     FourHourPivotEvidence,
 )
@@ -102,3 +103,47 @@ def test_coverage_rejects_missing_or_unconfirmed_four_hour_evidence() -> None:
     )
     with pytest.raises(DataIntegrityError):
         summarize_window_coverage(bars, broken)
+
+
+class TestCrossUnknownClassification:
+    """33 §14: 교차-UNKNOWN 후보 기술 — 집계와 같은 건수, 경계 사유·극값 위치·확인 지연."""
+
+    @staticmethod
+    def _crossing() -> tuple[list[Candle], list[FourHourEvidence]]:
+        bars = [_bar(index) for index in range(10)]
+        evidence = [FourHourEvidence(bar.close_ms, EvidenceStatus.NO_EVENT) for bar in bars]
+        evidence[1] = _candidate(bars, 1, 0)
+        evidence[4] = FourHourEvidence(
+            bars[4].close_ms, EvidenceStatus.UNKNOWN, reason=EvidenceUnknownReason.MULTIPLE_EVENTS
+        )
+        evidence[6] = _candidate(bars, 6, 3)  # 극값이 경계 봉(4) 보다 1봉 앞 · 첫 후보
+        evidence[8] = _candidate(bars, 8, 7)  # 정상 후보
+        return bars, evidence
+
+    def test_same_count_as_coverage_and_fields(self) -> None:
+        bars, evidence = self._crossing()
+        cases = classify_cross_unknown(bars, evidence)
+        assert len(cases) == summarize_window_coverage(bars, evidence).cross_unknown_candidates == 1
+        (case,) = cases
+        assert case.boundary_reason is EvidenceUnknownReason.MULTIPLE_EVENTS
+        assert case.extreme_offset_bars == 1
+        assert case.confirm_lag_bars == 3
+        assert case.first_in_segment is True
+
+    def test_extreme_in_boundary_bar_is_offset_zero(self) -> None:
+        bars, evidence = self._crossing()
+        evidence[6] = _candidate(bars, 6, 4)
+        (case,) = classify_cross_unknown(bars, evidence)
+        assert case.extreme_offset_bars == 0
+
+    def test_later_candidate_in_segment_is_not_first(self) -> None:
+        bars, evidence = self._crossing()
+        evidence[6] = _candidate(bars, 6, 5)  # 정상 첫 후보
+        evidence[8] = _candidate(bars, 8, 2)  # 두 번째 후보가 경계 이전 극값
+        cases = classify_cross_unknown(bars, evidence)
+        assert [c.first_in_segment for c in cases] == [False]
+
+    def test_no_unknown_means_no_cases(self) -> None:
+        bars, evidence = _sample()
+        evidence[7] = FourHourEvidence(bars[7].close_ms, EvidenceStatus.NO_EVENT)
+        assert classify_cross_unknown(bars, evidence) == ()
