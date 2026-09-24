@@ -61,7 +61,7 @@ D22의 다중 시간대 대량 점수, 패턴 결합, 15분봉 재평가, 뉴스
 | storage/marketdata | SQLite 마이그레이션·조회, 백필·funding·causal snapshot: 구현 |
 | features/strategy/risk | H1/A1 재현 기반 유지. WA 순수 상태·방향별 손절·6h 청산, 엔진 1h 평가·BACKTEST 전용 우위 측정 모드 구현(2026-09-24). WA는 기각, 재현용 유지 |
 | backtest | feed/fills/portfolio/engine, 보고서·기준선·연구 선별: 구현 |
-| exchange/execution | 현물: 멱등 주문·재시작 복구·읽기 전용 실계좌(T/v2). **선물(2026-09-24)**: 계약·가짜 거래소(장애 주입)·멱등 주문(보호 스톱 Algo 경로 분리)·재시작 정합성 복구(`futures_guard`)·서명 읽기 전용 어댑터, 실계좌 읽기 점검 통과. **주문 전송 경로는 없다**(Phase 8 승인 전) |
+| exchange/execution | 현물: 멱등 주문·재시작 복구·읽기 전용 실계좌(T/v2). **선물(2026-09-24)**: 계약·가짜 거래소(장애 주입)·멱등 주문(보호 스톱 Algo 경로 분리)·재시작 정합성 복구(`futures_guard`)·서명 읽기 전용 어댑터, 실계좌 읽기 점검 통과. **테스트넷 전용 주문 어댑터**(테스트넷 주소 외 생성 거부) + 테스트넷 훈련 20/20(Phase 7 착수). **실계좌 주문 전송 경로는 없다**(Phase 8 승인 전) |
 | ai/notify/ui | 분석 보조·대시보드: 계획. **notify: Paper 일일 점검 알림 구현**(로컬 기록 항상 + 텔레그램 선택, 토큰 비노출). 실거래 경로 알림은 미구현 |
 | ops | Clock, **Paper watchdog**(`ops/paper_watch.py`, 실행기와 독립·DB 읽기 전용, 16 §3·25 §3 중단 기준 판정). 실거래 워치독·복구 검증 대기 |
 
