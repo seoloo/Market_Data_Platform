@@ -229,6 +229,34 @@ PnL은 아직 측정하지 않았다. 이 결과로 §8의 2% 임계값이나 �
 완화하지 않는다. `NOT_READY_FOR_WA_TEST`를 유지하며, 다음은 4h 이상 Elliott 문법의
 인과적 validator·복수 시나리오·불명 정책을 합성 자료로 검증하는 것이다.
 
+## 10. EW-0 엄격 문법 코어 — 합성 검증만
+
+[순수 문법 검사기](../../src/auto_trading/research/elliott/grammar.py)는 §8의 **마감 4h
+후보 증거**가 연속된 구간을 입력으로 받는다. 중간의 `NO_EVENT`는 허용하지만 `UNKNOWN`은
+`UNKNOWN`으로 전파하고, 중간 후보를 건너뛰어 유리한 여섯 꼭짓점을 고르지 않는다.
+입력 4h 봉·증거는 현재 `as_of_ms`까지만 읽고, 확인 시각·실제 4h high/low를 다시 검사한다.
+서로 경쟁하는 시나리오를 그대로 모두 반환하며 확률·우선순위를 부여하지 않는다.
+
+| 문법 | 이번에 검사하는 hard/초기 엄격 프로파일 | 아직 확인하지 못하는 것 |
+|---|---|---|
+| 1~5 impulse | 방향 대칭 endpoint, 2파 시작점 미침범, 3파 추진·최단 금지, 4파 endpoint 및 완전한 중간 4h wick의 1파 영역 비중첩, 5파 방향. 3파 하위파는 generic motive가 아닌 impulse여야 함 | 3파 꼭짓점 **자체의 4h 봉**에서 고저 선후가 불명일 때 4파 wick 판정 `PENDING`; 5파 미달형은 자동 확정하지 않음 |
+| 일반 zigzag | A-B-C 네 꼭짓점, 엄격 B 되돌림 `0<retr_B<1`, C가 A 끝 초과, motive–corrective–motive 하위파 형식 | 미달형 C, flat·triangle·complex는 이 문법의 `FAIL`이 곧 패턴 부재를 뜻하지 않음 |
+| 수렴 ending diagonal | 5 또는 C 부모 위치, 1/4 중첩, endpoint·길이·실제 1-3/2-4 시간-가격 선 폭 수렴, 3-3-3-3-3 하위파 형식 | 부모 위치·하위파 미검증은 `PENDING`; leading·확산·예외·throw-over 자동 판정은 범위 밖 |
+
+출력 `PASS`는 **제공된 하위파 표식까지 문법적으로 일치한다는 조건부 결과**일 뿐,
+시장 파동의 정답·종료 시점·거래 가능 신호가 아니다. `PENDING`은 꼭짓점 미완성,
+하위파 미검증, 4파 시작 경계봉 내부 순서 불명, 부모 위치 불명 등을 보존한다.
+`FAIL`은 *선택한 엄격 문법*에 한정된 위반이며 다른 조정형의 기각이 아니다.
+`UNKNOWN`은 자료/경로가 끊겨 판단 자체를 할 수 없다는 뜻이다.
+
+[합성·미래 무관성 테스트](../../tests/research/test_elliott_grammar.py)는 상승·하락 대칭,
+2파 경계·3파 최단·4파 중간 wick·3파 하위파 종류, zigzag B 경계,
+ending 부모·수렴, 복수 시나리오 보존·추가 꼭짓점 건너뛰기 금지·과거 prefix 불변을 검사한다.
+**681개 시장 후보는 이번 문법 검사기에 넣지 않았다.** 하위 degree를 검증하는 인과적
+재귀 parser와 그 provenance가 없으므로 현재 시장자료로 `PASS` 비율이나 Elliott 라벨을
+보고하지 않는다. 다음은 하위파 검증·후보 생성의 고정 탐색 창·UNKNOWN 정책을 설계하고
+블라인드 synthetic/시장 품질 검증을 거쳐야 한다.
+
 지금의 판정은 **`NOT_READY_FOR_WA_TEST`**다. 이는 Elliott 패턴의 부재나 유용성 기각이 아니라
 동일 시장 자료·분류기·검정 설계의 미완료를 뜻한다. 독립 순수
 [가격 피벗·RSI adapter](../../src/auto_trading/research/elliott/divergence.py)와

@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 후보 증거의 시장자료 적용률 감사, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 엄격 문법의 순수 합성 검증, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 4h 후보 coverage)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 엄격 문법)
+
+- [grammar.py](src/auto_trading/research/elliott/grammar.py): 최소 마감 4h 후보 증거의 **연속 구간**에서 strict impulse·일반 zigzag·수렴 ending diagonal의 기하학/하위파 문법만 순수 판정. `PASS/FAIL/PENDING/UNKNOWN`과 위반·미검증 사유를 분리하고 복수 시나리오를 선택·확률화 없이 모두 반환. 추가 피벗 건너뛰기 금지, 4h wick·부모 위치·시간-가격 수렴 검사.
+- [합성 테스트](tests/research/test_elliott_grammar.py): 상승/하락 대칭, 2파 경계·3파 최단·4파 wick/봉 내부 불명, 3파 generic motive 거부, zigzag B 경계, ending 부모/수렴, UNKNOWN·미완성·미검증 하위파, 복수 시나리오·미래 prefix 불변. 문서 [33 §10](docs/research/33-elliott-phase0-data-and-profile.md)에 조건부 `PASS`의 한계 기록.
+- **681개 시장 후보를 문법 판정기에 넣지 않았다.** 하위 degree parser/provenance·고정 탐색 창·invalidation 원장 미구현. 시장 파동 라벨, WA 방향/PnL·거래 신호 없음. `NOT_READY_FOR_WA_TEST`, 운영 Phase 6 유지.
+- 검증: 전체 pytest **1,803건**·leakage **63건**·strict mypy **257개 소스**·ruff check/format **315파일**·import-linter **5계약** 통과. `git diff --check` 통과.
+- 다음: 하위파 검증 자료 계약과 bounded candidate generator·시나리오 snapshot/invalidation을 합성 자료로 설계. 이후 블라인드 coverage, 그 뒤 WA 결합 게이트.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 4h 후보 coverage)
 
 - §8의 사전 고정 규칙을 바꾸지 않고 [읽기 전용 감사](scripts/audit_ew0_h4_evidence.py)를 2020~2021 Binance USD-M BTCUSDT 대용 4h/1m에 적용. 시장 봉 이외 WA 거래·성과 자료는 열지 않았고 DB·보고서 파일은 쓰지 않았다. 기존 1m 감사의 `load_market_replay`를 재사용, 가짜 DB 해시 불변·부재 시 미생성 테스트 추가.
 - 4h 4,386개: `CANDIDATE` **681(15.5%)**(high 358·low 323), `NO_EVENT` **2,476(56.5%)**, `UNKNOWN` **1,229(28.0%)**. UNKNOWN 첫 사유: 복수 553·동일 4h 480·모호 1m 124·국소 극값 44·단절 20·품질 차단 8. 2020/2021 연도별·확정 지연은 [33 §9](docs/research/33-elliott-phase0-data-and-profile.md)에 기록.
