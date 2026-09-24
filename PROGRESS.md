@@ -1,8 +1,21 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: 자동 판단·커밋·푸시).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 독립 연구 문서·계획, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
+
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0)
+
+- 추가 요청 반영: 연구 문서 §7.1~7.3에 일반 상승·하락 다이버전스, 가격 피벗 기준 지표 대응·확정 시각·분석 무효화/TTL·DV1~DV3 대조 분석·테스트 계획 추가. 히든 다이버전스는 초기 범위 제외. 코드·실제 결합 분석 없음.
+- 사용자 선택: Elliott 분석 체계를 먼저 정리하고 이후 실제 워뇨띠 체결·D22 맥락과 결합하는 **독립 연구**. 기존 전략·운영 변경 없음.
+- [ELLIOTT_WAVE_ANALYSIS](docs/research/ELLIOTT_WAVE_ANALYSIS.md) 작성: PDF 21쪽 본문·주요 도해, Aurra 공식 영문판(한국어 URL 접근 오류), EWI 직접 해설 대조.
+- hard / guideline / subjective / 구현 약속 분리. PDF 삼각형 5-5-5 표기·105% 상한·diagonal 4파 경계 등 충돌을 기록하고 무비판적 코드화 방지.
+- confirmed_at 기반 복수 scenario + 미보정 confidence + invalidation + UNKNOWN, 과거 snapshot 불변, 4h 이상 Elliott·D22 맥락 분리 설계.
+- `WA_trades`(실제 BitMEX 체결)와 기각된 `WA_strategy` 분리. D22는 **이 연구의 설명 변수 참조만** 허용하며 운영 EXCLUDED 유지.
+- 후속 설계: 진입 집중도 H1~H4, flat risk set·시장 맥락 matched baseline, 군집·다중검정·검정력, 사후 size/holding/PnL/MFE/MAE 분리.
+- Opus 최신 기록: UI·WS 검증·O/v2·O/v3·저녁 시각 변경·32 후보 비교 확인. 실제 스케줄/거래소/기존 테스트 재실행 없음.
+- **다음: Phase 0 — 규칙 프로파일·미확정 수치와 데이터 가용성/검정력 설계 확정**. 이후 별도 순수 판정기 검증, 그다음 사용자 요청 순서대로 실제 체결 결합.
+- 검증: 문서 링크·내용·diff 범위 검사만. 코드/config/원장/DB/스케줄 변경 없음. WA CSV 재분석·파동 실험·통계 판정 미실행.
 
 ## 이번 작업 (Claude — 노출 검토 · O/v3 한 달 관찰 · 저녁 실행)
 
