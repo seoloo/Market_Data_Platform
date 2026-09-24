@@ -462,3 +462,13 @@ def test_ew1_ignores_path_events_not_yet_available() -> None:
         child_path=index_child_path(_replay(visible)),
     )  # fmt: skip
     assert full == cut
+
+
+def test_ew1_vertices_confirmed_in_same_four_hour_are_unreadable() -> None:
+    bars, parent, child = ladder_fixture(("100", "150"))
+    a, b = _anchors(parent)
+    events = path_from(child)
+    same = replace(events[0], available_at_ms=events[1].available_at_ms)
+    path = index_child_path(_replay([same, events[1]]))
+    result = read_leg_on_path(bars, child, path, a, b, bars[-1].close_ms)
+    assert result.reason is ChildReadingReason.VERTEX_CONFIRMED_SAME_4H

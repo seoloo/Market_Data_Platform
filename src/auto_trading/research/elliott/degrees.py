@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from itertools import pairwise
 
 from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError
@@ -76,6 +77,7 @@ class ChildReadingReason(StrEnum):
     PATH_BROKEN_IN_LEG = "PATH_BROKEN_IN_LEG"
     CHILD_SUB_4H_AT_VERTEX = "CHILD_SUB_4H_AT_VERTEX"
     CHILD_INTERIOR_UNRESOLVED = "CHILD_INTERIOR_UNRESOLVED"
+    VERTEX_CONFIRMED_SAME_4H = "VERTEX_CONFIRMED_SAME_4H"
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +289,12 @@ def read_leg_on_path(
         children.append(vertex)
     end_vertex = _as_vertex(segment[last[1]])
     children.append(end_vertex)
+    if any(
+        later.confirmed_four_hour_close_ms <= earlier.confirmed_four_hour_close_ms
+        for earlier, later in pairwise(children)
+    ):
+        # 연속 꼭짓점의 반전이 같은 4h 안에서 확인됨 — 4h 해상도로 순서를 세울 수 없다
+        return unknown(ChildReadingReason.VERTEX_CONFIRMED_SAME_4H)
     available = max(end.confirmed_four_hour_close_ms, end_vertex.confirmed_four_hour_close_ms)
     return _classify(bars, children, start, available, as_of_ms)
 
