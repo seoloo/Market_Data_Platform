@@ -52,7 +52,7 @@ from auto_trading.exchange.futures import (
     OrderStatus,
 )
 
-__all__ = ["BASE_URL", "BinanceUsdmReadOnly", "OrderPathDisabledError"]
+__all__ = ["BASE_URL", "BinanceApiError", "BinanceUsdmReadOnly", "OrderPathDisabledError"]
 
 BASE_URL = "https://fapi.binance.com"
 _RECV_WINDOW_MS = 5000
@@ -78,10 +78,13 @@ class OrderPathDisabledError(OrderRejectedError):
     """
 
 
-class _ApiError(ExchangeError):
-    def __init__(self, message: str, code: int | None) -> None:
+class BinanceApiError(ExchangeError):
+    """거래소가 HTTP 오류로 답했다. ``code``는 Binance 오류 코드(없으면 None), ``status``는 HTTP."""
+
+    def __init__(self, message: str, code: int | None, status: int = 400) -> None:
         super().__init__(message)
         self.code = code
+        self.status = status
 
 
 def _dec(value: object) -> Decimal:
@@ -109,7 +112,12 @@ class BinanceUsdmReadOnly:
     # ------------------------------------------------------------ HTTP
 
     def _request(
-        self, path: str, params: Mapping[str, Any] | None = None, *, signed: bool = False
+        self,
+        path: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        signed: bool = False,
+        method: str = "GET",
     ) -> Any:
         query = dict(params or {})
         headers = {}
@@ -123,7 +131,7 @@ class BinanceUsdmReadOnly:
             query_string = urlencode(query)
         url = f"{self.base_url}{path}" + (f"?{query_string}" if query_string else "")
         try:
-            response = self._client.get(url, headers=headers)
+            response = self._client.request(method, url, headers=headers)
         except httpx.HTTPError as exc:
             raise ExchangeError(f"Binance 선물 요청 실패: {path} ({type(exc).__name__})") from None
         if response.status_code in (418, 429):
@@ -132,15 +140,19 @@ class BinanceUsdmReadOnly:
             body = response.json() if response.content else {}
         except ValueError:
             # 없는 경로(404 HTML 등). 계약대로 ExchangeError 로 올린다 — 파싱 오류로 죽지 않는다.
-            raise _ApiError(
-                f"Binance 선물 응답이 JSON 이 아니다 {response.status_code} ({path})", None
+            raise BinanceApiError(
+                f"Binance 선물 응답이 JSON 이 아니다 {response.status_code} ({path})",
+                None,
+                response.status_code,
             ) from None
         if response.is_success:
             return body
         code = body.get("code") if isinstance(body, dict) else None
         msg = body.get("msg") if isinstance(body, dict) else ""
-        raise _ApiError(
-            f"Binance 선물 오류 {response.status_code} code={code}: {msg} ({path})", code
+        raise BinanceApiError(
+            f"Binance 선물 오류 {response.status_code} code={code}: {msg} ({path})",
+            code,
+            response.status_code,
         )
 
     def clock_offset_ms(self) -> int:
@@ -200,7 +212,7 @@ class BinanceUsdmReadOnly:
                 {"symbol": symbol, "origClientOrderId": client_order_id},
                 signed=True,
             )
-        except _ApiError as exc:
+        except BinanceApiError as exc:
             if exc.code == _ORDER_NOT_FOUND:
                 return None
             raise
@@ -215,13 +227,31 @@ class BinanceUsdmReadOnly:
             data = self._request(
                 "/fapi/v1/algoOrder", {"clientAlgoId": client_order_id}, signed=True
             )
-        except _ApiError as exc:
+        except BinanceApiError as exc:
             if exc.code == _ORDER_NOT_FOUND:
                 return None
             raise
         if not data or data.get("symbol") != symbol:
             return None
         return self._stop(data)
+
+    def trade_fees(self, symbol: str, exchange_order_id: str) -> tuple[Decimal, Decimal]:
+        """주문 하나의 실제 체결 ``(수수료 합, 체결 명목 합)``.
+
+        주문 조회 응답에는 수수료가 없어 체결 내역에서 따로 읽는다.
+
+        ``GET /fapi/v1/userTrades`` (최근 7일). 수수료 자산이 USDT 가 아니면 거부한다.
+        """
+        rows = self._request(
+            "/fapi/v1/userTrades", {"symbol": symbol, "orderId": exchange_order_id}, signed=True
+        )
+        fee, quote = _ZERO, _ZERO
+        for r in rows:
+            if str(r.get("commissionAsset", "USDT")) != "USDT":
+                raise ExchangeError(f"USDT 가 아닌 수수료 자산: {r.get('commissionAsset')}")
+            fee += _dec(r.get("commission"))
+            quote += _dec(r.get("quoteQty"))
+        return fee, quote
 
     def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
         rows = self._request("/fapi/v1/openAlgoOrders", {"symbol": symbol}, signed=True)
@@ -257,6 +287,13 @@ class BinanceUsdmReadOnly:
 
     @staticmethod
     def _order(d: Mapping[str, Any]) -> FuturesOrderResult:
+        executed = _dec(d.get("executedQty"))
+        avg = _dec(d.get("avgPrice"))
+        if not avg and executed:
+            # 테스트넷 실측: RESULT 응답이 FILLED 인데 avgPrice 가 0 이었다. 체결 명목으로 계산한다.
+            quote = _dec(d.get("cumQuote"))
+            if quote:
+                avg = quote / executed
         return FuturesOrderResult(
             client_order_id=str(d.get("clientOrderId", "")),
             exchange_order_id=str(d.get("orderId", "")),
@@ -265,8 +302,8 @@ class BinanceUsdmReadOnly:
             order_type=FuturesOrderType.MARKET,
             status=_STATUS.get(str(d.get("status")), OrderStatus.NEW),
             orig_qty=_dec(d.get("origQty")),
-            executed_qty=_dec(d.get("executedQty")),
-            avg_price=_dec(d.get("avgPrice")),
+            executed_qty=executed,
+            avg_price=avg,
             reduce_only=bool(d.get("reduceOnly", False)),
             close_position=bool(d.get("closePosition", False)),
             stop_price=_dec(d.get("stopPrice")),

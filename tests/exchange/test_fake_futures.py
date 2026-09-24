@@ -133,13 +133,26 @@ class TestProtectiveStop:
         assert ex.account().positions == {}
         assert ex.wallet == Decimal(10_000) - Decimal(600)
 
-    def test_second_close_stop_expires_when_the_position_is_gone(self) -> None:
+    def test_only_one_close_stop_per_direction(self) -> None:
+        """테스트넷 실측 -4130: 같은 방향 closePosition 스톱은 하나만 걸린다."""
         ex = fake()
         market(ex, "BUY", "0.1", "a")
         ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s1")
-        ex.place_stop_market("BTCUSDT", "SELL", Decimal(40_000), "s2")
-        ex.set_mark_price("BTCUSDT", Decimal(44_000))
-        assert ex.orders["s2"].status is OrderStatus.EXPIRED
+        with pytest.raises(OrderRejectedError, match="4130"):
+            ex.place_stop_market("BTCUSDT", "SELL", Decimal(40_000), "s2")
+        assert len(ex.open_stops("BTCUSDT")) == 1
+
+    @pytest.mark.parametrize(("opened", "stop_side"), [(None, "SELL"), ("BUY", "BUY")])
+    def test_close_stop_needs_a_position_it_can_close(
+        self, opened: str | None, stop_side: str
+    ) -> None:
+        """테스트넷 실측 -4509: 포지션이 없거나 반대 방향이면 closePosition 스톱이 걸리지 않는다."""
+        ex = fake()
+        if opened:
+            market(ex, opened, "0.1", "a")
+        price = Decimal(45_000) if stop_side == "SELL" else Decimal(55_000)
+        with pytest.raises(OrderRejectedError, match="4509"):
+            ex.place_stop_market("BTCUSDT", stop_side, price, "s")
 
     def test_manual_close_expires_the_stop(self) -> None:
         ex = fake()
@@ -150,6 +163,7 @@ class TestProtectiveStop:
 
     def test_a_stop_that_would_trigger_immediately_is_rejected(self) -> None:
         ex = fake()
+        market(ex, "BUY", "0.1", "a")
         with pytest.raises(OrderRejectedError, match="immediately"):
             ex.place_stop_market("BTCUSDT", "SELL", Decimal(50_000), "s")
 
@@ -160,6 +174,7 @@ class TestProtectiveStop:
 
     def test_cancel_and_cancel_again(self) -> None:
         ex = fake()
+        market(ex, "BUY", "0.1", "a")
         ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
         canceled = ex.cancel_stop("BTCUSDT", "s")
         assert canceled is not None and canceled.status is OrderStatus.CANCELED
@@ -219,6 +234,7 @@ class TestFaults:
 
     def test_failed_cancel_leaves_the_stop_working(self) -> None:
         ex = fake(fail_cancels=1)
+        market(ex, "BUY", "0.1", "a")
         ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
         with pytest.raises(ExchangeError):
             ex.cancel_stop("BTCUSDT", "s")

@@ -167,20 +167,33 @@ class TestProtection:
         assert rig.m.working_stops() == [] and report.actions == []
 
     def test_stop_on_the_wrong_side_is_replaced(self) -> None:
+        """실거래소는 반대 방향 closePosition 스톱을 받지 않는다(-4509). 숏에서 건 스톱이
+        남은 채 포지션이 롱으로 뒤집힌 비정상 상태를 흉내 낸다."""
         rig = Rig()
-        rig.open_long()
+        rig.m.submit_market(
+            decision_ms=T0, symbol="BTCUSDT", side="SELL", quantity=Decimal("0.1"), purpose="OPEN"
+        )
         rig.m.place_protective_stop(
             decision_ms=T0, symbol="BTCUSDT", side="BUY", stop_price=Decimal(55_000)
         )
+        rig.ex._qty["BTCUSDT"] = Decimal("0.1")  # 스톱은 남고 포지션만 뒤집힌 상태
+        rig.store.add_adjustment(0, "BTCUSDT", Decimal("0.2"), "테스트: 외부에서 뒤집힌 포지션")
         report = rig.recover()
         assert "STOP_WRONG_SIDE" in rig.kinds(report)
         assert [s.side for s in rig.m.working_stops()] == ["SELL"]
 
     def test_stale_stop_on_a_flat_account_is_cancelled(self) -> None:
+        """실거래소는 평탄해지면 closePosition 스톱을 자동 정리한다(테스트넷 실측).
+
+        그래도 스톱만 남은 비정상 상태를 가정해 방어 경로를 검사한다.
+        """
         rig = Rig()
+        rig.open_long()
         rig.m.place_protective_stop(
             decision_ms=T0, symbol="BTCUSDT", side="SELL", stop_price=Decimal(45_000)
         )
+        rig.ex._qty["BTCUSDT"] = Decimal(0)  # 스톱은 남고 포지션만 사라진 상태를 흉내
+        rig.store.add_adjustment(0, "BTCUSDT", Decimal("-0.1"), "테스트: 외부에서 사라진 포지션")
         report = rig.recover()
         assert "STALE_STOP" in rig.kinds(report)
         assert rig.m.working_stops() == [] and report.state == "RUNNING"
@@ -234,15 +247,19 @@ class TestManualReview:
         report = rig.recover()
         assert "QTY_MISMATCH" in rig.kinds(report) and report.state == "DEGRADED"
 
-    def test_order_we_did_not_place_degrades(self) -> None:
+    def test_order_we_did_not_place_degrades_without_fighting_it(self) -> None:
+        """모르는 스톱이 이미 보호 중이면 우리 스톱은 -4130 으로 막힌다.
+
+        자동 조치를 했다면 3번 거부 뒤 멀쩡한 포지션을 비상 청산했을 것이다.
+        """
         rig = Rig()
         rig.open_long()
-        rig.m.place_protective_stop(
-            decision_ms=T0, symbol="BTCUSDT", side="SELL", stop_price=Decimal(45_000)
-        )
-        rig.ex.place_stop_market("BTCUSDT", "SELL", Decimal(40_000), "someone-else")
+        rig.ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "someone-else")
+        placed = rig.ex.placed_count
         report = rig.recover()
         assert "UNTRACKED_ORDER" in rig.kinds(report) and report.state == "DEGRADED"
+        assert rig.ex.placed_count == placed and rig.position() == Decimal("0.1")
+        assert any("자동 조치하지 않음" in a for a in report.actions)
 
     def test_account_query_failure_sends_nothing(self) -> None:
         rig = Rig()

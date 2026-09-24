@@ -206,9 +206,16 @@ class FakeFuturesExchange:
         f = self.symbol_filters[symbol]
         if stop_price <= 0 or stop_price != floor_to_step(stop_price, f.tick_size):
             raise OrderRejectedError("PRICE_FILTER")
+        # 테스트넷 실측(2026-09-24) 규칙과 검사 순서: 닫을 포지션(-4509) → 같은 방향 중복(-4130)
+        # → 즉시 발동(-2021). closePosition 스톱은 그 방향으로 닫을 포지션이 있어야 걸린다.
+        position = self._qty.get(symbol, _ZERO)
+        if (side == "SELL" and position <= 0) or (side == "BUY" and position >= 0):
+            raise OrderRejectedError("-4509 closePosition stop needs an open position to close")
+        if any(o.side == side and o.close_position for o in self.open_stops(symbol)):
+            raise OrderRejectedError("-4130 closePosition stop in this direction already exists")
         mark = self.prices[symbol]
         if (side == "SELL" and stop_price >= mark) or (side == "BUY" and stop_price <= mark):
-            raise OrderRejectedError("Order would immediately trigger")
+            raise OrderRejectedError("-2021 Order would immediately trigger")
         return self._record(
             FuturesOrderResult(
                 client_order_id=client_order_id,

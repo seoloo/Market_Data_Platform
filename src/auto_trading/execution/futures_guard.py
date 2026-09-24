@@ -22,6 +22,9 @@ TRADING_CORE §재시작·정합성 복구, §포지션 상태·보호주문.
   조정 기록으로 남긴다. ``hold_with_stop``이면 기록으로 입양하고 보호 스톱을 건다.
 * **할 일이 없는 스톱**(포지션이 없거나 방향이 틀림): 취소한다.
 
+**우리가 걸지 않은 주문이 있는 심볼은 아무것도 자동으로 하지 않는다.** 다른 주체가 있다는 뜻이고,
+자동 조치는 그 주체와 부딪친다(모르는 스톱이 보호 중인데 우리 스톱이 -4130 으로 막혀 비상 청산 등).
+
 보호 스톱 요구는 정책으로 받는다(``require_stop``). TRADING_CORE 는 거래소 보호주문을 필수로 두지만,
 O/v1 은 연구 한정으로 "가격 손절 없음" 예외를 두었다(24 §7) — 이 충돌은 실거래 전 결정할 일이며
 여기서 정하지 않는다. ``require_stop=False`` 면 보호 없는 포지션은 정보로만 기록한다.
@@ -221,6 +224,13 @@ class FuturesSupervisor:
         for symbol in sorted({i.symbol for i in found}):
             kinds = {i.kind: i for i in found if i.symbol == symbol}
             position = account.positions.get(symbol)
+            if "UNTRACKED_ORDER" in kinds:
+                # 우리가 걸지 않은 주문이 있다 = 다른 주체(수동 조작 등)가 있다.
+                # 자동으로 스톱을 걸거나 정리하면 그 주체와 부딪친다 — 예: 모르는 스톱이 이미
+                # 보호 중인데 우리 스톱이 -4130 으로 막혀 멀쩡한 포지션을 비상 청산하게 된다.
+                # 사람 확인으로 넘긴다.
+                report.actions.append(f"{symbol}: 모르는 주문이 있어 자동 조치하지 않음")
+                continue
             for kind in ("STALE_STOP", "STOP_WRONG_SIDE"):
                 for issue in (i for i in found if i.symbol == symbol and i.kind == kind):
                     cid = issue.detail["client_order_id"]
