@@ -42,6 +42,7 @@ from auto_trading.backtest.trend import TrendConfig, target_weight
 
 __all__ = [
     "O2_STOP",
+    "O3_2X",
     "T2_ALONE",
     "OverlayBar",
     "OverlayConfig",
@@ -85,6 +86,9 @@ T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=
 
 O2_STOP = OverlayConfig(catastrophe_stop=0.20)
 """O/v2: O/v1 + 선물 추가분 비상 스톱 −20% (docs/research/27, 전향 관찰 28)."""
+
+O3_2X = OverlayConfig(exposure=2.0, catastrophe_stop=0.20)
+"""O/v3: O/v2 규칙에 노출만 2배 — 한 달 운영 관찰용 (docs/research/31). 판정된 전략이 아니다."""
 
 
 @dataclass(frozen=True, slots=True)

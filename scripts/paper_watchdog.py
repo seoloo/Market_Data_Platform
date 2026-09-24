@@ -6,7 +6,10 @@
     python scripts/paper_watchdog.py --no-send       # 텔레그램 보내지 않고 화면·로컬 기록만
     python scripts/paper_watchdog.py --test-telegram # 텔레그램 설정 확인용 시험 메시지
 
-윈도우 작업 스케줄러로 매일 09:20(KST) 실행한다 — T/v2(09:05)·O/v1(09:10)·테스트넷 훈련(09:14) 뒤.
+윈도우 작업 스케줄러로 매일 21:20(KST) 실행한다 — T/v2(21:00)·O/v1(21:02)·O/v2(21:04)·O/v3(21:06)·
+테스트넷 훈련(21:08) 뒤.
+2026-09-24 사용자 결정으로 저녁 시각으로 옮겼다
+(출근 때문에 아침에 PC 를 켤 수 없다).
 테스트넷 훈련 결과(``reports/testnet/drill-*.json``)도 한 줄로 요약한다.
 훈련 실패는 경고(1)까지만 올린다.
 종료 코드: 0 이상 없음 · 1 경고 · 2 조치 필요(중단 기준·실행 누락·원장 불일치·알림 실패).
@@ -26,7 +29,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from auto_trading.backtest.overlay import O2_STOP
+from auto_trading.backtest.overlay import O2_STOP, O3_2X
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
@@ -56,6 +59,8 @@ OUT = REPO / "reports" / "watchdog"
 DRILLS = REPO / "reports" / "testnet"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
+_EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
+"""O/v1 다음에 점검하는 원장 (O/v3 는 docs/research/31 한 달 관찰)."""
 PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
 """Phase 7 매일 훈련 운영 시작 (docs/research/26). 이전 기록은 개발 중 실행이다."""
 
@@ -84,17 +89,18 @@ def collect(now_ms: int) -> tuple[list[LedgerSummary | None], list[Finding]]:
             summary, found = check_o1(o1_rows, now_ms)
             summaries.append(summary)
             findings.extend(found)
-        try:
-            o2_rows = OverlayPaperDayRepository(conn).all(O2_LEDGER)
-        except sqlite3.Error as exc:
-            findings.append(Finding("CRITICAL", "O/v2", f"원장 조회 실패: {exc}"))
-        else:
-            if o2_rows:
-                summary, found = check_o1(o2_rows, now_ms, ledger="O/v2", cfg=O2_STOP)
+        for name, strategy_id, cfg in _EXTRA_LEDGERS:
+            try:
+                rows = OverlayPaperDayRepository(conn).all(strategy_id)
+            except sqlite3.Error as exc:
+                findings.append(Finding("CRITICAL", name, f"원장 조회 실패: {exc}"))
+                continue
+            if rows:
+                summary, found = check_o1(rows, now_ms, ledger=name, cfg=cfg)
                 summaries.append(summary)
                 findings.extend(found)
             else:  # 스케줄 등록 전 — 경고하지 않는다 (28 §4)
-                findings.append(Finding("INFO", "O/v2", "기록 없음 — 스케줄 등록 전"))
+                findings.append(Finding("INFO", name, "기록 없음 — 스케줄 등록 전"))
     finally:
         conn.close()
     return summaries, findings

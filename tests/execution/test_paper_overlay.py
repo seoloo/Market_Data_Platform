@@ -17,6 +17,7 @@ import pytest
 
 from auto_trading.backtest.overlay import (
     O2_STOP,
+    O3_2X,
     OverlayBar,
     OverlayConfig,
     OverlayResult,
@@ -368,3 +369,18 @@ class TestO2Ledger:
         runner.run_once(now_after(P0))
         (row,) = OverlayPaperDayRepository(conn).all("o1_overlay")
         assert "stop_hits" not in row.tally
+
+    def test_o3_two_times_ledger_verifies_with_its_own_rules(self) -> None:
+        market = self.crash_market()
+        conn = connect(":memory:")
+        apply_migrations(conn, now_ms=1)
+        repo = OverlayPaperDayRepository(conn)
+        runner = PaperOverlayRunner(market, repo, clock=lambda: 1, cfg=O3_2X, strategy_id="o3_2x")
+        for k in range(130):
+            runner.run_once(now_after(P0 + k * D))
+        rows = repo.all("o3_2x")
+        expected = research(market, P0 + 129 * D, O3_2X)
+        assert [r.equity for r in rows] == expected.equity  # 비트 단위
+        assert verify_ledger(rows, cfg=O3_2X) == []
+        assert verify_ledger(rows, cfg=O2_STOP) != []  # 1.5배 규칙으로는 재현되지 않는다
+        assert max(r.tally["exposure"] for r in rows) > 1.5  # 실제로 2배 쪽으로 컸다

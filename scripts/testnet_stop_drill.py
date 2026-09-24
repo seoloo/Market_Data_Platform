@@ -1,7 +1,7 @@
 """Phase 7 스톱 발동 훈련 — 가격이 실제로 보호 스톱에 닿을 때를 테스트넷에서 확인한다 (26 §3).
 
 **가짜 돈만 쓴다.** 매일 훈련(:mod:`testnet_drill`)과 같은 테스트넷 키·어댑터·DB를 쓰되
-종목을 **ETHUSDT** 로 나눠 서로의 포지션을 건드리지 않는다. 매일 훈련 시각(09:14 KST) 근처에는
+종목을 **ETHUSDT** 로 나눠 서로의 포지션을 건드리지 않는다. 매일 자동 실행(21시대 KST) 근처에는
 시작하지 않는다. 필요할 때 손으로 돌리는 선택형 훈련이며 스케줄에 넣지 않는다.
 
 순서 (각 단계 PASS/FAIL):
@@ -64,8 +64,10 @@ for _stream in (sys.stdout, sys.stderr):
 SYMBOL = "ETHUSDT"
 TAG = "ts"
 POLL_SECONDS = 5.0
-DAILY_DRILL_UTC_MINUTES = (5, 35)
-"""매일 훈련(00:14 UTC = 09:14 KST) 앞뒤로 비워 두는 구간 [00:05, 00:35) UTC."""
+DAILY_DRILL_UTC_MINUTES = (12 * 60 - 5, 12 * 60 + 30)
+"""매일 자동 실행(21:00~21:20 KST = 12:00~12:20 UTC) 앞뒤로 비워 두는 구간 [11:55, 12:30) UTC.
+
+2026-09-24 사용자 결정으로 스케줄을 아침 9시대에서 저녁 9시대로 옮겼다."""
 _MINUTE_MS = 60_000
 _DAY_MS = 86_400_000
 
@@ -288,7 +290,7 @@ def main() -> int:
     now = int(time.time() * 1000)
     if overlaps_daily_drill(now, args.max_minutes):
         raise SystemExit(
-            "매일 훈련(09:14 KST) 구간과 겹친다 — 09:35 KST 이후나 대기 시간을 줄여 다시"
+            "매일 자동 실행(21:00~21:20 KST) 구간과 겹친다 — 21:30 KST 이후나 대기 시간을 줄여 다시"
         )
     api = BinanceUsdmTestnet(load_testnet_credentials())
     conn = connect(DB)

@@ -263,7 +263,7 @@ def main() -> int:
     now = _now_ms()
     if overlaps_daily_drill(now, args.max_minutes + 5):
         raise SystemExit(
-            "매일 훈련(09:14 KST) 구간과 겹친다 — 09:35 KST 이후나 대기 시간을 줄여 다시"
+            "매일 자동 실행(21:00~21:20 KST) 구간과 겹친다 — 21:30 KST 이후나 대기 시간을 줄여 다시"
         )
     api = BinanceUsdmTestnet(load_testnet_credentials())
     conn = connect(DB)

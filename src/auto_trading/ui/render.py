@@ -27,7 +27,13 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 )
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
-_COLORS = {"t2": "var(--t2)", "o1": "var(--o1)", "o2": "var(--o2)", "hold": "var(--hold)"}
+_COLORS = {
+    "t2": "var(--t2)",
+    "o1": "var(--o1)",
+    "o2": "var(--o2)",
+    "o3": "var(--o3)",
+    "hold": "var(--hold)",
+}
 PHASE7_FROM = datetime(2026, 9, 25, tzinfo=UTC)
 PHASE7_DAYS = 14
 _STOP_LINE, _WARN_LINE, _HALT_LINE = 0.25, 0.20, 0.30
@@ -450,7 +456,7 @@ def _risk(data: DashboardData) -> str:
             f"<tr><td>{escape(lg.name)}</td><td class='num'>{_dot(level)}{dd * 100:.1f}%</td>"
             f"<td class='num'>{_WARN_LINE:.0%} / {_STOP_LINE:.0%}</td>"
             f"<td class='num'>{lg.liquidations}</td><td>{'정지' if lg.halted else '정상'}</td>"
-            f"<td class='num'>{lg.stop_hits if lg.key == 'o2' else '—'}</td></tr>"
+            f"<td class='num'>{lg.stop_hits if lg.key in {'o2', 'o3'} else '—'}</td></tr>"
         )
     history = "".join(_watch_row(w) for w in data.watch) or (
         "<tr><td colspan=3 class='mute'>점검 기록 없음</td></tr>"

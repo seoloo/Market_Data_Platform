@@ -10,11 +10,15 @@ T/v2 Paper(`run_paper_t2.py`)와 원장이 분리돼 있다. 이 스크립트는
     python scripts/run_paper_o1.py status   # 최근 기록·밀린 날·누락 보정일
     python scripts/run_paper_o1.py verify   # 저장된 원장을 첫날부터 다시 계산해 어긋남 확인
     python scripts/run_paper_o1.py run --ledger o2   # O/v2(비상 스톱 −20%) 별도 원장 (28)
+    python scripts/run_paper_o1.py run --ledger o3   # O/v3(2배 + 비상 스톱) 한 달 관찰 (31)
 
-``--ledger`` 를 주지 않으면 O/v1 이다 — 기존 스케줄(09:10)은 그대로 O/v1 을 돌린다.
+``--ledger`` 를 주지 않으면 O/v1 이다 — O/v1 스케줄은 인자 없이 돌린다.
 O/v1 과 O/v2 는 원장(strategy_id)·보고서 폴더가 다르고 서로의 기록을 읽지 않는다.
 
-윈도우 작업 스케줄러로 매일 09:10(KST, = 00:10 UTC) 실행한다 — T/v2(09:05) 뒤에 같은 DB를 쓴다.
+윈도우 작업 스케줄러로 매일 21:02(O/v1)·21:04(O/v2)·21:06(O/v3) KST 실행한다 — T/v2(21:00) 뒤에
+같은 DB를 쓴다. 체결은 마감 일봉 종가라 실행 시각이 결과를 바꾸지 않는다.
+2026-09-24 사용자 결정으로 저녁 시각으로 옮겼다
+(출근 때문에 아침에 PC 를 켤 수 없다).
 결과: DB ``paper_overlay_days``, 보고서 ``reports/paper/o1/<날짜>.json``.
 데이터가 모자라면 아무것도 기록하지 않고 종료 코드 1로 끝난다(다음 실행이 그날을 다시 계산한다).
 """
@@ -30,7 +34,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from auto_trading.backtest.overlay import O2_STOP, OverlayConfig
+from auto_trading.backtest.overlay import O2_STOP, O3_2X, OverlayConfig
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
@@ -60,6 +64,7 @@ class Ledger:
 LEDGERS = {
     "o1": Ledger("O/v1", "o1_overlay", OverlayConfig(), REPO / "reports" / "paper" / "o1"),
     "o2": Ledger("O/v2", "o2_stop", O2_STOP, REPO / "reports" / "paper" / "o2"),
+    "o3": Ledger("O/v3", "o3_2x", O3_2X, REPO / "reports" / "paper" / "o3"),
 }
 _DAY = 86_400_000
 

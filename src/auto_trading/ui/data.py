@@ -204,7 +204,9 @@ def _overlay_view(
 ) -> LedgerView:
     points = tuple(Point(_day(r.decision_ms), r.equity) for r in rows)
     last = rows[-1]
-    protection = "추세 청산 · 비상 스톱 −20%" if key == "o2" else "추세 청산 (가격 손절 없음)"
+    protection = (
+        "추세 청산 · 비상 스톱 −20%" if key in {"o2", "o3"} else "추세 청산 (가격 손절 없음)"
+    )
     holdings: list[Holding] = []
     for symbol in _SYMBOLS:
         for venue, qty_key, price_key in (
@@ -445,6 +447,11 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
             o2 = overlay.all("o2_stop")
             if o2:
                 ledgers.append(_overlay_view("o2", "O/v2", "추가 노출 + 비상 스톱", o2, reserve))
+            o3 = overlay.all("o3_2x")
+            if o3:
+                ledgers.append(
+                    _overlay_view("o3", "O/v3", "2배 + 비상 스톱 · 한 달 관찰", o3, reserve)
+                )
         except (sqlite3.Error, KeyError, ValueError, TypeError) as exc:
             errors.append(f"원장 읽기 실패: {type(exc).__name__}: {exc}")
         finally:

@@ -17,12 +17,12 @@ def _ms(h: int, m: int, day: int = 25) -> int:
 @pytest.mark.parametrize(
     ("start", "minutes", "overlaps"),
     [
-        (_ms(0, 14), 10, True),  # 매일 훈련 시각 한가운데
-        (_ms(23, 30, 24), 60, True),  # 전날 밤 시작, 대기 중 00:05 를 넘는다
-        (_ms(23, 30, 24), 25, False),  # 00:00 에 끝난다 (5분 여유 포함 00:00)
-        (_ms(0, 36), 60, False),  # 구간이 끝난 뒤 시작
+        (_ms(12, 8), 10, True),  # 매일 자동 실행(21:08 KST = 12:08 UTC) 한가운데
+        (_ms(11, 30), 60, True),  # 대기 중 11:55 를 넘는다
+        (_ms(11, 0), 25, False),  # 11:30 에 끝난다 (5분 여유 포함)
+        (_ms(12, 31), 60, False),  # 구간이 끝난 뒤 시작
         (_ms(3, 0), 60, False),
-        (_ms(22, 0), 180, True),  # 01:05 까지 — 다음 날 구간을 지난다
+        (_ms(10, 0), 180, True),  # 13:05 까지 — 구간을 지난다
     ],
 )
 def test_overlaps_daily_drill(start: int, minutes: float, overlaps: bool) -> None:

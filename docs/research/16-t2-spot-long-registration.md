@@ -48,3 +48,6 @@ CURRENT_SPEC 범위 변경(현물 거래) 승인.
 | Phase 2 | `SpotTrendConfig`(고정값 검증), `features/tsmom.py`, `strategy/spot_trend.py`(목표 비중·주문 계획, fail-closed). 연구 시뮬레이터와 목표 비중 일치(1e-9), 1,000회 결정 재현, 미래 무관성 테스트 | **완료** |
 | Phase 5 | FakeSpotExchange 상태 전이·장애 주입, 멱등 주문(동일 의도 100회 → 1건), 선기록·재시작 10회 복구, UNKNOWN 추정 재주문 금지, 무작위 장애 성질 테스트 (`exchange/spot.py`·`fake_spot.py`, `execution/spot_orders.py`, `spot_orders` 테이블 004) | **완료 (2026-09-24)** · 읽기 전용 어댑터로 실계좌 조회 성공(권한 읽기 전용·IP 제한 확인, 서버 시계 차이 보정, BTC·ETH 주문 규칙 조회) |
 | Phase 6 | `execution/paper_t2.py`(전날 목표를 오늘 가격에 체결 = 연구의 1일 지연, 원장 잔고, 누락일은 오래된 목표 미체결, 미해소 주문 시 DEGRADED), `paper_days` 테이블 005, `scripts/run_paper_t2.py run·status`. 테스트: 연구와 목표 비중 일치(1e-9)·자본 0.1% 이내, 멱등, 누락일, 체결 후 강제 종료, fail-closed. **2026-09-24 첫 실행**(결정일 2026-09-22) | **운영 시작** · 최소 4주 |
+
+**운영 시각 변경 (2026-09-24, 사용자 결정):** Paper 실행을 09:05 → **21:00 KST** 로 옮겼다(출근으로 아침에 PC 를 켤 수 없다).
+T/v2 Paper 는 현재가 체결이라 마감 뒤 약 12시간 지난 가격에 체결된다 — 연구(종가 체결)와의 차이가 커진다. 신호·규칙은 그대로다.

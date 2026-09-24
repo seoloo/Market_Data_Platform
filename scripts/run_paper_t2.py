@@ -5,7 +5,9 @@
     python scripts/run_paper_t2.py run      # 오늘(00:00 UTC 이후) 1회. 이미 했으면 보고만 한다
     python scripts/run_paper_t2.py status   # 최근 기록·누락일 (watchdog 점검)
 
-윈도우 작업 스케줄러로 매일 09:05(KST, = 00:05 UTC) 실행한다. 경로는 모두 프로젝트 기준 절대 경로다.
+윈도우 작업 스케줄러로 매일 21:00(KST, = 12:00 UTC) 실행한다(현재가 체결 — 마감 약 12시간 뒤 가격).
+2026-09-24 사용자 결정으로 저녁 시각으로 옮겼다
+(출근 때문에 아침에 PC 를 켤 수 없다). 경로는 모두 프로젝트 기준 절대 경로다.
 결과: DB ``paper_days``·``spot_orders``(mode='paper'), 보고서 ``reports/paper/t2/<날짜>.json``.
 """
 
