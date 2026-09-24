@@ -494,7 +494,7 @@ JEV의 정체·공급자·모델은 미정이며 추측해 구현하지 않는�
 | invalidation | `invalidation_levels[]` | 가격·비교(`<=`/`>=`)·기준(HIGH/LOW)·발동 시각. `scope=ANALYSIS_ONLY` |
 | 근거 | `evidence[]` | 가족별 FIBONACCI·ALTERNATION(원값, 출처, 가이드라인 범위)·MOMENTUM·VOLUME·MULTI_TIMEFRAME·CHANNEL. 계산 안 한 것은 `NOT_COMPUTED` — 중립값이 아니다 |
 | UNKNOWN 가능성 | `uncertainty`, 묶음의 `exhaustive=false`, `other_or_unknown=ALWAYS_POSSIBLE` | 하위파 `UNVERIFIED`, 경쟁 시나리오 수, 교차 거래소 대리 등 플래그 |
-| 하위파 | `hard_checks` 의 `LEG_k_SUBDIVISION`, `evidence` 의 `SUBDIVISION` (다리별 보이는 하위 다리 수), `uncertainty.subdivision_status` | 바로 아래 degree 로 읽음([33 §16](33-elliott-phase0-data-and-profile.md)). 일치=PASS, 못 읽음=UNVERIFIED, 모양 다름=CONFLICT 보류(해상도 한계라 FAIL 아님). 기본 읽기는 **EW-2**(반옥타브 격자로 내려가며 처음 보이는 구조, 각 단계는 EW-0 읽기 — 33 §20·§21). 꼭짓점을 1m 경로로 맞추는 EW-1 은 채택 기준 (iv) 미달로 선택 옵션(§19). 전 다리 일치면 `VERIFIED`, 일부면 `PARTIAL`. `degree_id` 는 `H4:D1` 처럼 degree 를 밝힌다 |
+| 하위파 | `hard_checks` 의 `LEG_k_SUBDIVISION`, `evidence` 의 `SUBDIVISION` (다리별 보이는 하위 다리 수), `uncertainty.subdivision_status` | 바로 아래 degree 로 읽음([33 §16](33-elliott-phase0-data-and-profile.md)). 일치=PASS, 못 읽음=UNVERIFIED, 모양 다름=CONFLICT 보류(해상도 한계라 FAIL 아님). 기본 읽기는 **EW-2**(반옥타브 격자로 내려가며 처음 보이는 구조, 각 단계는 EW-0 읽기 — 33 §20·§21). 꼭짓점을 1m 경로로 맞추는 EW-1 은 채택 기준 (iv) 미달로 선택 옵션(§19). 후보 생성·순위의 새 경로는 **EW-3d′**(33 §24~§29): 카운트는 4h, 하위파 증거는 1h, 절대 규칙으로 모든 후보를 만들고 검증 다리 비율 → 가이드라인 거리로 순위를 매긴다(`ranking.py` — JEV 로 바꿀 자리). 합성 확인 seed 에서 진짜 해석 포함 92~96%, 상위 3 안 67~71%. 전 다리 일치면 `VERIFIED`, 일부면 `PARTIAL`. `degree_id` 는 `H4:D1` 처럼 degree 를 밝힌다 |
 
 단일 count를 확정하는 필드는 없다. 묶음 상태는 `SCENARIOS`·`NO_VALID_COUNT`·
 `INSUFFICIENT_ANCHORS`·`UNKNOWN`. `validate_scenario_set_dict`가 완전 목록 주장·확률 기입·
