@@ -100,7 +100,9 @@ def _stratified(cells: list[tuple[str, int, int, int, int]]) -> float | None:
     return num / den if den else None
 
 
-def run() -> dict[str, object]:
+def run(only: tuple[str, ...] | None = None) -> dict[str, object]:
+    """``only`` 가 있으면 그 가설만 검정하고 Holm 도 그 수로 한다 (문서 36 §8)."""
+    selected = {k: v for k, v in TESTS.items() if only is None or k in only}
     grid = _exposures()
     fills, funding, _ = load_xbtusd(SOURCE)
     trips = sorted(build_trips(fills, funding), key=lambda t: t.opened)
@@ -118,7 +120,7 @@ def run() -> dict[str, object]:
     rng = random.Random(SEED)
     report: dict[str, object] = {}
     pvalues: dict[str, float] = {}
-    for name, (need, _kind) in TESTS.items():
+    for name, (need, _kind) in selected.items():
         cells_by_week: dict[str, dict[str, list[int]]] = defaultdict(
             lambda: defaultdict(lambda: [0, 0, 0, 0])
         )
@@ -171,14 +173,16 @@ def run() -> dict[str, object]:
         "grid_hours": len(grid),
         "wa_flat_share_of_hours": round(flat_share, 4),
         "tests": report,
+        "tests_run": list(selected),
         "note": "문서 36 1회 실행. 준확증(35 결과를 본 뒤), CROSS_VENUE_PROXY.",
     }
 
 
 def main(argv: list[str]) -> int:
-    modes = {"precheck": precheck, "run": run}
+    fib_only = ("P2a_long_held_in_up_leg_fib_zone", "P2b_short_held_in_down_leg_fib_zone")
+    modes = {"precheck": precheck, "run": run, "run-fib": lambda: run(fib_only)}
     if not argv or argv[0] not in modes:
-        raise SystemExit("usage: audit_wa_position_state.py precheck|run")
+        raise SystemExit("usage: audit_wa_position_state.py precheck|run|run-fib")
     sys.stdout.write(json.dumps(modes[argv[0]](), ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
