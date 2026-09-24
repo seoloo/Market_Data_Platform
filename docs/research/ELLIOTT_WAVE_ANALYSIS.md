@@ -289,8 +289,10 @@ Elliott “extension”과 D22 “price extension/과확장”은 다른 필드�
 이는 지표 자체의 독립적인 국소 저점/고점을 찾는 방식과 다르므로 `pairing_method=PRICE_ANCHORED`로 기록한다.
 지표의 독립 피벗을 매칭하는 방식은 시간 허용폭·동률·확정 지연이 추가되므로 별도 버전으로 남긴다.
 
-`epsilon_price`는 상품 tick을 반영한 최소 가격 차이, `epsilon_indicator`는 지표 단위의 최소 차이다.
-두 값·피벗 최소/최대 간격·TTL·지표 기간은 구현 전에 고정한다. 이번 문서에서 최적값을 정하지 않는다.
+후속 [EW-0 프로파일](33-elliott-phase0-data-and-profile.md)은 두 epsilon을 0으로 두고
+저장 가격·Decimal RSI의 엄격 부등호만 사용한다. 이는 tick·RSI 차이 문턱의 최적값이라는 주장이 아니다.
+피벗 최소/최대 간격·노출 TTL은 WA 결합 전에 별도로 고정하며, 작은 수치 차이의 분포를 보고
+사후 epsilon을 올려 유리한 패턴만 남기지 않는다.
 
 ```text
 REGULAR_BULLISH:
@@ -469,7 +471,12 @@ I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에
 지금의 권고는 **이론 문법 → causal 후보 판정기의 신뢰성 → 실제 진입 집중도 → 새 가설** 순서다.
 파동 라벨 수나 과거 성공 그림 수를 성과 지표로 삼지 않는다.
 
-미확정: 피벗 임계·척도/탐색 깊이·window, 보조지표 기간, 다이버전스 epsilon·간격·TTL·지표 초기화,
+후속 Phase 0의 [시장 데이터·초기 규칙 감사](33-elliott-phase0-data-and-profile.md)에서
+4h 개발용 시장·2% 피벗·RSI(14)·가격 피벗 기준 엄격 비교를 `EW-0`로 고정했다.
+이것은 WA 결합 분석의 사전등록이나 검정력 통과가 아니다.
+
+미확정: Elliott 후보 탐색 깊이·endpoint window, 다이버전스 노출 TTL·최소/최대 간격,
+RSI 계산 context·시장 가격 단위 감사,
 endpoint 확인·최근 구간 정의, profile 세부 예외,
 동일 거래소 데이터 확보, 통계적 최소 효과·군집/대조군 수·검정력. 결과를 보기 전에 별도 확정해야 한다.
 따라서 본 문서는 사전등록 완료도, 코딩 착수/WA 실제 결합 분석 완료도 아니다.
