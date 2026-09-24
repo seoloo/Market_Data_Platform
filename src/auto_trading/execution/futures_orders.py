@@ -203,6 +203,18 @@ class FuturesOrderManager:
         """기동 시·주기적으로 열린 주문을 거래소 조회로 맞춘다. 재주문하지 않는다."""
         return [self._reconcile(r) for r in self._store.open()]
 
+    def refresh(self, client_order_id: str) -> FuturesOrderRecord:
+        """주문 하나를 거래소 조회로 다시 맞춘다 (사용자 스트림 이벤트가 알려 준 변화).
+
+        이미 종결된 기록은 그대로 돌려준다. 재주문하지 않는다.
+        """
+        record = self._store.get(client_order_id)
+        if record is None:
+            raise ValueError(f"기록에 없는 주문: {client_order_id}")
+        if record.state in TERMINAL_STATES:
+            return record
+        return self._reconcile(record)
+
     # ------------------------------------------------------------ 내부
 
     def _new_record(

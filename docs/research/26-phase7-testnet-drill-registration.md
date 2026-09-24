@@ -43,7 +43,7 @@
 |---|---|---|
 | **실제 스톱 발동** | 가격이 스톱에 닿아야 한다 — 매일 훈련에서 기다릴 수 없다 | **확인 (2026-09-24)**: 선택형 훈련 `scripts/testnet_stop_drill.py`(ETHUSDT, mark 15bp 아래, 최대 60분, 09:05~09:35 KST 시작 거부). 9/9 통과 — §6 |
 | **부분 체결** | 소량 시장가는 전량 체결된다. 테스트넷에서 재현이 어렵다 | 가짜 거래소 장애 주입 테스트로 대신하고, 그 한계를 게이트 판정에 적는다 |
-| 체결 실시간 수신 | WS 사용자 스트림(`ORDER_TRADE_UPDATE`·`ALGO_UPDATE`) 미구현 | 다음 작업 |
+| 체결 실시간 수신 | WS 사용자 스트림 | **구현·확인 (2026-09-24)**: `exchange/user_stream.py`(해석)·`binance_usdm_stream.py`(연결 수명)·`execution/stream_sync.py`(이벤트 → 조회 확정), 선택형 훈련 `scripts/testnet_stream_drill.py` — §6 |
 
 ## 4. 한계
 
@@ -65,3 +65,7 @@ Register-ScheduledTask -TaskName "AutoTrading_Testnet_Drill" -Action (New-Schedu
 |---|---|
 | 2026-09-24 | 개발 중 훈련 3회: 16/17 → 18/19 → **20/20**. 실패는 모두 거래소 실측 규칙(-4130·-4509·평균가 0·취소 직후 조회 지연)을 코드에 반영하며 해소. 이 3회는 기간 통계에 넣지 않는다 |
 | 2026-09-24 | **스톱 발동 훈련 9/9 (TRIGGERED)**: ETH 0.010 롱 @ 2,683.90 → 스톱 2,679.49(mark 15bp 아래, Algo·MARK_PRICE) → 235초 뒤 발동, 체결 2,679.33(스톱 대비 **0.60bp 불리**). 스톱 기록 FILLED·수량 일치·평탄·남은 스톱 0, 재시작 복구 RUNNING(스톱 체결을 로컬 기록이 반영 — Algo `actualOrderId` 경로 확인). 기록 `reports/testnet/stop-20260924T031236Z.json`. 테스트넷 유동성 기준이며 실계좌 급변·갭 슬리피지를 뜻하지 않는다 |
+| 2026-09-24 | **WS 사용자 스트림 실측 조사** (일회성, ETH): 테스트넷 WS 주소 `wss://fstream.binancefuture.com/private/ws?listenKey=…&events=…`(문서에 없음), listenKey 는 `demo-fapi` POST. 받은 이벤트 12개로 확인: ① **발동한 스톱의 실제 시장가 주문이 스톱과 같은 client ID**(`st=ALGO_CONDITION`, `si=algoId`) ② **순서 역전** — 체결(ORDER_TRADE_UPDATE FILLED)이 ALGO_UPDATE TRIGGERING 보다 먼저 ③ ALGO 상태 NEW → TRIGGERING → TRIGGERED(`ai`) → FINISHED(`ap`·`aq`) ④ 이벤트 시각(E)과 체결 시각(T) 차이 ≈ 10ms. 그래서 이벤트를 상태로 쓰지 않고 "그 주문을 다시 조회" 신호로만 쓴다 |
+| 2026-09-24 | **스트림 훈련 1차 8/9 (TRIGGERED)**: 연결·진입 체결 이벤트(전송 뒤 87ms)·스톱 NEW·모르는 ID 스톱 UNTRACKED·강제 끊기 뒤 재연결 6.3초·**가까운 스톱 발동을 이벤트로 확정**(37분 대기 중 listenKey 연장 1회, 체결 FILLED 이벤트 → LAGGING → TRIGGERED 이벤트에서 FILLED)·마무리 RUNNING 통과. 실패 1: 관리자 밖 취소 — 취소 직후 조회가 아직 NEW 라 LAGGING 이 됐고 재조회로 풀렸는데 **훈련 판정이 재조회 결과를 세지 않았다**(훈련 스크립트 결함, 코드 결함 아님) → 수정. 기록 `stream-20260924T041857Z.json` |
+| 2026-09-24 | **스트림 훈련 2차 8/8 · NOT_TRIGGERED**: 수정한 취소 반영 통과(LAGGING → 재조회로 CANCELED). 스톱(10bp)은 가격이 멀어져 60분 안에 발동하지 않아 정리 후 판정 불가. 이벤트 수신 지연(서버 시계 보정) 최대 약 0.3초. 기록 `stream-20260924T051952Z.json` |
+| 2026-09-24 | **스트림 훈련 3차 9/9 (TRIGGERED)** — 최종 코드로 한 번에 전부 통과: 진입 체결 이벤트 87ms · 스톱 NEW · 관리자 밖 취소 → CANCELED · UNTRACKED · 재연결 6.3초 · 스톱(5bp) 815초 뒤 발동, 체결 2,688.24(스톱 2,688.33, 0.3bp 불리)를 **조회 루프 없이 이벤트로 확정** · RUNNING. LAGGING 3건 모두 재조회로 해소, 이벤트 수신 지연 최대 73ms(서버 시계 보정). 기록 `stream-20260924T053405Z.json`. **남은 것**: 운영 프로세스(Paper·실거래 실행기)에 스트림을 붙이는 일 — 지금은 훈련에서만 쓴다 |

@@ -14,6 +14,7 @@ Phase 8(소액 실거래) 승인 전에는 선물 주문 경로가 존재하지 
 | mark 가격 | ``GET /fapi/v1/premiumIndex`` |
 | 일반 주문 | ``GET /fapi/v1/order``(origClientOrderId) · ``GET /fapi/v1/openOrders`` |
 | 보호 스톱 | ``GET /fapi/v1/algoOrder``(clientAlgoId) · ``GET /fapi/v1/openAlgoOrders`` |
+| 사용자 스트림 | ``POST·PUT·DELETE /fapi/v1/listenKey`` (키 헤더만, :mod:`binance_usdm_stream`) |
 
 보호 스톱(STOP_MARKET)은 2025-12-09 부터 Algo Order API 로 옮겨졌다
 (:mod:`auto_trading.exchange.futures`).
@@ -117,10 +118,14 @@ class BinanceUsdmReadOnly:
         params: Mapping[str, Any] | None = None,
         *,
         signed: bool = False,
+        keyed: bool = False,
         method: str = "GET",
     ) -> Any:
+        """``signed``: 서명·키 헤더. ``keyed``: 키 헤더만 (listenKey 처럼 USER_STREAM 보안 유형)."""
         query = dict(params or {})
         headers = {}
+        if keyed and not signed:
+            headers["X-MBX-APIKEY"] = self._creds.api_key
         if signed:
             query["recvWindow"] = _RECV_WINDOW_MS
             query["timestamp"] = self._clock() + self.clock_offset_ms()
@@ -256,6 +261,26 @@ class BinanceUsdmReadOnly:
     def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
         rows = self._request("/fapi/v1/openAlgoOrders", {"symbol": symbol}, signed=True)
         return [self._stop(r) for r in rows]
+
+    # ------------------------------------------------------------ 사용자 스트림 listenKey
+
+    def start_user_stream(self) -> str:
+        """listenKey 를 받는다. 이미 있으면 같은 키가 오고 유효기간이 60분 연장된다.
+
+        ``POST /fapi/v1/listenKey`` (USER_STREAM — 서명 없이 키 헤더만). 읽기 전용 키로 된다.
+        """
+        data = self._request("/fapi/v1/listenKey", keyed=True, method="POST")
+        key = str(data.get("listenKey", "")) if isinstance(data, dict) else ""
+        if not key:
+            raise ExchangeError("listenKey 응답에 키가 없다")
+        return key
+
+    def keepalive_user_stream(self) -> None:
+        """유효기간을 60분 연장한다. 60분 안에 부르지 않으면 스트림이 닫힌다."""
+        self._request("/fapi/v1/listenKey", keyed=True, method="PUT")
+
+    def close_user_stream(self) -> None:
+        self._request("/fapi/v1/listenKey", keyed=True, method="DELETE")
 
     # ------------------------------------------------------------ 주문 (항상 거부)
 
