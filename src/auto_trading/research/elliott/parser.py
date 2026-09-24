@@ -40,6 +40,8 @@ class Label(StrEnum):
     """꼭짓점 네 개짜리 극단 구간 — motive 자리에서는 미검증 motive 로만 받는다."""
     IMPULSE = "IMPULSE"
     ZIGZAG = "ZIGZAG"
+    OPAQUE = "OPAQUE"
+    """EW-3d: 극단 구간이지만 요구 모양으로 파싱되지 않은 다리 — 후보는 유지, 미검증."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +189,67 @@ class WaveParser:
                             continue
                         found.append(
                             Parse(Label.IMPULSE, (i, b1, b2, b3, b4, j), (l1, l2, l3, l4, l5))
+                        )
+        return tuple(found)
+
+    # ------------------------------------------------------------ EW-3d 후보 (33 §28)
+
+    def _leg(self, i: int, j: int, need: Label) -> Label | None:
+        """후보용 다리: 원자이거나 극단 구간이면 받고, 요구 모양 파싱 여부만 라벨로 남긴다."""
+        if j == i + 1:
+            return Label.ATOM
+        if not self.extremal(i, j):
+            return None
+        return need if need in self.labels(i, j) else Label.OPAQUE
+
+    def top_candidates(self, i: int, j: int) -> tuple[Parse, ...]:
+        """절대 규칙만으로 만든 최상위 후보 전부 (impulse·zigzag). 내부 미검증 다리도 포함."""
+        if not self.extremal(i, j):
+            return ()
+        d = self._direction(i)
+        q = [d * pivot.price for pivot in self._p]
+        as_of = self._p[j].confirmed_four_hour_close_ms
+        closed = tuple(bar for bar in self._bars if bar.close_ms <= as_of)
+        found: list[Parse] = []
+        for b1 in self._ends[i]:
+            if b1 >= j:
+                break
+            la = self._leg(i, b1, Label.IMPULSE)
+            if la is None:
+                continue
+            for b2 in self._ends[b1]:
+                if b2 >= j:
+                    break
+                lb = self._leg(b1, b2, Label.ZIGZAG)
+                if lb is None:
+                    continue
+                lc = self._leg(b2, j, Label.IMPULSE)
+                if lc is not None:
+                    found.append(Parse(Label.ZIGZAG, (i, b1, b2, j), (la, lb, lc)))
+                if q[b2] <= q[i]:
+                    continue
+                for b3 in self._ends[b2]:
+                    if b3 >= j - 1:
+                        break
+                    if q[b3] <= q[b1]:
+                        continue
+                    l3 = self._leg(b2, b3, Label.IMPULSE)
+                    if l3 is None:
+                        continue
+                    for b4 in self._ends[b3]:
+                        if b4 >= j:
+                            break
+                        if q[b4] <= q[b1]:
+                            continue
+                        l4 = self._leg(b3, b4, Label.ZIGZAG)
+                        l5 = self._leg(b4, j, Label.IMPULSE)
+                        if l4 is None or l5 is None:
+                            continue
+                        anchors = [self._p[k] for k in (i, b1, b2, b3, b4, j)]
+                        if impulse_rules(anchors, closed, d)[0]:
+                            continue
+                        found.append(
+                            Parse(Label.IMPULSE, (i, b1, b2, b3, b4, j), (la, lb, l3, l4, l5))
                         )
         return tuple(found)
 
