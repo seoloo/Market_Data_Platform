@@ -17,6 +17,7 @@ one-way 포지션, 교차 지갑, 수수료, reduce-only, closePosition 보호 �
 * ``lose_response_after_accept`` — 다음 N번 주문을 받은 **뒤** 응답 유실 (주문 있음, 결과 모름)
 * ``fail_lookups`` — 다음 N번 조회 실패
 * ``fail_cancels`` — 다음 N번 취소 요청 실패 (취소 안 됨)
+* ``fail_account`` — 다음 N번 계좌 조회 실패
 """
 
 from __future__ import annotations
@@ -59,6 +60,7 @@ class FakeFuturesExchange:
     lose_response_after_accept: int = 0
     fail_lookups: int = 0
     fail_cancels: int = 0
+    fail_account: int = 0
     orders: dict[str, FuturesOrderResult] = field(default_factory=dict)
     placed_count: int = 0
     liquidations: int = 0
@@ -88,6 +90,9 @@ class FakeFuturesExchange:
         )
 
     def account(self) -> FuturesAccount:
+        if self.fail_account:
+            self.fail_account -= 1
+            raise ExchangeError("계좌 조회 실패")
         positions = {
             s: FuturesPosition(s, q, self._entry[s], self._lev(s))
             for s, q in sorted(self._qty.items())

@@ -35,3 +35,18 @@ CREATE TABLE futures_orders (
 
 CREATE INDEX idx_futures_orders_open ON futures_orders (state)
     WHERE state IN ('PENDING', 'SUBMITTED', 'UNKNOWN', 'PARTIALLY_FILLED');
+
+-- 확인된 외부 포지션 변동 (재시작 정합성 복구, execution/futures_guard.py).
+--
+-- 거래소 포지션 = 우리 주문 체결의 합 + 외부 변동(원인 불명 포지션·청산·수동 거래).
+-- 외부 변동을 기록하지 않으면, 원인 불명 포지션을 정리한 뒤에도 "기록 합 ≠ 거래소"가 영원히 남아
+-- 매 재시작마다 불일치로 잡힌다. 그래서 **확인된** 외부 변동만 여기에 남긴다.
+-- 자동으로 쓰는 경우는 orphan_policy=flatten 으로 정리할 때 하나뿐이다. 청산·수량 불일치는
+-- 사람이 확인한 뒤에만 기록한다(자동 조정 금지).
+CREATE TABLE futures_position_adjustments (
+    id         INTEGER PRIMARY KEY,
+    ts_ms      INTEGER NOT NULL,
+    symbol     TEXT    NOT NULL,
+    qty        TEXT    NOT NULL,   -- 부호 있는 수량 (+ 롱 방향 외부 증가)
+    reason     TEXT    NOT NULL
+);

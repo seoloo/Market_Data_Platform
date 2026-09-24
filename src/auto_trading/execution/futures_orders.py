@@ -87,6 +87,11 @@ class FuturesOrderManager:
 
     # ------------------------------------------------------------ 상태
 
+    @property
+    def tag(self) -> str:
+        """client_order_id 앞머리 (재발행 번호를 찾는 쪽이 같은 규칙을 쓰게 한다)."""
+        return self._tag
+
     def blocked(self) -> bool:
         """결과를 모르는 주문이 있으면 True — 신규 진입(OPEN) 금지."""
         return any(r.needs_reconcile for r in self._store.open())

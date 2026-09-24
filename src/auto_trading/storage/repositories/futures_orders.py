@@ -178,3 +178,20 @@ class FuturesOrderRepository:
             f"SELECT {_COLUMNS} FROM futures_orders ORDER BY created_ms, client_order_id"
         ).fetchall()
         return [_record(r) for r in rows]
+
+    # ------------------------------------------------------------ 외부 변동
+
+    def add_adjustment(self, ts_ms: int, symbol: str, qty: Decimal, reason: str) -> None:
+        """확인된 외부 포지션 변동을 남긴다 (부호 있는 수량)."""
+        self._conn.execute(
+            "INSERT INTO futures_position_adjustments (ts_ms, symbol, qty, reason)"
+            " VALUES (?, ?, ?, ?)",
+            (ts_ms, symbol, str(qty), reason),
+        )
+        self._conn.commit()
+
+    def adjustments(self) -> list[tuple[str, Decimal]]:
+        rows = self._conn.execute(
+            "SELECT symbol, qty FROM futures_position_adjustments ORDER BY id"
+        ).fetchall()
+        return [(str(r[0]), Decimal(str(r[1]))) for r in rows]
