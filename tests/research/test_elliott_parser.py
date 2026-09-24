@@ -103,3 +103,46 @@ def test_path_pivots_break_on_sub_four_hour_legs_and_non_bar_extremes() -> None:
         len(s) for s in four_hour_path_pivots(_replay([*events[:3], off, *events[4:]]), bars)
     ] == [3, 2]
     assert isinstance(_replay(events), MinutePathReplay)
+
+
+def test_hourly_pivots_and_four_hour_count_rule() -> None:
+    import random
+    from itertools import pairwise
+
+    from scripts.audit_ew3c_hourly import hour_bars
+
+    from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder
+    from auto_trading.research.elliott.parser import (
+        Parse,
+        counted_at_four_hour,
+        four_hour_path_pivots,
+        hourly_path_pivots,
+    )
+    from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT
+    from auto_trading.research.elliott.synthetic import build_path
+
+    path = build_path(random.Random(3), "IMPULSE", 0.5, 0.04, 0.0)
+    bars = path.four_hour
+    groups = (path.minutes[240 * i : 240 * (i + 1)] for i in range(len(bars)))
+    (replay,) = replay_minute_groups_ladder(bars, groups, bars[-1].close_ms, (EW0_THRESHOLD_PCT,))
+    segments = hourly_path_pivots(replay, hour_bars(path.minutes), bars)
+    fine = [p for s in segments for p in s]
+    assert fine
+    for seg in segments:
+        for a, b in pairwise(seg):
+            assert a.hour_open_ms < b.hour_open_ms and a.kind is not b.kind  # 1h 미만 다리 없음
+    # 1h 해상도는 4h 해상도보다 꼭짓점을 적게 보지 않는다
+    four = [p for s in four_hour_path_pivots(replay, bars) for p in s]
+    assert len(fine) >= len(four)
+    seg = max(segments, key=len)
+    same_four = next(
+        (
+            i
+            for i in range(len(seg) - 1)
+            if seg[i].four_hour_open_ms == seg[i + 1].four_hour_open_ms
+        ),
+        None,
+    )
+    if same_four is not None:
+        parse = Parse(Label.ZIGZAG, (same_four, same_four + 1, same_four + 2, same_four + 3), ())
+        assert not counted_at_four_hour(parse, seg)

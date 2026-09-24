@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 from functools import cache
 from itertools import pairwise
@@ -20,7 +21,16 @@ from auto_trading.research.elliott.grammar import impulse_rules
 from auto_trading.research.elliott.h4_evidence import FourHourPivotEvidence
 from auto_trading.research.elliott.minute_path import MinutePathReplay
 
-__all__ = ["Label", "Parse", "WaveParser", "four_hour_path_pivots"]
+__all__ = [
+    "FinePivot",
+    "Label",
+    "Parse",
+    "WaveParser",
+    "as_grid_anchor",
+    "counted_at_four_hour",
+    "four_hour_path_pivots",
+    "hourly_path_pivots",
+]
 
 
 class Label(StrEnum):
@@ -241,3 +251,82 @@ def four_hour_path_pivots(
         if current:
             out.append(tuple(current))
     return tuple(out)
+
+
+# ---------------------------------------------------------------- EW-3c (33 §26)
+
+
+@dataclass(frozen=True, slots=True)
+class FinePivot:
+    """1h 해상도 꼭짓점. 카운트(최상위)에는 ``four_hour_visible`` 인 것만 쓴다."""
+
+    kind: SwingKind
+    price: Decimal
+    hour_open_ms: int
+    four_hour_open_ms: int
+    available_at_ms: int
+    four_hour_visible: bool
+
+
+def hourly_path_pivots(
+    replay: MinutePathReplay, hour_bars: Sequence[Candle], four_hour_bars: Sequence[Candle]
+) -> tuple[tuple[FinePivot, ...], ...]:
+    """1m 경로 사건을 1h 해상도로 옮긴다. 1h 봉 극값 불일치·같은 1h 봉 연속 꼭짓점은 끊는다."""
+    hours = {bar.open_ms: bar for bar in hour_bars}
+    fours = {bar.open_ms: bar for bar in four_hour_bars}
+    out: list[tuple[FinePivot, ...]] = []
+    for segment in replay.segments:
+        current: list[FinePivot] = []
+        for event in segment:
+            hour_open = Timeframe.H1.open_ms_of(event.extreme_minute_ms)
+            four_open = Timeframe.H4.open_ms_of(event.extreme_minute_ms)
+            hour, four = hours.get(hour_open), fours.get(four_open)
+            if hour is None or four is None or event.price != _extreme(hour, event.kind):
+                if current:
+                    out.append(tuple(current))
+                current = []
+                continue
+            if current and current[-1].hour_open_ms == hour_open:
+                current.pop()
+                if current:
+                    out.append(tuple(current))
+                current = []
+                continue
+            current.append(
+                FinePivot(
+                    kind=event.kind,
+                    price=event.price,
+                    hour_open_ms=hour_open,
+                    four_hour_open_ms=four_open,
+                    available_at_ms=event.available_at_ms,
+                    four_hour_visible=event.price == _extreme(four, event.kind),
+                )
+            )
+        if current:
+            out.append(tuple(current))
+    return tuple(out)
+
+
+def _extreme(bar: Candle, kind: SwingKind) -> Decimal:
+    return bar.high if kind is SwingKind.HIGH else bar.low
+
+
+def as_grid_anchor(pivot: FinePivot) -> FourHourPivotEvidence:
+    """파서·impulse 규칙 입력용.
+
+    1h 격자 위에서 파싱하므로 극값 시각 필드에 **1h 봉 open** 을 담는다.
+    """
+    return FourHourPivotEvidence(
+        kind=pivot.kind,
+        price=pivot.price,
+        extreme_four_hour_open_ms=pivot.hour_open_ms,
+        confirmed_four_hour_close_ms=pivot.available_at_ms,
+    )
+
+
+def counted_at_four_hour(parse: Parse, pivots: Sequence[FinePivot]) -> bool:
+    """최상위 경계가 모두 4h 가시이고 이웃 경계가 서로 다른 4h 봉인가 (카운트는 4h 에서)."""
+    bounds = [pivots[k] for k in parse.bounds]
+    return all(p.four_hour_visible for p in bounds) and all(
+        a.four_hour_open_ms != b.four_hour_open_ms for a, b in pairwise(bounds)
+    )
