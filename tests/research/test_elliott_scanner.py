@@ -45,3 +45,26 @@ def test_triggers_and_results_never_depend_on_later_bars() -> None:
     for trig, res in zip(full, grouped, strict=True):
         if trig.close_ms <= cut_bar.close_ms:
             assert evaluate_trigger(trig, cut_hours) == res
+
+
+def test_scenario_list_top_agrees_with_top1_and_ranks_pessimistically() -> None:
+    from auto_trading.research.elliott.scanner import scenario_list
+
+    path = build_path(random.Random(5), "IMPULSE", 0.5, 0.04, 0.001)
+    triggers, hours = _scan(path.minutes, path.four_hour)
+    checked = 0
+    for trig in triggers:
+        res = evaluate_trigger(trig, hours)
+        scen = scenario_list(trig, hours)
+        assert scen.total == res.candidates
+        if not scen.ranked:
+            continue
+        best_key = scen.ranked[0][1]
+        best = {c.bounds for c, k in scen.ranked if k == best_key}
+        assert best == set(res.top_bounds)
+        first = scen.ranked[0][0]
+        ties = sum(1 for _, k in scen.ranked if k == best_key)
+        assert scen.pessimistic_rank(first) == ties
+        assert len(scen.top) == min(10, scen.total)
+        checked += 1
+    assert checked > 0

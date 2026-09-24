@@ -22,19 +22,25 @@ from auto_trading.research.elliott.parser import (
     as_grid_anchor,
     counted_at_four_hour,
 )
-from auto_trading.research.elliott.ranking import rank_key
+from auto_trading.research.elliott.ranking import RankKey, rank_key
 
 __all__ = [
     "LOOKBACK_BARS",
+    "SCENARIO_SET_SIZE",
+    "ScenarioList",
     "Trigger",
     "TriggerResult",
     "causal_triggers",
     "evaluate_trigger",
     "evaluate_triggers",
+    "scenario_list",
+    "trigger_candidates",
 ]
 
 LOOKBACK_BARS = 360
 """시작 후보는 E 의 4h 봉에서 360 봉(60일) 이내 (문서 34 §3)."""
+SCENARIO_SET_SIZE = 10
+"""JEV 에 넘길 시나리오 묶음 크기 (문서 39 §2)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,17 +117,13 @@ def causal_triggers(
     return triggers
 
 
-def evaluate_trigger(
+def trigger_candidates(
     trigger: Trigger,
     hour_bars: Sequence[Candle],
     *,
     parser: WaveParser | None = None,
-) -> TriggerResult:
-    """E 로 끝나는 모든 시작 후보의 해석을 한 목록에서 순위 매긴다 (문서 34 §3 4~5).
-
-    ``parser`` 는 같은 구간의 더 긴 꼭짓점 열로 만든 파서를 재사용할 때 넘긴다.
-    E 까지의 접두가 같아야 한다 — :func:`evaluate_triggers` 가 그렇게 묶는다.
-    """
+) -> tuple[list[Parse], int]:
+    """E 로 끝나는 모든 시작 후보의 EW-3d′ 후보 전부와 시작 후보 수 (문서 34 §3 3~4)."""
     fine = trigger.segment
     j = len(fine) - 1
     end = fine[j]
@@ -135,14 +137,69 @@ def evaluate_trigger(
         and (end.four_hour_open_ms - fine[i].four_hour_open_ms) // Timeframe.H4.ms <= LOOKBACK_BARS
         and parser.relaxed_span(i, j)
     ]
-    candidates: list[Parse] = [
+    candidates = [
         c
         for i in starts
         for c in parser.top_candidates(i, j, relaxed=True)
         if counted_at_four_hour(c, fine)
     ]
+    return candidates, len(starts)
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioList:
+    """발동 하나의 시나리오 묶음 (문서 39): 순위순 상위 ``size`` 개와 목록 밖 후보 수."""
+
+    ranked: tuple[tuple[Parse, RankKey], ...]
+    size: int
+    total: int
+
+    @property
+    def top(self) -> tuple[tuple[Parse, RankKey], ...]:
+        return self.ranked[: self.size]
+
+    @property
+    def outside(self) -> int:
+        return max(0, self.total - self.size)
+
+    def pessimistic_rank(self, parse: Parse) -> int | None:
+        key = next((k for c, k in self.ranked if c == parse), None)
+        if key is None:
+            return None
+        return 1 + sum(1 for c, k in self.ranked if c != parse and k <= key)
+
+
+def scenario_list(
+    trigger: Trigger,
+    hour_bars: Sequence[Candle],
+    *,
+    size: int = SCENARIO_SET_SIZE,
+    parser: WaveParser | None = None,
+) -> ScenarioList:
+    """모든 시작 후보의 후보를 ``rank_key`` 로 정렬한 시나리오 묶음. 확률이 아니다."""
+    candidates, _ = trigger_candidates(trigger, hour_bars, parser=parser)
+    ranked = sorted(
+        ((c, rank_key(c, trigger.segment)) for c in candidates),
+        key=lambda item: (item[1], item[0].pattern.value, item[0].bounds),
+    )
+    return ScenarioList(tuple(ranked), size, len(ranked))
+
+
+def evaluate_trigger(
+    trigger: Trigger,
+    hour_bars: Sequence[Candle],
+    *,
+    parser: WaveParser | None = None,
+) -> TriggerResult:
+    """E 로 끝나는 모든 시작 후보의 해석을 한 목록에서 순위 매긴다 (문서 34 §3 4~5).
+
+    ``parser`` 는 같은 구간의 더 긴 꼭짓점 열로 만든 파서를 재사용할 때 넘긴다.
+    E 까지의 접두가 같아야 한다 — :func:`evaluate_triggers` 가 그렇게 묶는다.
+    """
+    fine = trigger.segment
+    candidates, starts = trigger_candidates(trigger, hour_bars, parser=parser)
     if not candidates:
-        return TriggerResult(trigger.close_ms, trigger.direction, False, (), (), 0, len(starts))
+        return TriggerResult(trigger.close_ms, trigger.direction, False, (), (), 0, starts)
     keys = [rank_key(c, fine) for c in candidates]
     best = min(keys)
     top = [c for c, k in zip(candidates, keys, strict=True) if k == best]
@@ -154,7 +211,7 @@ def evaluate_trigger(
         top_patterns=patterns,
         top_bounds=tuple(c.bounds for c in top),
         candidates=len(candidates),
-        starts=len(starts),
+        starts=starts,
     )
 
 
