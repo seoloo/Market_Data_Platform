@@ -88,3 +88,13 @@ degree 별 impulse @50 (잡음 0.1%): D1 72% · D2 72% · D3 76%. 약점: D3 imp
 **JEV 섀도 비교의 기준선:** 위 recall@50 이 JEV 가 고를 수 있는 상한이다. 기준 순위 규칙의 **묶음 안 선택률**
 (정답이 묶음에 있을 때 1등으로 고른 비율) = @1 / @50: impulse 13.3/73.3 = **18.2%**, zigzag 36.7/88.7 = **41.4%** (잡음 0.1%).
 JEV 는 같은 묶음에서 이 값과 나란히 비교한다(§6 요구: recall 과 선택률 분리).
+
+## 8. 시나리오 내보내기 (JEV 섀도 입력 준비, JEV 형태는 미정 유지)
+
+`research/elliott/scenario_export.py` + `scripts/export_ew_scenarios.py`. 형식은 기존 `ew-scenario-set/1` 그대로(계약 검증 통과 필수).
+- 발동마다 상위 50 시나리오: 파동 번호, 현재 위치(`WAVE_5_END_CANDIDATE`/`WAVE_C_END_CANDIDATE`), 꼭짓점(1h 봉 open·가용 시각),
+  최상위 절대 규칙 PASS, 다리별 하위파 판독(IMPULSE/ZIGZAG=PASS, ATOM/THREE/OPAQUE=UNVERIFIED), 교과서 비율 근거,
+  **시나리오별 피보나치 되돌림 가격**(전체 움직임·마지막 다리의 0.382/0.5/0.618), 교과서 목표비 거리, 무효화 가격(분석 전용),
+  목록 밖 후보 수, `other_or_unknown`, 확률 없음.
+- **순위 정보를 평가자 입력에서 뺐다:** 시나리오는 `scenario_id` 순, 기준 순위 규칙의 순위는 별도 사이드카 파일에만 둔다.
+- BTCUSDT USD-M 2020-01~2026-09: 발동 3,741 묶음 · 시나리오 16,906 개 (`data/research/elliott_scenarios/`, git 제외, 약 2.1MB + 0.3MB).

@@ -34,6 +34,7 @@ __all__ = [
     "evaluate_trigger",
     "evaluate_triggers",
     "scenario_list",
+    "scenario_lists",
     "trigger_candidates",
 ]
 
@@ -237,3 +238,20 @@ def evaluate_triggers(
         for trig in members:
             results[order[id(trig)]] = evaluate_trigger(trig, hour_bars, parser=parser)
     return [results[n] for n in range(len(triggers))]
+
+
+def scenario_lists(
+    triggers: Sequence[Trigger], hour_bars: Sequence[Candle], *, size: int = SCENARIO_SET_SIZE
+) -> list[ScenarioList]:
+    """:func:`evaluate_triggers` 와 같이 구간별 파서를 재사용해 발동마다 시나리오 묶음을 만든다."""
+    groups: dict[tuple[int, int], list[int]] = {}
+    for n, trig in enumerate(triggers):
+        head = trig.segment[0]
+        groups.setdefault((head.hour_open_ms, head.available_at_ms), []).append(n)
+    out: dict[int, ScenarioList] = {}
+    for members in groups.values():
+        longest = max((triggers[n] for n in members), key=lambda trig: len(trig.segment))
+        parser = WaveParser([as_grid_anchor(p) for p in longest.segment], list(hour_bars))
+        for n in members:
+            out[n] = scenario_list(triggers[n], hour_bars, size=size, parser=parser)
+    return [out[n] for n in range(len(triggers))]
