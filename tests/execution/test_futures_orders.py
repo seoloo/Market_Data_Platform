@@ -97,6 +97,15 @@ class CrashingExchange:
     def open_orders(self, symbol: str) -> list[FuturesOrderResult]:
         return self.inner.open_orders(symbol)
 
+    def get_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self.inner.get_stop(symbol, client_order_id)
+
+    def cancel_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self.inner.cancel_stop(symbol, client_order_id)
+
+    def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
+        return self.inner.open_stops(symbol)
+
 
 def new_fake(**kwargs: object) -> FakeFuturesExchange:
     return FakeFuturesExchange(
@@ -180,7 +189,7 @@ class TestIdempotence:
         open_long(m)
         stops = [protect(m) for _ in range(100)]
         assert {s.state for s in stops} == {"SUBMITTED"}
-        assert len(ex.open_orders("BTCUSDT")) == 1
+        assert len(ex.open_stops("BTCUSDT")) == 1
 
 
 class TestFaults:
@@ -291,7 +300,7 @@ class TestProtectiveStops:
         open_long(m)
         stop = protect(m)
         assert m.cancel(stop.client_order_id).state == "CANCELED"
-        assert ex.open_orders("BTCUSDT") == []
+        assert ex.open_stops("BTCUSDT") == []
 
     def test_cancelling_an_already_triggered_stop_reads_the_final_state(
         self, tmp_path: Path

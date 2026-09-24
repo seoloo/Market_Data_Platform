@@ -193,7 +193,10 @@ class FuturesSupervisor:
             account = self._exchange.account()
             symbols = set(self._symbols) | set(account.positions)
             symbols |= {r.symbol for r in self._manager.working_stops()}
-            exchange_open = {s: self._exchange.open_orders(s) for s in sorted(symbols)}
+            exchange_open = {
+                s: [*self._exchange.open_orders(s), *self._exchange.open_stops(s)]
+                for s in sorted(symbols)
+            }
             steps = {s: self._exchange.filters(s).step_size for s in sorted(symbols)}
         except ExchangeError as exc:
             report.issues.append(

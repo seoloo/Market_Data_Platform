@@ -101,17 +101,35 @@ class FakeFuturesExchange:
         available = self.wallet + self._upnl() - self._initial_margin()
         return FuturesAccount(self.wallet, max(available, _ZERO), positions)
 
-    def get_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+    def _lookup(
+        self, symbol: str, client_order_id: str, kind: FuturesOrderType
+    ) -> FuturesOrderResult | None:
         if self.fail_lookups:
             self.fail_lookups -= 1
             raise ExchangeError("조회 실패")
         order = self.orders.get(client_order_id)
-        return order if order is not None and order.symbol == symbol else None
+        if order is None or order.symbol != symbol or order.order_type is not kind:
+            return None
+        return order
+
+    def _working(self, symbol: str, kind: FuturesOrderType) -> list[FuturesOrderResult]:
+        return [
+            o
+            for o in self.orders.values()
+            if o.symbol == symbol and o.status is OrderStatus.NEW and o.order_type is kind
+        ]
+
+    def get_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self._lookup(symbol, client_order_id, FuturesOrderType.MARKET)
 
     def open_orders(self, symbol: str) -> list[FuturesOrderResult]:
-        return [
-            o for o in self.orders.values() if o.symbol == symbol and o.status is OrderStatus.NEW
-        ]
+        return self._working(symbol, FuturesOrderType.MARKET)
+
+    def get_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self._lookup(symbol, client_order_id, FuturesOrderType.STOP_MARKET)
+
+    def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
+        return self._working(symbol, FuturesOrderType.STOP_MARKET)
 
     # ------------------------------------------------------------ 주문
 
@@ -211,11 +229,19 @@ class FakeFuturesExchange:
         )
 
     def cancel_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self._cancel(symbol, client_order_id, FuturesOrderType.MARKET)
+
+    def cancel_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        return self._cancel(symbol, client_order_id, FuturesOrderType.STOP_MARKET)
+
+    def _cancel(
+        self, symbol: str, client_order_id: str, kind: FuturesOrderType
+    ) -> FuturesOrderResult | None:
         if self.fail_cancels:
             self.fail_cancels -= 1
             raise ExchangeError("취소 요청 실패")
         order = self.orders.get(client_order_id)
-        if order is None or order.symbol != symbol:
+        if order is None or order.symbol != symbol or order.order_type is not kind:
             return None
         if order.status is not OrderStatus.NEW:
             raise OrderRejectedError(f"Unknown order sent (이미 {order.status})")

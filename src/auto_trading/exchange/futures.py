@@ -14,6 +14,10 @@
 * 보호 스톱은 ``STOP_MARKET`` · ``closePosition=true`` · ``workingType=MARK_PRICE`` 다
   (TRADING_CORE §포지션 상태·보호주문). 발동 즉시 체결되지만 **손절가 체결을 보장하지 않는다** —
   갭이면 그보다 나쁜 가격에 체결된다.
+* **보호 스톱은 일반 주문과 다른 경로다.** Binance 는 2025-12-09 부터 조건부 주문(STOP_MARKET 등)을
+  Algo Order API(``/fapi/v1/algoOrder``, ``clientAlgoId``)로 옮겼고, 일반 주문 엔드포인트로 보내면
+  ``-4120 STOP_ORDER_SWITCH_ALGO`` 로 거부한다(공식 변경 기록, 2026-09-24 확인).
+  그래서 조회·취소·미체결 목록을 ``*_stop`` 메서드로 따로 둔다. 두 ID 공간은 서로 다르다.
 """
 
 from __future__ import annotations
@@ -113,11 +117,25 @@ class FuturesExchange(Protocol):
         ...
 
     def cancel_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
-        """걸려 있는 주문을 취소한다. 거래소에 없으면 None. 이미 종결됐으면 OrderRejectedError."""
+        """걸려 있는 일반 주문을 취소한다. 없으면 None. 이미 종결됐으면 OrderRejectedError."""
         ...
 
     def get_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
-        """``client_order_id``로 조회. 거래소에 없으면 None (주문이 들어가지 않았다)."""
+        """일반 주문 조회. 거래소에 없으면 None (주문이 들어가지 않았다)."""
         ...
 
-    def open_orders(self, symbol: str) -> list[FuturesOrderResult]: ...
+    def open_orders(self, symbol: str) -> list[FuturesOrderResult]:
+        """걸려 있는 일반 주문 (보호 스톱 제외)."""
+        ...
+
+    def get_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        """보호 스톱 조회 (Algo). 없으면 None. 발동해 체결됐으면 FILLED 와 실제 체결 수량·가격."""
+        ...
+
+    def cancel_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        """보호 스톱 취소. 없으면 None. 이미 종결됐으면 OrderRejectedError."""
+        ...
+
+    def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
+        """걸려 있는 보호 스톱."""
+        ...

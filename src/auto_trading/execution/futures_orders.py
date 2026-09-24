@@ -12,6 +12,8 @@
 * **신규 진입만 막는다:** 결과를 모르는 주문이 하나라도 있으면 ``OPEN`` 은 거부한다. 그러나
   ``REDUCE``·``CLOSE``·``PROTECT`` 는 막지 않는다 — 위험 축소와 보호는 어떤 상태에서도 허용된다.
 * **걸린 보호 스톱은 정상이다:** SUBMITTED 스톱은 막지 않고, 복구 때 조회해 발동·만료를 반영한다.
+* **스톱은 다른 경로로 조회·취소한다:** Binance 조건부 주문은 Algo API 라서
+  (:mod:`auto_trading.exchange.futures` 참조) 기록의 주문 종류를 보고 ``*_stop`` 을 부른다.
 """
 
 from __future__ import annotations
@@ -182,8 +184,13 @@ class FuturesOrderManager:
             raise ValueError(f"기록에 없는 주문: {client_order_id}")
         if record.state in TERMINAL_STATES:
             return record
+        cancel = (
+            self._exchange.cancel_stop
+            if record.order_type == "STOP_MARKET"
+            else self._exchange.cancel_order
+        )
         try:
-            result = self._exchange.cancel_order(record.symbol, client_order_id)
+            result = cancel(record.symbol, client_order_id)
         except OrderRejectedError:
             return self._reconcile(record)  # 이미 발동·만료 — 최종 상태를 읽는다
         except ExchangeError as exc:
@@ -249,8 +256,13 @@ class FuturesOrderManager:
         return self._apply(record, result)
 
     def _reconcile(self, record: FuturesOrderRecord) -> FuturesOrderRecord:
+        lookup = (
+            self._exchange.get_stop
+            if record.order_type == "STOP_MARKET"
+            else self._exchange.get_order
+        )
         try:
-            result = self._exchange.get_order(record.symbol, record.client_order_id)
+            result = lookup(record.symbol, record.client_order_id)
         except ExchangeError as exc:
             return self._keep(record, str(exc))
         if result is not None:

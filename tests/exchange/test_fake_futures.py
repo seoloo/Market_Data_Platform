@@ -120,7 +120,8 @@ class TestProtectiveStop:
         stop = ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
         assert stop.status is OrderStatus.NEW and stop.order_type is FuturesOrderType.STOP_MARKET
         assert ex.set_mark_price("BTCUSDT", Decimal(46_000)) == []
-        assert ex.open_orders("BTCUSDT") == [stop]
+        assert ex.open_stops("BTCUSDT") == [stop]
+        assert ex.open_orders("BTCUSDT") == []  # 스톱은 일반 미체결 목록에 없다
 
     def test_gap_through_the_stop_fills_at_the_worse_price(self) -> None:
         ex = fake()
@@ -160,11 +161,22 @@ class TestProtectiveStop:
     def test_cancel_and_cancel_again(self) -> None:
         ex = fake()
         ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
-        canceled = ex.cancel_order("BTCUSDT", "s")
+        canceled = ex.cancel_stop("BTCUSDT", "s")
         assert canceled is not None and canceled.status is OrderStatus.CANCELED
         with pytest.raises(OrderRejectedError):
-            ex.cancel_order("BTCUSDT", "s")
-        assert ex.cancel_order("BTCUSDT", "nope") is None
+            ex.cancel_stop("BTCUSDT", "s")
+        assert ex.cancel_stop("BTCUSDT", "nope") is None
+
+    def test_stop_and_order_paths_do_not_mix(self) -> None:
+        """Binance 는 조건부 주문을 Algo API 로 옮겼다 — 일반 주문 경로로는 스톱이 보이지 않는다."""
+        ex = fake()
+        market(ex, "BUY", "0.1", "m")
+        ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
+        assert ex.get_order("BTCUSDT", "s") is None
+        assert ex.get_stop("BTCUSDT", "m") is None
+        assert ex.cancel_order("BTCUSDT", "s") is None
+        assert ex.get_stop("BTCUSDT", "s") is not None
+        assert ex.get_order("BTCUSDT", "m") is not None
 
 
 class TestFundingAndLiquidation:
@@ -209,5 +221,5 @@ class TestFaults:
         ex = fake(fail_cancels=1)
         ex.place_stop_market("BTCUSDT", "SELL", Decimal(45_000), "s")
         with pytest.raises(ExchangeError):
-            ex.cancel_order("BTCUSDT", "s")
+            ex.cancel_stop("BTCUSDT", "s")
         assert ex.orders["s"].status is OrderStatus.NEW
