@@ -30,16 +30,20 @@ from auto_trading.research.elliott.h4_evidence import (
     FourHourEvidence,
     FourHourPivotEvidence,
 )
+from auto_trading.research.elliott.minute_path import MinutePathPivot, MinutePathReplay
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT
 
 __all__ = [
     "DEGREE_LADDER",
+    "ChildPath",
     "ChildReadingReason",
     "DegreeSpec",
     "LegReading",
     "check_aligned",
+    "index_child_path",
     "leg_proof",
     "read_leg",
+    "read_leg_on_path",
 ]
 
 
@@ -66,6 +70,12 @@ class ChildReadingReason(StrEnum):
     CHILD_FIVE_PENDING = "CHILD_FIVE_PENDING"
     CHILD_FIVE_NOT_MOTIVE = "CHILD_FIVE_NOT_MOTIVE"
     CHILD_LEGS_7_PLUS = "CHILD_LEGS_7_PLUS"
+    # EW-1 (33 §18)
+    START_NOT_ON_PATH = "START_NOT_ON_PATH"
+    END_NOT_ON_PATH = "END_NOT_ON_PATH"
+    PATH_BROKEN_IN_LEG = "PATH_BROKEN_IN_LEG"
+    CHILD_SUB_4H_AT_VERTEX = "CHILD_SUB_4H_AT_VERTEX"
+    CHILD_INTERIOR_UNRESOLVED = "CHILD_INTERIOR_UNRESOLVED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,10 +162,21 @@ def read_leg(
     if end_index is None:
         return unknown(ChildReadingReason.END_NOT_ALIGNED)
 
+    available = max(end.confirmed_four_hour_close_ms, bars[end_index].close_ms)
+    return _classify(bars, children, start, available, as_of_ms)
+
+
+def _classify(
+    bars: Sequence[Candle],
+    children: list[FourHourPivotEvidence],
+    start: FourHourPivotEvidence,
+    available: int,
+    as_of_ms: int,
+) -> LegReading:
+    """보이는 하위 다리 수로 모양을 정한다 (33 §16 의 n 규칙, EW-0·EW-1 공통)."""
     direction = 1 if start.kind is SwingKind.LOW else -1
     if anchor_failures(children, direction):
         raise DataIntegrityError("하위 degree 후보가 교대·시간 순서를 어긴다")
-    available = max(end.confirmed_four_hour_close_ms, bars[end_index].close_ms)
     count = len(children) - 1
 
     def reading(shape: LegSubdivision, reason: ChildReadingReason | None = None) -> LegReading:
@@ -177,6 +198,97 @@ def read_leg(
             return reading(LegSubdivision.UNKNOWN, ChildReadingReason.CHILD_FIVE_PENDING)
         return reading(LegSubdivision.UNKNOWN, ChildReadingReason.CHILD_FIVE_NOT_MOTIVE)
     return reading(LegSubdivision.UNKNOWN, ChildReadingReason.CHILD_LEGS_7_PLUS)
+
+
+# ---------------------------------------------------------------- EW-1 (33 §18)
+
+_PathKey = tuple[SwingKind, int, Decimal]
+
+
+@dataclass(frozen=True, slots=True)
+class ChildPath:
+    """자식 degree 1m 경로 사건의 조회표. 전체 기간 재생이어도 가용 시각으로 인과를 지킨다."""
+
+    replay: MinutePathReplay
+    positions: dict[_PathKey, tuple[tuple[int, int], ...]]
+
+
+def index_child_path(replay: MinutePathReplay) -> ChildPath:
+    positions: dict[_PathKey, list[tuple[int, int]]] = {}
+    for s, segment in enumerate(replay.segments):
+        for i, event in enumerate(segment):
+            key = (event.kind, Timeframe.H4.open_ms_of(event.extreme_minute_ms), event.price)
+            positions.setdefault(key, []).append((s, i))
+    return ChildPath(replay, {k: tuple(v) for k, v in positions.items()})
+
+
+def _path_vertex(
+    path: ChildPath, anchor: FourHourPivotEvidence, as_of_ms: int
+) -> tuple[int, int] | None:
+    key = (anchor.kind, anchor.extreme_four_hour_open_ms, anchor.price)
+    found = [
+        (s, i)
+        for s, i in path.positions.get(key, ())
+        if path.replay.segments[s][i].available_at_ms <= as_of_ms
+    ]
+    return found[0] if len(found) == 1 else None
+
+
+def _as_vertex(event: MinutePathPivot) -> FourHourPivotEvidence:
+    return FourHourPivotEvidence(
+        kind=event.kind,
+        price=event.price,
+        extreme_four_hour_open_ms=Timeframe.H4.open_ms_of(event.extreme_minute_ms),
+        confirmed_four_hour_close_ms=event.available_at_ms,
+    )
+
+
+def read_leg_on_path(
+    bars: Sequence[Candle],
+    child_evidence: Sequence[FourHourEvidence],
+    child_path: ChildPath,
+    start: FourHourPivotEvidence,
+    end: FourHourPivotEvidence,
+    as_of_ms: int,
+) -> LegReading:
+    """EW-1: 양 끝 꼭짓점만 자식 degree 1m 경로 사건으로 찾고, 내부는 4h 후보만 인정한다."""
+    if not bars or end.extreme_four_hour_open_ms <= start.extreme_four_hour_open_ms:
+        raise DataIntegrityError("부모 다리의 시간 순서가 유효하지 않다")
+    if end.confirmed_four_hour_close_ms > as_of_ms:
+        raise DataIntegrityError("아직 확정되지 않은 부모 꼭짓점이다")
+    fallback = end.confirmed_four_hour_close_ms
+
+    def unknown(reason: ChildReadingReason) -> LegReading:
+        return LegReading(LegSubdivision.UNKNOWN, None, reason, fallback)
+
+    first = _path_vertex(child_path, start, as_of_ms)
+    if first is None:
+        return unknown(ChildReadingReason.START_NOT_ON_PATH)
+    last = _path_vertex(child_path, end, as_of_ms)
+    if last is None:
+        return unknown(ChildReadingReason.END_NOT_ON_PATH)
+    if first[0] != last[0] or last[1] <= first[1]:
+        return unknown(ChildReadingReason.PATH_BROKEN_IN_LEG)
+    segment = child_path.replay.segments[first[0]]
+    first_close = bars[0].close_ms
+    children = [_as_vertex(segment[first[1]])]
+    for event in segment[first[1] + 1 : last[1]]:
+        vertex = _as_vertex(event)
+        if not (
+            start.extreme_four_hour_open_ms
+            < vertex.extreme_four_hour_open_ms
+            < end.extreme_four_hour_open_ms
+        ):
+            return unknown(ChildReadingReason.CHILD_SUB_4H_AT_VERTEX)
+        index = (vertex.confirmed_four_hour_close_ms - first_close) // Timeframe.H4.ms
+        item = child_evidence[index] if 0 <= index < len(child_evidence) else None
+        if item is None or item.status is not EvidenceStatus.CANDIDATE or item.candidate != vertex:
+            return unknown(ChildReadingReason.CHILD_INTERIOR_UNRESOLVED)
+        children.append(vertex)
+    end_vertex = _as_vertex(segment[last[1]])
+    children.append(end_vertex)
+    available = max(end.confirmed_four_hour_close_ms, end_vertex.confirmed_four_hour_close_ms)
+    return _classify(bars, children, start, available, as_of_ms)
 
 
 def leg_proof(

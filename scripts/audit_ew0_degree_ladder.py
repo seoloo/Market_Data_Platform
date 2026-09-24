@@ -1,4 +1,6 @@
-"""4h degree 사다리 하위파 읽기의 시장 기술 통계 (33 §16 에서 사전 고정). 읽기 전용.
+"""4h degree 사다리 하위파 읽기의 시장 기술 통계 (33 §16·§18 에서 사전 고정). 읽기 전용.
+
+EW-0(§16)과 EW-1(§18, 꼭짓점만 1m 경로로 정렬)을 같은 실행에서 나란히 계산한다.
 
 WA 거래·방향·손익, D22, 전략 경로·원장을 조회하지 않는다. 결과는 stdout JSON 뿐이다.
 """
@@ -24,7 +26,13 @@ from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.core.errors import DataIntegrityError  # noqa: E402
 from auto_trading.core.types import Candle  # noqa: E402
 from auto_trading.research.elliott.candidates import generate_bounded_candidates  # noqa: E402
-from auto_trading.research.elliott.degrees import DEGREE_LADDER, read_leg  # noqa: E402
+from auto_trading.research.elliott.degrees import (  # noqa: E402
+    DEGREE_LADDER,
+    ChildPath,
+    index_child_path,
+    read_leg,
+    read_leg_on_path,
+)
 from auto_trading.research.elliott.grammar import (  # noqa: E402
     EXPECTED_SUBDIVISIONS,
     LegSubdivision,
@@ -36,10 +44,14 @@ from auto_trading.research.elliott.h4_evidence import (  # noqa: E402
     FourHourPivotEvidence,
     map_minute_path_to_four_hour_evidence,
 )
-from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
+from auto_trading.research.elliott.minute_path import (  # noqa: E402
+    MinutePathReplay,
+    replay_minute_groups_ladder,
+)
 from scripts import audit_ew0_minute_path as market  # noqa: E402
 
 EW0_DIGEST = "034a8ed68e5d67b343d65049ffcdd0274a58bcc6dc4894af55c9e406dd5ffe37"
+EW0_ALIGNED = {"D1": 179, "D2": 118, "D3": 41}  # 33 §17 재현 확인
 ALIGNMENT_FLOOR = 0.90
 
 
@@ -55,7 +67,9 @@ def _digest(evidence: Sequence[FourHourEvidence]) -> str:
     return digest.hexdigest()
 
 
-def load_ladder(db_path: Path) -> tuple[tuple[Candle, ...], list[tuple[FourHourEvidence, ...]]]:
+def load_ladder(
+    db_path: Path,
+) -> tuple[tuple[Candle, ...], list[tuple[FourHourEvidence, ...]], tuple[MinutePathReplay, ...]]:
     if not db_path.is_file():
         raise FileNotFoundError(db_path)
     connection = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
@@ -78,11 +92,59 @@ def load_ladder(db_path: Path) -> tuple[tuple[Candle, ...], list[tuple[FourHourE
         )
     finally:
         connection.close()
-    return four_hour, [map_minute_path_to_four_hour_evidence(four_hour, r, as_of) for r in replays]
+    evidence = [map_minute_path_to_four_hour_evidence(four_hour, r, as_of) for r in replays]
+    return four_hour, evidence, replays
 
 
 def _key(c: FourHourPivotEvidence) -> tuple[str, int, str]:
     return (c.kind.value, c.extreme_four_hour_open_ms, str(c.price))
+
+
+def _path_alignment(
+    parent: Sequence[FourHourEvidence],
+    child: Sequence[FourHourEvidence],
+    path: ChildPath,
+) -> dict[str, object]:
+    """EW-1 정렬률과 채택 기준 (iv): 경로 꼭짓점이 4h 후보와 다른 극값을 가리킨 경우."""
+    by_bar: dict[tuple[str, int], set[str]] = {}
+    for key in path.positions:
+        by_bar.setdefault((key[0].value, key[1]), set()).add(str(key[2]))
+    child_bar = {
+        (i.candidate.kind.value, i.candidate.extreme_four_hour_open_ms): str(i.candidate.price)
+        for i in child
+        if i.candidate is not None
+    }
+    aligned = ambiguous = missing = different = 0
+    for item in parent:
+        c = item.candidate
+        if c is None:
+            continue
+        positions = path.positions.get((c.kind, c.extreme_four_hour_open_ms, c.price), ())
+        if len(positions) == 1:
+            aligned += 1
+        elif positions:
+            ambiguous += 1
+        elif (c.kind.value, c.extreme_four_hour_open_ms) in by_bar:
+            different += 1
+        else:
+            missing += 1
+    disagree = sum(
+        1
+        for bar_key, price in child_bar.items()
+        if bar_key in by_bar and price not in by_bar[bar_key]
+    )
+    total = aligned + ambiguous + missing + different
+    rate = aligned / total if total else None
+    return {
+        "parent_candidates": total,
+        "aligned": aligned,
+        "ambiguous_repeat": ambiguous,
+        "misaligned_no_path_event": missing,
+        "misaligned_different_extreme": different,
+        "path_vs_candidate_disagreements": disagree,
+        "alignment_rate": None if rate is None else round(rate, 4),
+        "nested_enough": None if rate is None else rate >= ALIGNMENT_FLOOR,
+    }
 
 
 def _alignment(
@@ -120,10 +182,14 @@ def _legs(
     bars: tuple[Candle, ...],
     parent: Sequence[FourHourEvidence],
     child: Sequence[FourHourEvidence],
+    path: ChildPath | None = None,
 ) -> dict[str, object]:
     as_of = bars[-1].close_ms
+    origin = bars[0].open_ms
     readings: Counter[str] = Counter()
     counts: Counter[str] = Counter()
+    newly_read_ew0_reason: Counter[str] = Counter()
+    newly_read_vertex_unknown: Counter[str] = Counter()
     child_later = 0
     previous: FourHourPivotEvidence | None = None
     for item in parent:
@@ -133,17 +199,36 @@ def _legs(
         if item.candidate is None:
             continue
         if previous is not None:
-            r = read_leg(bars, child, previous, item.candidate, as_of)
+            if path is None:
+                r = read_leg(bars, child, previous, item.candidate, as_of)
+            else:
+                r = read_leg_on_path(bars, child, path, previous, item.candidate, as_of)
+                old = read_leg(bars, child, previous, item.candidate, as_of)
+                if r.child_leg_count is not None and old.child_leg_count is None:
+                    assert old.reason is not None
+                    newly_read_ew0_reason[old.reason.value] += 1
+                    for vertex in (previous, item.candidate):
+                        lo = (vertex.extreme_four_hour_open_ms - origin) // Timeframe.H4.ms
+                        hi = (vertex.confirmed_four_hour_close_ms + 1 - origin) // Timeframe.H4.ms
+                        for ev in child[lo:hi]:
+                            if ev.reason is not None:
+                                newly_read_vertex_unknown[ev.reason.value] += 1
             readings[r.shape.value if r.reason is None else r.reason.value] += 1
             counts["none" if r.child_leg_count is None else str(r.child_leg_count)] += 1
             child_later += r.available_at_ms > item.candidate.confirmed_four_hour_close_ms
         previous = item.candidate
-    return {
+    result: dict[str, object] = {
         "legs": sum(readings.values()),
         "reading": dict(sorted(readings.items())),
         "child_leg_count": dict(sorted(counts.items())),
         "child_confirmed_after_parent": child_later,
     }
+    if path is not None:
+        result["newly_readable_ew0_reason"] = dict(sorted(newly_read_ew0_reason.items()))
+        result["newly_readable_vertex_child_unknown"] = dict(
+            sorted(newly_read_vertex_unknown.items())
+        )
+    return result
 
 
 def _scenarios(
@@ -152,6 +237,7 @@ def _scenarios(
     child: Sequence[FourHourEvidence],
     degree_id: str,
     child_degree_id: str,
+    path: ChildPath | None = None,
 ) -> dict[str, object]:
     status: Counter[str] = Counter()
     complete_legs_consistent: Counter[str] = Counter()
@@ -167,6 +253,7 @@ def _scenarios(
                 degree_id=degree_id,
                 child_evidence=child[: index + 1],
                 child_degree_id=child_degree_id,
+                child_path=path,
             )
         except DataIntegrityError as exc:
             if "UNKNOWN 경계" not in str(exc):
@@ -203,12 +290,14 @@ def _scenarios(
 
 
 def main() -> int:
-    bars, ladder = load_ladder(market.DB_PATH)
+    bars, ladder, replays = load_ladder(market.DB_PATH)
     digests = [_digest(ev) for ev in ladder]
     if digests[0] != EW0_DIGEST:
         raise SystemExit(f"D0 매핑 digest 가 §13 과 다르다: {digests[0]}")
     origin = bars[0].open_ms
     degrees: dict[str, object] = {}
+    checks_iii: list[bool] = []
+    checks_iv: list[bool] = []
     for k, (spec, evidence) in enumerate(zip(DEGREE_LADDER, ladder, strict=True)):
         statuses = Counter(item.status.value for item in evidence)
         reasons = Counter(item.reason.value for item in evidence if item.reason is not None)
@@ -222,14 +311,35 @@ def main() -> int:
             child = ladder[k - 1]
             child_id = DEGREE_LADDER[k - 1].degree_id
             entry["child_degree"] = child_id
-            entry["alignment"] = _alignment(evidence, child, origin)
-            entry["legs"] = _legs(bars, evidence, child)
-            entry["scenarios"] = _scenarios(bars, evidence, child, spec.degree_id, child_id)
+            ew0_alignment = _alignment(evidence, child, origin)
+            if ew0_alignment["aligned"] != EW0_ALIGNED[spec.degree_id]:
+                raise SystemExit(f"{spec.degree_id} EW-0 정렬 수가 §17 과 다르다")
+            path = index_child_path(replays[k - 1])
+            ew1_alignment = _path_alignment(evidence, child, path)
+            checks_iii.append(int(str(ew1_alignment["aligned"])) >= EW0_ALIGNED[spec.degree_id])
+            checks_iv.append(
+                ew1_alignment["path_vs_candidate_disagreements"] == 0
+                and ew1_alignment["misaligned_different_extreme"] == 0
+            )
+            entry["ew0"] = {
+                "alignment": ew0_alignment,
+                "legs": _legs(bars, evidence, child),
+                "scenarios": _scenarios(bars, evidence, child, spec.degree_id, child_id),
+            }
+            entry["ew1"] = {
+                "alignment": ew1_alignment,
+                "legs": _legs(bars, evidence, child, path),
+                "scenarios": _scenarios(bars, evidence, child, spec.degree_id, child_id, path),
+            }
         degrees[spec.degree_id] = entry
     result = {
         "period_utc": "2020-01-01/2022-01-01",
         "source": "binance_usdm:BTCUSDT",
         "degrees": degrees,
+        "ew1_adoption_checks": {
+            "iii_ew1_alignment_not_lower": all(checks_iii),
+            "iv_no_path_candidate_disagreement": all(checks_iv),
+        },
         "note": "33 §16 사전 고정 기술 통계. 반복 마감은 독립 표본 아님. WA·성과 미조회.",
     }
     sys.stdout.write(json.dumps(result, ensure_ascii=True, sort_keys=True) + "\n")

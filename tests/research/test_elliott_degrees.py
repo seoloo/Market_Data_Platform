@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.research.elliott.candidates import (
@@ -18,7 +19,9 @@ from auto_trading.research.elliott.degrees import (
     DEGREE_LADDER,
     ChildReadingReason,
     check_aligned,
+    index_child_path,
     read_leg,
+    read_leg_on_path,
 )
 from auto_trading.research.elliott.grammar import (
     GrammarStatus,
@@ -34,12 +37,17 @@ from auto_trading.research.elliott.h4_evidence import (
     FourHourPivotEvidence,
 )
 from auto_trading.research.elliott.minute_path import (
+    MinutePathPivot,
+    MinutePathReplay,
     replay_minute_groups,
     replay_minute_groups_ladder,
 )
 from auto_trading.research.elliott.scenario_contract import CheckStatus, from_candidate_snapshot
 from tests.research.test_elliott_grammar import synthetic_scenario
 from tests.research.test_elliott_minute_path import group, outer, priced_path
+
+H4 = Timeframe.H4.ms
+M1 = Timeframe.M1.ms
 
 # 부모 impulse 100→150→125→225→190→250, 각 다리의 자식 구조 5-3-5-3-5
 LEG1 = ("100", "120", "110", "140", "130", "150")
@@ -320,3 +328,137 @@ def test_unknown_shape_needs_ladder_source_and_reason() -> None:
     )
     assert ok.status is GrammarStatus.PENDING
     assert "LEG_1_SUBDIVISION_UNVERIFIED" in ok.pending
+
+
+# ---------------------------------------------------------------- EW-1 (33 §18)
+
+
+def path_from(
+    child: list[FourHourEvidence], *, same_bar: frozenset[int] = frozenset()
+) -> list[MinutePathPivot]:
+    """자식 4h 후보를 1m 경로 사건 한 구간으로 옮긴다.
+
+    ``same_bar`` 꼭짓점은 극값 봉 안에서 확인된 것으로 둔다.
+    """
+    events: list[MinutePathPivot] = []
+    for n, item in enumerate(i for i in child if i.candidate is not None):
+        c = item.candidate
+        assert c is not None
+        confirm_bar_open = c.extreme_four_hour_open_ms if n in same_bar else item.close_ms + 1 - H4
+        events.append(
+            MinutePathPivot(
+                kind=c.kind,
+                price=c.price,
+                extreme_minute_ms=c.extreme_four_hour_open_ms,
+                confirmation_minute_close_ms=confirm_bar_open + 2 * M1 - 1,
+                available_at_ms=confirm_bar_open + H4 - 1,
+            )
+        )
+    return events
+
+
+def _replay(*segments: list[MinutePathPivot]) -> MinutePathReplay:
+    return MinutePathReplay(tuple(tuple(s) for s in segments), (), (), 0)
+
+
+def _unknown(item: FourHourEvidence) -> FourHourEvidence:
+    return FourHourEvidence(
+        item.close_ms, EvidenceStatus.UNKNOWN, reason=EvidenceUnknownReason.SAME_FOUR_HOUR
+    )
+
+
+def test_ew1_matches_ew0_when_every_child_vertex_is_a_candidate() -> None:
+    bars, parent, child = ladder_fixture(LEG1, LEG2, LEG3, LEG4, LEG5)
+    path = index_child_path(_replay(path_from(child)))
+    ew0 = _impulse(
+        generate_bounded_candidates(
+            bars, parent, bars[-1].close_ms, child_evidence=child, child_degree_id="D0"
+        )
+    )
+    ew1 = _impulse(
+        generate_bounded_candidates(
+            bars, parent, bars[-1].close_ms, child_evidence=child, child_degree_id="D0",
+            child_path=path,
+        )
+    )  # fmt: skip
+    assert [p.shape for p in ew1.scenario.subdivisions] == [
+        p.shape for p in ew0.scenario.subdivisions
+    ]
+    assert ew1.assessment.status is GrammarStatus.PASS
+    assert ew1.scenario.subdivisions[0].source_id.startswith("D0/EW1:")
+
+
+def test_ew1_finds_vertex_that_four_hour_mapping_left_unknown() -> None:
+    bars, parent, child = ladder_fixture(LEG1)
+    a, b = _anchors(parent)
+    child = list(child)
+    child[1] = _unknown(child[1])  # 시작 꼭짓점: 극값과 2% 확인이 같은 4h
+    events = path_from(ladder_fixture(LEG1)[2], same_bar=frozenset({0}))
+    path = index_child_path(_replay(events))
+    as_of = bars[-1].close_ms
+    assert read_leg(bars, child, a, b, as_of).reason is ChildReadingReason.START_NOT_ALIGNED
+    ew1 = read_leg_on_path(bars, child, path, a, b, as_of)
+    assert (ew1.shape, ew1.child_leg_count) == (LegSubdivision.IMPULSE_FIVE, 5)
+    assert ew1.child_anchors[0].confirmed_four_hour_close_ms == bars[0].close_ms
+
+
+def test_ew1_interior_stays_strict() -> None:
+    bars, parent, child = ladder_fixture(LEG1)
+    a, b = _anchors(parent)
+    path = index_child_path(_replay(path_from(child)))
+    child = list(child)
+    child[3] = _unknown(child[3])  # 내부 자식 꼭짓점이 4h 후보가 아니다
+    result = read_leg_on_path(bars, child, path, a, b, bars[-1].close_ms)
+    assert result.reason is ChildReadingReason.CHILD_INTERIOR_UNRESOLVED
+
+
+def test_ew1_rejects_sub_four_hour_reversal_inside_vertex_bar() -> None:
+    bars, parent, child = ladder_fixture(LEG1)
+    a, b = _anchors(parent)
+    events = path_from(child)
+    wiggle = [
+        replace(events[1], extreme_minute_ms=10 * M1, price=Decimal("103")),
+        replace(events[0], extreme_minute_ms=20 * M1, price=Decimal("101")),
+    ]
+    path = index_child_path(_replay([events[0], *wiggle, *events[1:]]))
+    result = read_leg_on_path(bars, child, path, a, b, bars[-1].close_ms)
+    assert result.reason is ChildReadingReason.CHILD_SUB_4H_AT_VERTEX
+
+
+def test_ew1_needs_one_unbroken_path_segment_and_both_vertices() -> None:
+    bars, parent, child = ladder_fixture(LEG1)
+    a, b = _anchors(parent)
+    events = path_from(child)
+    as_of = bars[-1].close_ms
+    broken = index_child_path(_replay(events[:3], events[3:]))
+    assert (
+        read_leg_on_path(bars, child, broken, a, b, as_of).reason
+        is ChildReadingReason.PATH_BROKEN_IN_LEG
+    )
+    no_start = index_child_path(_replay(events[1:]))
+    assert (
+        read_leg_on_path(bars, child, no_start, a, b, as_of).reason
+        is ChildReadingReason.START_NOT_ON_PATH
+    )
+
+
+@pytest.mark.leakage
+def test_ew1_ignores_path_events_not_yet_available() -> None:
+    bars, parent, child = ladder_fixture(LEG1, LEG2, LEG3, LEG4, LEG5, parent_lag=0)
+    events = path_from(child)
+    a, b = _anchors(parent)[:2]
+    late_end = replace(events[5], available_at_ms=events[5].available_at_ms + 2 * H4)
+    path = index_child_path(_replay([*events[:5], late_end, *events[6:]]))
+    at_parent = read_leg_on_path(bars, child, path, a, b, b.confirmed_four_hour_close_ms)
+    assert at_parent.reason is ChildReadingReason.END_NOT_ON_PATH
+    as_of = bars[20].close_ms
+    full = generate_bounded_candidates(
+        bars, parent, as_of, child_evidence=child, child_degree_id="D0",
+        child_path=index_child_path(_replay(events)),
+    )  # fmt: skip
+    visible = [e for e in events if e.available_at_ms <= as_of]
+    cut = generate_bounded_candidates(
+        bars[:21], parent[:21], as_of, child_evidence=child[:21], child_degree_id="D0",
+        child_path=index_child_path(_replay(visible)),
+    )  # fmt: skip
+    assert full == cut

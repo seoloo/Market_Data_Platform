@@ -15,7 +15,13 @@ from itertools import pairwise
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
-from auto_trading.research.elliott.degrees import check_aligned, leg_proof, read_leg
+from auto_trading.research.elliott.degrees import (
+    ChildPath,
+    check_aligned,
+    leg_proof,
+    read_leg,
+    read_leg_on_path,
+)
 from auto_trading.research.elliott.grammar import (
     GrammarAssessment,
     GrammarScenario,
@@ -74,13 +80,17 @@ def generate_bounded_candidates(
     degree_id: str = "EW0",
     child_evidence: Sequence[FourHourEvidence] | None = None,
     child_degree_id: str | None = None,
+    child_path: ChildPath | None = None,
 ) -> CandidateSnapshot:
     """최신 연속 구간의 마지막 N개 후보만 쓰며, 패턴당 가설은 하나다.
 
     N=6(impulse/ending), N=4(zigzag). 중간 후보 선택·생략이나
     성과에 따른 검색은 하지 않는다. UNKNOWN은 새 구간 경계다.
-    ``child_evidence`` 는 바로 아래 degree 의 같은 4h 격자 증거다.
+    ``child_evidence`` 는 바로 아래 degree 의 같은 4h 격자 증거다. ``child_path`` 를 주면
+    다리 양 끝을 그 degree 의 1m 경로 사건으로 찾는 EW-1 읽기(33 §18)를 쓴다.
     """
+    if child_path is not None and child_evidence is None:
+        raise DataIntegrityError("EW-1 읽기에는 하위 degree 4h 증거도 필요하다")
     if (child_evidence is None) != (child_degree_id is None):
         raise DataIntegrityError("하위 degree 증거와 ID 는 함께 줘야 한다")
     closed = closed_ew0_candles(four_hour_candles, as_of_ms)
@@ -137,10 +147,21 @@ def generate_bounded_candidates(
         proofs: tuple[LegSubdivisionProof, ...] = ()
         if child_prefix is not None and child_degree_id is not None:
             legs = [item.candidate for item in window if item.candidate is not None]
-            proofs = tuple(
-                leg_proof(read_leg(closed, child_prefix, a, b, as_of_ms), a, b, child_degree_id)
-                for a, b in pairwise(legs)
-            )
+            if child_path is None:
+                proofs = tuple(
+                    leg_proof(read_leg(closed, child_prefix, a, b, as_of_ms), a, b, child_degree_id)
+                    for a, b in pairwise(legs)
+                )
+            else:
+                proofs = tuple(
+                    leg_proof(
+                        read_leg_on_path(closed, child_prefix, child_path, a, b, as_of_ms),
+                        a,
+                        b,
+                        f"{child_degree_id}/EW1",
+                    )
+                    for a, b in pairwise(legs)
+                )
         scenarios.append(
             GrammarScenario(
                 scenario_id=f"{degree_id}:{pattern.value}:{window[0].close_ms}:{as_of_ms}",
