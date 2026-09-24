@@ -52,6 +52,22 @@ def detect_guarded_pivots(candles: Sequence[Candle], as_of_ms: int) -> PivotDete
     검출률을 낮출 수 있으며 기존 운영 `detect_swings`를 대체하지 않는다.
     """
     closed = closed_ew0_candles(candles, as_of_ms)
+    segments, ambiguous_open_ms = replay_guarded_extrema(closed)
+    return PivotDetection(
+        segments=segments,
+        ambiguous_open_ms=ambiguous_open_ms,
+        as_of_ms=as_of_ms,
+    )
+
+
+def replay_guarded_extrema(
+    validated_bars: Sequence[Candle],
+) -> tuple[tuple[SwingSeries, ...], tuple[int, ...]]:
+    """검증된 시간순 봉의 2% 반전 경로를 재생한다.
+
+    입력의 시간대·격자·가용 시각은 **호출자 책임**이다. 연구 전용 4h/1m
+    검증기만 이 함수를 호출하며, 운영 피벗 검출기에 연결하지 않는다.
+    """
     segments: list[list[Swing]] = [[]]
     ambiguous_open_ms: list[int] = []
     direction = 0  # 0: 첫 피벗 미정, +1: 고점 탐색, -1: 저점 탐색
@@ -59,7 +75,7 @@ def detect_guarded_pivots(candles: Sequence[Candle], as_of_ms: int) -> PivotDete
     low: tuple[Decimal, int] | None = None
 
     with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
-        for candle in closed:
+        for candle in validated_bars:
             if high is None or low is None:
                 if _drops(candle.high, candle.low) or _rises(candle.low, candle.high):
                     ambiguous_open_ms.append(candle.open_ms)
@@ -125,13 +141,12 @@ def detect_guarded_pivots(candles: Sequence[Candle], as_of_ms: int) -> PivotDete
             if direction <= 0 and new_low:
                 low = (candle.low, candle.open_ms)
 
-    return PivotDetection(
-        segments=tuple(
+    return (
+        tuple(
             SwingSeries(swings=tuple(swings), threshold_pct=EW0_THRESHOLD_PCT)
             for swings in segments
         ),
-        ambiguous_open_ms=tuple(ambiguous_open_ms),
-        as_of_ms=as_of_ms,
+        tuple(ambiguous_open_ms),
     )
 
 

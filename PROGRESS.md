@@ -1,10 +1,19 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 전역 고저 순서 감사, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 시간순 경로 합성 검증, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 1m 순서 감사)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 1m 경로 재생)
+
+- `src/auto_trading/research/elliott/pivots.py`의 기존 2% 가드 상태 기계를 시간순 검증 봉 재생 함수로 분리하고, `minute_path.py`에서 완성 4h마다 240개 1m 격자·양수 거래량·OHLC·전역 고저 순서가 확인될 때만 연속 경로를 재생한다.
+- 1m 안의 새 극값·반전 선후가 모호하면 해당 분에서 구간을 절단한다. 품질 실패·전역 고저 겹침 4h는 통째로 차단하며, 서로 다른 구간을 잇지 않는다. 분봉 반전 확인은 **해당 4h 마감 후에만** 연구 결과로 노출하고 4h Elliott 파동 라벨로 승격하지 않는다.
+- 합성 테스트 8건: 복수 분봉 반전의 마감 전 미노출, 연속 4h 후보 유지, 1m 모호함, 결측·거래량 0·OHLC 불일치·전역 고저 겹침 차단, 미래 자료 무관성. [33 감사](docs/research/33-elliott-phase0-data-and-profile.md)에 경계 기록.
+- **시장자료 전체 경로 coverage·확정 지연은 아직 측정하지 않았다.** 기존 1,931/1,933개 수치는 전역 고저 선후만 확인된 봉 수다. WA 거래·방향·PnL, 전략·Paper·DB·스케줄은 변경하지 않았다. `NOT_READY_FOR_WA_TEST` 유지.
+- 검증: 전체 pytest 1,776건, leakage 59건, strict mypy 251개 소스, ruff check/format 307파일, import-linter 5계약 모두 통과.
+- 다음: WA 결과를 가린 채 Binance 대용 자료에서 1m 경로의 블라인드 coverage·연속 구간 길이·확정 지연을 읽기 전용 감사한다. 이후 4h 파동 입력 매핑 규칙과 원시장 BitMEX 자료 경계를 고정한다.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 1m 순서 감사)
 
 - `src/auto_trading/research/elliott/intrabar.py`: 닫힌 4h 봉의 240개 1m 시각 격자·양수 거래량·OHLC 정확 일치 시에만 **전역 최고·최저 발생 분의 선후** 반환. 같은 분/교차 반복·품질 실패는 UNKNOWN, 4h 마감 전에는 결과 미노출.
 - `scripts/audit_ew0_intrabar.py`: DB `mode=ro`·`query_only=ON` 스트리밍 집계, 파일 출력 없음. 테스트는 가짜 DB 해시 불변·DB 부재 시 미생성까지 검사.
