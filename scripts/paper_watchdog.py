@@ -6,7 +6,9 @@
     python scripts/paper_watchdog.py --no-send       # 텔레그램 보내지 않고 화면·로컬 기록만
     python scripts/paper_watchdog.py --test-telegram # 텔레그램 설정 확인용 시험 메시지
 
-윈도우 작업 스케줄러로 매일 09:20(KST) 실행한다 — T/v2(09:05)·O/v1(09:10) 뒤.
+윈도우 작업 스케줄러로 매일 09:20(KST) 실행한다 — T/v2(09:05)·O/v1(09:10)·테스트넷 훈련(09:14) 뒤.
+테스트넷 훈련 결과(``reports/testnet/drill-*.json``)도 한 줄로 요약한다.
+훈련 실패는 경고(1)까지만 올린다.
 종료 코드: 0 이상 없음 · 1 경고 · 2 조치 필요(중단 기준·실행 누락·원장 불일치·알림 실패).
 보고서: ``reports/watchdog/<날짜>.txt``, 누적 기록 ``reports/watchdog/outbox.log``.
 텔레그램은 ``.env``의 ``TELEGRAM_BOT_TOKEN``·``TELEGRAM_CHAT_ID``가 있을 때만 쓴다.
@@ -15,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 import sys
 import time
@@ -29,6 +32,7 @@ from auto_trading.ops.paper_watch import (
     LedgerSummary,
     check_o1,
     check_t2,
+    check_testnet_drill,
     exit_code,
     expected_decision_ms,
     render_report,
@@ -46,6 +50,9 @@ REPO = Path(__file__).resolve().parent.parent
 DB = REPO / "data" / "trading.db"
 ENV = REPO / ".env"
 OUT = REPO / "reports" / "watchdog"
+DRILLS = REPO / "reports" / "testnet"
+PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
+"""Phase 7 매일 훈련 운영 시작 (docs/research/26). 이전 기록은 개발 중 실행이다."""
 
 
 def collect(now_ms: int) -> tuple[list[LedgerSummary | None], list[Finding]]:
@@ -77,6 +84,20 @@ def collect(now_ms: int) -> tuple[list[LedgerSummary | None], list[Finding]]:
     return summaries, findings
 
 
+def drill_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """테스트넷 훈련 보고서를 읽어 요약한다. 손상된 파일은 건너뛰고 경고한다."""
+    reports, broken = [], []
+    for path in sorted(DRILLS.glob("drill-*.json")):
+        try:
+            reports.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            broken.append(path.name)
+    lines, findings = check_testnet_drill(reports, now_ms, since_ms=PHASE7_START_MS)
+    if broken:
+        findings.append(Finding("WARN", "테스트넷", f"읽을 수 없는 훈련 기록 {broken}"))
+    return lines, findings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -101,8 +122,10 @@ def main() -> int:
 
     now_ms = int(time.time() * 1000)
     summaries, findings = collect(now_ms)
+    drill_lines, drill_findings = drill_status(now_ms)
+    findings += drill_findings
     code = exit_code(findings)
-    text = render_report(summaries, findings, now_ms)
+    text = render_report(summaries, findings, now_ms, extra=drill_lines)
 
     date = datetime.fromtimestamp(expected_decision_ms(now_ms) / 1000, tz=UTC).strftime("%Y-%m-%d")
     OUT.mkdir(parents=True, exist_ok=True)

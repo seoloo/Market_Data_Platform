@@ -10,6 +10,7 @@ from auto_trading.ops.paper_watch import (
     Finding,
     check_o1,
     check_t2,
+    check_testnet_drill,
     exit_code,
     render_report,
 )
@@ -169,3 +170,87 @@ class TestReport:
             .splitlines()[0]
             .endswith("✅ 이상 없음")
         )
+
+
+def drill(at: str, *, ok: bool = True, failed: tuple[str, ...] = ()) -> dict[str, object]:
+    checks = [{"step": s, "pass": False} for s in failed] + [{"step": "기본", "pass": True}]
+    return {"at": at, "ok": ok and not failed, "checks": checks, "error": None}
+
+
+def at_utc(stamp: str) -> int:
+    """``20260925T001400Z`` → ms."""
+    from datetime import UTC, datetime
+
+    return int(datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC).timestamp() * 1000)
+
+
+START = at_utc("20260925T000000Z")
+
+
+class TestTestnetDrill:
+    def test_no_reports_is_only_info(self) -> None:
+        lines, findings = check_testnet_drill([], START)
+        assert lines == [] and [f.level for f in findings] == ["INFO"]
+
+    def test_todays_passing_drill_is_clean(self) -> None:
+        now = at_utc("20260925T002000Z")
+        lines, findings = check_testnet_drill([drill("20260925T001400Z")], now, since_ms=START)
+        assert findings == []
+        assert "1/1 ✓" in lines[0] and "실행 1일 · 통과 1일" in lines[0]
+
+    def test_a_failed_drill_warns_with_the_failing_step(self) -> None:
+        now = at_utc("20260925T002000Z")
+        report = drill("20260925T001400Z", failed=("재보호",))
+        _, findings = check_testnet_drill([report], now, since_ms=START)
+        assert [f.level for f in findings] == ["WARN"]
+        assert "재보호" in findings[0].message
+
+    def test_error_without_steps_is_reported(self) -> None:
+        now = at_utc("20260925T002000Z")
+        report = {"at": "20260925T001400Z", "ok": False, "checks": [], "error": "ExchangeError"}
+        _, findings = check_testnet_drill([report], now, since_ms=START)
+        assert "ExchangeError" in findings[0].message
+
+    def test_a_missed_day_warns(self) -> None:
+        now = at_utc("20260927T002000Z")
+        _, findings = check_testnet_drill([drill("20260925T001400Z")], now, since_ms=START)
+        assert any("2일 밀림" in f.message for f in findings)
+
+    def test_failures_never_escalate_beyond_warn(self) -> None:
+        """훈련은 Paper 원장의 안전과 별개다 — 조치 필요(2)로 올리지 않는다."""
+        now = at_utc("20260930T002000Z")
+        report = drill("20260925T001400Z", failed=("a", "b"))
+        _, findings = check_testnet_drill([report], now, since_ms=START)
+        assert exit_code(findings) == 1
+
+    def test_runs_before_the_start_do_not_count(self) -> None:
+        """등록 전 개발 중 실행(1·2차 실패)은 기간 통계에 넣지 않는다."""
+        now = at_utc("20260925T002000Z")
+        reports = [
+            drill("20260924T023621Z", failed=("x",)),
+            drill("20260924T024226Z"),
+            drill("20260925T001400Z"),
+        ]
+        lines, _ = check_testnet_drill(reports, now, since_ms=START)
+        assert "실행 1일 · 통과 1일" in lines[0]
+
+    def test_the_last_run_of_a_day_decides_that_day(self) -> None:
+        now = at_utc("20260926T002000Z")
+        reports = [
+            drill("20260925T001400Z", failed=("x",)),
+            drill("20260925T030000Z"),  # 같은 날 다시 돌려 통과
+            drill("20260926T001400Z"),
+        ]
+        lines, findings = check_testnet_drill(reports, now, since_ms=START)
+        assert "실행 2일 · 통과 2일" in lines[0] and findings == []
+
+    def test_before_the_start_says_so(self) -> None:
+        now = at_utc("20260924T030000Z")
+        lines, findings = check_testnet_drill([drill("20260924T024226Z")], now, since_ms=START)
+        assert "운영 기간 전" in lines[0] and findings == []
+
+    def test_report_includes_the_drill_line(self) -> None:
+        rows = t2_rows([10_000, 10_050])
+        summary, findings = check_t2(rows, now_for(rows))
+        text = render_report([summary], findings, now_for(rows), extra=["테스트넷 훈련: 요약"])
+        assert text.splitlines()[-1] == "테스트넷 훈련: 요약"

@@ -17,23 +17,25 @@ T/v2 의 공식 MDD 는 연구 재생(``run_t_trend.py forward``)으로 매달 �
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import pairwise
-from typing import Literal
+from typing import Any, Literal
 
 from auto_trading.execution.paper_overlay import verify_ledger
 from auto_trading.storage.repositories.paper_days import PaperDay
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDay
 
 __all__ = [
+    "DRILL_WINDOW_DAYS",
     "STOP_DRAWDOWN",
     "WARN_DRAWDOWN",
     "Finding",
     "LedgerSummary",
     "check_o1",
     "check_t2",
+    "check_testnet_drill",
     "exit_code",
     "expected_decision_ms",
     "render_report",
@@ -195,6 +197,64 @@ def check_o1(
     return summary, findings
 
 
+DRILL_WINDOW_DAYS = 14
+"""Phase 7 운영 관찰 기간 (docs/research/26)."""
+
+
+def _drill_ms(stamp: str) -> int:
+    """훈련 보고서의 ``at`` (``20260924T024226Z``) → epoch ms."""
+    moment = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    return int(moment.timestamp() * 1000)
+
+
+def check_testnet_drill(
+    reports: Sequence[Mapping[str, Any]],
+    now_ms: int,
+    *,
+    since_ms: int = 0,
+    window_days: int = DRILL_WINDOW_DAYS,
+) -> tuple[list[str], list[Finding]]:
+    """테스트넷 훈련 보고서들로 한 줄 요약과 판정을 만든다.
+
+    훈련 실패는 **WARN 까지만** 올린다 — Paper 원장의 안전과는 별개인 Phase 7 운영 문제다.
+    ``since_ms`` 이전 기록(등록 전 개발 중 실행)은 기간 통계에 넣지 않는다.
+    """
+    ledger = "테스트넷"
+    if not reports:
+        return [], [Finding("INFO", ledger, "훈련 기록이 아직 없다")]
+    ordered = sorted(reports, key=lambda r: str(r["at"]))
+    latest = ordered[-1]
+    latest_ms = _drill_ms(str(latest["at"]))
+    checks = list(latest.get("checks", []))
+    passed = sum(bool(c.get("pass")) for c in checks)
+    ok = bool(latest.get("ok"))
+    findings: list[Finding] = []
+    behind = now_ms // _DAY_MS - latest_ms // _DAY_MS
+    if now_ms >= since_ms and behind >= 1:
+        findings.append(
+            Finding("WARN", ledger, f"훈련 {behind}일 밀림 — 마지막 {_date(latest_ms)}")
+        )
+    if not ok:
+        failed = [str(c.get("step")) for c in checks if not c.get("pass")]
+        reason = ", ".join(failed) if failed else str(latest.get("error") or "원인 미기록")
+        findings.append(
+            Finding("WARN", ledger, f"최근 훈련 실패 {passed}/{len(checks)} — {reason}")
+        )
+    first_day = max(now_ms // _DAY_MS - window_days + 1, since_ms // _DAY_MS)
+    by_day: dict[int, bool] = {}
+    for r in ordered:
+        at = _drill_ms(str(r["at"]))
+        if at >= since_ms and at // _DAY_MS >= first_day:
+            by_day[at // _DAY_MS] = bool(r.get("ok"))  # 그날 마지막 실행
+    mark = "✓" if ok else "✗"
+    line = f"테스트넷 훈련: {_date(latest_ms)} {passed}/{len(checks)} {mark}"
+    if now_ms >= since_ms:
+        line += f" · 최근 {window_days}일 중 실행 {len(by_day)}일 · 통과 {sum(by_day.values())}일"
+    else:
+        line += " · 운영 기간 전"
+    return [line], findings
+
+
 def exit_code(findings: Sequence[Finding]) -> int:
     """작업 스케줄러 '마지막 결과'로 보이게 한다: CRITICAL 2, WARN 1, 이상 없음 0."""
     levels = {f.level for f in findings}
@@ -204,12 +264,16 @@ def exit_code(findings: Sequence[Finding]) -> int:
 
 
 def render_report(
-    summaries: Sequence[LedgerSummary | None], findings: Sequence[Finding], now_ms: int
+    summaries: Sequence[LedgerSummary | None],
+    findings: Sequence[Finding],
+    now_ms: int,
+    *,
+    extra: Sequence[str] = (),
 ) -> str:
-    """텔레그램·로컬 기록에 그대로 보내는 일일 보고 (평문)."""
+    """텔레그램·로컬 기록에 그대로 보내는 일일 보고 (평문). ``extra``는 원장 요약 뒤에 붙는 줄."""
     code = exit_code(findings)
     head = {0: "✅ 이상 없음", 1: "⚠️ 경고", 2: "🚨 조치 필요"}[code]
-    lines = [f"[Paper 일일 점검 {_date(expected_decision_ms(now_ms))}] {head}"]
+    lines = [f"[일일 점검 {_date(expected_decision_ms(now_ms))}] {head}"]
     for s in summaries:
         if s is None:
             continue
@@ -219,6 +283,7 @@ def render_report(
             f" · {s.status} · {s.days}일"
         )
         lines.append(f"  {s.detail}")
+    lines.extend(extra)
     order = {"CRITICAL": 0, "WARN": 1, "INFO": 2}
     for f in sorted(findings, key=lambda f: order[f.level]):
         lines.append(f"- {f.level} [{f.ledger}] {f.message}")

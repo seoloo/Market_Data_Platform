@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from auto_trading.config.secrets import BinanceCredentials, read_env_file
-from auto_trading.core.errors import AutoTradingError, OrderRejectedError
+from auto_trading.core.errors import ConfigError, OrderRejectedError
 from auto_trading.core.money import floor_to_step
 from auto_trading.exchange.binance_usdm_testnet import BinanceUsdmTestnet
 from auto_trading.exchange.futures import FuturesPosition
@@ -153,7 +153,7 @@ class Drill:
         print("1. 계좌 준비")
         one_way = not self.api.dual_side_position()
         if not self.check("one-way 모드", one_way):
-            raise SystemExit(
+            raise ConfigError(
                 "헤지 모드 계좌 — 이 시스템은 one-way 만 쓴다. 테스트넷 설정을 바꾼다."
             )
         self.api.set_margin_type(SYMBOL, "CROSSED")
@@ -391,11 +391,11 @@ def main() -> int:
     apply_migrations(conn)
     decision = int(time.time() * 1000)
     drill = Drill(api, FuturesOrderRepository(conn), RiskEventRepository(conn), decision)
-    print(f"테스트넷 {api.base_url} · 지갑 {api.account().wallet_balance:f} USDT · 가짜 돈")
     error: str | None = None
     try:
+        print(f"테스트넷 {api.base_url} · 지갑 {api.account().wallet_balance:f} USDT · 가짜 돈")
         drill.run()
-    except (AutoTradingError, StopIteration, ValueError) as exc:
+    except Exception as exc:  # 무인 실행: 어떤 실패든 보고서를 남겨 점검 보고에 원인이 보이게 한다
         error = f"{type(exc).__name__}: {exc}"
         print(f"중단: {error}")
     finally:
