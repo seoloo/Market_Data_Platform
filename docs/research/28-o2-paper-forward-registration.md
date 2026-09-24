@@ -10,7 +10,7 @@
 | 범위 | **실제 돈 없음.** 공개 시세 + 가상 원장. T/v2·O/v1 Paper·신호·설정·스케줄은 그대로 둔다 |
 | 원장 | `paper_overlay_days` 의 `strategy_id = o2_stop` (O/v1 은 `o1_overlay`) · 보고서 `reports/paper/o2/` |
 | 가상 자본 | 10,000 USDT (T/v2·O/v1 과 별도, 합산하지 않는다) |
-| 관찰 기간 | 첫 결정일 ~ 12개월 (§5 기록) |
+| 관찰 기간 | 첫 결정일 **2026-09-23** ~ **2027-09-22** (12개월, O/v1 과 같은 날짜) |
 | 실행 | `scripts/run_paper_o1.py run --ledger o2` 매일 **09:12 KST** (O/v1 09:10 뒤, 테스트넷 훈련 09:14 앞) |
 
 ## 1. 왜 O/v1 옆에 하나 더 두는가
@@ -61,3 +61,4 @@ Register-ScheduledTask -TaskName "AutoTrading_Paper_O2" -Action $a -Trigger (New
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-09-24 | 등록·구현(커밋 `e7d30e5`). **첫 실행**(05:55 UTC): 결정일 2026-09-23 · `NO_PRIOR_DECISION` · 자본 10,000 · 내일 목표 BTC 0.3487 / ETH 0.2538 — O/v1 과 같은 날·같은 목표로 시작. 재실행 멱등 · `verify --ledger o2` 일치 · 일일 점검(`--no-send`)에 O/v2 줄 표시 확인 |
