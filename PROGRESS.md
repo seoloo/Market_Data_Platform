@@ -4,7 +4,17 @@
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Claude — O/v2 비상 스톱 사전등록)
+## 이번 작업 (Claude — 읽기 전용 운영 대시보드)
+
+- 사용자 결정: 대시보드 먼저, 그다음 새 수익 전략 연구. 구성은 사용자가 고른 초안(Astra 목업)을 따른다.
+- `src/auto_trading/ui/`: `data.py`(DB **mode=ro** + 보고서 파일 읽기, 실패는 화면에 표시하고 계속) · `charts.py`(서버 SVG, 외부 자원 없음)
+  · `render.py`(화면 6개: 운영 개요·전략 비교·포지션·테스트넷 검증·위험·연구 기록, 모든 동적 문자열 이스케이프) · `server.py`(표준 라이브러리,
+  **127.0.0.1 전용·GET 만**·CSP·no-store) · `dashboard.css`. `scripts/dashboard.py`(서버 / `--export`). 새 의존성 없음.
+- import 계약 유지: ui 는 core·storage 만(판정은 일일 점검 JSON·훈련 보고서·RESEARCH_HISTORY 를 읽는다). 점검 스크립트가 `reports/watchdog/<날짜>.json` 도 남긴다.
+- 테스트 19건: 읽어도 DB 해시 불변, DB 없으면 만들지 않음, 손상 파일 건너뜀, 화면 6개·이스케이프·폼/스크립트 없음, 0.0.0.0 거부, 쓰기 메서드 501, 404.
+- 실행: `python scripts/dashboard.py` → http://127.0.0.1:8787 (Ctrl+C 로 끔). 다음: 새 수익 전략 연구(사용자 결정 순서).
+
+## 이전 작업 (Claude — O/v2 비상 스톱 사전등록)
 
 - 사용자 선택: 다음 작업 1번 **비상 손절**, 거리 **−20%** (급락 일수 측정 뒤: 보유 중 −20% 이상 BTC 3일·ETH 12일, 연 약 2회).
 - `OverlayConfig.catastrophe_stop`(기본 None = O/v1 과 비트 단위 동일)·`stop_slippage` 1%, `OverlayResult.stop_hits`.

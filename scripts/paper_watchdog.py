@@ -10,7 +10,8 @@
 테스트넷 훈련 결과(``reports/testnet/drill-*.json``)도 한 줄로 요약한다.
 훈련 실패는 경고(1)까지만 올린다.
 종료 코드: 0 이상 없음 · 1 경고 · 2 조치 필요(중단 기준·실행 누락·원장 불일치·알림 실패).
-보고서: ``reports/watchdog/<날짜>.txt``, 누적 기록 ``reports/watchdog/outbox.log``.
+보고서: ``reports/watchdog/<날짜>.txt``·``<날짜>.json``(대시보드용),
+누적 기록 ``reports/watchdog/outbox.log``.
 텔레그램은 ``.env``의 ``TELEGRAM_BOT_TOKEN``·``TELEGRAM_CHAT_ID``가 있을 때만 쓴다.
 """
 
@@ -21,6 +22,7 @@ import json
 import sqlite3
 import sys
 import time
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -159,6 +161,18 @@ def main() -> int:
             telegram.close()
     elif creds is None:
         print("(텔레그램 미설정 — 로컬 기록만)")
+    # 대시보드(ui/)가 읽는 구조화 기록 — 텍스트와 같은 내용, 알림 실패까지 반영한 종료 코드
+    record = {
+        "date": date,
+        "at_ms": now_ms,
+        "exit_code": code,
+        "summaries": [asdict(s) for s in summaries if s is not None],
+        "findings": [asdict(f) for f in findings],
+        "extra": drill_lines,
+    }
+    (OUT / f"{date}.json").write_text(
+        json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n"
+    )
     print(text)
     return code
 

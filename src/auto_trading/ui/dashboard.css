@@ -1,0 +1,55 @@
+/* 운영 대시보드 스타일 (ui/render.py 가 인라인으로 넣는다 — 외부 자원 없음). */
+:root{--bg:#0b1424;--panel:#101c31;--panel2:#13223b;--line:#22324d;--text:#dfe7f3;--mute:#8797b0;
+--t2:#2dd4bf;--o1:#3b82f6;--o2:#a78bfa;--hold:#9ca3af;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;
+--accent:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
+font:14px/1.5 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+nav{background:#0a1220;border-right:1px solid var(--line);padding:22px 12px}
+.logo{font-weight:800;font-size:19px;padding:0 10px 22px}.logo b{color:var(--accent)}
+nav a{display:block;padding:11px 14px;border-radius:8px;color:var(--mute);margin-bottom:4px}
+nav a.on{background:#16305a;color:#fff;box-shadow:inset 3px 0 0 var(--o1)}
+nav a:hover{color:#fff}
+main{padding:22px 26px;min-width:0}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:24px;margin:0 10px 0 0}.date{color:var(--mute)}
+.badge{border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:13px}
+.badge.red{border-color:#7f1d1d;color:var(--bad);background:#2a1215}
+.banner{border:1px solid #854d0e;background:#271d0b;color:#fcd34d;border-radius:8px;padding:9px 14px;
+margin-bottom:14px}
+.errors{border:1px solid #7f1d1d;background:#2a1215;color:#fecaca;border-radius:8px;padding:9px 14px;
+margin-bottom:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+border-left:4px solid var(--line)}
+.card h3{margin:0;font-size:20px}.card .sub{color:var(--mute);font-size:13px}
+.card .big{font-size:21px;font-weight:700;margin-top:8px}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+margin-left:6px;vertical-align:middle;color:var(--mute)}
+.pos{color:var(--ok)}.neg{color:var(--bad)}.mute{color:var(--mute)}
+.grid2{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(260px,1fr);gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+margin-bottom:12px;min-width:0}
+.panel h2{font-size:16px;margin:0 0 10px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
+border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}th{color:var(--mute);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
+.ok-bg{background:var(--ok)}.warn-bg{background:var(--warn)}.bad-bg{background:var(--bad)}
+.mute-bg{background:var(--mute)}
+.chart{width:100%;height:auto}.chart .grid{stroke:var(--line);stroke-dasharray:3 4}
+.chart .axis{fill:var(--mute);font-size:11px}.chart .end{font-size:12px;font-weight:700}
+.chart-empty{color:var(--mute);padding:40px 0;text-align:center}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--mute);font-size:13px;margin-bottom:6px}
+.ranges input{display:none}.ranges label{border:1px solid var(--line);border-radius:6px;padding:3px 12px;
+cursor:pointer;color:var(--mute);margin-left:4px}
+#r1:checked~.row label[for=r1],#r2:checked~.row label[for=r2],#r3:checked~.row label[for=r3]{border-color:var(--o1);color:#fff;background:#16305a}
+.rng{display:none}#r1:checked~.charts .r1,#r2:checked~.charts .r2,#r3:checked~.charts .r3{display:block}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal div{border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:center}
+.foot{color:var(--mute);font-size:12px;margin-top:6px}
+details summary{cursor:pointer;color:var(--mute)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav{display:flex;overflow-x:auto}
+nav .logo{display:none}.grid2{grid-template-columns:1fr}}
