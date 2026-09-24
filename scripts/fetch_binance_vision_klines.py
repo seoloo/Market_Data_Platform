@@ -1,8 +1,8 @@
-"""Binance 공개 데이터(data.binance.vision) USD-M 선물 월별 kline 을 내려받아 SHA-256 을 확인한다.
+"""Binance 공개 데이터(data.binance.vision) 선물·현물 월별 kline 을 받아 SHA-256 을 확인한다.
 
 연구 자료 전용. 메인 DB 에 쓰지 않고
-``data/external/binance_vision/um/<SYMBOL>/<interval>/`` 에 zip 을 둔다.
-사용: ``python scripts/fetch_binance_vision_klines.py ETHUSDT 1m 2020-01 2026-08``
+``data/external/binance_vision/<um|spot>/<SYMBOL>/<interval>/`` 에 zip 을 둔다.
+사용: ``python scripts/fetch_binance_vision_klines.py ETHUSDT 1m 2020-01 2026-08 [um|spot]``
 """
 
 from __future__ import annotations
@@ -13,8 +13,11 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BASE = "https://data.binance.vision/data/futures/um/monthly/klines"
-OUT_ROOT = REPO_ROOT / "data" / "external" / "binance_vision" / "um"
+BASES = {
+    "um": "https://data.binance.vision/data/futures/um/monthly/klines",
+    "spot": "https://data.binance.vision/data/spot/monthly/klines",
+}
+OUT_ROOT = REPO_ROOT / "data" / "external" / "binance_vision"
 
 
 def months(start: str, end: str) -> list[str]:
@@ -33,12 +36,12 @@ def _get(url: str) -> bytes:
         return bytes(response.read())
 
 
-def fetch(symbol: str, interval: str, month: str) -> tuple[Path, int]:
+def fetch(symbol: str, interval: str, month: str, market: str = "um") -> tuple[Path, int]:
     name = f"{symbol}-{interval}-{month}.zip"
-    out_dir = OUT_ROOT / symbol / interval
+    out_dir = OUT_ROOT / market / symbol / interval
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / name
-    url = f"{BASE}/{symbol}/{interval}/{name}"
+    url = f"{BASES[market]}/{symbol}/{interval}/{name}"
     expected = _get(url + ".CHECKSUM").decode("ascii").split()[0].lower()
     if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() == expected:
         return target, target.stat().st_size
@@ -51,12 +54,15 @@ def fetch(symbol: str, interval: str, month: str) -> tuple[Path, int]:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 4:
-        raise SystemExit("usage: fetch_binance_vision_klines.py SYMBOL INTERVAL YYYY-MM YYYY-MM")
-    symbol, interval, start, end = argv
+    if len(argv) not in (4, 5) or (len(argv) == 5 and argv[4] not in BASES):
+        raise SystemExit(
+            "usage: fetch_binance_vision_klines.py SYMBOL INTERVAL YYYY-MM YYYY-MM [um|spot]"
+        )
+    symbol, interval, start, end = argv[:4]
+    market = argv[4] if len(argv) == 5 else "um"
     total = 0
     for month in months(start, end):
-        path, size = fetch(symbol, interval, month)
+        path, size = fetch(symbol, interval, month, market)
         total += size
         sys.stdout.write(f"{path.name} {size} OK\n")
         sys.stdout.flush()
