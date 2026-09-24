@@ -84,7 +84,8 @@ CANCELED/EXPIRED/REJECTED를 원격 확인하고 Risk 재승인·재시도 한�
 FLAT → OPENING → 첫 체결 UNPROTECTED → 스톱 확인 OPEN → CLOSING → CLOSED → FLAT.
 부분 축소는 OPEN → REDUCING → OPEN. 임의 상태에서 기동/불일치 시 RECONCILING을 거친다.
 
-- 첫 체결 즉시 거래소 측 STOP_MARKET, closePosition=true, MARK_PRICE 기준 보호주문을 등록하는 기존 설계를 유지한다. 실제 API 호환성은 Phase 5에서 확인한다.
+- 첫 체결 즉시 거래소 측 STOP_MARKET, closePosition=true, MARK_PRICE 기준 보호주문을 등록하는 기존 설계를 유지한다.
+  **API 확인(2026-09-24)**: Binance 는 2025-12-09 부터 조건부 주문을 **Algo Order API**(`/fapi/v1/algoOrder`, `clientAlgoId`)로 옮겼고, 일반 주문 엔드포인트로 보내면 `-4120` 으로 거부한다. 걸린 목록은 `/fapi/v1/openAlgoOrders`(문서 페이지의 `algoOpenOrders` 는 실측 404), 없는 주문 조회는 `-2013`. 구현: `exchange/futures.py`(스톱 경로 분리)·`binance_usdm.py`.
 - 보호 등록 실패는 최대 3회·총 3초 내 재시도, 실패하면 전량 시장가 청산 후 HALTED. 보호 공백 상한은 별도로 적용한다.
 - 부분 체결·청산과 잔여 진입 주문의 경합을 검사한다. 잔여 진입 주문을 방치해 청산 후 다시 노출되지 않게 한다.
 - 청산 확인 후 잔여 TP/SL을 정리한다. reduce-only/close-all 제약을 지켜 반대 포지션을 만들지 않는다.

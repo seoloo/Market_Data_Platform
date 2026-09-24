@@ -61,7 +61,7 @@ D22의 다중 시간대 대량 점수, 패턴 결합, 15분봉 재평가, 뉴스
 | storage/marketdata | SQLite 마이그레이션·조회, 백필·funding·causal snapshot: 구현 |
 | features/strategy/risk | H1/A1 재현 기반 유지. WA 순수 상태·방향별 손절·6h 청산, 엔진 1h 평가·BACKTEST 전용 우위 측정 모드 구현(2026-09-24). WA는 기각, 재현용 유지 |
 | backtest | feed/fills/portfolio/engine, 보고서·기준선·연구 선별: 구현 |
-| exchange/execution | 주문·보호주문·reconciliation: 설계, 실거래 구현/검증 대기 |
+| exchange/execution | 현물: 멱등 주문·재시작 복구·읽기 전용 실계좌(T/v2). **선물(2026-09-24)**: 계약·가짜 거래소(장애 주입)·멱등 주문(보호 스톱 Algo 경로 분리)·재시작 정합성 복구(`futures_guard`)·서명 읽기 전용 어댑터, 실계좌 읽기 점검 통과. **주문 전송 경로는 없다**(Phase 8 승인 전) |
 | ai/notify/ui | 분석 보조·대시보드: 계획. **notify: Paper 일일 점검 알림 구현**(로컬 기록 항상 + 텔레그램 선택, 토큰 비노출). 실거래 경로 알림은 미구현 |
 | ops | Clock, **Paper watchdog**(`ops/paper_watch.py`, 실행기와 독립·DB 읽기 전용, 16 §3·25 §3 중단 기준 판정). 실거래 워치독·복구 검증 대기 |
 
@@ -99,7 +99,7 @@ Phase 4에서 승인된 전략은 없다. Phase 5 이후와 실거래는 미착�
 | C3 | 과거 진행률의 기반 게이트 완료와 2019 데이터·계좌 스냅샷 체크리스트 불일치 | 데이터 시작점/예외 및 미구현 항목 감사. 일괄 통과 주장 금지 |
 | C4 | 무제한 보유와 “최대 보유기간만큼 embargo” 양립 불명확 | 전략별 label/포지션 구간 purge 및 경계 보유 처리 사전등록 |
 | C5 | 운용 자본 및 새 전략 미선정 | 후보 비교 → 사용자 선택 → 수치 사전등록 |
-| C6 | 실거래 관련 API 명세와 안전장치는 설계만 존재 | Phase 5에서 당시 공식 API 확인 후 구현·장애검증 |
+| C6 | 실거래 관련 API 명세와 안전장치 | **선물 부분 진행(2026-09-24)**: 공식 API 확인·구현·장애 테스트·실계좌 읽기 완료. 남은 것: 주문 전송 경로(Phase 8), WS 사용자 스트림(`ALGO_UPDATE`), 체결 수수료(userTrades) |
 | C7 | D22 제외가 사용자 의도인지 미확인 (2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`) | 사용자 확인. 원문은 [초안 보관](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
 | C8 | Phase 4 OOS `실제 거래 n≥100` 이 TRAIN 보다 약해, 23~35bps 효과는 TRAIN 통과 후 OOS 확인 불가 | 사전등록 전 사용자 결정. 선택지는 [후보 비교 §6](../research/01-candidate-comparison.md) |
 
