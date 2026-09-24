@@ -1,10 +1,19 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 순수 다이버전스 adapter, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 가드 피벗·시장자료 가용성 감사, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 순수 판정 경계)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 가드 피벗)
+
+- `src/auto_trading/research/elliott/pivots.py`: 별도 순수 4h·2% 피벗 검출기. 새 극값과 반전이 같은 봉에 담기면 장중 순서를 가정하지 않고 모호한 봉을 절단, 구간별 확정 피벗·모호한 시각을 반환. 기존 운영 `detect_swings` 미변경.
+- `divergence.py`는 가드 검출 결과를 구간별로만 다이버전스 판정하도록 결합. 모호함 양쪽 피벗을 한 쌍으로 만들지 않음.
+- 합성·무작위 경로 테스트: 확정 시각·경계 2%·고저 대칭·동률·같은 봉 모호함·구간 분리·미래 prefix 불변·결측/역순/거래량 0 거부.
+- **시장자료만 읽기 전용 감사**: 2020~2021 Binance USD-M BTCUSDT 4h 4,386봉 중 모호한 봉 1,933개(44.1%), 확정 피벗 496개, 피벗 ≥6개 연속 구간 10개. WA 거래·방향·손익 미조회. 수치 때문에 규칙을 조정하지 않음.
+- [33 Phase 0 감사](docs/research/33-elliott-phase0-data-and-profile.md)와 [Elliott 설계](docs/research/ELLIOTT_WAVE_ANALYSIS.md)에 방법·결과·한계 기록. `NOT_READY_FOR_WA_TEST` 유지. 다음: 1m 봉으로 4h 내부 사건 순서만 확인하는 방법·품질 경계를 검증.
+- 검증: 전체 pytest·leakage·strict mypy·ruff check/format·import-linter 통과. 기존 Paper/전략/DB/스케줄 변경 없음.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 순수 판정 경계)
 
 - `src/auto_trading/research/elliott/divergence.py`: EW-0 확정 가격 피벗·4h 종가 RSI(14) 일반 상승/하락 다이버전스 사건 판정. 피벗 가격/확정 봉·연속성·격자·거래량 0 검증, RSI warmup/같은 봉 발생·확정은 UNKNOWN, 미래 봉·미확정 피벗 비노출. Decimal 계산 context 고정.
 - `tests/research/test_elliott_divergence.py`: 합성 방향 대칭·확정 지연·미래 변형·prefix 일치·warmup·동일 봉 모호함·결측/역순/잘못된 가격/임계 거부·Decimal context 검증.

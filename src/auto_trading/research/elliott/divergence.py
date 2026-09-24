@@ -11,15 +11,18 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 from enum import StrEnum
 
-from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.indicators import rsi_series
 from auto_trading.features.structure import Swing, SwingKind, SwingSeries
+from auto_trading.research.elliott.pivots import (
+    EW0_THRESHOLD_PCT,
+    PivotDetection,
+    closed_ew0_candles,
+    detect_guarded_pivots,
+)
 
-EW0_THRESHOLD_PCT = Decimal("0.02")
 EW0_RSI_PERIOD = 14
-_STEP_MS = Timeframe.H4.ms
 
 
 class DivergenceKind(StrEnum):
@@ -77,8 +80,7 @@ def confirmed_divergences(
     if swings.threshold_pct != EW0_THRESHOLD_PCT:
         raise ValueError("EW-0 피벗 임계는 2%로 고정된다")
 
-    closed = tuple(c for c in candles if c.close_ms <= as_of_ms)
-    _validate_closed_candles(closed)
+    closed = closed_ew0_candles(candles, as_of_ms)
     by_open = {c.open_ms: c for c in closed}
     by_close = {c.close_ms: c for c in closed}
 
@@ -141,13 +143,14 @@ def confirmed_divergences(
     return tuple(events)
 
 
-def _validate_closed_candles(candles: tuple[Candle, ...]) -> None:
-    previous_open_ms: int | None = None
-    for candle in candles:
-        if candle.open_ms % _STEP_MS or candle.close_ms != candle.open_ms + _STEP_MS - 1:
-            raise DataIntegrityError("EW-0에는 UTC 정렬 마감 4h 봉만 허용한다")
-        if candle.volume <= 0:
-            raise DataIntegrityError("체결량 0인 4h 봉에서는 가격 피벗을 판정하지 않는다")
-        if previous_open_ms is not None and candle.open_ms != previous_open_ms + _STEP_MS:
-            raise DataIntegrityError("4h 봉이 누락·중복·역순이다")
-        previous_open_ms = candle.open_ms
+def detect_ew0_divergences(
+    candles: Sequence[Candle], as_of_ms: int
+) -> tuple[PivotDetection, tuple[DivergenceEvent, ...]]:
+    """가드된 피벗의 **같은 구간 안에서만** 다이버전스 사건을 계산한다."""
+    detection = detect_guarded_pivots(candles, as_of_ms)
+    events = tuple(
+        event
+        for segment in detection.segments
+        for event in confirmed_divergences(candles, segment, as_of_ms)
+    )
+    return detection, events
