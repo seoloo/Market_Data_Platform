@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **선물 연구 계속 — P1 ETH/BTC 페어 추세 1회 판정** · T/v2 Paper 운영 중(2026-10-24 점검 알림) · T/v1·F 전향 관찰.
+현재: **선물 연구 — P1 기각, 다음 방향 사용자 결정 대기** · T/v2 Paper 운영 중(2026-10-24 점검 알림) · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — 2번: 새 선물 수익원)
@@ -16,7 +16,9 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - 사용자 결정(정정): 현물 T/v2는 그대로 두고 Paper 4주 동안 **선물 연구 계속**.
 - [21 후보 비교](docs/research/21-futures-candidates-3.md): P1 ETH/BTC 페어(BTC와 상관 0.04) · P2 현금 구간 베이시스 · P3 약세장 숏(비권장). 사용자 선택 P1.
 - [22 P1 사전등록](docs/research/22-p1-pair-preregistration.md): 비율 20·60·120 부호 평균 × min(15%/σ60, 0.5), 같은 명목 롱숏,
-  1일 지연·5%p 밴드·다리별 0.095%·funding 실측, 2018~2026-08 1회. `backtest/pair_trend.py`(테스트 7건), `scripts/run_p1.py`(테스트 8건).
+  1일 지연·5%p 밴드·다리별 0.095%·funding 실측, 2018~2026-08 1회. `backtest/pair_trend.py`(테스트 7건), `scripts/run_p1.py`(테스트 8건). 커밋 `5b85553`.
+- **P1 결과: REJECT.** 샤프 0.32, 하한 음수, 2022~2026 음수, MDD 34.6%. 비용이 가격 수익의 절반. BTC와 상관 0.02(시장 중립은 확인).
+  T/v2+P1 50/50 샤프 1.12 < T/v2 단독 1.20. 기록: 22 §5, RESEARCH_HISTORY P1 항목.
 - (앞선 결정) 새 연구는 잠시 멈추고 Paper 4주 운영 뒤 점검. 2026-10-24 10:00 KST 알림 예약(Claude 앱 예약 작업).
   점검 항목: Paper status·누락·DEGRADED, 연구 시뮬레이터와 일치, T/v1·T/v2·F 전향 월간 갱신, Phase 6 게이트 판정.
 

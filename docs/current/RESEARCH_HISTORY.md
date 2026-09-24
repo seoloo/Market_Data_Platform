@@ -131,6 +131,17 @@ Learned: 암호화폐에서 종목을 늘려도 추세 샤프가 오르지 않�
 Do not retry: 유니버스 크기·예산·상한·밴드·lookback 조정으로 같은 기간 재판정, 알트만 골라내기.
 근거: [19 후보 비교](../research/19-futures-next-candidates.md), [20 사전등록·§7 결과](../research/20-ta-preregistration.md).
 
+## P1 — REJECTED (2026-09-24)
+
+Hypothesis: ETH/BTC 비율의 20·60·120일 추세 방향으로 ETH·BTC 무기한을 같은 명목 롱숏(시장 중립)하면 비용 후 순수익 > 0.
+판정 2018-01~2026-08 (1회): 일간 평균 0.011%, 2SE 하한 −0.012% → 실패. 2022~2026 평균 음수, MDD 34.6% > 30% → **REJECT**. 청산 0.
+샤프 **0.32**(2018~2021 0.84 → 2022~2026 −0.16), CAGR 3.3%. 가격 +6,704 · funding −54 · 비용 −3,374 (10,000 기준). BTC와 상관 0.02, T/v2와 0.08.
+보고: T/v2 + P1 50/50 샤프 1.12 < T/v2 단독 1.20.
+Failure: 비율 추세 수익이 초기 구간에 몰렸고 최근은 음수, 잦은 방향 전환과 두 다리 재조정 비용이 가격 수익의 절반.
+Learned: 시장 중립 상대 추세도 비용을 넘지 못했다(R1과 같은 결론, 한 쌍으로 좁혀도 같다). 낮은 상관만으로는 포트폴리오를 개선하지 못한다 — 자체 샤프가 필요하다.
+Do not retry: 다른 코인 쌍(SOL/BTC 등), lookback·밴드·목표 변동성 조정.
+근거: [21 후보 비교](../research/21-futures-candidates-3.md), [22 사전등록·§5 결과](../research/22-p1-pair-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
