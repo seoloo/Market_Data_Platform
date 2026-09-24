@@ -479,6 +479,42 @@ I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에
    피벗 확정 전 미노출, 지표 warmup·초기화, expiry, 미래 봉 추가 후 기존 사건 불변, 새 극값 이후 과거 기록 보존을 검사한다.
 10. 구현 변경 시 프로젝트 전체 pytest·leakage·mypy strict·ruff·import 계약 검사.
 
+## 11. 복수 시나리오 출력과 평가자(JEV) 연결 계약
+
+Elliott 분석이 끝난 뒤 JEV를 붙일 수 있도록 **출력 형식과 평가자 인터페이스만** 먼저 고정한다.
+JEV의 정체·공급자·모델은 미정이며 추측해 구현하지 않는다. 지금은 평가자를 붙이지 않았다.
+
+**출력** — `research/elliott/scenario_contract.py`, 스키마 `ew-scenario-set/1`.
+`generate_bounded_candidates` 결과를 그대로 변환한다(새 판정 규칙 없음, `EW-0` 불변).
+
+| 요구 | 필드 | 규칙 |
+| --- | --- | --- |
+| wave count·현재 상태 | `wave_count`, `anchors[]`, `current_state` | 예: `WAVE_4_FORMING`, `WAVE_5_END_UNVERIFIED`, `END_INVALIDATED`, `REJECTED` |
+| confidence | `rule_support` | 하드 규칙 PASS/FAIL/PENDING 수·가이드라인 부합 수 원값. `kind=RULE_SUPPORT_UNCALIBRATED`, `probability=null` 고정 |
+| invalidation | `invalidation_levels[]` | 가격·비교(`<=`/`>=`)·기준(HIGH/LOW)·발동 시각. `scope=ANALYSIS_ONLY` |
+| 근거 | `evidence[]` | 가족별 FIBONACCI·ALTERNATION(원값, 출처, 가이드라인 범위)·MOMENTUM·VOLUME·MULTI_TIMEFRAME·CHANNEL. 계산 안 한 것은 `NOT_COMPUTED` — 중립값이 아니다 |
+| UNKNOWN 가능성 | `uncertainty`, 묶음의 `exhaustive=false`, `other_or_unknown=ALWAYS_POSSIBLE` | 하위파 `UNVERIFIED`, 경쟁 시나리오 수, 교차 거래소 대리 등 플래그 |
+
+단일 count를 확정하는 필드는 없다. 묶음 상태는 `SCENARIOS`·`NO_VALID_COUNT`·
+`INSUFFICIENT_ANCHORS`·`UNKNOWN`. `validate_scenario_set_dict`가 완전 목록 주장·확률 기입·
+UNKNOWN 자리 제거·분석 외 무효화 범위를 거부한다. `scenario_set_digest`(정렬 JSON sha256)로 입력을 고정한다.
+
+**평가자** — `research/elliott/evaluation.py`, 스키마 `ew-scenario-eval/1`.
+
+- `ScenarioEvaluator` Protocol: `evaluate(scenario_set_json, *, evaluated_at_ms) -> ScenarioEvaluation`.
+- 결과: 시나리오별 `relative_support`(0~1, 합 1 불필요) + 근거 문장, `other_or_unknown_support`,
+  `interpretation=RELATIVE_NOT_PROBABILITY`, 평가자·모델·프롬프트 버전, 입력 해시, 원출력.
+- 판정: `RELATIVE_SUPPORT` · `ABSTAIN`(근거 부족을 스스로 밝힘) · `UNAVAILABLE`(실패·시간 초과).
+  실패를 중립 의견으로 채우지 않는다.
+- `validate_evaluation`: 해시 불일치, 입력에 없는 ID, 중복, 0~1 밖, 확률 표기, 판정과 내용 불일치를 거부.
+- 자리표시 `AbstainEvaluator`로 파이프라인만 시험한다.
+
+평가 결과는 Shadow 기록일 뿐 주문·veto·사이징·보호주문에 쓰지 않는다. 거래 경로가
+`auto_trading.research.elliott`를 import하지 못하도록 import-linter 계약이 막는다.
+JEV를 실제로 붙이는 것은 (1) 하위파 출처 계약과 UNKNOWN 경계 문제가 풀리고
+(2) 평가 대상·비교 기준을 결과 열람 전에 따로 고정한 뒤다.
+상대 평가를 확률로 쓰려면 §6.3대로 예측 대상을 정의하고 미열람 구간에서 calibration해야 한다.
+
 ## 10. 다음 결정과 완료 조건
 
 지금의 권고는 **이론 문법 → causal 후보 판정기의 신뢰성 → 실제 진입 집중도 → 새 가설** 순서다.
