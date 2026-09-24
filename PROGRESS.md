@@ -16,7 +16,7 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - 사용자 결정: "O/v1 은 그대로 두고 **O/v2 를 하나 더**" → [28 전향 등록](docs/research/28-o2-paper-forward-registration.md)(첫 실행 전 고정, 기준 25 §3 과 같음).
   `O2_STOP` 설정 한 곳, `run_paper_o1.py --ledger o2`(인자 없으면 O/v1 — 기존 09:10 스케줄 그대로), 원장 `o2_stop`·`reports/paper/o2/`,
   O/v2 만 `stop_hits` 기록, 일일 점검에 O/v2 줄(기록 없으면 '등록 전' 정보, 스톱 발동일 경고). 테스트: 스톱 발동 포함 비트 단위 재현·규칙별 재계산·원장 분리·O/v1 형식 불변.
-- **남은 일(사용자)**: 스케줄 `AutoTrading_Paper_O2` 09:12 등록 — 28 §5 명령.
+- 스케줄 `AutoTrading_Paper_O2` 09:12 등록 — 사용자 완료, Ready 확인. 첫 실행(수동) 결정일 2026-09-23, O/v1 과 같은 목표.
 
 ## 이전 작업 (Claude — Phase 7 WS 사용자 스트림, 커밋 `5d794df`)
 

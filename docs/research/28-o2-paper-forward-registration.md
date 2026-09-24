@@ -62,3 +62,4 @@ Register-ScheduledTask -TaskName "AutoTrading_Paper_O2" -Action $a -Trigger (New
 | 날짜 | 내용 |
 |---|---|
 | 2026-09-24 | 등록·구현(커밋 `e7d30e5`). **첫 실행**(05:55 UTC): 결정일 2026-09-23 · `NO_PRIOR_DECISION` · 자본 10,000 · 내일 목표 BTC 0.3487 / ETH 0.2538 — O/v1 과 같은 날·같은 목표로 시작. 재실행 멱등 · `verify --ledger o2` 일치 · 일일 점검(`--no-send`)에 O/v2 줄 표시 확인 |
+| 2026-09-24 | 스케줄러 `AutoTrading_Paper_O2` 등록 확인(사용자): Ready, 다음 09-25 09:12, 인자 `run --ledger o2` |
