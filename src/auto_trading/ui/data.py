@@ -404,11 +404,11 @@ def _schedule(path: Path, errors: list[str]) -> tuple[RateSchedule | None, float
         errors.append(f"이자 가정 읽기 실패: {type(exc).__name__}")
         return None, 0.5, ""
     latest = doc["rates"][-1]
-    tiers = " · ".join(
+    label = " · ".join(
         f"{t['apr'] * 100:.2f}%" + (f"(≤{t['up_to']:,} USDT)" if t["up_to"] is not None else "")
         for t in latest["tiers"]
     )
-    return schedule, float(doc.get("margin_reserve", 0.5)), f"{tiers} · {latest['from']} 확인"
+    return schedule, float(doc.get("margin_reserve", 0.5)), f"{label} · {latest['from']} 확인"
 
 
 def _apply_yield(view: LedgerView, schedule: RateSchedule) -> LedgerView:
