@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -54,6 +55,7 @@ __all__ = [
     "simulate_overlay",
     "split_weights",
     "step_overlay_day",
+    "vol_spikes",
 ]
 
 _DAY_MS = 86_400_000
@@ -79,6 +81,11 @@ class OverlayConfig:
     O/v2 사전등록(docs/research/27)은 0.20 (2026-09-24 사용자 선택)."""
     stop_slippage: float = 0.01
     """비상 스톱 체결 불리폭 — 급락 중 시장가 체결을 보수적으로 1% 로 둔다."""
+    vol_spike_ratio: float | None = None
+    """변동성 급등 끄기 (docs/research/43): 종목별 현물 σ(최근 ``vol_spike_days``일)
+    ≥ 이 값 × σ(T/v2 60일)이면 다음 체결에서 그 종목 노출 배수를 1.0 으로 둔다(선물 추가분 0).
+    ``None``이면 없음(O/v2)."""
+    vol_spike_days: int = 10
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -120,19 +127,37 @@ class OverlayResult:
     worst_intraday_drawdown: float = 0.0
     stop_hits: int = 0
     """비상 스톱이 발동한 (종목, 날) 수."""
+    spike_days: int = 0
+    """변동성 급등으로 노출 배수를 1.0 으로 둔 (종목, 날) 수 (43)."""
 
 
 def split_weights(
-    weights: Mapping[str, float], exposure: float, max_leverage: float
+    weights: Mapping[str, float],
+    exposure: float,
+    max_leverage: float,
+    exposures: Mapping[str, float] | None = None,
 ) -> tuple[dict[str, float], dict[str, float]]:
-    """T/v2 목표 비중을 현물 비중·선물 비중으로 나눈다."""
+    """T/v2 목표 비중을 현물 비중·선물 비중으로 나눈다.
+
+    ``exposures``를 주면 종목별 배수(43 변동성 급등 끄기)를 쓴다. 없으면 모두 ``exposure``.
+    """
+    if exposures is None:
+        total = sum(weights.values())
+        k = 1.0
+        if total > 0 and max_leverage > 1:
+            k = min(1.0, (max_leverage - exposure * total) / ((max_leverage - 1) * total))
+        k = max(k, 0.0)
+        spot = {s: k * w for s, w in weights.items()}
+        fut = {s: (exposure - k) * w for s, w in weights.items()}
+        return spot, fut
     total = sum(weights.values())
+    gross = sum(exposures[s] * w for s, w in weights.items())
     k = 1.0
     if total > 0 and max_leverage > 1:
-        k = min(1.0, (max_leverage - exposure * total) / ((max_leverage - 1) * total))
+        k = min(1.0, (max_leverage - gross) / ((max_leverage - 1) * total))
     k = max(k, 0.0)
     spot = {s: k * w for s, w in weights.items()}
-    fut = {s: (exposure - k) * w for s, w in weights.items()}
+    fut = {s: (exposures[s] - k) * w for s, w in weights.items()}
     return spot, fut
 
 
@@ -179,6 +204,8 @@ class OverlayMarketDay:
     perp: Mapping[str, OverlayBar]
     funding_rates: Mapping[str, Sequence[float]]
     """그날(``[d, d + 1일)``) 정산된 funding 비율, 시각 순."""
+    spiked: frozenset[str] = frozenset()
+    """전날 종가까지로 판정한 변동성 급등 종목 (43). 이 종목은 오늘 체결에서 배수 1.0."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,13 +313,18 @@ def step_overlay_day(
     tally.loss_limit_days += no_increase
     # 5. 체결
     if target is not None and equity > 0:
-        spot_w, fut_w = split_weights(target, exposure, cfg.max_futures_leverage)
+        per_symbol = None
+        if market.spiked:
+            per_symbol = {s: 1.0 if s in market.spiked else exposure for s in symbols}
+            tally.spike_days += sum(1 for s in symbols if s in market.spiked)
+        spot_w, fut_w = split_weights(target, exposure, cfg.max_futures_leverage, per_symbol)
         tally.capped_days += any(spot_w[s] < target[s] - 1e-12 for s in symbols)
         traded = False
         for s in symbols:
             current = (sq[s] * spot_px[s] + fq[s] * perp_px[s]) / equity
             want = spot_w[s] + fut_w[s]
-            if abs(want - current) < tc.band * exposure and _sign(want) == _sign(current):
+            band = tc.band * (exposure if per_symbol is None else per_symbol[s])
+            if abs(want - current) < band and _sign(want) == _sign(current):
                 continue
             if no_increase and want > current:
                 continue
@@ -365,6 +397,28 @@ def next_targets(closes: Mapping[str, Sequence[float]], cfg: OverlayConfig) -> d
     return {s: target_weight(closes[s], cfg.trend) or 0.0 for s in sorted(closes)}
 
 
+def vol_spikes(closes: Mapping[str, Sequence[float]], cfg: OverlayConfig) -> frozenset[str]:
+    """43: 마지막 종가까지 σ(최근 ``vol_spike_days``일) ≥ ``vol_spike_ratio`` × σ(60일)인 종목.
+
+    σ는 일간 로그수익 표본 표준편차(T/v2 ``target_weight``와 같은 계산).
+    이력이 부족하면 판정하지 않는다.
+    """
+    ratio = cfg.vol_spike_ratio
+    if ratio is None:
+        return frozenset()
+    long_days = cfg.trend.vol_days
+    out: set[str] = set()
+    for s, series in closes.items():
+        if len(series) < long_days + 1:
+            continue
+        steps = [math.log(series[-k] / series[-k - 1]) for k in range(1, long_days + 1)]
+        long_vol = statistics.stdev(steps)
+        short_vol = statistics.stdev(steps[: cfg.vol_spike_days])
+        if long_vol > 0 and short_vol >= ratio * long_vol:
+            out.add(s)
+    return frozenset(out)
+
+
 def simulate_overlay(
     spot_bars: Mapping[str, Mapping[int, OverlayBar]],
     perp_bars: Mapping[str, Mapping[int, OverlayBar]],
@@ -401,6 +455,7 @@ def simulate_overlay(
             perp_prev_close={s: perp_bars[s][prev_day].close for s in symbols},
             perp={s: perp_bars[s][day] for s in symbols},
             funding_rates=rates,
+            spiked=vol_spikes(history, cfg),
         )
         outcome = step_overlay_day(state, day, market, cfg, result)
         # 6. 다음 목표

@@ -252,3 +252,54 @@ class TestCatastropheStop:
         spot, perp = self.crash(n, crash_day, low=0.85)  # 장중 −15% < 20%
         with_stop = self.run_bars(spot, perp, OverlayConfig(trend=FREE_T2, catastrophe_stop=0.20))
         assert with_stop.stop_hits == 0
+
+
+class TestVolSpike:
+    """43: 종목별 σ10 ≥ K × σ60 이면 다음 체결에서 그 종목 배수 1.0 (선물 추가분 0)."""
+
+    def test_never_triggering_ratio_is_identical_to_none(self) -> None:
+        n = 400
+        closes = {"AUSDT": wave(n, 0.004), "BUSDT": zigzag(n)}
+        base = run(closes, OverlayConfig())
+        far = run(closes, OverlayConfig(vol_spike_ratio=1e9))
+        assert far.spike_days == 0
+        assert far.equity == base.equity
+
+    def test_calm_path_never_spikes(self) -> None:
+        n = 400
+        closes = {"AUSDT": wave(n, 0.004)}
+        assert run(closes, OverlayConfig(vol_spike_ratio=1.5)).spike_days == 0
+
+    def test_vol_spikes_flags_only_the_jumping_symbol(self) -> None:
+        from auto_trading.backtest.overlay import vol_spikes
+
+        calm = wave(200, 0.002)
+        jumpy = calm[:-10] + [calm[-11] * (1.08 if k % 2 else 0.93) for k in range(10)]
+        cfg = OverlayConfig(vol_spike_ratio=1.5)
+        assert vol_spikes({"AUSDT": calm, "BUSDT": jumpy}, cfg) == frozenset({"BUSDT"})
+        assert vol_spikes({"BUSDT": jumpy}, OverlayConfig()) == frozenset()
+        assert vol_spikes({"BUSDT": jumpy[:50]}, cfg) == frozenset()  # 60 일 이력 부족
+
+    def test_spike_removes_futures_for_that_symbol_only(self) -> None:
+        n = 400
+        a_path = wave(n, 0.004)
+        b_path = wave(n, 0.004, base=50.0)
+        # B 만 마지막 20 일 동안 크게 흔들리되 추세는 위로 유지
+        for k in range(n - 20, n):
+            b_path[k] = b_path[k] * (1.06 if k % 2 else 0.97)
+        closes = {"AUSDT": a_path, "BUSDT": b_path}
+        cfg = OverlayConfig(trend=FREE_T2)
+        base = run(closes, cfg)
+        capped = run(closes, replace(cfg, vol_spike_ratio=1.5))
+        assert capped.spike_days > 0
+        assert capped.exposure[-1] < base.exposure[-1]
+
+    def test_split_weights_per_symbol_matches_scalar_when_equal(self) -> None:
+        w = {"AUSDT": 0.4, "BUSDT": 0.5}
+        assert split_weights(w, 1.5, 3.0) == split_weights(
+            w, 1.5, 3.0, {"AUSDT": 1.5, "BUSDT": 1.5}
+        )
+        spot, fut = split_weights(w, 1.5, 3.0, {"AUSDT": 1.0, "BUSDT": 1.5})
+        assert fut["AUSDT"] == pytest.approx(0.0)
+        assert spot["AUSDT"] == pytest.approx(0.4)
+        assert fut["BUSDT"] == pytest.approx(0.25)
