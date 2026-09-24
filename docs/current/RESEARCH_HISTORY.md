@@ -153,6 +153,14 @@ Do not retry: 2배·다른 레버리지 상한·일 손실 처리 변경으로 �
 근거: [23 검토](../research/23-t2-futures-overlay-review.md), [24 사전등록·§9 결과](../research/24-o-overlay-preregistration.md).
 전향: 2026-09-24 사용자 승인으로 **별도 원장 Paper** 시작 (첫 결정일 2026-09-23, 12개월). 청산·정지 즉시 중단, 매달 MDD 25% 중단, 12개월 뒤 같은 날 T2_ALONE 재생보다 순수익이 크면 소액 실거래 검토 자격. 연구와 같은 하루 함수(비트 일치). 근거: [25 전향 등록](../research/25-o1-paper-forward-registration.md).
 
+## O/v2 — PASS (2026-09-24, 보호 장치 비용 판정)
+
+Hypothesis: O/v1 에 선물 추가분 −20% 비상 스톱(매일 전날 종가 기준, 체결 불리폭 1%)을 더해도 O/v1 판정이 유지되고 보험 비용이 CAGR 2%p 이하다.
+판정 2020-03~2026-08 (1회): O1~O5 전부 통과(MDD 23.2%, CAGR 31.7% > T/v2 23.4%, 두 절반 모두) · 보험 비용 1.56%p ≤ 2%p → **PASS**. 발동 11회.
+Learned: 과거에는 보험이 낙폭을 줄이지 못하고 비용만 들었다(MDD 23.1 → 23.2%). 큰 낙폭은 여러 날 하락이라 추세 청산이 먼저 막았고, 하루 급락은 장중 반등이 많았다. 비상 스톱의 근거는 과거 성과가 아니라 표본 밖 위험(프로그램 중단·연쇄 청산)과 거래소 보호 주문 규칙이다.
+Do not retry: 같은 데이터로 거리(15%·25%)·불리폭 변경.
+근거: [27 사전등록·§7 결과](../research/27-o2-catastrophe-stop-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
