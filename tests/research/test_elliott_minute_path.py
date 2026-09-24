@@ -14,6 +14,7 @@ from auto_trading.research.elliott.minute_path import (
     MinutePathPivot,
     MinutePathReplay,
     replay_four_hour_minute_path,
+    replay_minute_groups,
 )
 
 D = Decimal
@@ -179,3 +180,49 @@ def test_future_four_hour_and_minute_mutation_cannot_change_prior_snapshot() -> 
         first.close_ms,
     )
     assert baseline == extended
+
+
+@pytest.mark.leakage
+def test_streamed_groups_match_mapping_and_preserve_four_hour_boundary() -> None:
+    first, first_minutes = priced_path()
+    second_minutes = group(240, ["97"] * 10 + ["101"] * 230)
+    second = outer(second_minutes)
+    groups = (bars for bars in (first_minutes, second_minutes))
+    streamed = replay_minute_groups([first, second], groups, second.close_ms)
+    mapped = replay_four_hour_minute_path(
+        [first, second],
+        {first.open_ms: first_minutes, second.open_ms: second_minutes},
+        second.close_ms,
+    )
+    assert streamed == mapped
+    assert all(p.available_at_ms in (first.close_ms, second.close_ms) for p in all_pivots(streamed))
+    prior = replay_minute_groups([first], iter((first_minutes,)), first.close_ms)
+    with_future = replay_minute_groups(
+        [first, second], iter((first_minutes, second_minutes)), first.close_ms
+    )
+    assert prior == with_future
+
+
+def test_streaming_and_mapping_agree_through_block_and_ambiguous_minute() -> None:
+    first, first_minutes = priced_path()
+    blocked_minutes = group(240, ["97"] * 240)
+    blocked = outer(blocked_minutes)
+    ambiguous_minutes = group(480, ["100"] * 240)
+    ambiguous_minutes[10] = minute(490, "101", high="103", low="100")
+    ambiguous_minutes[50] = minute(530, "105")
+    ambiguous_minutes[200] = minute(680, "95")
+    ambiguous = outer(ambiguous_minutes)
+    supplied = [first_minutes, blocked_minutes[:-1], ambiguous_minutes]
+    stream = replay_minute_groups([first, blocked, ambiguous], iter(supplied), ambiguous.close_ms)
+    mapping = replay_four_hour_minute_path(
+        [first, blocked, ambiguous],
+        {
+            first.open_ms: first_minutes,
+            blocked.open_ms: blocked_minutes[:-1],
+            ambiguous.open_ms: ambiguous_minutes,
+        },
+        ambiguous.close_ms,
+    )
+    assert stream == mapping
+    assert stream.blocked_four_hours[0].open_ms == blocked.open_ms
+    assert ambiguous_minutes[10].open_ms in stream.ambiguous_minute_open_ms

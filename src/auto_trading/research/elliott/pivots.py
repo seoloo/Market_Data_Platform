@@ -68,86 +68,110 @@ def replay_guarded_extrema(
     입력의 시간대·격자·가용 시각은 **호출자 책임**이다. 연구 전용 4h/1m
     검증기만 이 함수를 호출하며, 운영 피벗 검출기에 연결하지 않는다.
     """
-    segments: list[list[Swing]] = [[]]
-    ambiguous_open_ms: list[int] = []
-    direction = 0  # 0: 첫 피벗 미정, +1: 고점 탐색, -1: 저점 탐색
-    high: tuple[Decimal, int] | None = None
-    low: tuple[Decimal, int] | None = None
+    state = GuardedExtremaState()
+    for candle in validated_bars:
+        state.feed(candle)
+    return state.snapshot()
 
-    with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
-        for candle in validated_bars:
-            if high is None or low is None:
-                if _drops(candle.high, candle.low) or _rises(candle.low, candle.high):
-                    ambiguous_open_ms.append(candle.open_ms)
-                    segments.append([])
-                    continue
-                high = (candle.high, candle.open_ms)
-                low = (candle.low, candle.open_ms)
-                continue
 
-            new_high = candle.high > high[0]
-            new_low = candle.low < low[0]
-            high_then_low_possible = new_high and _drops(candle.high, candle.low)
-            low_then_high_possible = new_low and _rises(candle.low, candle.high)
-            confirms_high = _drops(high[0], candle.low)
-            confirms_low = _rises(low[0], candle.high)
+class GuardedExtremaState:
+    """검증된 연속 봉을 한 번씩 읽는 연구용 상태 기계.
 
-            if direction == 0:
-                ambiguous = (
-                    high_then_low_possible
-                    or low_then_high_possible
-                    or (confirms_high and confirms_low)
+    호출자는 시간대·격자·거래량과 품질을 먼저 검증한다. `break_segment`는
+    결측/모호한 상위 봉의 경계에만 사용하며, 과거 피벗은 수정하지 않는다.
+    """
+
+    def __init__(self) -> None:
+        self._segments: list[list[Swing]] = [[]]
+        self._ambiguous_open_ms: list[int] = []
+        self._direction = 0  # 0: 첫 피벗 미정, +1: 고점 탐색, -1: 저점 탐색
+        self._high: tuple[Decimal, int] | None = None
+        self._low: tuple[Decimal, int] | None = None
+
+    def break_segment(self) -> None:
+        self._segments.append([])
+        self._direction = 0
+        self._high = None
+        self._low = None
+
+    def feed(self, candle: Candle) -> None:
+        """OHLC 내부 경로를 발명하지 않고 다음 봉 하나를 반영한다."""
+        with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
+            self._feed(candle)
+
+    def _feed(self, candle: Candle) -> None:
+        high = self._high
+        low = self._low
+        direction = self._direction
+        if high is None or low is None:
+            if _drops(candle.high, candle.low) or _rises(candle.low, candle.high):
+                self._ambiguous_open_ms.append(candle.open_ms)
+                self.break_segment()
+                return
+            self._high = (candle.high, candle.open_ms)
+            self._low = (candle.low, candle.open_ms)
+            return
+
+        new_high = candle.high > high[0]
+        new_low = candle.low < low[0]
+        high_then_low_possible = new_high and _drops(candle.high, candle.low)
+        low_then_high_possible = new_low and _rises(candle.low, candle.high)
+        confirms_high = _drops(high[0], candle.low)
+        confirms_low = _rises(low[0], candle.high)
+
+        if direction == 0:
+            ambiguous = (
+                high_then_low_possible or low_then_high_possible or (confirms_high and confirms_low)
+            )
+        elif direction > 0:
+            ambiguous = high_then_low_possible
+        else:
+            ambiguous = low_then_high_possible
+
+        if ambiguous:
+            self._ambiguous_open_ms.append(candle.open_ms)
+            self.break_segment()
+            return
+
+        if direction >= 0 and confirms_high:
+            self._segments[-1].append(
+                Swing(
+                    kind=SwingKind.HIGH,
+                    price=high[0],
+                    at_ms=high[1],
+                    confirmed_at_ms=candle.close_ms,
                 )
-            elif direction > 0:
-                ambiguous = high_then_low_possible
-            else:
-                ambiguous = low_then_high_possible
-
-            if ambiguous:
-                ambiguous_open_ms.append(candle.open_ms)
-                segments.append([])
-                direction = 0
-                high = None
-                low = None
-                continue
-
-            if direction >= 0 and confirms_high:
-                segments[-1].append(
-                    Swing(
-                        kind=SwingKind.HIGH,
-                        price=high[0],
-                        at_ms=high[1],
-                        confirmed_at_ms=candle.close_ms,
-                    )
+            )
+            self._direction = -1
+            self._low = (candle.low, candle.open_ms)
+            return
+        if direction <= 0 and confirms_low:
+            self._segments[-1].append(
+                Swing(
+                    kind=SwingKind.LOW,
+                    price=low[0],
+                    at_ms=low[1],
+                    confirmed_at_ms=candle.close_ms,
                 )
-                direction = -1
-                low = (candle.low, candle.open_ms)
-                continue
-            if direction <= 0 and confirms_low:
-                segments[-1].append(
-                    Swing(
-                        kind=SwingKind.LOW,
-                        price=low[0],
-                        at_ms=low[1],
-                        confirmed_at_ms=candle.close_ms,
-                    )
-                )
-                direction = 1
-                high = (candle.high, candle.open_ms)
-                continue
+            )
+            self._direction = 1
+            self._high = (candle.high, candle.open_ms)
+            return
 
-            if direction >= 0 and new_high:
-                high = (candle.high, candle.open_ms)
-            if direction <= 0 and new_low:
-                low = (candle.low, candle.open_ms)
+        if direction >= 0 and new_high:
+            self._high = (candle.high, candle.open_ms)
+        if direction <= 0 and new_low:
+            self._low = (candle.low, candle.open_ms)
 
-    return (
-        tuple(
-            SwingSeries(swings=tuple(swings), threshold_pct=EW0_THRESHOLD_PCT)
-            for swings in segments
-        ),
-        tuple(ambiguous_open_ms),
-    )
+    def snapshot(self) -> tuple[tuple[SwingSeries, ...], tuple[int, ...]]:
+        """현재까지 확정된 사건만 반환한다. 미확정 극값은 포함하지 않는다."""
+        return (
+            tuple(
+                SwingSeries(swings=tuple(swings), threshold_pct=EW0_THRESHOLD_PCT)
+                for swings in self._segments
+            ),
+            tuple(self._ambiguous_open_ms),
+        )
 
 
 def _drops(high: Decimal, low: Decimal) -> bool:

@@ -1,10 +1,19 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 시간순 경로 합성 검증, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 시장자료 경로 감사·최소 4h 경계 명시, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 1m 경로 재생)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 스트리밍 시장 감사)
+
+- 사용자 결정 반영: **Elliott 파동 분석·판정의 최소 시간대는 마감 4h**. 1m은 4h 내부 사건 순서/품질 확인에만 사용하고 1m 파동·진입 신호로 쓰지 않는다. [CURRENT_SPEC](docs/current/CURRENT_SPEC.md), [Elliott 설계](docs/research/ELLIOTT_WAVE_ANALYSIS.md), [33 감사](docs/research/33-elliott-phase0-data-and-profile.md)에 명시. 실거래 연결은 별도 승인 전 금지.
+- `GuardedExtremaState`로 기존 2% 재생기를 한 봉씩 먹이는 동일 상태 기계로 분리하고, `replay_minute_groups`가 4h당 240개 1m만 메모리에 두고 경계 간 후보 상태를 유지한다. 배치·스트리밍 결과 일치, 품질 차단·1m 모호함 경계 테스트 추가.
+- `scripts/audit_ew0_minute_path.py`: 시장 DB `mode=ro`·`query_only=ON`, 2020~2021 Binance 대용 4h/1m만 읽음. 4h 4,386개 중 품질·전역 고저 순서 통과 4,378개(99.82%), 차단 8개(겹침 6·거래량 0 포함 2). 1m 모호함 565개에서 절단, 분봉 경로 반전 사건 3,500개, 사건 노출 4h 1,894개, 분봉 확인→4h 마감 중앙 대기 125분. **이는 4h Elliott 피벗/파동 coverage 또는 수익 검증이 아니다.**
+- WA 거래·방향·PnL, 전략·Paper·DB·스케줄은 변경하지 않았다. `NOT_READY_FOR_WA_TEST` 유지.
+- 검증: 전체 pytest **1,780건**·leakage **60건**·strict mypy (`src tests` 252개 소스, 새 감사 스크립트 포함 별도 검사 131개 소스)·ruff check/format **309파일**·import-linter **5계약** 통과. 가짜 DB 해시 불변·부재 시 미생성 테스트 통과.
+- 다음: WA 결과 가림 유지, 1m 사건을 4h 이상 후보에 연결할 수 있는 다대일·충돌·UNKNOWN 매핑 규칙을 사전 고정하고 테스트. BitMEX 원시장 자료 결측 해결 전 WA 진입 분석 금지.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 1m 경로 재생)
 
 - `src/auto_trading/research/elliott/pivots.py`의 기존 2% 가드 상태 기계를 시간순 검증 봉 재생 함수로 분리하고, `minute_path.py`에서 완성 4h마다 240개 1m 격자·양수 거래량·OHLC·전역 고저 순서가 확인될 때만 연속 경로를 재생한다.
 - 1m 안의 새 극값·반전 선후가 모호하면 해당 분에서 구간을 절단한다. 품질 실패·전역 고저 겹침 4h는 통째로 차단하며, 서로 다른 구간을 잇지 않는다. 분봉 반전 확인은 **해당 4h 마감 후에만** 연구 결과로 노출하고 4h Elliott 파동 라벨로 승격하지 않는다.
