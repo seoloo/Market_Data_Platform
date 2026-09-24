@@ -12,9 +12,11 @@ import math
 import random
 import sqlite3
 import sys
+import zipfile
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from statistics import pstdev
 
@@ -187,10 +189,195 @@ def power() -> dict[str, object]:
     }
 
 
+# ---------------------------------------------------------------- §9 BTC + ETH 합산 (수익률 미열람)
+
+ETH_DIR = REPO_ROOT / "data" / "external" / "binance_vision" / "um" / "ETHUSDT" / "1m"
+H4 = Timeframe.H4.ms
+
+
+def _eth_minutes() -> Iterator[Candle]:
+    """내려받은 ETHUSDT 1m zip 을 월 순서대로 읽는다 (헤더 줄은 건너뜀)."""
+    for path in sorted(ETH_DIR.glob("ETHUSDT-1m-*.zip")):
+        with zipfile.ZipFile(path) as archive:
+            (name,) = archive.namelist()
+            for line in archive.read(name).decode("ascii").splitlines():
+                cells = line.split(",")
+                if not cells[0].isdigit():
+                    continue
+                open_ms = int(cells[0])
+                yield Candle(
+                    open_ms=open_ms,
+                    close_ms=open_ms + Timeframe.M1.ms - 1,
+                    open=Decimal(cells[1]),
+                    high=Decimal(cells[2]),
+                    low=Decimal(cells[3]),
+                    close=Decimal(cells[4]),
+                    volume=Decimal(cells[5]),
+                )
+
+
+def _aggregate(minutes: Iterator[Candle], step: int) -> list[Candle]:
+    out: list[Candle] = []
+    bucket: list[Candle] = []
+    for m in minutes:
+        if bucket and m.open_ms // step != bucket[0].open_ms // step:
+            out.append(_bar(bucket, step))
+            bucket = []
+        bucket.append(m)
+    if bucket:
+        out.append(_bar(bucket, step))
+    return out
+
+
+def _bar(bucket: list[Candle], step: int) -> Candle:
+    start = bucket[0].open_ms // step * step
+    return Candle(
+        open_ms=start,
+        close_ms=start + step - 1,
+        open=bucket[0].open,
+        high=max(c.high for c in bucket),
+        low=min(c.low for c in bucket),
+        close=bucket[-1].close,
+        volume=sum((c.volume for c in bucket), start=Decimal(0)),
+    )
+
+
+def _chunks(four: Sequence[Candle]) -> list[list[Candle]]:
+    """1m 이 하나도 없는 4h 에서 자료를 끊는다 (§9)."""
+    chunks: list[list[Candle]] = [[]]
+    for bar in four:
+        if chunks[-1] and bar.open_ms != chunks[-1][-1].open_ms + H4:
+            chunks.append([])
+        chunks[-1].append(bar)
+    return [c for c in chunks if c]
+
+
+def _groups(minutes: Iterator[Candle], four: Sequence[Candle]) -> Iterator[list[Candle]]:
+    row = next(minutes, None)
+    for outer in four:
+        while row is not None and row.open_ms < outer.open_ms:
+            row = next(minutes, None)
+        group: list[Candle] = []
+        while row is not None and row.open_ms < outer.open_ms + H4:
+            group.append(row)
+            row = next(minutes, None)
+        yield group
+
+
+def _scan_asset(
+    four: Sequence[Candle], hours: Sequence[Candle], minute_source: Iterator[Candle] | None
+) -> tuple[list[TriggerResult], int]:
+    results: list[TriggerResult] = []
+    blocked = 0
+    for chunk in _chunks(four):
+        source = minute_source if minute_source is not None else iter(())
+        (replay,) = replay_minute_groups_ladder(
+            chunk, _groups(source, chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
+        )
+        blocked += len(replay.blocked_four_hours)
+        chunk_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
+        results.extend(evaluate_triggers(causal_triggers(replay, chunk_hours, chunk), chunk_hours))
+    return results, blocked
+
+
+def _btc_bars() -> tuple[tuple[Candle, ...], tuple[Candle, ...], int]:
+    conn = sqlite3.connect(market.DB_PATH.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        conn.execute("PRAGMA query_only=ON")
+        last_open = conn.execute(
+            "SELECT MAX(open_ms) FROM candles WHERE exchange='binance_usdm' AND symbol='BTCUSDT' "
+            "AND timeframe='4h'"
+        ).fetchone()[0]
+        to_ms = int(last_open) + H4
+        four = tuple(market._candle(r) for r in _rows(conn, "4h", to_ms))
+        hours = tuple(market._candle(r) for r in _rows(conn, "1h", to_ms))
+    finally:
+        conn.close()
+    return four, hours, to_ms
+
+
+def _btc_minutes(to_ms: int) -> Iterator[Candle]:
+    conn = sqlite3.connect(market.DB_PATH.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        conn.execute("PRAGMA query_only=ON")
+        for row in _rows(conn, "1m", to_ms):
+            yield market._candle(row)
+    finally:
+        conn.close()
+
+
+def _pooled_thin(results: Sequence[tuple[str, TriggerResult]]) -> list[tuple[str, TriggerResult]]:
+    """두 자산을 한 시간축에서 겹침 제거 (§9, 보수적)."""
+    kept: list[tuple[str, TriggerResult]] = []
+    last = -(10**18)
+    for asset, r in sorted(results, key=lambda x: (x[1].close_ms, x[0])):
+        if r.close_ms - last >= HORIZON * H4:
+            kept.append((asset, r))
+            last = r.close_ms
+    return kept
+
+
+def power_pooled() -> dict[str, object]:
+    btc_four, btc_hours, to_ms = _btc_bars()
+    eth_four = _aggregate(_eth_minutes(), H4)
+    eth_hours = _aggregate(_eth_minutes(), Timeframe.H1.ms)
+    assets = {
+        "BTCUSDT": (btc_four, btc_hours, _btc_minutes(to_ms)),
+        "ETHUSDT": (tuple(eth_four), tuple(eth_hours), _eth_minutes()),
+    }
+    tagged: list[tuple[str, TriggerResult]] = []
+    fwd_all: list[float] = []
+    per_asset: dict[str, object] = {}
+    for asset, (four, hours, minutes) in assets.items():
+        results, blocked = _scan_asset(four, hours, minutes)
+        close_at = {bar.close_ms: float(bar.close) for bar in four}
+        usable = [r for r in results if r.close_ms + HORIZON * H4 in close_at]
+        fwd = [
+            math.log(close_at[c + HORIZON * H4] / v)
+            for c, v in close_at.items()
+            if c + HORIZON * H4 in close_at
+        ]
+        fwd_all.extend(fwd)
+        events = [r for r in usable if r.is_event]
+        solo_ev = _pooled_thin([(asset, r) for r in events])
+        solo_co = _pooled_thin([(asset, r) for r in usable if not r.is_event])
+        sd = pstdev(fwd)
+        per_asset[asset] = {
+            "four_hour_bars": len(four),
+            "chunks": len(_chunks(four)),
+            "blocked_four_hours": blocked,
+            "triggers": len(results),
+            "events": len(events),
+            "n1": len(solo_ev),
+            "n2": len(solo_co),
+            "sd": round(sd, 5),
+            "mde_alone": round(2.84 * sd * math.sqrt(1 / len(solo_ev) + 1 / len(solo_co)), 5)
+            if solo_ev and solo_co
+            else None,
+        }
+        tagged.extend((asset, r) for r in usable)
+    ev = _pooled_thin([x for x in tagged if x[1].is_event])
+    co = _pooled_thin([x for x in tagged if not x[1].is_event])
+    sd = pstdev(fwd_all)
+    n1, n2 = len(ev), len(co)
+    mde = 2.84 * sd * math.sqrt(1 / n1 + 1 / n2) if n1 and n2 else math.inf
+    return {
+        "per_asset": per_asset,
+        "pooled_n1_events_independent": n1,
+        "pooled_n2_controls_independent": n2,
+        "pooled_events_by_asset": dict(sorted(Counter(a for a, _ in ev).items())),
+        "pooled_sd": round(sd, 5),
+        "pooled_mde": round(mde, 5),
+        "gate_mde_le_2pct": mde <= MDE_GATE,
+        "note": "문서 34 §9. 사건 뒤 수익률은 계산하지 않았다.",
+    }
+
+
 def main(argv: list[str]) -> int:
-    if not argv or argv[0] not in ("synthetic", "power"):
-        raise SystemExit("usage: audit_ew_edge_power.py synthetic|power")
-    result = synthetic() if argv[0] == "synthetic" else power()
+    modes = {"synthetic": synthetic, "power": power, "power-pooled": power_pooled}
+    if not argv or argv[0] not in modes:
+        raise SystemExit("usage: audit_ew_edge_power.py synthetic|power|power-pooled")
+    result = modes[argv[0]]()
     sys.stdout.write(json.dumps(result, ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
