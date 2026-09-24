@@ -12,7 +12,13 @@ from pathlib import Path
 
 from auto_trading.core.errors import ConfigError
 
-__all__ = ["BinanceCredentials", "load_binance_credentials", "read_env_file"]
+__all__ = [
+    "BinanceCredentials",
+    "TelegramCredentials",
+    "load_binance_credentials",
+    "load_telegram_credentials",
+    "read_env_file",
+]
 
 
 def read_env_file(path: Path | str = ".env") -> dict[str, str]:
@@ -54,3 +60,26 @@ def load_binance_credentials(
     if not key or not secret:
         raise ConfigError("BINANCE_API_KEY / BINANCE_API_SECRET 가 .env 또는 환경변수에 없다")
     return BinanceCredentials(key, secret)
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramCredentials:
+    bot_token: str
+    chat_id: str
+
+    def __repr__(self) -> str:
+        return f"TelegramCredentials(bot_token=***, chat_id={self.chat_id[:3]}…)"
+
+    __str__ = __repr__
+
+
+def load_telegram_credentials(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> TelegramCredentials | None:
+    """텔레그램은 선택 사항이다. 토큰·채팅 ID 중 하나라도 비면 ``None`` (알림은 로컬 기록만)."""
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    token = merged.get("TELEGRAM_BOT_TOKEN", "")
+    chat = merged.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat:
+        return None
+    return TelegramCredentials(token, chat)
