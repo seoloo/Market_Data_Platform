@@ -10,14 +10,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
+from itertools import pairwise
 
+from auto_trading.core.enums import Timeframe
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
-from auto_trading.research.elliott.grammar import anchor_failures, impulse_rules
+from auto_trading.research.elliott.grammar import impulse_rules
 from auto_trading.research.elliott.h4_evidence import FourHourPivotEvidence
+from auto_trading.research.elliott.minute_path import MinutePathReplay
 
-__all__ = ["Label", "Parse", "WaveParser"]
+__all__ = ["Label", "Parse", "WaveParser", "four_hour_path_pivots"]
 
 
 class Label(StrEnum):
@@ -58,8 +61,13 @@ class WaveParser:
         *,
         lenient_three: bool = True,
     ) -> None:
-        if pivots and anchor_failures(list(pivots), 1 if pivots[0].kind is SwingKind.LOW else -1):
-            raise DataIntegrityError("꼭짓점 열이 교대·시간 순서를 어긴다")
+        for a, b in pairwise(pivots):
+            if (
+                a.kind is b.kind
+                or b.extreme_four_hour_open_ms <= a.extreme_four_hour_open_ms
+                or b.confirmed_four_hour_close_ms < a.confirmed_four_hour_close_ms
+            ):
+                raise DataIntegrityError("꼭짓점 열이 교대·시간 순서를 어긴다")
         self._p = tuple(pivots)
         self._bars = tuple(bars)
         self._lenient = lenient_three
@@ -191,3 +199,45 @@ class WaveParser:
                     continue
                 found.append(Parse(Label.ZIGZAG, (i, b1, b2, j), (la, lb, lc)))
         return tuple(found)
+
+
+def four_hour_path_pivots(
+    replay: MinutePathReplay, bars: Sequence[Candle]
+) -> tuple[tuple[FourHourPivotEvidence, ...], ...]:
+    """EW-3b (33 §24 변경 1): 1m 경로 사건을 4h 해상도 꼭짓점 열로 옮긴다.
+
+    가격이 극값 4h 봉의 high/low 와 다르거나 연속 두 사건의 극값이 같은 4h 봉이면(4h 미만 파동)
+    그 자리에서 구간을 끊는다. 1m 경로 구간 경계(차단 4h·모호한 분)도 그대로 경계다.
+    """
+    by_open = {bar.open_ms: bar for bar in bars}
+    out: list[tuple[FourHourPivotEvidence, ...]] = []
+    for segment in replay.segments:
+        current: list[FourHourPivotEvidence] = []
+        for event in segment:
+            bar_open = Timeframe.H4.open_ms_of(event.extreme_minute_ms)
+            bar = by_open.get(bar_open)
+            extreme = (
+                None if bar is None else (bar.high if event.kind is SwingKind.HIGH else bar.low)
+            )
+            if extreme != event.price:
+                if current:
+                    out.append(tuple(current))
+                current = []
+                continue
+            if current and current[-1].extreme_four_hour_open_ms == bar_open:
+                current.pop()
+                if current:
+                    out.append(tuple(current))
+                current = []
+                continue
+            current.append(
+                FourHourPivotEvidence(
+                    kind=event.kind,
+                    price=event.price,
+                    extreme_four_hour_open_ms=bar_open,
+                    confirmed_four_hour_close_ms=event.available_at_ms,
+                )
+            )
+        if current:
+            out.append(tuple(current))
+    return tuple(out)

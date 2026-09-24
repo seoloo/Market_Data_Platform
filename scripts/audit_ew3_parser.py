@@ -20,13 +20,12 @@ if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
-from auto_trading.research.elliott.h4_evidence import (  # noqa: E402
-    EvidenceStatus,
-    FourHourPivotEvidence,
-    map_minute_path_to_four_hour_evidence,
-)
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
-from auto_trading.research.elliott.parser import Parse, WaveParser  # noqa: E402
+from auto_trading.research.elliott.parser import (  # noqa: E402
+    Parse,
+    WaveParser,
+    four_hour_path_pivots,
+)
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
 from auto_trading.research.elliott.synthetic import SyntheticPath, build_path  # noqa: E402
 
@@ -40,13 +39,7 @@ def _one(path: SyntheticPath) -> dict[str, object]:
     as_of = bars[-1].close_ms
     groups = (path.minutes[240 * i : 240 * (i + 1)] for i in range(len(bars)))
     (replay,) = replay_minute_groups_ladder(bars, groups, as_of, (EW0_THRESHOLD_PCT,))
-    evidence = map_minute_path_to_four_hour_evidence(bars, replay, as_of)
-    segments: list[list[FourHourPivotEvidence]] = [[]]
-    for item in evidence:
-        if item.status is EvidenceStatus.UNKNOWN:
-            segments.append([])
-        elif item.candidate is not None:
-            segments[-1].append(item.candidate)
+    segments = [list(s) for s in four_hour_path_pivots(replay, bars)]  # EW-3b (§24 변경 1)
     where = {
         (c.kind, c.extreme_four_hour_open_ms): (s, i)
         for s, seg in enumerate(segments)

@@ -78,3 +78,28 @@ def test_rejects_non_alternating_pivots() -> None:
     bars, pivots = _pivots(LEG1)
     with pytest.raises(DataIntegrityError):
         WaveParser([pivots[0], pivots[2]], bars)
+
+
+def test_path_pivots_break_on_sub_four_hour_legs_and_non_bar_extremes() -> None:
+    from dataclasses import replace
+
+    from auto_trading.research.elliott.minute_path import MinutePathReplay
+    from auto_trading.research.elliott.parser import four_hour_path_pivots
+    from tests.research.test_elliott_degrees import _replay, path_from
+
+    bars, _, child = ladder_fixture(LEG1)
+    events = path_from(child)
+    clean = four_hour_path_pivots(_replay(events), bars)
+    assert [len(s) for s in clean] == [6]
+    # 같은 4h 봉에 연속 두 꼭짓점 → 두 사건 모두 빼고 끊는다
+    same_bar = replace(
+        events[2], extreme_minute_ms=events[1].extreme_minute_ms + 60_000, price=bars[2].low
+    )
+    broken = four_hour_path_pivots(_replay([*events[:2], same_bar, *events[3:]]), bars)
+    assert [len(s) for s in broken] == [1, 3]
+    # 봉의 high/low 가 아닌 국소 극값 → 끊는다
+    off = replace(events[3], price=events[3].price - 1)
+    assert [
+        len(s) for s in four_hour_path_pivots(_replay([*events[:3], off, *events[4:]]), bars)
+    ] == [3, 2]
+    assert isinstance(_replay(events), MinutePathReplay)
