@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m→4h 증거 매핑 규칙 고정, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 후보 증거의 시장자료 적용률 감사, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 4h 증거 매핑)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 4h 후보 coverage)
+
+- §8의 사전 고정 규칙을 바꾸지 않고 [읽기 전용 감사](scripts/audit_ew0_h4_evidence.py)를 2020~2021 Binance USD-M BTCUSDT 대용 4h/1m에 적용. 시장 봉 이외 WA 거래·성과 자료는 열지 않았고 DB·보고서 파일은 쓰지 않았다. 기존 1m 감사의 `load_market_replay`를 재사용, 가짜 DB 해시 불변·부재 시 미생성 테스트 추가.
+- 4h 4,386개: `CANDIDATE` **681(15.5%)**(high 358·low 323), `NO_EVENT` **2,476(56.5%)**, `UNKNOWN` **1,229(28.0%)**. UNKNOWN 첫 사유: 복수 553·동일 4h 480·모호 1m 124·국소 극값 44·단절 20·품질 차단 8. 2020/2021 연도별·확정 지연은 [33 §9](docs/research/33-elliott-phase0-data-and-profile.md)에 기록.
+- **681은 Elliott 파동 수나 독립 WA 표본 수가 아니다.** 후보 연속 구간·파동 문법·WA 방향/PnL·BitMEX 원시장 확인 미실시. 수치에 맞춰 임계/매핑 규칙 조정 없음. `NOT_READY_FOR_WA_TEST`, 운영 Phase 6 유지.
+- 검증: 전체 pytest **1,790건**·leakage **62건**·strict mypy (`src tests` 255개 소스 및 감사 스크립트 포함 별도 132개 소스)·ruff check/format **313파일**·import-linter **5계약** 통과. 가짜 DB 무변경·부재 시 미생성, 동일 시장 감사 재현 확인.
+- 다음: 최소 마감 4h 봉에서 impulse·zigzag·ending diagonal의 hard rule과 `UNKNOWN`/복수 시나리오를 보존하는 **순수 문법 validator 설계·합성 테스트**. 시장 후보를 바로 파동 라벨로 부르지 않음.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 4h 증거 매핑)
 
 - 결과·WA 거래를 보지 않고 [33 §8](docs/research/33-elliott-phase0-data-and-profile.md)에 1m 경로 사건→마감 4h 피벗 *후보 증거*의 보수적 규칙 고정. Elliott 파동/진입 신호는 생성하지 않는다.
 - `h4_evidence.py`: 4h당 확인 사건 정확히 1개, 극값은 이전 완성 4h의 실제 high/low, 극값~확정 경로 연속, 후보 극값 시각 증가·종류 교대일 때만 `CANDIDATE`. 정상 무사건은 `NO_EVENT`; 복수 사건·동일 4h·국소 극값·모호/차단·비단조는 사유별 `UNKNOWN`, 데이터 오류는 거부. 과거 후보 소급 변경 금지.

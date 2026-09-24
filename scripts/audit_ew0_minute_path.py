@@ -21,7 +21,10 @@ if str(REPO_ROOT / "src") not in sys.path:
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.core.types import Candle  # noqa: E402
-from auto_trading.research.elliott.minute_path import replay_minute_groups  # noqa: E402
+from auto_trading.research.elliott.minute_path import (  # noqa: E402
+    MinutePathReplay,
+    replay_minute_groups,
+)
 
 FROM_MS = 1_577_836_800_000
 TO_MS = 1_640_995_200_000
@@ -60,10 +63,11 @@ def _minute_groups(
         yield group
 
 
-def main() -> int:
-    if not DB_PATH.is_file():
-        raise FileNotFoundError(DB_PATH)
-    connection = sqlite3.connect(DB_PATH.resolve().as_uri() + "?mode=ro", uri=True)
+def load_market_replay(db_path: Path) -> tuple[tuple[Candle, ...], MinutePathReplay]:
+    """시장 봉만 읽어 시간순 경로를 재생한다. DB·보고서 파일은 쓰지 않는다."""
+    if not db_path.is_file():
+        raise FileNotFoundError(db_path)
+    connection = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
     try:
         connection.execute("PRAGMA query_only=ON")
         four_hour = tuple(
@@ -77,6 +81,11 @@ def main() -> int:
         )
     finally:
         connection.close()
+    return four_hour, replay
+
+
+def main() -> int:
+    four_hour, replay = load_market_replay(DB_PATH)
 
     events = [event for segment in replay.segments for event in segment]
     blocked = Counter(item.reason.value for item in replay.blocked_four_hours)
