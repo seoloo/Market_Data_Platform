@@ -1,10 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 시장자료 경로 감사·최소 4h 경계 명시, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m→4h 증거 매핑 규칙 고정, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 스트리밍 시장 감사)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 4h 증거 매핑)
+
+- 결과·WA 거래를 보지 않고 [33 §8](docs/research/33-elliott-phase0-data-and-profile.md)에 1m 경로 사건→마감 4h 피벗 *후보 증거*의 보수적 규칙 고정. Elliott 파동/진입 신호는 생성하지 않는다.
+- `h4_evidence.py`: 4h당 확인 사건 정확히 1개, 극값은 이전 완성 4h의 실제 high/low, 극값~확정 경로 연속, 후보 극값 시각 증가·종류 교대일 때만 `CANDIDATE`. 정상 무사건은 `NO_EVENT`; 복수 사건·동일 4h·국소 극값·모호/차단·비단조는 사유별 `UNKNOWN`, 데이터 오류는 거부. 과거 후보 소급 변경 금지.
+- 합성 테스트: 4h 마감 전 미노출·이전 봉 극값·복수 사건·동일 봉·국소 극값·단절·비단조 충돌·미래 prefix 불변. **이 규칙의 시장자료 적용 비율과 WA 효과는 아직 보지 않았다.** 기존 운영·DB·Paper·스케줄 불변, `NOT_READY_FOR_WA_TEST` 유지.
+- 검증: 전체 pytest **1,788건**·leakage **62건**·strict mypy **254개 소스**·ruff check/format **311파일**·import-linter **5계약** 통과. `git diff --check` 통과.
+- 다음: WA 결과를 가린 채 2020~2021 Binance 대용 시장자료에서 4h 후보/무사건/UNKNOWN 사유별 coverage를 읽기 전용 측정. 이후 Elliott 문법 validator 설계. BitMEX 자료 결측 전 WA 결합 금지.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 스트리밍 시장 감사)
 
 - 사용자 결정 반영: **Elliott 파동 분석·판정의 최소 시간대는 마감 4h**. 1m은 4h 내부 사건 순서/품질 확인에만 사용하고 1m 파동·진입 신호로 쓰지 않는다. [CURRENT_SPEC](docs/current/CURRENT_SPEC.md), [Elliott 설계](docs/research/ELLIOTT_WAVE_ANALYSIS.md), [33 감사](docs/research/33-elliott-phase0-data-and-profile.md)에 명시. 실거래 연결은 별도 승인 전 금지.
 - `GuardedExtremaState`로 기존 2% 재생기를 한 봉씩 먹이는 동일 상태 기계로 분리하고, `replay_minute_groups`가 4h당 240개 1m만 메모리에 두고 경계 간 후보 상태를 유지한다. 배치·스트리밍 결과 일치, 품질 차단·1m 모호함 경계 테스트 추가.

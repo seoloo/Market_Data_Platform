@@ -1,6 +1,6 @@
 # Elliott Wave 분석 체계와 독립 연구 설계
 
-작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 / 1m 경로 시장자료 감사, 4h 파동 매핑 미구현**.
+작성: 2026-09-24 · 트랙: `EW-WA-CONTEXT` · 상태: **Phase 0 설계 / 1m 경로→4h 후보 증거 규칙 합성 검증, 파동 판정 미구현**.
 최초 기반 점검 기준 커밋: `c01bee7`. 본 문서는 거래 전략이나 수익성 판정이 아니다.
 
 ## 1. 목적과 변경하지 않는 경계
@@ -446,15 +446,17 @@ Flat·Triangle은 혼동 대안/미지원 상태로 남기고, 학파 예외·co
 |---|---|---|
 | A. Phase 0 후속 | source conflict 표 승인, 규칙 프로파일·피벗 척도·시간대·UNKNOWN 정책·분석 가족·검정력 설계 확정 | 실제 거래와 라벨 결합 전 |
 | B. Phase 1 | 원자료 provenance, 시장 구간·TF 재집계·warmup·사건 재구성 감사 | DB read-only, 별도 연구 산출물. 운영 테이블 migration 없음 |
-| C. Phase 2에 준하는 순수 연구 코어 | 4h OHLC 가드 피벗·확정 피벗 RSI adapter·1m 전역 고저/경로 감사 구현. 2020~2021 1m 시장자료 경로 가용성만 측정. 4h 매핑 규칙 → 문법 validator → bounded candidate search → snapshot 기록은 대기 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
+| C. Phase 2에 준하는 순수 연구 코어 | 4h OHLC 가드 피벗·확정 피벗 RSI adapter·1m 전역 고저/경로 감사 구현. 2020~2021 1m 시장자료 경로 가용성 측정, 보수적 1m→4h 후보 증거 매핑의 합성 테스트 완료. 4h 매핑 실측 감사 → 문법 validator → bounded candidate search → snapshot 기록은 대기 | 기존 decide/risk/execution import 경로에 연결하지 않음 |
 | D. 인식 검증 | 합성 기대값·불변성·블라인드 차트 검토, coverage/지연/UNKNOWN 보고 | PnL이나 WA 진입점 표시 없이 검토, 분석가 불일치도 보존 |
 | E. 별도 결합 승인 뒤 | WA event join·대조군·집중도 분석·사후 결과 기술 통계 | 이번 단계 밖. 거래 백테스트나 전체 Phase 4 통과로 부르지 않음 |
 
 현재 순수 구성요소는 [pivots.py](../../src/auto_trading/research/elliott/pivots.py),
 [divergence.py](../../src/auto_trading/research/elliott/divergence.py),
 [intrabar.py](../../src/auto_trading/research/elliott/intrabar.py),
-[minute_path.py](../../src/auto_trading/research/elliott/minute_path.py)다.
-경로 자료 감사 수치·한계는 [33 §7](33-elliott-phase0-data-and-profile.md)에 기록했다.
+[minute_path.py](../../src/auto_trading/research/elliott/minute_path.py),
+[h4_evidence.py](../../src/auto_trading/research/elliott/h4_evidence.py)다.
+경로 자료 감사 수치·한계와 결과를 보기 전 고정한 4h 투영 규칙은
+[33 §7~8](33-elliott-phase0-data-and-profile.md)에 기록했다.
 다음 예상 모듈 경계(경로·API는 후속 구현 때 확정): pure `research/elliott/{types,rules,candidates}.py`,
 I/O는 `scripts/research_elliott_*.py`, 산출물 `reports/elliott/<run_id>/`에 분리.
 분류기는 시장자료만 읽고, 거래 join runner는 고정된 snapshot을 받아 읽는다. 양방향 피드백 없음.
