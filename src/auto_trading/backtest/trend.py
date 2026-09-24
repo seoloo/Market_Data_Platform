@@ -18,9 +18,18 @@ import bisect
 import math
 import statistics
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-__all__ = ["DailyBar", "TrendConfig", "TrendResult", "simulate_trend", "target_weight"]
+__all__ = [
+    "REALISTIC_PERP_COST",
+    "REALISTIC_SPOT_COST",
+    "DailyBar",
+    "TrendConfig",
+    "TrendResult",
+    "realistic_costs",
+    "simulate_trend",
+    "target_weight",
+]
 
 _DAY_MS = 86_400_000
 
@@ -41,6 +50,18 @@ class TrendConfig:
     maintenance_margin: float = 0.004
     long_only: bool = False
     """True면 보고용 변형: 숏 신호를 현금(0)으로 바꾼다."""
+
+
+REALISTIC_SPOT_COST = 0.0011
+"""**참고 줄 전용** 현물 비용: 수수료 0.10% + 불리폭 1bp (docs/research/42 §8).
+판정 기준은 ``TrendConfig.spot_cost``(0.15%) 그대로다 — 2026-09-25 사용자 결정."""
+REALISTIC_PERP_COST = 0.00023
+"""**참고 줄 전용** 무기한 비용: 지정가 L240 실측 평균 (docs/research/42 §7·§8)."""
+
+
+def realistic_costs(cfg: TrendConfig) -> TrendConfig:
+    """``cfg``의 비용만 참고 줄 값으로 바꾼 사본. 판정·Paper 에는 쓰지 않는다."""
+    return replace(cfg, spot_cost=REALISTIC_SPOT_COST, perp_cost=REALISTIC_PERP_COST)
 
 
 @dataclass(frozen=True, slots=True)

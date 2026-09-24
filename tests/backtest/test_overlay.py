@@ -319,3 +319,13 @@ class TestVolSpike:
         assert rally[-1] > rally[-11] and crash[-1] < crash[-11]
         assert vol_spikes({"R": rally, "C": crash}, both) == frozenset({"R", "C"})
         assert vol_spikes({"R": rally, "C": crash}, down) == frozenset({"C"})
+
+
+def test_realistic_costs_is_reference_only() -> None:
+    from auto_trading.backtest.trend import realistic_costs
+
+    base = TrendConfig(long_only=True)
+    ref = realistic_costs(base)
+    assert (base.spot_cost, base.perp_cost) == (0.0015, 0.00095)  # 판정 기준 그대로 (42 §8)
+    assert (ref.spot_cost, ref.perp_cost) == (0.0011, 0.00023)
+    assert replace(ref, spot_cost=base.spot_cost, perp_cost=base.perp_cost) == base
