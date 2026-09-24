@@ -16,10 +16,12 @@ from auto_trading.core.errors import DataIntegrityError
 from auto_trading.core.types import Candle
 from auto_trading.features.structure import SwingKind
 from auto_trading.research.elliott.degrees import (
+    ChildLevel,
     ChildPath,
     check_aligned,
     leg_proof,
     read_leg,
+    read_leg_descending,
     read_leg_on_path,
 )
 from auto_trading.research.elliott.grammar import (
@@ -81,6 +83,7 @@ def generate_bounded_candidates(
     child_evidence: Sequence[FourHourEvidence] | None = None,
     child_degree_id: str | None = None,
     child_path: ChildPath | None = None,
+    child_levels: Sequence[ChildLevel] | None = None,
 ) -> CandidateSnapshot:
     """최신 연속 구간의 마지막 N개 후보만 쓰며, 패턴당 가설은 하나다.
 
@@ -91,7 +94,9 @@ def generate_bounded_candidates(
     """
     if child_path is not None and child_evidence is None:
         raise DataIntegrityError("EW-1 읽기에는 하위 degree 4h 증거도 필요하다")
-    if (child_evidence is None) != (child_degree_id is None):
+    if child_levels is not None and (child_evidence is not None or child_degree_id is None):
+        raise DataIntegrityError("EW-2 하강 읽기는 단계 목록과 라벨(child_degree_id)만 받는다")
+    if child_levels is None and (child_evidence is None) != (child_degree_id is None):
         raise DataIntegrityError("하위 degree 증거와 ID 는 함께 줘야 한다")
     closed = closed_ew0_candles(four_hour_candles, as_of_ms)
     if not closed or closed[-1].close_ms != as_of_ms:
@@ -131,6 +136,18 @@ def generate_bounded_candidates(
     if child_evidence is not None:
         child_prefix = tuple(item for item in child_evidence if item.close_ms <= as_of_ms)
         check_aligned(closed, child_prefix)
+    levels: tuple[ChildLevel, ...] = ()
+    if child_levels is not None:
+        levels = tuple(
+            ChildLevel(
+                level.degree_id,
+                tuple(item for item in level.evidence if item.close_ms <= as_of_ms),
+                level.path,
+            )
+            for level in child_levels
+        )
+        for level in levels:
+            check_aligned(closed, level.evidence)
 
     scenarios: list[GrammarScenario] = []
     for pattern, required in (
@@ -145,7 +162,15 @@ def generate_bounded_candidates(
             raise DataIntegrityError("CANDIDATE의 피벗 증거가 없다")
         direction = 1 if first.kind is SwingKind.LOW else -1
         proofs: tuple[LegSubdivisionProof, ...] = ()
-        if child_prefix is not None and child_degree_id is not None:
+        if levels and child_degree_id is not None:
+            legs = [item.candidate for item in window if item.candidate is not None]
+            pairs = list(pairwise(legs))
+            readings = [read_leg_descending(closed, levels, a, b, as_of_ms) for a, b in pairs]
+            proofs = tuple(
+                leg_proof(r, a, b, f"{r.child_degree_id}/{child_degree_id}")
+                for r, (a, b) in zip(readings, pairs, strict=True)
+            )
+        elif child_prefix is not None and child_degree_id is not None:
             legs = [item.candidate for item in window if item.candidate is not None]
             if child_path is None:
                 proofs = tuple(

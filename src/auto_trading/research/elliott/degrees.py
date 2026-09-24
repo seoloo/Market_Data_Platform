@@ -36,6 +36,8 @@ from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT
 
 __all__ = [
     "DEGREE_LADDER",
+    "HALF_OCTAVE_GRID",
+    "ChildLevel",
     "ChildPath",
     "ChildReadingReason",
     "DegreeSpec",
@@ -44,6 +46,7 @@ __all__ = [
     "index_child_path",
     "leg_proof",
     "read_leg",
+    "read_leg_descending",
     "read_leg_on_path",
 ]
 
@@ -62,6 +65,17 @@ DEGREE_LADDER: tuple[DegreeSpec, ...] = (
 )
 """33 §16 에서 결과 열람 전 고정: 2% 부터 배율 2. 조정하려면 새 프로파일."""
 
+HALF_OCTAVE_GRID: tuple[DegreeSpec, ...] = (
+    DegreeSpec("G0", Decimal("0.02")),
+    DegreeSpec("G1", Decimal("0.028284")),
+    DegreeSpec("G2", Decimal("0.04")),
+    DegreeSpec("G3", Decimal("0.056569")),
+    DegreeSpec("G4", Decimal("0.08")),
+    DegreeSpec("G5", Decimal("0.113137")),
+    DegreeSpec("G6", Decimal("0.16")),
+)
+"""33 §20 에서 결과 열람 전 고정: 2% × 2^(j/2). G0/G2/G4/G6 은 D0~D3 과 같은 임계."""
+
 
 class ChildReadingReason(StrEnum):
     START_NOT_ALIGNED = "START_NOT_ALIGNED"
@@ -78,6 +92,10 @@ class ChildReadingReason(StrEnum):
     CHILD_SUB_4H_AT_VERTEX = "CHILD_SUB_4H_AT_VERTEX"
     CHILD_INTERIOR_UNRESOLVED = "CHILD_INTERIOR_UNRESOLVED"
     VERTEX_CONFIRMED_SAME_4H = "VERTEX_CONFIRMED_SAME_4H"
+    # EW-2 (33 §20)
+    DESCENT_BLOCKED = "DESCENT_BLOCKED"
+    INVISIBLE_TO_FLOOR = "INVISIBLE_TO_FLOOR"
+    THREE_THEN_FIVE = "THREE_THEN_FIVE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +106,8 @@ class LegReading:
     reason: ChildReadingReason | None
     available_at_ms: int
     child_anchors: tuple[FourHourPivotEvidence, ...] = ()
+    child_degree_id: str | None = None
+    """EW-2: 읽기에 쓴 격자 단계 (멈춘 단계 포함)."""
 
 
 def check_aligned(bars: Sequence[Candle], evidence: Sequence[FourHourEvidence]) -> None:
@@ -318,4 +338,92 @@ def leg_proof(
         ),
         child_leg_count=reading.child_leg_count,
         reason=None if reading.reason is None else reading.reason.value,
+    )
+
+
+# ---------------------------------------------------------------- EW-2 (33 §20)
+
+
+@dataclass(frozen=True, slots=True)
+class ChildLevel:
+    """하강 읽기의 한 단계. ``path`` 가 있으면 EW-1 읽기, 없으면 EW-0 읽기."""
+
+    degree_id: str
+    evidence: Sequence[FourHourEvidence]
+    path: ChildPath | None = None
+
+
+def _read_level(
+    bars: Sequence[Candle],
+    level: ChildLevel,
+    start: FourHourPivotEvidence,
+    end: FourHourPivotEvidence,
+    as_of_ms: int,
+) -> LegReading:
+    if level.path is None:
+        return read_leg(bars, level.evidence, start, end, as_of_ms)
+    return read_leg_on_path(bars, level.evidence, level.path, start, end, as_of_ms)
+
+
+def _vertex_key(v: FourHourPivotEvidence) -> tuple[SwingKind, int, Decimal]:
+    return (v.kind, v.extreme_four_hour_open_ms, v.price)
+
+
+def read_leg_descending(
+    bars: Sequence[Candle],
+    levels: Sequence[ChildLevel],
+    start: FourHourPivotEvidence,
+    end: FourHourPivotEvidence,
+    as_of_ms: int,
+) -> LegReading:
+    """굵은 단계부터 내려가며 처음 보이는 하위 구조를 읽는다 (33 §20).
+
+    ``levels`` 는 부모 바로 아래 → 가장 촘촘한 단계 순서다. 멈추는 위치는 보이는 다리 수로만
+    정하며, 기대 모양과 맞는지를 보고 단계를 고르지 않는다.
+    """
+    if not levels:
+        raise DataIntegrityError("하강 읽기에는 하위 단계가 하나 이상 필요하다")
+    available = end.confirmed_four_hour_close_ms
+    for index, level in enumerate(levels):
+        reading = _read_level(bars, level, start, end, as_of_ms)
+        available = max(available, reading.available_at_ms)
+        if reading.child_leg_count is None:
+            return LegReading(
+                LegSubdivision.UNKNOWN,
+                None,
+                ChildReadingReason.DESCENT_BLOCKED,
+                available,
+                child_degree_id=level.degree_id,
+            )
+        if reading.child_leg_count == 1:
+            continue
+        if reading.child_leg_count == 3 and index + 1 < len(levels):
+            finer = _read_level(bars, levels[index + 1], start, end, as_of_ms)
+            finer_keys = {_vertex_key(v) for v in finer.child_anchors}
+            if (
+                finer.shape in (LegSubdivision.IMPULSE_FIVE, LegSubdivision.MOTIVE_FIVE)
+                and {_vertex_key(v) for v in reading.child_anchors} <= finer_keys
+            ):
+                return LegReading(
+                    LegSubdivision.UNKNOWN,
+                    3,
+                    ChildReadingReason.THREE_THEN_FIVE,
+                    max(available, finer.available_at_ms),
+                    reading.child_anchors,
+                    level.degree_id,
+                )
+        return LegReading(
+            reading.shape,
+            reading.child_leg_count,
+            reading.reason,
+            available,
+            reading.child_anchors,
+            level.degree_id,
+        )
+    return LegReading(
+        LegSubdivision.UNKNOWN,
+        1,
+        ChildReadingReason.INVISIBLE_TO_FLOOR,
+        available,
+        child_degree_id=levels[-1].degree_id,
     )
