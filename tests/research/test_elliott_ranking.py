@@ -79,3 +79,14 @@ def test_verified_fraction_outranks_guideline_distance_and_ties_are_pessimistic(
     twin = Parse(Label.ZIGZAG, (0, 1, 2, 3), (Label.ATOM, Label.ATOM, Label.OPAQUE))
     assert pessimistic_rank(atoms, [atoms, twin], fine) == 2  # 같은 근거면 뒤로 센다
     assert pessimistic_rank(atoms, [twin], fine) is None
+
+
+def test_relaxed_candidates_accept_truncated_fifth() -> None:
+    # 5파 끝(135)이 3파 끝(140) 아래인 절단형 — 엄격 후보에는 없고 완화 후보에는 있다
+    bars, pivots = _pivots(("100", "120", "110", "140", "125", "135"))
+    parser = WaveParser(pivots, bars)
+    assert parser.top_candidates(0, 5) == ()
+    relaxed = parser.top_candidates(0, 5, relaxed=True)
+    assert any(c.pattern is Label.IMPULSE and c.bounds == (0, 1, 2, 3, 4, 5) for c in relaxed)
+    # zigzag 후보는 C 가 A 끝을 넘어야 한다
+    assert not any(c.pattern is Label.ZIGZAG and c.bounds == (0, 3, 4, 5) for c in relaxed)

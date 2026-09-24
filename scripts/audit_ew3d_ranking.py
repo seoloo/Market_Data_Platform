@@ -63,7 +63,9 @@ def _one(path: SyntheticPath) -> dict[str, object]:
     closed = [h for h in hours if h.close_ms <= cutoff]
     parser = WaveParser([as_grid_anchor(p) for p in fine], closed)
     candidates = [
-        c for c in parser.top_candidates(idx[0], idx[-1]) if counted_at_four_hour(c, fine)
+        c
+        for c in parser.top_candidates(idx[0], idx[-1], relaxed=True)  # §28 변경 1
+        if counted_at_four_hour(c, fine)
     ]
     pattern = Label.IMPULSE if path.pattern == "IMPULSE" else Label.ZIGZAG
     truth = next((c for c in candidates if c.pattern is pattern and c.bounds == idx), None)

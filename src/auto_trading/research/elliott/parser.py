@@ -84,6 +84,7 @@ class WaveParser:
         self._bars = tuple(bars)
         self._lenient = lenient_three
         self._ends = [self._extremal_ends(i) for i in range(len(self._p))]
+        self._relaxed = [self._start_ends(i) for i in range(len(self._p))]
         self.labels = cache(self._labels)
         self.impulses = cache(self._impulses)
         self.zigzags = cache(self._zigzags)
@@ -194,55 +195,71 @@ class WaveParser:
 
     # ------------------------------------------------------------ EW-3d 후보 (33 §28)
 
-    def _leg(self, i: int, j: int, need: Label) -> Label | None:
-        """후보용 다리: 원자이거나 극단 구간이면 받고, 요구 모양 파싱 여부만 라벨로 남긴다."""
+    def _start_ends(self, i: int) -> tuple[int, ...]:
+        """EW-3d′: p_i 를 넘어 되돌아가는 꼭짓점이 나오기 전까지의 j (끝 극단은 요구하지 않음)."""
+        d = self._direction(i)
+        start = d * self._p[i].price
+        ends: list[int] = []
+        for j in range(i + 1, len(self._p)):
+            if d * self._p[j].price <= start:
+                break
+            if (j - i) % 2 == 1:
+                ends.append(j)
+        return tuple(ends)
+
+    def _leg(self, i: int, j: int, need: Label, *, relaxed: bool = False) -> Label | None:
+        """후보용 다리: 원자·(시작) 극단 구간이면 받고, 요구 모양 파싱 여부만 라벨로 남긴다."""
         if j == i + 1:
             return Label.ATOM
-        if not self.extremal(i, j):
+        if not (j in self._relaxed[i] if relaxed else self.extremal(i, j)):
             return None
         return need if need in self.labels(i, j) else Label.OPAQUE
 
-    def top_candidates(self, i: int, j: int) -> tuple[Parse, ...]:
-        """절대 규칙만으로 만든 최상위 후보 전부 (impulse·zigzag). 내부 미검증 다리도 포함."""
-        if not self.extremal(i, j):
+    def top_candidates(self, i: int, j: int, *, relaxed: bool = False) -> tuple[Parse, ...]:
+        """절대 규칙만으로 만든 최상위 후보 전부 (impulse·zigzag). 내부 미검증 다리도 포함.
+
+        ``relaxed`` (33 §28 변경 1): 다리·전체 구간에 시작 극단만 요구해 절단형(5파·C)을 받는다.
+        """
+        ends = self._relaxed if relaxed else self._ends
+        if j not in ends[i]:
             return ()
         d = self._direction(i)
         q = [d * pivot.price for pivot in self._p]
         as_of = self._p[j].confirmed_four_hour_close_ms
         closed = tuple(bar for bar in self._bars if bar.close_ms <= as_of)
         found: list[Parse] = []
-        for b1 in self._ends[i]:
+        for b1 in ends[i]:
             if b1 >= j:
                 break
-            la = self._leg(i, b1, Label.IMPULSE)
+            la = self._leg(i, b1, Label.IMPULSE, relaxed=relaxed)
             if la is None:
                 continue
-            for b2 in self._ends[b1]:
+            for b2 in ends[b1]:
                 if b2 >= j:
                     break
-                lb = self._leg(b1, b2, Label.ZIGZAG)
+                lb = self._leg(b1, b2, Label.ZIGZAG, relaxed=relaxed)
                 if lb is None:
                     continue
-                lc = self._leg(b2, j, Label.IMPULSE)
-                if lc is not None:
+                lc = self._leg(b2, j, Label.IMPULSE, relaxed=relaxed)
+                if lc is not None and q[j] > q[b1] and q[b2] > q[i]:
                     found.append(Parse(Label.ZIGZAG, (i, b1, b2, j), (la, lb, lc)))
                 if q[b2] <= q[i]:
                     continue
-                for b3 in self._ends[b2]:
+                for b3 in ends[b2]:
                     if b3 >= j - 1:
                         break
                     if q[b3] <= q[b1]:
                         continue
-                    l3 = self._leg(b2, b3, Label.IMPULSE)
+                    l3 = self._leg(b2, b3, Label.IMPULSE, relaxed=relaxed)
                     if l3 is None:
                         continue
-                    for b4 in self._ends[b3]:
+                    for b4 in ends[b3]:
                         if b4 >= j:
                             break
                         if q[b4] <= q[b1]:
                             continue
-                        l4 = self._leg(b3, b4, Label.ZIGZAG)
-                        l5 = self._leg(b4, j, Label.IMPULSE)
+                        l4 = self._leg(b3, b4, Label.ZIGZAG, relaxed=relaxed)
+                        l5 = self._leg(b4, j, Label.IMPULSE, relaxed=relaxed)
                         if l4 is None or l5 is None:
                             continue
                         anchors = [self._p[k] for k in (i, b1, b2, b3, b4, j)]
