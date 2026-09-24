@@ -20,7 +20,7 @@ from typing import Any
 from scripts.run_a1_train import git_state
 from scripts.run_o_overlay import FROM_MS, INITIAL, TO_MS, describe, judge, load
 
-from auto_trading.backtest.overlay import T2_ALONE, OverlayConfig, simulate_overlay
+from auto_trading.backtest.overlay import O2_STOP, T2_ALONE, OverlayConfig, simulate_overlay
 
 OUTPUT = Path("reports/o2")
 STOP = 0.20
@@ -30,7 +30,8 @@ MAX_CAGR_GIVEUP = 0.02
 
 
 def o2_config() -> OverlayConfig:
-    return replace(OverlayConfig(), catastrophe_stop=STOP)
+    assert replace(OverlayConfig(), catastrophe_stop=STOP) == O2_STOP
+    return O2_STOP
 
 
 def judge_o2(a: dict[str, Any], b1: dict[str, Any], b2: dict[str, Any]) -> dict[str, Any]:

@@ -13,7 +13,10 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
 - [27 사전등록](docs/research/27-o2-catastrophe-stop-preregistration.md): S1 O/v1 기준(O1~O5) 유지 · S2 보험 비용 ≤ CAGR 2%p. `scripts/run_o2_stop.py`(1회 가드, 테스트 9건).
 - 사용자 승인 뒤 1회 실행 → **PASS**: CAGR 31.7%(O/v1 33.3%, 보험 비용 1.56%p ≤ 2%p), MDD 23.2%, 발동 11회, 정지·청산 0.
   과거에는 낙폭을 줄이지 못하고 비용만 들었다 — 근거는 표본 밖 위험과 보호 주문 규칙. 27 §7, RESEARCH_HISTORY.
-- 다음(사용자 결정): 실거래 설계에 O/v2 를 쓸지, O/v1 Paper 를 O/v2 로 바꿀지(바꾸면 전향 관찰을 새로 시작).
+- 사용자 결정: "O/v1 은 그대로 두고 **O/v2 를 하나 더**" → [28 전향 등록](docs/research/28-o2-paper-forward-registration.md)(첫 실행 전 고정, 기준 25 §3 과 같음).
+  `O2_STOP` 설정 한 곳, `run_paper_o1.py --ledger o2`(인자 없으면 O/v1 — 기존 09:10 스케줄 그대로), 원장 `o2_stop`·`reports/paper/o2/`,
+  O/v2 만 `stop_hits` 기록, 일일 점검에 O/v2 줄(기록 없으면 '등록 전' 정보, 스톱 발동일 경고). 테스트: 스톱 발동 포함 비트 단위 재현·규칙별 재계산·원장 분리·O/v1 형식 불변.
+- **남은 일(사용자)**: 스케줄 `AutoTrading_Paper_O2` 09:12 등록 — 28 §5 명령.
 
 ## 이전 작업 (Claude — Phase 7 WS 사용자 스트림, 커밋 `5d794df`)
 

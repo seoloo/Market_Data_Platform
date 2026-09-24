@@ -1,4 +1,4 @@
-"""O/v1 Paper 일일 실행 (Phase 6 전향 관찰, docs/research/25).
+"""O/v1·O/v2 Paper 일일 실행 (Phase 6 전향 관찰, docs/research/25 · 28).
 
 실제 주문은 없다 — 공개 시세 + 가상 원장.
 
@@ -9,6 +9,10 @@ T/v2 Paper(`run_paper_t2.py`)와 원장이 분리돼 있다. 이 스크립트는
     python scripts/run_paper_o1.py run      # 오늘(00:00 UTC 이후) 1회. 이미 했으면 보고만 한다
     python scripts/run_paper_o1.py status   # 최근 기록·밀린 날·누락 보정일
     python scripts/run_paper_o1.py verify   # 저장된 원장을 첫날부터 다시 계산해 어긋남 확인
+    python scripts/run_paper_o1.py run --ledger o2   # O/v2(비상 스톱 −20%) 별도 원장 (28)
+
+``--ledger`` 를 주지 않으면 O/v1 이다 — 기존 스케줄(09:10)은 그대로 O/v1 을 돌린다.
+O/v1 과 O/v2 는 원장(strategy_id)·보고서 폴더가 다르고 서로의 기록을 읽지 않는다.
 
 윈도우 작업 스케줄러로 매일 09:10(KST, = 00:10 UTC) 실행한다 — T/v2(09:05) 뒤에 같은 DB를 쓴다.
 결과: DB ``paper_overlay_days``, 보고서 ``reports/paper/o1/<날짜>.json``.
@@ -21,11 +25,12 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from auto_trading.backtest.overlay import O2_STOP, OverlayConfig
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
@@ -42,8 +47,20 @@ for _stream in (sys.stdout, sys.stderr):
 
 REPO = Path(__file__).resolve().parent.parent
 DB = REPO / "data" / "trading.db"
-REPORTS = REPO / "reports" / "paper" / "o1"
-STRATEGY = "o1_overlay"
+
+
+@dataclass(frozen=True, slots=True)
+class Ledger:
+    name: str
+    strategy_id: str
+    cfg: OverlayConfig
+    reports: Path
+
+
+LEDGERS = {
+    "o1": Ledger("O/v1", "o1_overlay", OverlayConfig(), REPO / "reports" / "paper" / "o1"),
+    "o2": Ledger("O/v2", "o2_stop", O2_STOP, REPO / "reports" / "paper" / "o2"),
+}
 _DAY = 86_400_000
 
 
@@ -78,13 +95,17 @@ def _date(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=UTC).strftime("%Y-%m-%d")
 
 
-def run() -> int:
+def run(ledger: Ledger) -> int:
     conn = connect(DB)
     apply_migrations(conn)
     market = BinanceOverlayMarket()
     try:
         runner = PaperOverlayRunner(
-            market, OverlayPaperDayRepository(conn), clock=lambda: int(time.time() * 1000)
+            market,
+            OverlayPaperDayRepository(conn),
+            clock=lambda: int(time.time() * 1000),
+            cfg=ledger.cfg,
+            strategy_id=ledger.strategy_id,
         )
         rows = runner.run_once(int(time.time() * 1000))
     except AutoTradingError as exc:
@@ -93,9 +114,9 @@ def run() -> int:
     finally:
         market.close()
         conn.close()
-    REPORTS.mkdir(parents=True, exist_ok=True)
+    ledger.reports.mkdir(parents=True, exist_ok=True)
     for row in rows:
-        path = REPORTS / f"{_date(row.decision_ms)}.json"
+        path = ledger.reports / f"{_date(row.decision_ms)}.json"
         path.write_text(
             json.dumps(asdict(row), ensure_ascii=False, indent=1, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -110,8 +131,8 @@ def run() -> int:
         )
     t = today.tally
     print(
-        f"[{_date(today.decision_ms)}] {today.status} · 가상 자본 {today.equity:,.2f} USDT"
-        f" · 노출 {t['exposure']:.2f}배"
+        f"{ledger.name} [{_date(today.decision_ms)}] {today.status}"
+        f" · 가상 자본 {today.equity:,.2f} USDT · 노출 {t['exposure']:.2f}배"
     )
     print(f"  현물 {today.state['spot_qty']}")
     print(f"  선물 {today.state['fut_qty']} · 지갑 {today.state['wallet']:,.2f}")
@@ -120,6 +141,8 @@ def run() -> int:
         print("  ⚠ 선물 청산 발생")
     if t["halted_day"]:
         print("  ⚠ 계좌 정지(−30%) — 선물 추가 중단")
+    if t.get("stop_hits"):
+        print("  ⚠ 선물 비상 스톱 발동 — 추세 신호대로 다시 든다")
     if t["loss_limit_days"]:
         print("  일 손실 2% — 오늘은 노출 증가 거래 없음")
     print(f"  내일 체결할 T/v2 목표 비중 {today.state['target']}")
@@ -128,13 +151,13 @@ def run() -> int:
     return 0
 
 
-def status(limit: int) -> int:
+def status(ledger: Ledger, limit: int) -> int:
     conn = connect(DB)
     apply_migrations(conn)
-    days = OverlayPaperDayRepository(conn).recent(STRATEGY, limit)
+    days = OverlayPaperDayRepository(conn).recent(ledger.strategy_id, limit)
     conn.close()
     if not days:
-        print("O/v1 Paper 기록이 아직 없다.")
+        print(f"{ledger.name} Paper 기록이 아직 없다.")
         return 0
     latest = days[0].decision_ms
     expected = int(time.time() * 1000)
@@ -156,12 +179,12 @@ def status(limit: int) -> int:
     return 0
 
 
-def verify() -> int:
+def verify(ledger: Ledger) -> int:
     conn = connect(DB)
     apply_migrations(conn)
-    rows = OverlayPaperDayRepository(conn).all(STRATEGY)
+    rows = OverlayPaperDayRepository(conn).all(ledger.strategy_id)
     conn.close()
-    problems = verify_ledger(rows)
+    problems = verify_ledger(rows, cfg=ledger.cfg)
     if problems:
         print(f"원장 불일치 {len(problems)}건:")
         for p in problems[:20]:
@@ -175,12 +198,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("run", "status", "verify"))
     parser.add_argument("--limit", type=int, default=30)
+    parser.add_argument("--ledger", choices=sorted(LEDGERS), default="o1")
     args = parser.parse_args()
+    ledger = LEDGERS[args.ledger]
     if args.command == "run":
-        return run()
+        return run(ledger)
     if args.command == "status":
-        return status(args.limit)
-    return verify()
+        return status(ledger, args.limit)
+    return verify(ledger)
 
 
 if __name__ == "__main__":

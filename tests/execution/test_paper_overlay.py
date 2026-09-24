@@ -16,6 +16,7 @@ from itertools import pairwise
 import pytest
 
 from auto_trading.backtest.overlay import (
+    O2_STOP,
     OverlayBar,
     OverlayConfig,
     OverlayResult,
@@ -125,7 +126,7 @@ def setup(
     return runner, market, conn
 
 
-def research(market: FakeMarket, last_day: int) -> OverlayResult:
+def research(market: FakeMarket, last_day: int, cfg: OverlayConfig | None = None) -> OverlayResult:
     spot = {s: {t: OverlayBar(lo, c) for t, (lo, c) in market.spot[s].items()} for s in SYMBOLS}
     perp = {s: {t: OverlayBar(lo, c) for t, (lo, c) in market.perp[s].items()} for s in SYMBOLS}
     return simulate_overlay(
@@ -135,7 +136,7 @@ def research(market: FakeMarket, last_day: int) -> OverlayResult:
         from_ms=P0,
         to_ms=last_day,
         initial_equity=10_000.0,
-        cfg=OverlayConfig(),
+        cfg=cfg if cfg is not None else OverlayConfig(),
     )
 
 
@@ -325,3 +326,45 @@ class TestVerifyLedger:
         del rows[60]
         problems = verify_ledger(rows)
         assert any("간격" in p for p in problems)
+
+
+class TestO2Ledger:
+    """O/v2(비상 스톱 −20%) 별도 원장 (docs/research/28)."""
+
+    @staticmethod
+    def crash_market() -> FakeMarket:
+        market = FakeMarket(vol=0.012)  # 저변동 상승 — 선물을 들고 있다
+        for k in (40, 80, 120):  # 무기한 저가만 전날 종가의 75% (종가는 그대로)
+            day = P0 + k * D
+            for s in SYMBOLS:
+                prev_close = market.perp[s][day - D][1]
+                market.perp[s][day] = (round(prev_close * 0.75, 6), market.perp[s][day][1])
+        return market
+
+    def test_daily_runs_reproduce_research_with_stop(self) -> None:
+        market = self.crash_market()
+        conn = connect(":memory:")
+        apply_migrations(conn, now_ms=1)
+        repo = OverlayPaperDayRepository(conn)
+        runner = PaperOverlayRunner(
+            market, repo, clock=lambda: 1, cfg=O2_STOP, strategy_id="o2_stop"
+        )
+        last = P0 + (DAYS - 2) * D
+        day = P0
+        while day <= last:
+            runner.run_once(now_after(day))
+            day += D
+        rows = repo.all("o2_stop")
+        expected = research(market, last, O2_STOP)
+        assert expected.stop_hits > 0  # 스톱이 실제로 발동한 경로의 일치여야 의미가 있다
+        assert [r.equity for r in rows] == expected.equity  # 비트 단위
+        assert sum(r.tally["stop_hits"] for r in rows) == expected.stop_hits
+        assert verify_ledger(rows, cfg=O2_STOP) == []
+        assert verify_ledger(rows) != []  # O/v1 규칙으로는 재현되지 않는다
+        assert repo.all("o1_overlay") == []  # 원장 분리
+
+    def test_o1_record_format_is_unchanged(self) -> None:
+        runner, _, conn = setup()
+        runner.run_once(now_after(P0))
+        (row,) = OverlayPaperDayRepository(conn).all("o1_overlay")
+        assert "stop_hits" not in row.tally

@@ -24,6 +24,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from auto_trading.backtest.overlay import O2_STOP
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
@@ -51,6 +52,8 @@ DB = REPO / "data" / "trading.db"
 ENV = REPO / ".env"
 OUT = REPO / "reports" / "watchdog"
 DRILLS = REPO / "reports" / "testnet"
+O2_LEDGER = "o2_stop"
+"""O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
 PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
 """Phase 7 매일 훈련 운영 시작 (docs/research/26). 이전 기록은 개발 중 실행이다."""
 
@@ -79,6 +82,17 @@ def collect(now_ms: int) -> tuple[list[LedgerSummary | None], list[Finding]]:
             summary, found = check_o1(o1_rows, now_ms)
             summaries.append(summary)
             findings.extend(found)
+        try:
+            o2_rows = OverlayPaperDayRepository(conn).all(O2_LEDGER)
+        except sqlite3.Error as exc:
+            findings.append(Finding("CRITICAL", "O/v2", f"원장 조회 실패: {exc}"))
+        else:
+            if o2_rows:
+                summary, found = check_o1(o2_rows, now_ms, ledger="O/v2", cfg=O2_STOP)
+                summaries.append(summary)
+                findings.extend(found)
+            else:  # 스케줄 등록 전 — 경고하지 않는다 (28 §4)
+                findings.append(Finding("INFO", "O/v2", "기록 없음 — 스케줄 등록 전"))
     finally:
         conn.close()
     return summaries, findings

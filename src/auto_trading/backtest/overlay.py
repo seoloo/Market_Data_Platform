@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from auto_trading.backtest.trend import TrendConfig, target_weight
 
 __all__ = [
+    "O2_STOP",
     "T2_ALONE",
     "OverlayBar",
     "OverlayConfig",
@@ -81,6 +82,9 @@ class OverlayConfig:
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
 """대조군 A: 등록된 T/v2 그대로 (현물 규칙에는 일 손실·계좌 정지가 없다)."""
+
+O2_STOP = OverlayConfig(catastrophe_stop=0.20)
+"""O/v2: O/v1 + 선물 추가분 비상 스톱 −20% (docs/research/27, 전향 관찰 28)."""
 
 
 @dataclass(frozen=True, slots=True)

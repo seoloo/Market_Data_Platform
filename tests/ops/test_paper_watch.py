@@ -141,6 +141,48 @@ class TestO1:
         assert any(f.level == "CRITICAL" and "2일 밀림" in f.message for f in findings)
 
 
+class TestO2:
+    """O/v2 원장은 O/v2 규칙으로 재계산해야 한다 (docs/research/28)."""
+
+    def _rows(self) -> list[OverlayPaperDay]:
+        from auto_trading.backtest.overlay import O2_STOP
+        from auto_trading.execution.paper_overlay import PaperOverlayRunner
+        from auto_trading.storage.db import connect
+        from auto_trading.storage.migrations import apply_migrations
+        from tests.execution.test_paper_overlay import TestO2Ledger
+
+        conn = connect(":memory:")
+        apply_migrations(conn, now_ms=1)
+        repo = OverlayPaperDayRepository(conn)
+        runner = PaperOverlayRunner(
+            TestO2Ledger.crash_market(), repo, clock=lambda: 1, cfg=O2_STOP, strategy_id="o2_stop"
+        )
+        for k in range(130):
+            runner.run_once(now_after(P0 + k * D))
+        return repo.all("o2_stop")
+
+    def test_o2_rows_verify_with_o2_rules_only(self) -> None:
+        from auto_trading.backtest.overlay import O2_STOP
+
+        rows = self._rows()
+        now = now_after(P0 + 129 * D)
+        _, with_o2 = check_o1(rows, now, ledger="O/v2", cfg=O2_STOP)
+        assert not any("불일치" in f.message for f in with_o2)
+        _, with_o1 = check_o1(rows, now, ledger="O/v2")
+        assert any(f.level == "CRITICAL" and "불일치" in f.message for f in with_o1)
+
+    def test_stop_day_warns(self) -> None:
+        from auto_trading.backtest.overlay import O2_STOP
+
+        rows = self._rows()
+        hit = next(i for i, r in enumerate(rows) if r.tally.get("stop_hits"))
+        rows = rows[: hit + 1]
+        _, findings = check_o1(
+            rows, now_after(rows[-1].decision_ms + 1 - D), ledger="O/v2", cfg=O2_STOP
+        )
+        assert any(f.level == "WARN" and "비상 스톱" in f.message for f in findings)
+
+
 class TestReport:
     def test_exit_codes_follow_the_worst_level(self) -> None:
         assert exit_code([]) == 0

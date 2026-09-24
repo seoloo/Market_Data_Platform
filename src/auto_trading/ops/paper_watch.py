@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from itertools import pairwise
 from typing import Any, Literal
 
+from auto_trading.backtest.overlay import OverlayConfig
 from auto_trading.execution.paper_overlay import verify_ledger
 from auto_trading.storage.repositories.paper_days import PaperDay
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDay
@@ -141,9 +142,17 @@ def check_t2(
 
 
 def check_o1(
-    rows: Sequence[OverlayPaperDay], now_ms: int, *, ledger: str = "O/v1", recent_days: int = 7
+    rows: Sequence[OverlayPaperDay],
+    now_ms: int,
+    *,
+    ledger: str = "O/v1",
+    recent_days: int = 7,
+    cfg: OverlayConfig | None = None,
 ) -> tuple[LedgerSummary | None, list[Finding]]:
-    """O/v1 Paper 원장. ``rows``는 결정일 오름차순 전체 (원장 재계산에 첫날부터 필요)."""
+    """O/v1·O/v2 Paper 원장. ``rows``는 결정일 오름차순 전체 (원장 재계산에 첫날부터 필요).
+
+    ``cfg`` 는 원장을 다시 계산할 규칙이다 (O/v2 는 ``O2_STOP``).
+    """
     if not rows:
         return None, [Finding("CRITICAL", ledger, "기록이 없다")]
     last = rows[-1]
@@ -160,7 +169,7 @@ def check_o1(
         )
     if last.state.get("halted_day") is not None:
         findings.append(Finding("CRITICAL", ledger, "계좌 정지(봉 안 −30%) 발생 — 25 §3 즉시 중단"))
-    problems = verify_ledger(rows)
+    problems = verify_ledger(rows, cfg=cfg)
     if problems:
         findings.append(
             Finding("CRITICAL", ledger, f"원장 재계산 불일치 {len(problems)}건 — {problems[0]}")
@@ -173,6 +182,8 @@ def check_o1(
         )
     if last.status == "NO_PRIOR_DECISION" and len(rows) > 1:
         findings.append(Finding("WARN", ledger, "오래된 목표 미체결 (누락 뒤 첫 실행)"))
+    if last.tally.get("stop_hits"):
+        findings.append(Finding("WARN", ledger, "선물 비상 스톱 발동 — 추세 신호대로 다시 든다"))
     if last.tally.get("loss_limit_days"):
         findings.append(Finding("INFO", ledger, "일 손실 2% — 오늘 노출 증가 거래 없음"))
     peak = float(last.state["peak"])

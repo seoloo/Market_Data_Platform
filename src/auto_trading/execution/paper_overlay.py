@@ -287,7 +287,10 @@ class PaperOverlayRunner:
             "funding_rates": rates,
             "executed_target": executed_target,
         }
-        tally_json = {name: getattr(tally, name) for name in _TALLY_FIELDS}
+        fields: tuple[str, ...] = _TALLY_FIELDS
+        if self._cfg.catastrophe_stop is not None:  # O/v2 만 — O/v1 기록 형식은 그대로
+            fields = (*fields, "stop_hits")
+        tally_json = {name: getattr(tally, name) for name in fields}
         tally_json["start_equity"] = outcome.start_equity
         tally_json["exposure"] = outcome.exposure
         return OverlayPaperDay(
