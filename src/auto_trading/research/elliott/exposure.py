@@ -13,12 +13,28 @@ from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
 
 from auto_trading.core.enums import Timeframe
-from auto_trading.features.structure import SwingKind
+from auto_trading.core.types import Candle
+from auto_trading.features.indicators import rsi_series
+from auto_trading.features.structure import Swing, SwingKind
+from auto_trading.research.elliott.divergence import (
+    EW0_RSI_PERIOD,
+    DivergenceKind,
+    classify_regular_divergence,
+)
 from auto_trading.research.elliott.scanner import Trigger, TriggerResult
 
-__all__ = ["EW_STALENESS_BARS", "FIB_ZONE", "ExposureIndex", "FibLeg"]
+__all__ = [
+    "EW_STALENESS_BARS",
+    "FIB_ZONE",
+    "DivergenceIndex",
+    "ExposureIndex",
+    "FibLeg",
+    "UpState",
+    "up_state",
+]
 
 EW_STALENESS_BARS = 12
 """Elliott 종료 사건을 '최근' 으로 보는 기간: 12 개 4h 봉(2일). 문서 35 에서 고정."""
@@ -31,6 +47,8 @@ class FibLeg:
     """+1: A(저점)→B(고점) 상승 다리, −1: 하락 다리."""
     a: Decimal
     b: Decimal
+    end_hour_open_ms: int = 0
+    """B(다리 끝) 극값이 든 1h 봉 open — 문서 38 S_hold."""
 
     def retracement(self, price: Decimal) -> Decimal:
         return (self.b - price) / (self.b - self.a)
@@ -69,7 +87,9 @@ class ExposureIndex:
         )
         if start is None or start.price == end.price:
             return None
-        return FibLeg(1 if end.kind is SwingKind.HIGH else -1, start.price, end.price)
+        return FibLeg(
+            1 if end.kind is SwingKind.HIGH else -1, start.price, end.price, end.hour_open_ms
+        )
 
     def in_fib_zone(self, at_ms: int, price: Decimal, direction: int) -> bool:
         """``direction`` 방향 다리의 되돌림 구간에 가격이 있는가 (그 방향으로 재진입하는 자리)."""
@@ -78,3 +98,75 @@ class ExposureIndex:
             return False
         r = leg.retracement(price)
         return FIB_ZONE[0] <= r <= FIB_ZONE[1]
+
+
+class UpState(StrEnum):
+    """문서 38 §3 — 상승 쪽 시장 상태."""
+
+    UP_RUN = "UP_RUN"
+    UP_SHALLOW = "UP_SHALLOW"
+    UP_ZONE = "UP_ZONE"
+    OTHER = "OTHER"
+
+
+def up_state(leg: FibLeg, price: Decimal) -> UpState:
+    if leg.direction == -1:
+        return UpState.UP_RUN
+    r = leg.retracement(price)
+    if r < FIB_ZONE[0]:
+        return UpState.UP_SHALLOW
+    if r <= FIB_ZONE[1]:
+        return UpState.UP_ZONE
+    return UpState.OTHER
+
+
+class DivergenceIndex:
+    """같은 종류의 연속 4h 가시 꼭짓점 두 개로 EW-0 일반 다이버전스를 찾는다 (문서 38 §3).
+
+    RSI(14) 는 4h 종가로 구간(chunk)마다 계산하고, 사건 시각은 두 번째 꼭짓점이 발동한 4h 마감이다.
+    """
+
+    def __init__(
+        self, triggers: Sequence[Trigger], four_hour_chunks: Sequence[Sequence[Candle]]
+    ) -> None:
+        rsi_at: dict[int, Decimal] = {}
+        for chunk in four_hour_chunks:
+            values = rsi_series([bar.close for bar in chunk], EW0_RSI_PERIOD)
+            for bar, value in zip(chunk, values, strict=True):
+                if value is not None:
+                    rsi_at[bar.open_ms] = value
+        events: list[tuple[int, DivergenceKind]] = []
+        for trig in sorted(triggers, key=lambda x: x.close_ms):
+            end = trig.segment[-1]
+            first = next(
+                (
+                    p
+                    for p in reversed(trig.segment[:-1])
+                    if p.four_hour_visible and p.kind is end.kind
+                ),
+                None,
+            )
+            if first is None:
+                continue
+            r1, r2 = rsi_at.get(first.four_hour_open_ms), rsi_at.get(end.four_hour_open_ms)
+            if r1 is None or r2 is None:
+                continue
+            kind = classify_regular_divergence(
+                Swing(first.kind, first.price, first.four_hour_open_ms, first.available_at_ms),
+                Swing(end.kind, end.price, end.four_hour_open_ms, end.available_at_ms),
+                r1,
+                r2,
+            )
+            if kind is not DivergenceKind.NONE:
+                events.append((trig.close_ms, kind))
+        self.events = tuple(events)
+        self._closes = {
+            k: [c for c, kk in events if kk is k]
+            for k in (DivergenceKind.REGULAR_BULLISH, DivergenceKind.REGULAR_BEARISH)
+        }
+
+    def recent(self, at_ms: int, kind: DivergenceKind) -> bool:
+        """``at_ms`` 이전 12 봉 안에 그 종류의 다이버전스가 확정되었는가."""
+        closes = self._closes[kind]
+        k = bisect_left(closes, at_ms) - 1
+        return k >= 0 and at_ms - closes[k] <= EW_STALENESS_BARS * Timeframe.H4.ms

@@ -40,3 +40,43 @@ def test_fib_zone_on_retracement_of_last_leg() -> None:
     assert idx.in_fib_zone(t, Decimal("150"), 1)  # 50% 되돌림
     assert not idx.in_fib_zone(t, Decimal("190"), 1)  # 10% 되돌림
     assert not idx.in_fib_zone(t, Decimal("150"), -1)  # 다리 방향과 다름
+
+
+def test_up_state_categories() -> None:
+    from auto_trading.research.elliott.exposure import FibLeg, UpState, up_state
+
+    up = FibLeg(1, Decimal("100"), Decimal("200"))
+    assert up_state(up, Decimal("190")) is UpState.UP_SHALLOW
+    assert up_state(up, Decimal("150")) is UpState.UP_ZONE
+    assert up_state(up, Decimal("110")) is UpState.OTHER
+    assert up_state(FibLeg(-1, Decimal("200"), Decimal("100")), Decimal("120")) is UpState.UP_RUN
+
+
+def test_bullish_divergence_detected_only_after_second_low_confirms() -> None:
+    from auto_trading.core.types import Candle
+    from auto_trading.research.elliott.divergence import DivergenceKind
+    from auto_trading.research.elliott.exposure import DivergenceIndex
+
+    closes = [100.0] * 15 + [96, 92, 88, 84, 80] + [83, 86, 88, 89, 90]
+    closes += [89.0, 88, 87, 86, 85, 84, 83, 82, 81, 79] + [80.0] * 5
+    bars = [
+        Candle(
+            i * H4,
+            (i + 1) * H4 - 1,
+            Decimal(str(c)),
+            Decimal(str(c)),
+            Decimal(str(c)),
+            Decimal(str(c)),
+            Decimal(1),
+        )
+        for i, c in enumerate(closes)
+    ]
+    low1 = _pivot(SwingKind.LOW, "80", 19)
+    high = _pivot(SwingKind.HIGH, "90", 24)
+    low2 = _pivot(SwingKind.LOW, "79", 34)
+    trig = Trigger(low2.available_at_ms, (low1, high, low2), -1)
+    index = DivergenceIndex([trig], [bars])
+    assert [k for _, k in index.events] == [DivergenceKind.REGULAR_BULLISH]
+    assert not index.recent(low2.available_at_ms, DivergenceKind.REGULAR_BULLISH)
+    assert index.recent(low2.available_at_ms + 1, DivergenceKind.REGULAR_BULLISH)
+    assert not index.recent(low2.available_at_ms + 1, DivergenceKind.REGULAR_BEARISH)
