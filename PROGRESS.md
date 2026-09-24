@@ -1,7 +1,7 @@
 # 작업 현황
 
 최종 갱신: 2026-09-24 · 작성: Claude (사용자 위임: M+F 자율 진행·커밋·푸시).
-현재: **2번 — TA 기각, 다음 방향 사용자 결정 대기** · T/v2 Paper 운영 중(작업 스케줄러) · T/v1·F 전향 관찰.
+현재: **연구 일시 중지 — T/v2 Paper 4주 운영 후 2026-10-24 점검(알림 예약)** · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M 기각.
 
 ## 이번 작업 (Claude — 2번: 새 선물 수익원)
@@ -13,6 +13,8 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
   `scripts/ta_data.py`, `backtest/multi_trend.py`(테스트 8건), `scripts/run_ta.py`(테스트 9건). 적재율 일봉 99.8%·funding 99.6%. 커밋 `ecebeb9`.
 - **TA 결과: REJECT.** 샤프 0.52, 하한 −0.010%/일(A1 실패), MDD 18.9%. 같은 규칙 BTC·ETH 2종목(보고) 샤프 0.77 — 분산이 오히려 해.
   기록: 20 §7, RESEARCH_HISTORY TA 항목.
+- 사용자 결정: 새 연구는 잠시 멈추고 Paper 4주 운영 뒤 점검. 2026-10-24 10:00 KST 알림 예약(Claude 앱 예약 작업).
+  점검 항목: Paper status·누락·DEGRADED, 연구 시뮬레이터와 일치, T/v1·T/v2·F 전향 월간 갱신, Phase 6 게이트 판정.
 
 ## 이전 작업 (Claude — T/v2 실행 인프라 착수)
 
