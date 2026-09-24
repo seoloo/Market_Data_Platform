@@ -4,7 +4,16 @@
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Claude — Phase 7 WS 사용자 스트림)
+## 이번 작업 (Claude — O/v2 비상 스톱 사전등록)
+
+- 사용자 선택: 다음 작업 1번 **비상 손절**, 거리 **−20%** (급락 일수 측정 뒤: 보유 중 −20% 이상 BTC 3일·ETH 12일, 연 약 2회).
+- `OverlayConfig.catastrophe_stop`(기본 None = O/v1 과 비트 단위 동일)·`stop_slippage` 1%, `OverlayResult.stop_hits`.
+  하루 순서: 손익·funding → **비상 스톱**(선물만, 전날 무기한 종가 × 0.8 이하 저가면 그 가격 × 0.99 체결) → 청산 → 정지 → 일 손실 → 체결.
+  O/v1 Paper 는 기본 설정이라 변화 없음(Paper 재현 테스트 통과). 테스트 4건(먼 스톱 = 없음, 발동·재진입, 청산보다 먼저, 미발동).
+- [27 사전등록](docs/research/27-o2-catastrophe-stop-preregistration.md): S1 O/v1 기준(O1~O5) 유지 · S2 보험 비용 ≤ CAGR 2%p. `scripts/run_o2_stop.py`(1회 가드, 테스트 9건).
+- 다음: 사용자 승인 → 1회 실행 → 결과 기록.
+
+## 이전 작업 (Claude — Phase 7 WS 사용자 스트림, 커밋 `5d794df`)
 
 - 공식 문서 재확인: **옛 WS 주소(`/ws/<listenKey>`)는 2026-04-23 폐지**, 사용자 데이터는 `wss://fstream.binance.com/private/ws?listenKey=…&events=…`.
   테스트넷 주소는 문서에 없어 실측: `wss://fstream.binancefuture.com/private/ws`(listenKey 는 `demo-fapi`).

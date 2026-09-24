@@ -12,6 +12,7 @@ T/v2(현물 롱 전용 추세, ``TrendConfig(long_only=True)``)의 종목별 목
 
 1. 현물은 현물 종가, 선물은 무기한 종가로 ``d-1 → d`` 손익.
    롱 선물은 그날 정산된 funding을 낸다(양수일 때).
+   (O/v2만) 선물 비상 스톱: 무기한 저가 ≤ 전날 종가 × (1 − d) 이면 스톱가 × (1 − 불리폭)에 닫는다.
 2. 청산 판정(보수적): 선물 지갑이 무기한 **저가**에서 유지증거금 이하면 선물 지갑 전액 손실.
 3. 계좌 정지: 봉 안 최악 자본(현물·무기한 저가)이 종가 기준 고점의 ``1 − halt_drawdown`` 이하면
    선물을 그날 종가에 전부 닫고 이후 선물 추가를 끈다(현물은 T/v2 그대로).
@@ -71,6 +72,11 @@ class OverlayConfig:
     daily_loss_limit: float = 0.02
     halt_drawdown: float = 0.30
     maintenance_margin: float = 0.005
+    catastrophe_stop: float | None = None
+    """선물 추가분 비상 스톱: 전날 무기한 종가 × (1 − 이 값). ``None``이면 없음(O/v1).
+    O/v2 사전등록(docs/research/27)은 0.20 (2026-09-24 사용자 선택)."""
+    stop_slippage: float = 0.01
+    """비상 스톱 체결 불리폭 — 급락 중 시장가 체결을 보수적으로 1% 로 둔다."""
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -104,6 +110,8 @@ class OverlayResult:
     """체결 뒤 선물 레버리지 상한 때문에 선물을 줄인 날."""
     max_futures_leverage: float = 0.0
     worst_intraday_drawdown: float = 0.0
+    stop_hits: int = 0
+    """비상 스톱이 발동한 (종목, 날) 수."""
 
 
 def split_weights(
@@ -214,8 +222,28 @@ def step_overlay_day(
                 fund_paid += fq[s] * perp_px[s] * rate
     tally.funding -= fund_paid
     wallet -= fund_paid
+    # 1b. 비상 스톱 (O/v2): 무기한 저가가 전날 종가 × (1 − d) 이하면 그 가격 × (1 − 불리폭)에
+    #     선물을 닫는다. 종가 손익을 스톱 체결가 손익으로 바꾼다. 청산보다 먼저 닿는다.
+    stopped_loss = 0.0
+    if cfg.catastrophe_stop is not None:
+        for s in symbols:
+            if fq[s] <= 0:
+                continue
+            trigger = market.perp_prev_close[s] * (1 - cfg.catastrophe_stop)
+            if market.perp[s].low > trigger:
+                continue
+            fill = trigger * (1 - cfg.stop_slippage)
+            adjust = fq[s] * (fill - perp_px[s])
+            cost = fq[s] * fill * tc.perp_cost
+            tally.futures_pnl += adjust
+            tally.costs += cost
+            tally.stop_hits += 1
+            wallet += adjust - cost
+            stopped_loss += fq[s] * (fill - market.perp_prev_close[s]) - cost
+            fills.append({"symbol": s, "reason": "stop", "fut_before": fq[s], "cost": cost})
+            fq[s] = 0.0
     # 2. 청산 (선물 지갑, 무기한 저가)
-    worst_wallet = start_wallet - fund_paid
+    worst_wallet = start_wallet - fund_paid + stopped_loss
     worst_notional = 0.0
     for s in symbols:
         low = market.perp[s].low

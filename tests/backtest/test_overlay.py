@@ -183,3 +183,72 @@ class TestOverlay:
                 initial_equity=10_000.0,
                 cfg=OverlayConfig(),
             )
+
+
+class TestCatastropheStop:
+    """O/v2 비상 스톱 (docs/research/27). 꺼져 있으면 O/v1 과 같다."""
+
+    @staticmethod
+    def crash(n: int, crash_day: int, low: float) -> tuple[list[float], dict[int, OverlayBar]]:
+        closes = wave(n, 0.004, wobble=0.002)
+        closes[crash_day:] = [c * 0.9 for c in closes[crash_day:]]  # 그날 종가 −10%
+        bars = to_bars(closes)
+        day = START - HISTORY * D + crash_day * D
+        bars[day] = OverlayBar(closes[crash_day - 1] * low, closes[crash_day])  # 장중 저가
+        return closes, bars
+
+    def run_bars(self, spot: list[float], perp: dict[int, OverlayBar], cfg: OverlayConfig):
+        n = len(spot)
+        return simulate_overlay(
+            {"AUSDT": to_bars(spot)},
+            {"AUSDT": perp},
+            {},
+            from_ms=START,
+            to_ms=START + (n - HISTORY - 1) * D,
+            initial_equity=10_000.0,
+            cfg=cfg,
+        )
+
+    def test_far_stop_that_never_triggers_is_identical_to_none(self) -> None:
+        n = 400
+        closes = {"AUSDT": wave(n, 0.004), "BUSDT": zigzag(n)}
+        base = run(closes, OverlayConfig())
+        far = run(closes, OverlayConfig(catastrophe_stop=0.99))
+        assert far.stop_hits == 0
+        assert far.equity == base.equity
+
+    def test_crash_below_stop_closes_futures_at_stop_price(self) -> None:
+        n = 400
+        crash_day = HISTORY + 200
+        spot, perp = self.crash(n, crash_day, low=0.70)  # 장중 −30%
+        cfg = OverlayConfig(trend=FREE_T2, catastrophe_stop=0.20)
+        with_stop = self.run_bars(spot, perp, cfg)
+        without = self.run_bars(spot, perp, replace(cfg, catastrophe_stop=None))
+        assert with_stop.stop_hits == 1
+        # 스톱 체결가 = 전날 종가 × 0.8 × 0.99 — 종가(−10%)보다 불리하게 팔았다
+        assert with_stop.futures_pnl < without.futures_pnl
+        idx = with_stop.days.index(START + (crash_day - HISTORY) * D)
+        # 그날은 일 손실 2% 로 재진입이 막히고, 다음 날 추세 신호대로 다시 든다
+        assert with_stop.exposure[idx] < without.exposure[idx]
+        assert with_stop.exposure[idx + 1] == pytest.approx(without.exposure[idx + 1], abs=0.1)
+
+    def test_stop_fires_before_liquidation(self) -> None:
+        n = 400
+        crash_day = HISTORY + 200
+        spot, perp = self.crash(
+            n, crash_day, low=0.55
+        )  # 장중 −45% (선물 약 5배면 청산 거리 약 −20%)
+        cfg = OverlayConfig(
+            trend=FREE_T2, exposure=6.0, max_futures_leverage=50.0, catastrophe_stop=0.20
+        )
+        assert self.run_bars(spot, perp, replace(cfg, catastrophe_stop=None)).liquidations >= 1
+        with_stop = self.run_bars(spot, perp, cfg)
+        assert with_stop.stop_hits == 1
+        assert with_stop.liquidations == 0
+
+    def test_dip_above_stop_does_not_trigger(self) -> None:
+        n = 400
+        crash_day = HISTORY + 200
+        spot, perp = self.crash(n, crash_day, low=0.85)  # 장중 −15% < 20%
+        with_stop = self.run_bars(spot, perp, OverlayConfig(trend=FREE_T2, catastrophe_stop=0.20))
+        assert with_stop.stop_hits == 0
