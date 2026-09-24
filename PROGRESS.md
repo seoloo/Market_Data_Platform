@@ -1,10 +1,19 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 가드 피벗·시장자료 가용성 감사, 커밋·푸시 없음).
+최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 1m 전역 고저 순서 감사, 커밋·푸시 없음).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 가드 피벗)
+## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 1m 순서 감사)
+
+- `src/auto_trading/research/elliott/intrabar.py`: 닫힌 4h 봉의 240개 1m 시각 격자·양수 거래량·OHLC 정확 일치 시에만 **전역 최고·최저 발생 분의 선후** 반환. 같은 분/교차 반복·품질 실패는 UNKNOWN, 4h 마감 전에는 결과 미노출.
+- `scripts/audit_ew0_intrabar.py`: DB `mode=ro`·`query_only=ON` 스트리밍 집계, 파일 출력 없음. 테스트는 가짜 DB 해시 불변·DB 부재 시 미생성까지 검사.
+- 2020~2021 Binance USD-M BTCUSDT 4h 4,386봉: 전역 고점 먼저 2,135·저점 먼저 2,243·겹침 6·거래량 0 포함 2. 4h/1m 격자·OHLC 불일치 0. 이전 가드 검출의 모호한 봉 1,933개 중 **전역 고저 순서만** 1,931개 확인(고점 먼저 942·저점 먼저 989), 나머지 겹침 1·거래량 0 포함 1.
+- 이 순서만으로 2% 반전 경로·피벗이 복원됐다고 간주하지 않음. 임계·가드 검출기·다이버전스·WA 거래·기존 Paper/전략/DB/스케줄 변경 없음. [33 감사](docs/research/33-elliott-phase0-data-and-profile.md), [Elliott 설계](docs/research/ELLIOTT_WAVE_ANALYSIS.md) 갱신.
+- `NOT_READY_FOR_WA_TEST` 유지. 다음: 1m 내부 순서 불명을 보존하는 시간순 경로 상태 기계와 4h 마감 전 미노출 테스트. BitMEX 원시장 봉은 여전히 없음.
+- 검증: 전체 pytest·leakage·strict mypy·ruff check/format·import-linter 통과.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 가드 피벗)
 
 - `src/auto_trading/research/elliott/pivots.py`: 별도 순수 4h·2% 피벗 검출기. 새 극값과 반전이 같은 봉에 담기면 장중 순서를 가정하지 않고 모호한 봉을 절단, 구간별 확정 피벗·모호한 시각을 반환. 기존 운영 `detect_swings` 미변경.
 - `divergence.py`는 가드 검출 결과를 구간별로만 다이버전스 판정하도록 결합. 모호함 양쪽 피벗을 한 쌍으로 만들지 않음.
