@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import os
 import sys
 import time
 from collections.abc import Callable
@@ -461,17 +460,33 @@ class EwDemoRunner:
         self.check()
 
 
+_LOCK_HANDLE: Any = None
+"""프로세스가 사는 동안 잠금 파일을 열어 둔다 — 죽으면 OS 가 잠금을 푼다."""
+
+
 def _lock(root: Path) -> bool:
+    """단일 실행 잠금. 이미 다른 실행기가 잡고 있으면 False.
+
+    ``os.kill(pid, 0)`` 로 살아 있는지 보는 방식은 쓰지 않는다
+    — Windows 에서는 그 프로세스를 **종료**시킨다.
+    """
+    global _LOCK_HANDLE
     root.mkdir(parents=True, exist_ok=True)
-    lock = root / "runner.lock"
-    if lock.exists():
-        try:
-            pid = int(lock.read_text().strip())
-            os.kill(pid, 0)
-            return False  # 살아 있는 실행기가 있다
-        except (OSError, ValueError):
-            pass
-    lock.write_text(str(os.getpid()))
+    handle = (root / "runner.lock").open("a+")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return False
+    _LOCK_HANDLE = handle
     return True
 
 

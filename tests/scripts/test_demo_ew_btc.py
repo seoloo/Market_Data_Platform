@@ -202,3 +202,22 @@ def test_first_scan_only_records_old_triggers(tmp_path: Path) -> None:
     assert not any(c.startswith("limit:") for c in api.calls)  # 지난 셋업으로 주문하지 않는다
     r.on_scan([(1_000, SETUP, 10), (2_000, None, 0), (3_000, SETUP, 10)])
     assert r.state["phase"] == "PENDING"  # 켠 뒤 새로 확정된 발동만 쓴다
+
+
+def test_single_instance_lock_blocks_a_second_holder(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    from scripts import demo_ew_btc
+
+    assert demo_ew_btc._lock(tmp_path) is True
+    # 다른 프로세스는 같은 잠금을 잡지 못한다 (그리고 이 프로세스를 죽이지 않는다)
+    code = (
+        "import sys; sys.path[:0]=['.', 'src']; from pathlib import Path; "
+        "from scripts import demo_ew_btc as d; "
+        f"print(d._lock(Path(r'{tmp_path}')))"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "False"
+    demo_ew_btc._LOCK_HANDLE.close()
+    demo_ew_btc._LOCK_HANDLE = None
