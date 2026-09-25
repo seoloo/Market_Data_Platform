@@ -114,6 +114,7 @@ class OverlayDrill:
             symbols=list(SYMBOLS),
             require_stop=True,
             orphan_policy="flatten",
+            shared_account=True,  # 데모 계좌를 여러 트랙이 나눠 쓴다 (문서 59 §3)
             clock=lambda: int(time.time() * 1000),
         )
         self.x = OverlayFuturesExecutor(

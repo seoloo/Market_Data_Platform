@@ -319,3 +319,57 @@ def test_expected_positions_sum_signed_fills_and_adjustments(
     assert got["BTCUSDT"] == expected
     assert expected_positions([], [("BTCUSDT", Decimal("0.2"))]) == {"BTCUSDT": Decimal("0.2")}
     assert isinstance(rig.ex.account().positions["BTCUSDT"], FuturesPosition)
+
+
+class TestSharedAccount:
+    """데모·테스트넷 계좌를 여러 트랙이 나눠 쓴다 (문서 59 §3).
+
+    다른 트랙 포지션은 건드리지 않는다.
+    """
+
+    def rig(self, *, shared: bool) -> tuple[FakeFuturesExchange, FuturesSupervisor]:
+        filters = {
+            **FILTERS,
+            "ETHUSDT": FuturesFilters(
+                Decimal("0.001"), Decimal("0.001"), Decimal(5), Decimal("0.01")
+            ),
+        }
+        ex = FakeFuturesExchange(
+            wallet=Decimal(1_000_000),
+            prices={"BTCUSDT": Decimal(50_000), "ETHUSDT": Decimal(2_500)},
+            symbol_filters=filters,
+        )
+        conn = connect(":memory:")
+        apply_migrations(conn, now_ms=1)
+        ticks = itertools.count(1)
+        store = FuturesOrderRepository(conn)
+        m = FuturesOrderManager(
+            ex, store, mode="demo", strategy_id="mine", strategy_tag="mn", clock=lambda: next(ticks)
+        )
+        guard = FuturesSupervisor(
+            ex,
+            m,
+            store,
+            RiskEventRepository(conn),
+            mode="demo",
+            symbols=["BTCUSDT"],
+            require_stop=True,
+            orphan_policy="flatten",
+            clock=lambda: 0,
+            shared_account=shared,
+        )
+        # 다른 트랙이 ETHUSDT 를 들고 있다 (우리 기록에 없음, 스톱도 잠깐 없음 — 교체 중일 수 있다)
+        ex.place_market_order("ETHUSDT", "BUY", Decimal("0.2"), "other-1", reduce_only=False)
+        return ex, guard
+
+    def test_shared_account_leaves_other_tracks_alone(self) -> None:
+        ex, guard = self.rig(shared=True)
+        report = guard.recover(T0, lambda s, p: Decimal(2_000))
+        assert report.state == "RUNNING" and report.issues == [] and report.actions == []
+        assert ex.account().positions["ETHUSDT"].quantity == Decimal("0.2")
+
+    def test_default_single_strategy_account_still_flattens_orphans(self) -> None:
+        ex, guard = self.rig(shared=False)
+        report = guard.recover(T0, lambda s, p: Decimal(2_000))
+        assert "ORPHAN_POSITION" in {i.kind for i in report.issues}
+        assert "ETHUSDT" not in ex.account().positions  # 실거래(전략 하나) 규칙은 그대로

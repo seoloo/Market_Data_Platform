@@ -405,3 +405,24 @@ def test_demo_ew_flags_dead_runner_errors_and_slow_protection() -> None:
     messages = " | ".join(f.message for f in findings)
     assert "소식 없음" in messages and "7.0초" in messages and "오류 1건" in messages
     assert {f.level for f in findings} == {"WARN"}
+
+
+def test_demo_o2_line_and_fired_stop_warning() -> None:
+    from auto_trading.ops.paper_watch import check_demo_o2
+
+    now = 1_790_300_000_000
+    report = {
+        "at_ms": now - 3_600_000,
+        "decision_date": "2026-09-24",
+        "report": {
+            "state": "OK",
+            "fired_stops": [],
+            "notes": [],
+            "legs": [{"symbol": "ETHUSDT", "after": "0.236", "stop": "2149.32 교체"}],
+        },
+    }
+    lines, findings = check_demo_o2(report, now)
+    assert "ETH 0.236" in lines[0] and findings == []
+    fired = {**report, "report": {**report["report"], "fired_stops": ["ETHUSDT PS 2149 → 0.236"]}}
+    _, findings = check_demo_o2(fired, now)
+    assert findings[0].level == "WARN" and "비상 스톱" in findings[0].message

@@ -35,6 +35,7 @@ __all__ = [
     "Finding",
     "LedgerSummary",
     "check_demo_ew",
+    "check_demo_o2",
     "check_demo_t2",
     "check_o1",
     "check_t2",
@@ -423,3 +424,29 @@ def check_demo_ew(
     if phase in ("PENDING", "OPEN"):
         line += f" · 진입 {state.get('entry')} 손절 {state.get('stop')} 목표 {state.get('target')}"
     return [line], findings
+
+
+def check_demo_o2(report: Mapping[str, Any] | None, now_ms: int) -> tuple[list[str], list[Finding]]:
+    """데모 O/v2 선물 추가분 (docs/research/59) 최신 보고서 한 줄과 판정. 데모라 WARN 까지만."""
+    ledger = "데모 O/v2"
+    if report is None:
+        return [], [Finding("INFO", ledger, "데모 O/v2 선물 기록이 아직 없다")]
+    findings: list[Finding] = []
+    at = int(report.get("at_ms") or 0)
+    behind = now_ms // _DAY_MS - at // _DAY_MS
+    if behind >= 1:
+        findings.append(Finding("WARN", ledger, f"{behind}일 밀림 — 마지막 {_date(at)}"))
+    if report.get("error"):
+        findings.append(Finding("WARN", ledger, f"실행 실패: {report['error']}"))
+    rep = report.get("report") or {}
+    state = str(rep.get("state", "?"))
+    if rep and state != "OK":
+        findings.append(Finding("WARN", ledger, f"{state}: {rep.get('notes')}"))
+    for fired in rep.get("fired_stops") or []:
+        findings.append(Finding("WARN", ledger, f"비상 스톱 발동: {fired}"))
+    legs = " · ".join(
+        f"{g['symbol'][:3]} {g['after']} (스톱 {g['stop']})" for g in rep.get("legs", [])
+    )
+    return [
+        f"데모 O/v2 선물: {report.get('decision_date')} {state} · {legs or '포지션 없음'}"
+    ], findings

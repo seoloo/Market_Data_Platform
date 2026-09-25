@@ -172,7 +172,15 @@ class FuturesSupervisor:
         clock: Callable[[], int],
         protect_attempts: int = 3,
         protect_window_ms: int = 3_000,
+        shared_account: bool = False,
     ) -> None:
+        """``shared_account``: 계좌를 여러 트랙이 나눠 쓴다(데모·테스트넷, 문서 59 §3).
+
+        기본(False)은 실거래처럼 **계좌 전체**를 본다
+        — 기록에 없는 포지션은 어느 종목이든 원인 불명이다.
+        True 면 ``symbols``·자기 스톱의 종목만 본다. 다른 트랙의 포지션을 원인 불명으로 보고
+        정리(flatten)하지 않게 한다.
+        """
         if orphan_policy not in {"flatten", "hold_with_stop"}:
             raise ValueError(f"orphan_policy: {orphan_policy}")
         self._exchange = exchange
@@ -186,6 +194,7 @@ class FuturesSupervisor:
         self._clock = clock
         self._attempts = protect_attempts
         self._window_ms = protect_window_ms
+        self._shared = shared_account
 
     def recover(self, decision_ms: int, stop_price_for: StopPriceFor) -> RecoveryReport:
         report = RecoveryReport("RUNNING", [], [])
@@ -194,8 +203,8 @@ class FuturesSupervisor:
             report.issues.append(Issue("UNRESOLVED_ORDERS", "*", "critical"))
         try:
             account = self._exchange.account()
-            symbols = set(self._symbols) | set(account.positions)
-            symbols |= {r.symbol for r in self._manager.working_stops()}
+            own = set(self._symbols) | {r.symbol for r in self._manager.working_stops()}
+            symbols = own if self._shared else own | set(account.positions)
             exchange_open = {
                 s: [*self._exchange.open_orders(s), *self._exchange.open_stops(s)]
                 for s in sorted(symbols)
@@ -211,7 +220,7 @@ class FuturesSupervisor:
 
         records = self._store.all()
         found = inspect_futures(
-            positions=account.positions,
+            positions={s: p for s, p in account.positions.items() if s in symbols},
             expected=expected_positions(records, self._store.adjustments()),
             local_stops=self._manager.working_stops(),
             exchange_open=exchange_open,

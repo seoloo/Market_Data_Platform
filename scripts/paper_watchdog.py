@@ -40,6 +40,7 @@ from auto_trading.ops.paper_watch import (
     Finding,
     LedgerSummary,
     check_demo_ew,
+    check_demo_o2,
     check_demo_t2,
     check_o1,
     check_shadow,
@@ -66,6 +67,7 @@ DRILLS = REPO / "reports" / "testnet"
 SHADOW = REPO / "reports" / "shadow" / "t2"
 DEMO_T2 = REPO / "reports" / "demo_t2"
 DEMO_EW = REPO / "reports" / "demo_ew"
+DEMO_O2 = REPO / "reports" / "demo_o2"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
 _EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
@@ -206,6 +208,18 @@ def demo_ew_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return check_demo_ew(state, events, now_ms)
 
 
+def demo_o2_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """데모 O/v2 선물 추가분 (docs/research/59) 최신 보고서."""
+    paths = sorted(DEMO_O2.glob("20*.json"))
+    if not paths:
+        return check_demo_o2(None, now_ms)
+    try:
+        report = json.loads(paths[-1].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [], [Finding("WARN", "데모 O/v2", f"읽을 수 없는 보고서 {paths[-1].name}")]
+    return check_demo_o2(report, now_ms)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -238,7 +252,7 @@ def main() -> int:
     shadow_lines, shadow_findings = shadow_status(now_ms)
     drill_lines += shadow_lines
     findings += shadow_findings
-    for status_fn in (demo_t2_status, demo_ew_status):
+    for status_fn in (demo_t2_status, demo_o2_status, demo_ew_status):
         demo_lines, demo_findings = status_fn(now_ms)
         drill_lines += demo_lines
         findings += demo_findings
