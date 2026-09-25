@@ -17,8 +17,9 @@ from auto_trading.core.enums import Timeframe
 from auto_trading.features.structure import SwingKind
 from auto_trading.research.elliott.grammar import WavePattern
 from auto_trading.research.elliott.h4_evidence import FourHourPivotEvidence
-from auto_trading.research.elliott.parser import FinePivot, Label, Parse
+from auto_trading.research.elliott.parser import LEG_NEEDS, FinePivot, Label, Parse
 from auto_trading.research.elliott.ranking import guideline_distance
+from auto_trading.research.elliott.ranking_v2 import guideline_distance_v2
 from auto_trading.research.elliott.scanner import ScenarioList, Trigger
 from auto_trading.research.elliott.scenario_contract import (
     SCHEMA_VERSION,
@@ -36,7 +37,7 @@ from auto_trading.research.elliott.scenario_contract import (
     _evidence,
 )
 
-__all__ = ["FIB_LEVELS", "RULE_PROFILE", "export_scenario_set"]
+__all__ = ["FIB_LEVELS", "RULE_PROFILE", "export_scenario_set", "flat_classes"]
 
 RULE_PROFILE = "EW-3d'"
 """기본값(재현용). EW-3e 로 만든 묶음은 ``rule_profile="EW-3e"`` 를 넘긴다 (문서 58)."""
@@ -44,8 +45,11 @@ FIB_LEVELS = (Decimal("0.382"), Decimal("0.5"), Decimal("0.618"))
 _LABELS = {
     Label.IMPULSE: ("0", "1", "2", "3", "4", "5"),
     Label.ZIGZAG: ("0", "A", "B", "C"),
+    Label.FLAT: ("0", "A", "B", "C"),
+    Label.TRIANGLE: ("0", "A", "B", "C", "D", "E"),
 }
-_NEED = (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE)
+_EW4 = (Label.FLAT, Label.TRIANGLE)
+_FOURLEAF = "FourLeaf(TradingView) 2026-02-27 · NEoWave — 분류 라벨일 뿐"
 
 
 def _scenario_id(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int) -> str:
@@ -68,6 +72,93 @@ def _fib_levels(key: str, start: FinePivot, end: FinePivot) -> list[EvidenceItem
     ]
 
 
+def flat_classes(b_over_a: float, c_over_b: float) -> tuple[str, str]:
+    """문서 60 §4 플랫 하위 유형 (B 분류, C 분류). 판정·순위에 쓰지 않는 근거 라벨."""
+    if b_over_a < 0.81:
+        b = "B_FAILURE"
+    elif b_over_a <= 1.0:
+        b = "NORMAL"
+    elif b_over_a <= 1.382:
+        b = "IRREGULAR"
+    else:
+        b = "RUNNING"
+    c = "C_FAILURE" if c_over_b < 1.0 else "NORMAL" if c_over_b <= 1.382 else "ELONGATED"
+    return b, c
+
+
+def _ew4_evidence(
+    pattern: Label, bounds: Sequence[FinePivot], direction: int
+) -> list[EvidenceItem]:
+    """플랫·삼각형 근거 (문서 60 §4) — 관찰값과 분류 라벨. 확률·신호가 아니다."""
+    p = [b.price for b in bounds]
+    legs = [abs(p[k + 1] - p[k]) for k in range(len(p) - 1)]
+
+    def ratio(num: int, den: int) -> float:
+        return round(float(legs[num] / legs[den]), 6)
+
+    obs = EvidenceState.OBSERVED
+    items: list[EvidenceItem] = []
+    if pattern is Label.FLAT:
+        ba, ca, cb = ratio(1, 0), ratio(2, 0), ratio(2, 1)
+        b_class, c_class = flat_classes(ba, cb)
+        items += [
+            EvidenceItem(
+                "FIBONACCI", "b_retrace_of_a", obs, ba, source="문서 60 F1·F2: 0.618~1.618"
+            ),
+            EvidenceItem("FIBONACCI", "c_over_a", obs, ca, source="문서 60 F3: 0.382~2.618"),
+            EvidenceItem("FIBONACCI", "c_over_b", obs, cb, source=_FOURLEAF),
+            EvidenceItem(
+                "PATTERN_CLASS",
+                f"flat_b={b_class}",
+                obs,
+                ba,
+                source="B/A 0.81·1.0·1.382 — " + _FOURLEAF,
+            ),
+            EvidenceItem(
+                "PATTERN_CLASS", f"flat_c={c_class}", obs, cb, source="C/B 1.0·1.382 — " + _FOURLEAF
+            ),
+        ]
+        if (b_class, c_class) == ("B_FAILURE", "C_FAILURE"):
+            items.append(
+                EvidenceItem(
+                    "HYPOTHESIS",
+                    "double_failure_full_retrace_to_a_start",
+                    obs,
+                    float(p[0]),
+                    source="이중 미달형 뒤 플랫 시작까지 100% 되돌림 — 미검증 가설 · " + _FOURLEAF,
+                    layer="SUBJECTIVE",
+                )
+            )
+    else:
+        items += [
+            EvidenceItem(
+                "FIBONACCI",
+                f"{b}_over_{a}",
+                obs,
+                ratio(k + 1, k),
+                source="교과서 대표값 0.618 (순위 v2 목표) — 범위 규칙 아님",
+            )
+            for k, (a, b) in enumerate(zip("abcd", "bcde", strict=True))
+        ]
+        items.append(
+            EvidenceItem(
+                "PROJECTION",
+                "triangle_thrust_target",
+                obs,
+                float(p[-1] - direction * legs[0]),
+                source="E 끝에서 A 반대 방향으로 가장 넓은 폭(A) — FourLeaf 2026-02-19 · 교과서",
+            )
+        )
+    for family, key in (
+        ("MOMENTUM", "rsi_divergence_at_last_anchor"),
+        ("VOLUME", "volume_profile_by_wave"),
+        ("MULTI_TIMEFRAME", "parent_degree_consistency"),
+        ("CHANNEL", "triangle_boundary_fit" if pattern is Label.TRIANGLE else "channel_fit"),
+    ):
+        items.append(EvidenceItem(family, key, EvidenceState.NOT_COMPUTED))
+    return items
+
+
 def _one(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int, total: int,
          flags: tuple[str, ...]) -> WaveScenario:  # fmt: skip
     bounds = [pivots[k] for k in parse.bounds]
@@ -76,14 +167,20 @@ def _one(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int, total: int,
     anchors_4h = [
         FourHourPivotEvidence(p.kind, p.price, p.hour_open_ms, p.available_at_ms) for p in bounds
     ]
-    wave = WavePattern.IMPULSE if parse.pattern is Label.IMPULSE else WavePattern.ZIGZAG
-    need = _NEED[: len(parse.leg_labels)]
+    ew4 = parse.pattern in _EW4
+    need = LEG_NEEDS[parse.pattern]
     verified = [lab is want for lab, want in zip(parse.leg_labels, need, strict=True)]
     checks = [HardCheck("TOP_LEVEL_HARD_RULES", CheckStatus.PASS)] + [
         HardCheck(f"LEG_{i}_SUBDIVISION", CheckStatus.PASS if ok else CheckStatus.UNVERIFIED)
         for i, ok in enumerate(verified, 1)
     ]
-    evidence = _evidence(wave, anchors_4h)
+    if ew4:
+        pattern_name = parse.pattern.value
+        evidence = _ew4_evidence(parse.pattern, bounds, direction)
+    else:
+        wave = WavePattern.IMPULSE if parse.pattern is Label.IMPULSE else WavePattern.ZIGZAG
+        pattern_name = wave.value
+        evidence = _evidence(wave, anchors_4h)
     evidence += [
         EvidenceItem(
             "SUBDIVISION",
@@ -101,20 +198,29 @@ def _one(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int, total: int,
             "GUIDELINE_DISTANCE",
             "mean_abs_log_ratio_to_textbook",
             EvidenceState.OBSERVED,
-            round(guideline_distance(parse, pivots), 6),
-            source="교과서 목표비 (엘갤 PDF p7·p12)",
+            round((guideline_distance_v2 if ew4 else guideline_distance)(parse, pivots), 6),
+            source="문서 60 §3.3 순위 v2 목표비" if ew4 else "교과서 목표비 (엘갤 PDF p7·p12)",
         )
     )
     below, basis = ("<=", "LOW") if direction > 0 else (">=", "HIGH")
     above, ext_basis = (">=", "HIGH") if direction > 0 else ("<=", "LOW")
-    levels = [
-        InvalidationLevel(
-            "WAVE2_BEYOND_ORIGIN" if parse.pattern is Label.IMPULSE else "B_BEYOND_A_START",
-            str(bounds[0].price),
-            below,
-            basis,
+    levels: list[InvalidationLevel] = []
+    if parse.pattern is Label.FLAT:
+        # 확장 플랫은 B 가 A 시작을 넘어도 된다 — 대신 C 가 A 의 2.618 배를 넘으면 플랫이 아니다(F3)
+        a_move = bounds[1].price - bounds[0].price
+        c_limit = bounds[2].price + a_move * Decimal("2.618")
+        levels.append(InvalidationLevel("C_BEYOND_2618_OF_A", str(c_limit), above, ext_basis))
+    elif parse.pattern is Label.TRIANGLE:
+        levels.append(InvalidationLevel("E_BEYOND_C_END", str(bounds[3].price), above, ext_basis))
+    else:
+        levels.append(
+            InvalidationLevel(
+                "WAVE2_BEYOND_ORIGIN" if parse.pattern is Label.IMPULSE else "B_BEYOND_A_START",
+                str(bounds[0].price),
+                below,
+                basis,
+            )
         )
-    ]
     if parse.pattern is Label.IMPULSE:
         levels.append(InvalidationLevel("WAVE4_OVERLAPS_WAVE1", str(bounds[1].price), below, basis))
     levels.append(InvalidationLevel("END_REEXTENDED", str(bounds[-1].price), above, ext_basis))
@@ -122,7 +228,7 @@ def _one(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int, total: int,
     status = "VERIFIED" if all(verified) else "PARTIAL" if any(verified) else "UNVERIFIED"
     return WaveScenario(
         scenario_id=_scenario_id(parse, pivots, as_of_ms),
-        pattern=wave.value,
+        pattern=pattern_name,
         direction=direction,
         degree_id="4h-count/1h-subwave",
         parent_id=None,

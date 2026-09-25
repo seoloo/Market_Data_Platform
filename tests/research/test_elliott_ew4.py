@@ -89,3 +89,53 @@ def test_flat_rules_reject_shallow_b_and_triangle_must_contract() -> None:
                 assert FLAT_B_MIN <= b / a <= FLAT_B_MAX
             elif parse.pattern is Label.TRIANGLE:
                 assert q[2] > q[0] and q[3] < q[1] and q[4] > q[2] and q[5] < q[3]
+
+
+def test_flat_classes_follow_doc60_boundaries() -> None:
+    from auto_trading.research.elliott.scenario_export import flat_classes
+
+    assert flat_classes(0.7, 0.9) == ("B_FAILURE", "C_FAILURE")  # 이중 미달형
+    assert flat_classes(0.81, 1.0) == ("NORMAL", "NORMAL")
+    assert flat_classes(1.2, 1.5) == ("IRREGULAR", "ELONGATED")
+    assert flat_classes(1.5, 1.2) == ("RUNNING", "NORMAL")
+
+
+@pytest.mark.parametrize("pattern", ["FLAT", "TRIANGLE"])
+def test_export_carries_flat_and_triangle_evidence(pattern: str) -> None:
+    from auto_trading.research.elliott.scenario_contract import (
+        to_json_dict,
+        validate_scenario_set_dict,
+    )
+    from auto_trading.research.elliott.scenario_export import export_scenario_set
+
+    found = []
+    for seed in range(3):
+        path = build_path(random.Random(seed), pattern, 1.0, 0.08, 0.0)
+        four, hours = path.four_hour, hour_bars(path.minutes)
+        groups = (path.minutes[240 * i : 240 * (i + 1)] for i in range(len(four)))
+        (replay,) = replay_minute_groups_ladder(
+            four, groups, four[-1].close_ms, (EW0_THRESHOLD_PCT,)
+        )
+        trig = causal_triggers(replay, hours, four, all_new_pivots=True)[-1]
+        scen = scenario_list(trig, hours, lookback_bars=EW3E_LOOKBACK_BARS, ew4=True)
+        data = to_json_dict(export_scenario_set(trig, scen, venue="v", instrument="i")[0])
+        assert validate_scenario_set_dict(data) == []
+        found += [s for s in data["scenarios"] if s["pattern"] == pattern]
+    assert found
+    for s in found:
+        keys = {e["key"] for e in s["evidence"]}
+        rules = {lv["rule_id"] for lv in s["invalidation_levels"]}
+        a0, a1, end = (float(s["anchors"][k]["price"]) for k in (0, 1, -1))
+        if pattern == "FLAT":
+            assert s["wave_count"] == ["0", "A", "B", "C"]
+            assert any(k.startswith("flat_b=") for k in keys)
+            assert any(k.startswith("flat_c=") for k in keys)
+            assert "C_BEYOND_2618_OF_A" in rules and "B_BEYOND_A_START" not in rules
+        else:
+            assert s["wave_count"] == ["0", "A", "B", "C", "D", "E"]
+            assert "E_BEYOND_C_END" in rules
+            (thrust,) = (
+                e["observed"] for e in s["evidence"] if e["key"] == "triangle_thrust_target"
+            )
+            # 스러스트는 A 의 반대 방향으로, A 폭만큼
+            assert thrust == pytest.approx(end - (a1 - a0))
