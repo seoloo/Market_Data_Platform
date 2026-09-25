@@ -234,6 +234,7 @@ Do not retry (같은 자료로):
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
 [21 종료 기록](../archive/research/21-closure.md)은 이후 철회된 역사이며 현행 프로젝트 종료 명령이 아니다.
+2026-09-25 사용자 결정: 몇 시간 단위 BTCUSDT 무기한 방향 탐색(48 FB·LQ, 49 MD)을 멈추고 Paper 결과(10/23·10/24)를 기다린다. 비용 전 수익이 모두 +4~7 bps 로 taker 왕복 19 bps 에 못 미쳤다. 선물 연구를 다시 열면 기간·시장을 바꾼 새 구조를 후보 비교부터 한다.
 D22는 미완성/제외된 초안으로 연구 판정(ACCEPTED/REJECTED/INCONCLUSIVE)을 받은 전략이 아니다.
 H1/H2를 전부 “단일 심볼 표본 부족 때문”으로 뭉뚱그리지 않는다. 관측 효과 부족과 검정력 부족을 구별한다.
 2024~2026 일부는 과거 개발·비교에서 노출됐다. 새 연구의 OOS를 보장하려면 노출 기록과 동결 후 전향적 구간이 필요하다.
