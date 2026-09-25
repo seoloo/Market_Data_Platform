@@ -17,17 +17,32 @@ T(15·16)와 같은 크기 규칙을 더 빠른 lookback(10·20·40일)으로 �
    그날 종가에 전부 닫고 이후 거래하지 않는다. 최종 체결가 기준 최악 낙폭은 따로 보고한다.
 5. 전날 종가에 정한 목표 비중을 ``d`` 종가에 체결한다(1일 지연, 밴드 5%p, 방향이 바뀌면 항상 체결).
 6. ``d`` 현물 종가까지로 다음 목표를 정한다.
+
+방향 규칙(``rule``)만 바꿔 같은 틀로 다른 신호를 판정한다:
+``"trend"`` 는 lookback 부호 평균(45 F1b), ``"macd_hist"`` 는 MACD(12,26,9) 히스토그램 부호(47 I3).
+크기는 둘 다 방향 × min(목표 변동성 / 현물 60일 변동성, 상한)이다.
 """
 
 from __future__ import annotations
 
 import bisect
+import math
+import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from auto_trading.backtest.indicator_signals import macd
 from auto_trading.backtest.trend import TrendConfig, target_weight
 
-__all__ = ["F1B", "FastBar", "FastTrendConfig", "FastTrendResult", "simulate_fast_trend"]
+__all__ = [
+    "F1B",
+    "I3",
+    "FastBar",
+    "FastTrendConfig",
+    "FastTrendResult",
+    "fast_target",
+    "simulate_fast_trend",
+]
 
 _DAY_MS = 86_400_000
 
@@ -48,6 +63,8 @@ class FastTrendConfig:
     liquidate_on_mark: bool = True
     maintenance_margin: float = 0.005
     halt_drawdown: float = 0.30
+    rule: str = "trend"
+    """방향 규칙: ``"trend"``(lookbacks 부호 평균) · ``"macd_hist"``(MACD(12,26,9) 히스토그램)."""
 
     def signal(self) -> TrendConfig:
         return TrendConfig(
@@ -60,6 +77,32 @@ class FastTrendConfig:
 
 F1B = FastTrendConfig()
 """F1b: 10·20·40일, 1x, ±20% 비상 스톱 (docs/research/45)."""
+
+I3 = FastTrendConfig(rule="macd_hist")
+"""I3: MACD(12,26,9) 히스토그램 부호, 그 밖은 F1b 와 같다 (docs/research/47)."""
+
+_MACD_WARMUP = 4 * 26 + 9
+"""MACD 가 EMA 시드 영향에서 벗어나는 봉 수 (``features.indicators.ema_warmup_bars`` 의 4배)."""
+
+
+def fast_target(history: Sequence[float], cfg: FastTrendConfig) -> float | None:
+    """마지막 값까지의 현물 종가로 다음 목표 비중. 이력이 부족하면 None."""
+    if cfg.rule == "trend":
+        return target_weight(history, cfg.signal())
+    if cfg.rule != "macd_hist":
+        raise ValueError(f"알 수 없는 방향 규칙: {cfg.rule}")
+    if len(history) < max(_MACD_WARMUP, cfg.vol_days + 1):
+        return None
+    line, sig = macd(history)
+    a, b = line[-1], sig[-1]
+    if a is None or b is None:  # pragma: no cover - 워밍업 뒤에는 항상 값이 있다
+        return None
+    direction = _sign(a - b)
+    steps = [math.log(history[-k] / history[-k - 1]) for k in range(1, cfg.vol_days + 1)]
+    vol = statistics.stdev(steps) * math.sqrt(365)
+    if vol <= 0:
+        return 0.0
+    return direction * min(cfg.target_vol / vol, cfg.max_weight)
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +195,6 @@ def simulate_fast_trend(
     cfg: FastTrendConfig,
 ) -> FastTrendResult:
     symbols = sorted(bars)
-    sig_cfg = cfg.signal()
     result = FastTrendResult()
     qty = dict.fromkeys(symbols, 0.0)
     target: dict[str, float] = {}
@@ -261,7 +303,7 @@ def simulate_fast_trend(
         # 6. 다음 목표
         for s in symbols:
             history[s].append(signal_closes[s][day])
-            target[s] = target_weight(history[s], sig_cfg) or 0.0
+            target[s] = fast_target(history[s], cfg) or 0.0
         peak = max(peak, equity)
         result.days.append(day)
         result.equity.append(equity)

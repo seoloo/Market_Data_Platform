@@ -5,7 +5,11 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from auto_trading.backtest.fast_trend import F1B, FastBar, simulate_fast_trend
+import pytest
+
+from auto_trading.backtest.fast_trend import F1B, I3, FastBar, fast_target, simulate_fast_trend
+from auto_trading.backtest.indicator_signals import macd
+from auto_trading.backtest.trend import TrendConfig, target_weight
 
 D = 86_400_000
 START = 1_583_020_800_000  # 2020-03-01
@@ -102,3 +106,34 @@ def test_worst_intraday_drawdown_stops_counting_after_halt() -> None:
     r = run(up + crash, cfg=cfg)
     assert r.halted_day is not None
     assert 0.3 <= r.worst_intraday_drawdown < 1.0
+
+
+# ---------------------------------------------------------------- I3 (MACD 히스토그램, 47)
+
+
+def test_macd_rule_matches_indicator_direction_times_vol_scale() -> None:
+    closes = path(300, 0.002)
+    w = fast_target(closes, I3)
+    line, sig = macd(closes)
+    direction = (line[-1] > sig[-1]) - (line[-1] < sig[-1])  # type: ignore[operator]
+    # 크기: T 와 같은 공식 — lookback 이 모두 같은 부호일 때의 |T 목표|
+    scale = abs(target_weight(closes, TrendConfig(lookbacks=(1,))) or 0.0)
+    assert w is not None and direction != 0
+    assert w == direction * scale
+
+
+def test_macd_rule_needs_warmup_and_rejects_unknown_rule() -> None:
+    assert fast_target(path(100, 0.002), I3) is None
+    assert fast_target(path(113, 0.002), I3) is not None
+    with pytest.raises(ValueError):
+        fast_target(path(200, 0.002), replace(I3, rule="rsi"))
+
+
+def test_macd_rule_goes_short_in_accelerating_decline() -> None:
+    closes = [1000 - 0.01 * k * k for k in range(300)]
+    r = run(closes, cfg=I3)
+    assert r.days_short > r.days_long
+
+
+def test_f1b_default_rule_is_trend() -> None:
+    assert F1B.rule == "trend"
