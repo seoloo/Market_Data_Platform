@@ -221,3 +221,29 @@ def test_single_instance_lock_blocks_a_second_holder(tmp_path: Path) -> None:
     assert out.stdout.strip() == "False"
     demo_ew_btc._LOCK_HANDLE.close()
     demo_ew_btc._LOCK_HANDLE = None
+
+
+def test_new_pivot_without_setup_explains_why_not(tmp_path: Path) -> None:
+    api = FakeApi()
+    r, notes = runner(tmp_path, api)
+    r.on_scan([(1_000, None, 0)])  # 첫 실행: 기록만
+    info = {"pivot": "고점", "price": "84000", "top": 10, "up": 3, "down": 1}
+    r.on_scan([(1_000, None, 0), (2_000, None, 12, info)])
+    assert "4h 고점 확정 @84,000.0 — 진입 안 함" in notes[-1]
+    assert "상승 3 · 하락 1 (같은 방향 6개 이상 필요)" in notes[-1]
+    assert not any(c.startswith("limit:") for c in api.calls)
+
+
+def test_agreement_counts_top10_impulse_ends() -> None:
+    from auto_trading.research.elliott.demo_setup import agreement
+
+    scen = [
+        {"scenario_id": f"s{i}", "current_state": st, "direction": d}
+        for i, (st, d) in enumerate(
+            [("WAVE_5_END_CANDIDATE", 1)] * 3
+            + [("WAVE_5_END_CANDIDATE", -1)]
+            + [("WAVE_C_END_CANDIDATE", 1)] * 8
+        )
+    ]
+    ranks = {s["scenario_id"]: i for i, s in enumerate(scen)}
+    assert agreement({"scenarios": scen}, ranks) == (10, 3, 1)

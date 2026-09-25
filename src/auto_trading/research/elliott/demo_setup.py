@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-__all__ = ["ENTRY_RETRACE", "TARGET_EXTENSION", "EwSetup", "setup_from_set"]
+__all__ = ["ENTRY_RETRACE", "TARGET_EXTENSION", "EwSetup", "agreement", "setup_from_set"]
 
 ENTRY_RETRACE = Decimal("0.5")
 TARGET_EXTENSION = Decimal("1.618")
@@ -86,3 +86,13 @@ def setup_from_set(
             scenario_ids=tuple(s["scenario_id"] for s in agree),
         )
     return None
+
+
+def agreement(
+    scenario_set: Mapping[str, Any], baseline_rank: Mapping[str, int], *, top_n: int = 10
+) -> tuple[int, int, int]:
+    """(상위 ``top_n`` 수, 상승 충격파 5파 종료 수, 하락 충격파 5파 종료 수) — 알림용."""
+    scenarios: Sequence[Mapping[str, Any]] = scenario_set.get("scenarios") or []
+    ranked = sorted(scenarios, key=lambda s: baseline_rank[s["scenario_id"]])[:top_n]
+    ends = [s["direction"] for s in ranked if s["current_state"] == IMPULSE_END]
+    return len(ranked), ends.count(1), ends.count(-1)

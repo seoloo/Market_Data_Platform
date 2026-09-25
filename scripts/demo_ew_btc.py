@@ -49,7 +49,11 @@ from auto_trading.core.types import Candle  # noqa: E402
 from auto_trading.exchange.binance_usdm_testnet import BinanceUsdmTestnet  # noqa: E402
 from auto_trading.exchange.futures import OrderStatus  # noqa: E402
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
-from auto_trading.research.elliott.demo_setup import EwSetup, setup_from_set  # noqa: E402
+from auto_trading.research.elliott.demo_setup import (  # noqa: E402
+    EwSetup,
+    agreement,
+    setup_from_set,
+)
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
 from auto_trading.research.elliott.scanner import (  # noqa: E402
@@ -120,8 +124,12 @@ def fetch_minutes(client: httpx.Client, now_ms: int) -> list[Candle]:
     ]
 
 
-def scan(minutes: list[Candle]) -> list[tuple[int, EwSetup | None, int]]:
-    """마지막 연속 구간의 모든 발동 → (발동 시각, 셋업, 시나리오 수)."""
+ScanRow = tuple[int, EwSetup | None, int, dict[str, Any]]
+"""(발동 시각, 셋업, 시나리오 수, 알림용 정보 — 꼭짓점 종류·가격·상위 10 합의 수)."""
+
+
+def scan(minutes: list[Candle]) -> list[ScanRow]:
+    """마지막 연속 구간의 모든 발동."""
     four = _aggregate(iter(minutes), H4)
     hours = _aggregate(iter(minutes), Timeframe.H1.ms)
     chunk = _chunks(four)[-1]
@@ -137,11 +145,30 @@ def scan(minutes: list[Candle]) -> list[tuple[int, EwSetup | None, int]]:
             trig, scen, venue="binance_usdm", instrument=SIGNAL_SYMBOL, rule_profile="EW-3e"
         )
         data = to_json_dict(data_set)
-        out.append((trig.close_ms, setup_from_set(data, ranks), len(data["scenarios"])))
+        top, up, down = agreement(data, ranks)
+        end = trig.segment[-1]
+        info = {
+            "pivot": "고점" if end.kind.value == "high" else "저점",
+            "price": str(end.price),
+            "top": top,
+            "up": up,
+            "down": down,
+        }
+        out.append((trig.close_ms, setup_from_set(data, ranks), len(data["scenarios"]), info))
     return out
 
 
 # ---------------------------------------------------------------- 상태·알림
+
+
+def no_setup_message(info: dict[str, Any]) -> str:
+    """새 꼭짓점이 확정됐지만 들어가지 않은 이유 한 줄."""
+    return (
+        f"[데모·선물 Elliott] 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}"
+        " — 진입 안 함\n"
+        f"이유: 상위 {info['top']}개 시나리오 중 '충격파 5파 종료' 합의 "
+        f"상승 {info['up']} · 하락 {info['down']} (같은 방향 6개 이상 필요)"
+    )
 
 
 class Store:
@@ -415,7 +442,8 @@ class EwDemoRunner:
             if now - int(self.state["opened_ms"]) > MAX_HOLD_MS:
                 self.time_exit()
 
-    def on_scan(self, results: list[tuple[int, EwSetup | None, int]]) -> None:
+    def on_scan(self, results: list[Any]) -> None:
+        """``results``: :data:`ScanRow` 목록 (테스트는 앞의 세 칸만 줘도 된다)."""
         last = int(self.state.get("last_trigger_ms", 0))
         if not last:
             # 첫 실행: 지난 발동(최대 90 일 전)은 기록만 한다 — 켠 뒤 확정되는 꼭짓점부터 쓴다
@@ -428,14 +456,19 @@ class EwDemoRunner:
             return
         self.state["last_trigger_ms"] = new[-1][0]
         self._save()
-        for close_ms, setup, n in new:
+        for row in new:
+            close_ms, setup, n = row[0], row[1], row[2]
+            info = row[3] if len(row) > 3 else {}
             self.store.event(
                 "trigger",
                 close_ms=close_ms,
                 scenarios=n,
                 setup=None if setup is None else _setup_row(setup),
+                **info,
             )
-        setups = [s for _, s, _ in new if s is not None]
+            if setup is None and info:
+                self.notify(no_setup_message(info))
+        setups = [row[1] for row in new if row[1] is not None]
         if not setups:
             return
         latest = setups[-1]
@@ -508,8 +541,8 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     client = httpx.Client(timeout=20)
     if args.scan_only:
-        for close_ms, s, n in scan(fetch_minutes(client, int(time.time() * 1000)))[-10:]:
-            print(_date(close_ms), n, None if s is None else _setup_row(s))
+        for close_ms, s, n, info in scan(fetch_minutes(client, int(time.time() * 1000)))[-10:]:
+            print(_date(close_ms), n, info, None if s is None else _setup_row(s))
         return 0
     if not args.once and not _lock(OUT):
         print("실행기가 이미 돌고 있다 — 끝낸다")

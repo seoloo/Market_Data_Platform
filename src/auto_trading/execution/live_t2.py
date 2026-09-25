@@ -50,7 +50,14 @@ from auto_trading.strategy.spot_trend import (
     spot_trend_targets,
 )
 
-__all__ = ["LiveOptions", "LiveSpotVenue", "LiveT2Runner", "OrderReport", "SignalSource"]
+__all__ = [
+    "LiveOptions",
+    "LiveSpotVenue",
+    "LiveT2Runner",
+    "OrderReport",
+    "SignalSource",
+    "TradeReason",
+]
 
 _DAY_MS = Timeframe.D1.ms
 _QUOTE = "USDT"
@@ -155,6 +162,39 @@ class OrderReport:
             "resumed": str(self.resumed),
             "notes": " | ".join(self.notes),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class TradeReason:
+    """알림용: 이 종목을 왜 사고/파는지 (T/v2 신호 그대로)."""
+
+    ups: int
+    """20·60·120 일 수익률 중 양수인 수 (0~3)."""
+    target: Decimal
+    current: Decimal
+    vol: Decimal
+    cap: Decimal
+    target_vol: Decimal
+
+    def action(self, side: SpotSide) -> str:
+        if side is SpotSide.BUY:
+            return "롱 진입(매수)" if self.current <= 0 else "롱 늘림(매수)"
+        return "청산(매도) → 현금" if self.target <= 0 else "롱 줄임(매도)"
+
+    @property
+    def why(self) -> str:
+        trend = f"20·60·120일 추세 {self.ups}/3 상승"
+        if self.target <= 0:
+            return f"{trend} → 상승 추세가 아니라 현금 (현재 {self.current:.1%})"
+        size = (
+            f"상한 {self.cap:.0%}"
+            if self.target >= self.cap
+            else f"{self.target_vol:.0%} ÷ 60일 변동성 {self.vol:.0%}"
+        )
+        strength = "상승 추세" if self.ups == 3 else "상승 우세"
+        return (
+            f"{trend} → {strength}. 목표 비중 {self.target:.1%} ({size}) ← 현재 {self.current:.1%}"
+        )
 
 
 @dataclass(slots=True)
@@ -509,22 +549,31 @@ class LiveT2Runner:
         self._days.insert(day)  # 선기록 — 주문보다 먼저
         if note is not None and status != "NO_PRIOR_DECISION":
             self._notify(f"[{self._opt.mode}·현물 T/v2] {status}: {note}")
-        if not planned or prev is None:
+        if prev is None:
             return day
         reasons = self._reasons(daily, decision - _DAY_MS, holdings, prices, equity)
+        if not planned:
+            if status == "OK":
+                self._notify(
+                    f"[{self._opt.mode}·현물 T/v2] 오늘 주문 없음 — 목표와 현재 비중 차이가 "
+                    f"밴드 {self._cfg.band:.0%}p 안\n"
+                    + "\n".join(f"{s}: {r.why}" for s, r in sorted(reasons.items()))
+                )
+            return day
         working: list[_Working] = []
         for side, symbol, qty, w in planned:
             cid = client_order_id(self._opt.tag, prev.decision_ms, symbol, side.value)
             record = self._new_record(cid, prev.decision_ms, symbol, side.value, qty, w)
             report = OrderReport(symbol, side.value, qty, cid)
             record = self._post(record, report)
-            side_ko = "매수" if side is SpotSide.BUY else "매도"
             if record.state in ("SUBMITTED", "PARTIALLY_FILLED", "FILLED"):
+                why = reasons.get(symbol)
+                action = why.action(side) if why else side.value
                 self._notify(
-                    f"[{self._opt.mode}·현물 T/v2] 연구 57 실거래 1단계 예행연습\n"
-                    f"{symbol} {side_ko} {qty} @{report.limit_price} post-only 예약 "
-                    f"(최대 {self._opt.timeout_min // 60}시간)\n"
-                    f"이유: {reasons.get(symbol, '')}"
+                    f"[{self._opt.mode}·현물 T/v2] {symbol} {action} {qty} "
+                    f"@{report.limit_price} 지정가 예약 (최대 {self._opt.timeout_min // 60}시간)\n"
+                    f"이유: {why.why if why else ''}\n"
+                    "(T/v2 는 현물 롱 전용 — 상승 추세면 사고, 꺾이면 팔아 현금으로. 숏 없음)"
                 )
             deadline = (report.posted_ms or self._clock()) + self._opt.timeout_min * 60_000
             if record.state in ("REJECTED",):
@@ -549,15 +598,18 @@ class LiveT2Runner:
         holdings: Mapping[str, Decimal],
         prices: Mapping[str, Decimal],
         equity: Decimal,
-    ) -> dict[str, str]:
+    ) -> dict[str, TradeReason]:
         out = {}
         for s, t in spot_trend_targets(daily, as_of_ms=prev_ms, cfg=self._cfg).items():
             if t.weight is None or t.direction is None or t.vol_annual is None:
                 continue
-            ups = round((t.direction * 3 + 3) / 2)
             current = holdings[s] * prices[s] / equity if equity else Decimal(0)
-            out[s] = (
-                f"T/v2 목표 {t.weight:.1%} ← 현재 {current:.1%} "
-                f"(20·60·120일 추세 {ups}/3 상승, 60일 변동성 {t.vol_annual:.0%})"
+            out[s] = TradeReason(
+                ups=round((t.direction * 3 + 3) / 2),
+                target=t.weight,
+                current=current,
+                vol=t.vol_annual,
+                cap=self._cfg.max_weight,
+                target_vol=self._cfg.target_vol,
             )
         return out

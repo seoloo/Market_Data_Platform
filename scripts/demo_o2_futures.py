@@ -125,6 +125,52 @@ def plan_leg(
     return LegPlan(symbol, weight, qty, current_qty, stop, kept)
 
 
+def leg_message(
+    p: LegPlan, before: Decimal, after: Decimal, ups: int | None, equity: Decimal
+) -> str:
+    """선물 다리 하나의 알림 — 무엇을 했고(롱 추가·늘림·줄임·청산·유지) 왜 했는지 짧게."""
+    head = f"[데모·선물 O/v2] {p.symbol}"
+    trend = "추세 정보 없음" if ups is None else f"20·60·120일 추세 {ups}/3 상승"
+    stop = f"비상 스톱 {p.stop} (전날 무기한 종가 × 0.8)" if p.stop else "스톱 없음"
+    if after == before:
+        return (
+            f"{head} 오늘 주문 없음 — 선물 롱 {after} 유지 (목표와 차이가 자본의 2.5% 밴드 안)\n"
+            f"{trend} · T/v2 목표 {p.weight:.1%} → 선물 {p.weight * EXTRA:.1%} · {stop}"
+        )
+    if after == 0:
+        action, why = (
+            "선물 추가분 청산",
+            f"{trend} → T/v2 목표가 0(현금)이라 선물 추가분도 0. 숏은 하지 않는다",
+        )
+    else:
+        action = (
+            "선물 롱 추가 진입"
+            if before == 0
+            else "선물 롱 늘림"
+            if after > before
+            else "선물 롱 줄임"
+        )
+        why = (
+            f"현물 T/v2 가 롱 중({trend}, 목표 {p.weight:.1%}) → 그 절반({p.weight * EXTRA:.1%})을 "
+            f"선물로 더 얹어 총 1.5배 (현물 자본 {equity:,.0f} USDT 기준)"
+        )
+    return f"{head} {action} {before} → {after}\n이유: {why}\n{stop}"
+
+
+def state_message(rep: OverlayExecutionReport) -> str:
+    """정상이 아닐 때 — 원인을 풀어 쓴다."""
+    reasons = [*rep.notes]
+    for g in rep.legs:
+        reasons.extend(f"{g.symbol}: {n}" for n in g.notes)
+    if rep.recovery_state != "RUNNING":
+        reasons.insert(0, f"시작 점검(거래소 대조) {rep.recovery_state}")
+    meaning = {
+        "DEGRADED": "노출을 늘리지 않고 줄이기·보호만 했다",
+        "HALTED": "아무 주문도 내지 않았다 — 사람 확인 필요",
+    }.get(rep.state, "")
+    return f"[데모·선물 O/v2] {rep.state} — {meaning}\n원인: {' | '.join(reasons) or '기록 확인'}"
+
+
 class Notify:
     def __init__(self) -> None:
         creds = load_telegram_credentials(REPO_ROOT / ".env")
@@ -228,8 +274,11 @@ def main(argv: list[str]) -> int:
         cfg = SpotTrendConfig()
         prev = decision - DAY_MS  # 오늘 체결하는 목표 = 전날 결정 (T/v2 와 같은 1 일 지연)
         daily = {s: public.closed_daily(s, prev) for s in cfg.symbols}
-        weights = {
-            s: t.weight for s, t in spot_trend_targets(daily, as_of_ms=prev, cfg=cfg).items()
+        signals = spot_trend_targets(daily, as_of_ms=prev, cfg=cfg)
+        weights = {s: t.weight for s, t in signals.items()}
+        ups = {
+            s: round((t.direction * 3 + 3) / 2) if t.direction is not None else None
+            for s, t in signals.items()
         }
         balances = spot.balances()
         prices = {s: spot.last_price(s) for s in cfg.symbols}
@@ -276,16 +325,9 @@ def main(argv: list[str]) -> int:
         for s in rep.fired_stops:
             notify(f"[데모·선물 O/v2] 비상 스톱 발동(밤사이): {s}")
         for p, leg in zip(plans, rep.legs, strict=True):
-            if leg.before == leg.after and not leg.orders:
-                continue
-            notify(
-                f"[데모·선물 O/v2] 연구 59 선물 추가분 예행연습\n"
-                f"{p.symbol} 선물 {leg.before} → {leg.after} · 스톱 {p.stop}\n"
-                f"이유: T/v2 목표 {p.weight:.1%} × 0.5 = 선물 {p.weight * EXTRA:.1%} "
-                f"(현물 자본 {equity:,.0f} USDT 기준) · 스톱 = 전날 무기한 종가 × 0.8"
-            )
+            notify(leg_message(p, leg.before, leg.after, ups.get(p.symbol), equity))
         if rep.state != "OK":
-            notify(f"[데모·선물 O/v2] {rep.state}: {' | '.join(rep.notes) or '다리 메모 확인'}")
+            notify(state_message(rep))
         return 0 if rep.state == "OK" else 1
     except Exception as exc:  # 무인 실행: 실패도 기록한다 (포지션은 거래소 스톱이 지킨다)
         record["error"] = f"{type(exc).__name__}: {exc}"

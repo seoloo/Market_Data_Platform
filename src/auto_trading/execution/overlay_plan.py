@@ -71,6 +71,19 @@ def _cents(x: Decimal) -> Decimal:
     return x.quantize(_CENT, rounding=ROUND_DOWN)
 
 
+_FINE = Decimal("1e-12")
+
+
+def _scaled_down(q: Decimal, factor: Decimal) -> Decimal:
+    """``q × factor`` 를 아래로 자른다 — 상한에 맞춰 줄인 양이 반올림으로 상한을 넘지 않게.
+
+    Decimal 나눗셈으로 만든 ``factor`` 는 마지막 자리에서 올림될 수 있다
+    (hypothesis 반례, 2026-09-25:
+    명목 213.63…0001 > 상한 213.63).
+    """
+    return (q * factor).quantize(_FINE, rounding=ROUND_DOWN)
+
+
 def plan_overlay_day(
     book: OverlayBook,
     spot_target: Mapping[str, Decimal],
@@ -125,7 +138,7 @@ def plan_overlay_day(
                 f"현물 매수 현금 부족 — 선물 지갑 최소 {_cents(need_wallet)} 를 지키려고 "
                 f"매수를 {factor:.3f} 배로 줄인다"
             )
-            buys = {s: q * factor for s, q in buys.items()}
+            buys = {s: _scaled_down(q, factor) for s, q in buys.items()}
     for s, q in buys.items():
         if q > 0:
             plan.steps.append(PlanStep("SPOT_BUY", s, q))
@@ -147,7 +160,7 @@ def plan_overlay_day(
         plan.notes.append(
             f"선물 명목이 지갑의 {max_leverage}배를 넘는다 — 늘리기를 {factor:.3f} 배로"
         )
-        incs = {s: q * factor for s, q in incs.items()}
+        incs = {s: _scaled_down(q, factor) for s, q in incs.items()}
     for s, q in incs.items():
         if q > 0:
             plan.steps.append(PlanStep("FUTURES_INCREASE", s, q))

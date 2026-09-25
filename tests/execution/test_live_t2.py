@@ -207,7 +207,12 @@ def test_first_day_records_only_then_second_day_buys_as_maker(env) -> None:
     states = {r.client_order_id: r.state for r in SpotOrderRepository(conn).all()}
     assert set(states.values()) == {"FILLED"}
     assert all(r.maker_qty > 0 and not r.chased for r in runner.reports)
-    assert any("post-only 예약" in n and "이유: T/v2 목표" in n for n in notes)
+    assert any(
+        "롱 진입(매수)" in n
+        and "이유: 20·60·120일 추세 3/3 상승 → 상승 추세" in n
+        and "숏 없음" in n
+        for n in notes
+    )
     assert any("지정가 체결" in n for n in notes)
 
 
@@ -310,3 +315,24 @@ def test_post_only_rejected_three_times_then_market(env) -> None:
     records = {r.client_order_id: r.state for r in SpotOrderRepository(conn).all()}
     assert "REJECTED" in records.values()
     assert any(c.endswith("m") for c in venue.placed)
+
+
+def test_quiet_day_says_why_nothing_was_ordered(env) -> None:
+    conn, halt = env
+    venue, notes = Venue(), []
+    clock = two_days(conn, halt, venue, notes)  # 둘째 날 목표대로 샀다
+    # 가짜 거래소는 잔고를 갱신하지 않는다 — 다음 날 체결할 목표(둘째 날 결정)대로 보유를 맞춘다
+    decided = PaperDayRepository(conn).get(OPT.strategy_id, START + 202 * D - 1)
+    assert decided is not None
+    value = Decimal(0)
+    for s, w in decided.targets.items():
+        qty = Decimal(w or 0) * Decimal(5000) / PRICE[s]
+        venue.base[s.removesuffix("USDT")] = qty
+        value += qty * PRICE[s]
+    venue.cash = Decimal(5000) - value
+    notes.clear()
+    clock.ms = after(202)
+    make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    quiet = [n for n in notes if "오늘 주문 없음" in n]
+    assert quiet and "BTCUSDT: 20·60·120일 추세 3/3 상승" in quiet[0]
+    assert "목표 비중" in quiet[0] and "← 현재" in quiet[0]

@@ -128,3 +128,12 @@ def test_plan_invariants(
     kept = min(fut_now, fut_want) * P["ETHUSDT"]
     if "FUTURES_INCREASE" in kinds:
         assert plan.futures_notional_after <= max(plan.futures_wallet_after * 3, kept) + Z
+
+
+def test_scaled_increase_never_exceeds_leverage_cap_by_rounding() -> None:
+    """hypothesis 가 찾은 반례 (2026-09-25): 명목 213.63…0001 > 상한 3 × 71.21."""
+    b = OverlayBook(
+        Decimal("0.00"), {"ETHUSDT": Decimal(0)}, Decimal("71.21"), {"ETHUSDT": Decimal(0)}, P
+    )
+    plan = plan_overlay_day(b, {"ETHUSDT": Decimal(0)}, {"ETHUSDT": Decimal("0.820")})
+    assert plan.futures_notional_after <= plan.futures_wallet_after * 3
