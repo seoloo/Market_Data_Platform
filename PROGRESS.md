@@ -1,7 +1,12 @@
 # 작업 현황
 
-최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 보호 롱 선체결 방식 연구).
+최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 RFQ 다중 다리 자동화·체결 계약 감사).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-09-26 — BTC 옵션 RFQ 자동화·다리 체결 계약 공개 감사
+
+- [77](docs/research/77-btc-option-rfq-api-and-leg-contract.md): Binance 공식 RFQ FAQ·출시 공지·Options 개발자 명세를 채널별로 대조했다. RFQ 플랫폼의 다중 다리 **단일 주문 구성은 확인**했지만, 자동 제출용 공개 RFQ API와 두 다리 all-or-none/부분 체결·실패 계약은 확인하지 못했다. 개발자 명세의 별도 `block/order/create`는 `legs` 필드가 있어도 **최대 1다리**이고, 공개 주문장 `batchOrders`는 매칭 순서 미보장이다. 공지 본문과 말미 위험 고지에도 다중 다리/한 계약 표현의 불일치가 남아 있다.
+- 판정 `RFQ_MULTI_LEG_UI_CONFIRMED / PUBLIC_MULTI_LEG_API_NOT_DOCUMENTED / ATOMIC_FILL_CONTRACT_UNVERIFIED / ACCOUNT_ELIGIBILITY_UNKNOWN / LIVE_BLOCKED`. 문서 부재를 기능의 절대 부재로 단정하지 않는다. RFQ 자동화 우회 구현·실거래·계정 인증·주문·유료 구매·코드/Paper 변경 없음. 다음 Phase 0: 보호 롱을 별도 보호 수단으로 인정할지 사용자 명시 결정이 필요하다. 승인이 있더라도 옵션 전용 청산·담보·계좌 위험 검증은 별도다. 10/23·10/24 일정 불변.
 
 ## 2026-09-26 — BTC 옵션 보호 롱 선체결의 별도 안전 방식 연구
 
