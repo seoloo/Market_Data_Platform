@@ -206,6 +206,30 @@ Do not retry:
 
 근거: [48 선택·사전 등록·§7 판정](../research/48-perp-positioning-events.md).
 
+## MD — REJECTED (TRAIN, 2026-09-25)
+
+Hypothesis: 미국 CPI·NFP·PCE 발표(08:30 ET)·FOMC 성명(14:00 ET) 뒤 첫 15분 BTCUSDT 반응이 이후 4시간 동안 지속(또는 반전)되며 비용·funding 을 넘는다.
+- 컨센서스는 라이선스 자료라, 시장의 첫 반응을 서프라이즈 대리로 썼다.
+- 규칙: 진입 t+15분, 스톱 첫 15분 극값, 청산 4시간, 편도 0.095%. 방향은 Train 에서 한 번 정했다.
+
+TRAIN 2021~2022 (88건, 1회):
+- 지속은 비용 전부터 음수라 규칙대로 반전이 정해졌다.
+- 순평균 **−13.6 bps**(비용 전 +5.3), 양측 p 0.42, 두 해 모두 음수 → **REJECT**
+- 스톱 72/88, 승률 17%. 보고: 스톱 없음 +28.1 bps(t 1.08), CPI 만 +14(24건).
+- VALIDATION 2023~2024 / OOS 2025~2026: 미실행. 발표 시각 자료가 없고 모으지 않았다.
+
+Learned:
+- 첫 반응은 이어지지 않는다.
+- 반전은 반응이 15분 뒤에도 더 나간 다음 온다. 첫 15분 극값 스톱으로는 잡을 수 없다.
+- 순수익 95% 상한은 약 +20 bps 다.
+
+Do not retry (같은 자료로):
+- 반응 창·보유 시간·스톱 변경
+- CPI 만 고르기
+- 스톱 없는 반전 판정
+
+근거: [49 사전등록·§7 판정](../research/49-macro-release-drift.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
