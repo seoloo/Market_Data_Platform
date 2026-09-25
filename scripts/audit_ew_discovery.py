@@ -2,6 +2,7 @@
 
 사용: ``python scripts/audit_ew_discovery.py dev`` 또는
 ``python scripts/audit_ew_discovery.py holdout --confirm-holdout`` (seed 20260926, 한 번만).
+문서 58: ``holdout2 --version ew3d|ew3e --confirm-holdout`` (seed 20260928, 버전마다 한 번만).
 seed 20260927 은 JEV 비교용으로 예약 — 이 스크립트는 만들지 않는다.
 """
 
@@ -22,16 +23,20 @@ if str(REPO_ROOT / "src") not in sys.path:
 from scripts.audit_ew3c_hourly import CELLS, DEGREES, hour_bars  # noqa: E402
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
+from auto_trading.research.elliott import scanner  # noqa: E402
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.parser import Label  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
 from auto_trading.research.elliott.scanner import causal_triggers, scenario_list  # noqa: E402
 from auto_trading.research.elliott.synthetic import SyntheticPath, build_path  # noqa: E402
 
-SEEDS = {"dev": 20260924, "holdout": 20260926}
+SEEDS = {"dev": 20260924, "holdout": 20260926, "holdout2": 20260928}
 RESERVED_FOR_JEV = 20260927
 KS = (1, 3, 10, 20, 30, 50, 100)
 GATE_N = 50  # 문서 39 §6
+VERSIONS = {"ew3d": (360, False), "ew3e": (720, True)}
+"""문서 58: (시작 탐색 창 4h 봉 수, 한 마감의 새 4h 가시 꼭짓점마다 발동)."""
+ALL_NEW = False
 
 
 def _one(path: SyntheticPath) -> dict[str, object]:
@@ -46,7 +51,7 @@ def _one(path: SyntheticPath) -> dict[str, object]:
     hit = next(
         (
             trig
-            for trig in causal_triggers(replay, hours, four)
+            for trig in causal_triggers(replay, hours, four, all_new_pivots=ALL_NEW)
             if (trig.segment[-1].kind, trig.segment[-1].hour_open_ms) == truth[-1]
         ),
         None,
@@ -104,8 +109,14 @@ def main(argv: list[str]) -> int:
     if not argv or argv[0] not in SEEDS:
         raise SystemExit("usage: audit_ew_discovery.py dev | holdout --confirm-holdout")
     split = argv[0]
-    if split == "holdout" and "--confirm-holdout" not in argv:
-        raise SystemExit("확인 seed 는 --confirm-holdout 과 함께 한 번만 채점한다 (문서 39 §4)")
+    if split.startswith("holdout") and "--confirm-holdout" not in argv:
+        raise SystemExit("확인 seed 는 --confirm-holdout 과 함께 한 번만 채점한다 (문서 39 §4·58)")
+    version = argv[argv.index("--version") + 1] if "--version" in argv else "ew3d"
+    if split == "holdout2" and "--version" not in argv:
+        raise SystemExit("holdout2 는 --version ew3d|ew3e 를 밝혀야 한다 (문서 58)")
+    global ALL_NEW
+    lookback, ALL_NEW = VERSIONS[version]
+    scanner.LOOKBACK_BARS = lookback
     rng = random.Random(SEEDS[split])
     cells: dict[str, object] = {}
     pooled: dict[str, dict[str, list[dict[str, object]]]] = {}
@@ -131,6 +142,9 @@ def main(argv: list[str]) -> int:
         }
     result = {
         "split": split,
+        "version": version,
+        "lookback_bars": lookback,
+        "all_new_pivots": ALL_NEW,
         "seed": SEEDS[split],
         "reserved_for_jev_untouched": RESERVED_FOR_JEV,
         "cells": cells,

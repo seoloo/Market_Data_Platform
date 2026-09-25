@@ -70,9 +70,20 @@ def _extreme(bar: Candle, kind: SwingKind) -> object:
 
 
 def causal_triggers(
-    replay: MinutePathReplay, hour_bars: Sequence[Candle], four_hour_bars: Sequence[Candle]
+    replay: MinutePathReplay,
+    hour_bars: Sequence[Candle],
+    four_hour_bars: Sequence[Candle],
+    *,
+    all_new_pivots: bool = False,
 ) -> list[Trigger]:
-    """33 §26 의 1h 꼭짓점 규칙을 사건이 알려지는 순서대로 적용하고 발동 시점을 모은다."""
+    """33 §26 의 1h 꼭짓점 규칙을 사건이 알려지는 순서대로 적용하고 발동 시점을 모은다.
+
+    기본(EW-3d′)은 한 4h 마감에서 **마지막** 꼭짓점이 4h 가시일 때만 발동한다.
+    ``all_new_pivots`` (문서 58 EW-3e 후보): 그 마감에 새로 확정된 4h 가시 꼭짓점
+    **각각**에서 발동한다 — 고점과 뒤따른 작은 저점이 같은 마감에 확정되면
+    고점으로 끝나는 해석이 평가되지 않던 문제.
+    모두 그 마감에 알려진 정보라 인과성은 같다.
+    """
     hours = {bar.open_ms: bar for bar in hour_bars}
     fours = {bar.open_ms: bar for bar in four_hour_bars}
     events = sorted(
@@ -110,7 +121,12 @@ def causal_triggers(
                     four_hour_visible=event.price == _extreme(four, event.kind),
                 )
             )
-        if current and current[-1].available_at_ms == close_ms and current[-1].four_hour_visible:
+        if all_new_pivots:
+            for k, pivot in enumerate(current):
+                if pivot.available_at_ms == close_ms and pivot.four_hour_visible:
+                    direction = 1 if pivot.kind is SwingKind.HIGH else -1
+                    triggers.append(Trigger(close_ms, tuple(current[: k + 1]), direction))
+        elif current and current[-1].available_at_ms == close_ms and current[-1].four_hour_visible:
             last = current[-1]
             triggers.append(
                 Trigger(close_ms, tuple(current), 1 if last.kind is SwingKind.HIGH else -1)

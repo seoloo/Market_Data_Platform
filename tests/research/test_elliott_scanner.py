@@ -68,3 +68,26 @@ def test_scenario_list_top_agrees_with_top1_and_ranks_pessimistically() -> None:
         assert len(scen.top) == min(SCENARIO_SET_SIZE, scen.total)
         checked += 1
     assert checked > 0
+
+
+def test_all_new_pivots_option_only_adds_triggers() -> None:
+    """문서 58: 한 마감에 확정된 4h 가시 꼭짓점 각각에서 발동 — 기본 발동은 그 부분집합이다."""
+    import random
+
+    from scripts.audit_ew3c_hourly import hour_bars
+
+    from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder
+    from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT
+    from auto_trading.research.elliott.scanner import causal_triggers
+    from auto_trading.research.elliott.synthetic import build_path
+
+    path = build_path(random.Random(7), "IMPULSE", 0.5, 0.04, 0.001)
+    four, hours = path.four_hour, hour_bars(path.minutes)
+    groups = (path.minutes[240 * i : 240 * (i + 1)] for i in range(len(four)))
+    (replay,) = replay_minute_groups_ladder(four, groups, four[-1].close_ms, (EW0_THRESHOLD_PCT,))
+    base = causal_triggers(replay, hours, four)
+    every = causal_triggers(replay, hours, four, all_new_pivots=True)
+    as_key = lambda t: (t.close_ms, t.segment[-1].hour_open_ms)  # noqa: E731
+    assert {as_key(t) for t in base} <= {as_key(t) for t in every}
+    assert all(t.segment[-1].four_hour_visible for t in every)
+    assert all(t.segment[-1].available_at_ms == t.close_ms for t in every)  # 그 마감에 알려진 것만
