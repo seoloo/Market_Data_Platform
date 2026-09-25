@@ -1,10 +1,20 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: BTCUSDT 무기한 포지셔닝 이벤트 FB·LQ Train 판정 REJECT — 문서 48 §7).
+최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: 거시 지표 발표 첫 반응 MD 사전 등록 — 문서 49).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3·FB·LQ 기각.
 
-## 이번 작업 (Claude — 선물 수익 전략 독립 트랙: FB·LQ 사전 등록)
+## 이번 작업 (Claude — 선물 트랙: 거시 지표 발표 첫 반응 MD 사전 등록)
+
+- 사용자 선택 "A로 가자" → [49](docs/research/49-macro-release-drift.md).
+  - 가설: CPI·NFP·PCE·FOMC 발표 첫 15분 BTC 반응이 4시간 동안 지속되거나 반전한다
+  - 방향은 Train 에서 한 번 정하고 양측 검정한다
+  - 컨센서스는 라이선스 자료라, 시장의 첫 반응을 서프라이즈 대리로 쓴다
+- Train 2021~2022 88건(`macro_events` 감사 시각). Validation·OOS 는 발표 시각 자료가 없어 Train 통과 시에만 모은다(BLS 자동 수집 금지).
+- 규칙: 진입 t+15분, 스톱 첫 15분 극값, 청산 4시간, 편도 0.095% + funding. 기준: 거래 ≥ 30, 순수익 > 0 + 양측 p < 0.05, 두 해 모두 양수.
+- 검출 가능 효과: 총 92 bps/거래 (4시간 표준편차 245 bps).
+
+## 이전 작업 (Claude — 선물 수익 전략 독립 트랙: FB·LQ 사전 등록)
 
 - 사용자 요청: BTCUSDT 무기한에서 비용 차감 후 재현 가능한 edge. 후보 4개 중 [48](docs/research/48-perp-positioning-events.md)에서 둘을 골랐다.
   - FB: 실패한 돌파 + OI 증가 + funding 과열
