@@ -22,6 +22,11 @@ from auto_trading.research.elliott.h4_evidence import FourHourPivotEvidence
 from auto_trading.research.elliott.minute_path import MinutePathReplay
 
 __all__ = [
+    "FLAT_B_MAX",
+    "FLAT_B_MIN",
+    "FLAT_C_MAX",
+    "FLAT_C_MIN",
+    "LEG_NEEDS",
     "FinePivot",
     "Label",
     "Parse",
@@ -42,6 +47,14 @@ class Label(StrEnum):
     ZIGZAG = "ZIGZAG"
     OPAQUE = "OPAQUE"
     """EW-3d: 극단 구간이지만 요구 모양으로 파싱되지 않은 다리 — 후보는 유지, 미검증."""
+    FLAT = "FLAT"
+    """EW-4 (문서 60): 플랫 A-B-C (3-3-5) — 최상위 후보로만."""
+    TRIANGLE = "TRIANGLE"
+    """EW-4 (문서 60): 수렴 삼각형 A-B-C-D-E (3-3-3-3-3) — 최상위 후보로만."""
+
+
+LEG_NEEDS: dict[Label, tuple[Label, ...]] = {}
+"""패턴별 다리가 읽혀야 할 모양 (아래에서 채운다)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,12 +68,22 @@ class Parse:
     @property
     def verified_one_level(self) -> bool:
         """모든 하위 구간이 요구 모양(비원자)으로 파싱되었는가."""
-        need: tuple[Label, ...]
-        if self.pattern is Label.IMPULSE:
-            need = (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE)
-        else:
-            need = (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE)
-        return self.leg_labels == need
+        return self.leg_labels == LEG_NEEDS[self.pattern]
+
+
+LEG_NEEDS.update(
+    {
+        Label.IMPULSE: (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE),
+        Label.ZIGZAG: (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE),
+        Label.FLAT: (Label.ZIGZAG, Label.ZIGZAG, Label.IMPULSE),
+        Label.TRIANGLE: (Label.ZIGZAG,) * 5,
+    }
+)
+
+FLAT_B_MIN, FLAT_B_MAX = 0.618, 1.618
+"""문서 60 §3.1 F1·F2: B/A 범위."""
+FLAT_C_MIN, FLAT_C_MAX = 0.382, 2.618
+"""문서 60 §3.1 F3: C/A 범위."""
 
 
 class WaveParser:
@@ -271,6 +294,64 @@ class WaveParser:
                             continue
                         found.append(
                             Parse(Label.IMPULSE, (i, b1, b2, b3, b4, j), (la, lb, l3, l4, l5))
+                        )
+        return tuple(found)
+
+    def pattern_candidates(self, i: int, j: int) -> tuple[Parse, ...]:
+        """EW-4 1단계 (문서 60 §3): 플랫·수렴 삼각형 최상위 후보. 각 다리는 시작 극단(relaxed).
+
+        전체 구간이 시작 극단일 필요는 없다 — 확장 플랫은 B 가 A 시작을 넘는다.
+        """
+        d = self._direction(i)
+        q = [d * float(pivot.price) for pivot in self._p]
+        rel = self._relaxed
+        found: list[Parse] = []
+        for b1 in rel[i]:
+            if b1 >= j:
+                break
+            a = q[b1] - q[i]
+            if a <= 0:
+                continue
+            la = self._leg(i, b1, Label.ZIGZAG, relaxed=True)
+            if la is None:
+                continue
+            for b2 in rel[b1]:
+                if b2 >= j:
+                    break
+                b = q[b1] - q[b2]
+                lb = self._leg(b1, b2, Label.ZIGZAG, relaxed=True)
+                if lb is None or b <= 0:
+                    continue
+                # 플랫: C = b2 → j
+                if j in rel[b2] and FLAT_B_MIN <= b / a <= FLAT_B_MAX:
+                    c = q[j] - q[b2]
+                    lc = self._leg(b2, j, Label.IMPULSE, relaxed=True)
+                    if lc is not None and FLAT_C_MIN <= c / a <= FLAT_C_MAX:
+                        found.append(Parse(Label.FLAT, (i, b1, b2, j), (la, lb, lc)))
+                # 수렴 삼각형: B 는 A 시작을 넘지 않는다
+                if q[b2] <= q[i]:
+                    continue
+                for b3 in rel[b2]:
+                    if b3 >= j - 1:
+                        break
+                    if q[b3] >= q[b1]:  # C 는 A 끝 안쪽
+                        continue
+                    lc3 = self._leg(b2, b3, Label.ZIGZAG, relaxed=True)
+                    if lc3 is None:
+                        continue
+                    for b4 in rel[b3]:
+                        if b4 >= j:
+                            break
+                        if q[b4] <= q[b2]:  # D 는 B 끝 안쪽
+                            continue
+                        if j not in rel[b4] or q[j] >= q[b3]:  # E 는 C 끝 안쪽
+                            continue
+                        ld = self._leg(b3, b4, Label.ZIGZAG, relaxed=True)
+                        le = self._leg(b4, j, Label.ZIGZAG, relaxed=True)
+                        if ld is None or le is None:
+                            continue
+                        found.append(
+                            Parse(Label.TRIANGLE, (i, b1, b2, b3, b4, j), (la, lb, lc3, ld, le))
                         )
         return tuple(found)
 

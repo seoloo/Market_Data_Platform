@@ -23,6 +23,7 @@ from auto_trading.research.elliott.parser import (
     counted_at_four_hour,
 )
 from auto_trading.research.elliott.ranking import RankKey, rank_key
+from auto_trading.research.elliott.ranking_v2 import rank_key_v2
 
 __all__ = [
     "EW3E_LOOKBACK_BARS",
@@ -143,6 +144,7 @@ def trigger_candidates(
     *,
     parser: WaveParser | None = None,
     lookback_bars: int | None = None,
+    ew4: bool = False,
 ) -> tuple[list[Parse], int]:
     """E 로 끝나는 모든 시작 후보의 EW-3d′ 후보 전부와 시작 후보 수 (문서 34 §3 3~4).
 
@@ -168,6 +170,20 @@ def trigger_candidates(
         for c in parser.top_candidates(i, j, relaxed=True)
         if counted_at_four_hour(c, fine)
     ]
+    if ew4:
+        # 문서 60: 플랫·삼각형 — 전체 구간이 시작 극단일 필요는 없다(확장 플랫)
+        ew4_starts = [
+            i
+            for i in range(j - 3, -1, -2)
+            if fine[i].four_hour_visible
+            and (end.four_hour_open_ms - fine[i].four_hour_open_ms) // Timeframe.H4.ms <= window
+        ]
+        candidates += [
+            c
+            for i in ew4_starts
+            for c in parser.pattern_candidates(i, j)
+            if counted_at_four_hour(c, fine)
+        ]
     return candidates, len(starts)
 
 
@@ -201,13 +217,19 @@ def scenario_list(
     size: int = SCENARIO_SET_SIZE,
     parser: WaveParser | None = None,
     lookback_bars: int | None = None,
+    ew4: bool = False,
 ) -> ScenarioList:
-    """모든 시작 후보의 후보를 ``rank_key`` 로 정렬한 시나리오 묶음. 확률이 아니다."""
+    """모든 시작 후보의 후보를 ``rank_key`` 로 정렬한 시나리오 묶음. 확률이 아니다.
+
+    ``ew4`` (문서 60): 플랫·삼각형 후보를 더하고 순위 v2 로 정렬한다
+    (충격파·지그재그 값은 v1 과 같다).
+    """
     candidates, _ = trigger_candidates(
-        trigger, hour_bars, parser=parser, lookback_bars=lookback_bars
+        trigger, hour_bars, parser=parser, lookback_bars=lookback_bars, ew4=ew4
     )
+    ranker = rank_key_v2 if ew4 else rank_key
     ranked = sorted(
-        ((c, rank_key(c, trigger.segment)) for c in candidates),
+        ((c, ranker(c, trigger.segment)) for c in candidates),
         key=lambda item: (item[1], item[0].pattern.value, item[0].bounds),
     )
     return ScenarioList(tuple(ranked), size, len(ranked))
@@ -273,6 +295,7 @@ def scenario_lists(
     *,
     size: int = SCENARIO_SET_SIZE,
     lookback_bars: int | None = None,
+    ew4: bool = False,
 ) -> list[ScenarioList]:
     """:func:`evaluate_triggers` 와 같이 구간별 파서를 재사용해 발동마다 시나리오 묶음을 만든다."""
     groups: dict[tuple[int, int], list[int]] = {}
@@ -285,6 +308,11 @@ def scenario_lists(
         parser = WaveParser([as_grid_anchor(p) for p in longest.segment], list(hour_bars))
         for n in members:
             out[n] = scenario_list(
-                triggers[n], hour_bars, size=size, parser=parser, lookback_bars=lookback_bars
+                triggers[n],
+                hour_bars,
+                size=size,
+                parser=parser,
+                lookback_bars=lookback_bars,
+                ew4=ew4,
             )
     return [out[n] for n in range(len(triggers))]

@@ -43,7 +43,7 @@ _Wave = tuple[str, float]  # (모양, 부호 있는 로그 크기)
 @dataclass(frozen=True, slots=True)
 class SyntheticPath:
     pattern: str
-    """IMPULSE | ZIGZAG (상승)."""
+    """IMPULSE | ZIGZAG | FLAT | TRIANGLE (첫 다리 상승)."""
     minutes: tuple[Candle, ...]
     four_hour: tuple[Candle, ...]
     vertex_minutes: tuple[int, ...]
@@ -76,6 +76,22 @@ def _zigzag(rng: random.Random, amp: float) -> list[_Wave]:
     kc = rng.uniform(0.618, 1.618)
     unit = amp / (1 - rb + kc)
     return [(MOTIVE, unit), (CORRECTIVE, -rb * unit), (MOTIVE, kc * unit)]
+
+
+def _flat(rng: random.Random, amp: float) -> list[_Wave]:
+    """플랫 A-B-C (3-3-5), 문서 60 §5: B/A ~ U(0.618, 1.382), C/A ~ U(0.618, 1.618)."""
+    rb = rng.uniform(0.618, 1.382)
+    kc = rng.uniform(0.618, 1.618)
+    unit = amp / (1 - rb + kc) if abs(1 - rb + kc) > 1e-9 else amp
+    return [(CORRECTIVE, unit), (CORRECTIVE, -rb * unit), (MOTIVE, kc * unit)]
+
+
+def _triangle(rng: random.Random, amp: float) -> list[_Wave]:
+    """수렴 삼각형 A-B-C-D-E (3-3-3-3-3), 문서 60 §5: 연속 다리 비율 ~ U(0.55, 0.85)."""
+    sizes = [1.0]
+    for _ in range(4):
+        sizes.append(sizes[-1] * rng.uniform(0.55, 0.85))
+    return [(CORRECTIVE, s * amp * (1 if k % 2 == 0 else -1)) for k, s in enumerate(sizes)]
 
 
 def _split(rng: random.Random, shape: str, amp: float) -> list[_Wave]:
@@ -114,14 +130,16 @@ def build_path(
     parent_threshold: float,
     noise_sd: float,
 ) -> SyntheticPath:
-    """상승 impulse(5-3-5-3-5) 또는 zigzag(5-3-5) 하나와 앞뒤 진입·이탈 직선."""
+    """상승 impulse(5-3-5-3-5)·zigzag(5-3-5)·flat(3-3-5)·수렴 triangle(3-3-3-3-3) 하나와
+    앞뒤 진입·이탈 직선."""
     w1 = BASE_W1 * scale
     if pattern == "IMPULSE":
         top_waves = _motive(rng, 1.0)
         unit = w1 / top_waves[0][1]
         top_waves = [(s, a * unit) for s, a in top_waves]
-    elif pattern == "ZIGZAG":
-        top_waves = _zigzag(rng, 1.0)
+    elif pattern in ("ZIGZAG", "FLAT", "TRIANGLE"):
+        maker = {"ZIGZAG": _zigzag, "FLAT": _flat, "TRIANGLE": _triangle}[pattern]
+        top_waves = maker(rng, 1.0)
         unit = w1 / top_waves[0][1]
         top_waves = [(s, a * unit) for s, a in top_waves]
     else:
