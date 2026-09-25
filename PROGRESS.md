@@ -1,7 +1,13 @@
 # 작업 현황
 
-최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 실행 안전성 게이트).
+최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 보호·청산 API 재확인).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-09-26 — BTC 옵션 보호·청산 기능 공식 명세 재확인
+
+- [75](docs/research/75-btc-option-protection-api-audit.md): 공식 옵션 REST 신규/일괄 주문·취소·계정 조회와 auto-cancel kill-switch/MMP를 대조했다. 신규 주문 유형은 명세상 `LIMIT`만 열거하고, IOC/FOK·`reduceOnly`는 전량 체결/시간 보증이 아니다. kill-switch와 MMP는 **열린 주문 취소/거부**이지 체결된 숏 포지션 청산이나 손절이 아니다. 계정·포지션 조회 인터페이스는 있으나 계정 값은 미확인이다.
+- 판정 `DOCUMENTED_OPTION_STOP_NOT_FOUND / ORDER_CANCEL_IS_NOT_POSITION_CLOSE / REDUCE_ONLY_LIMIT_NOT_GUARANTEED / POLICY_DECISION_REQUIRED`. 공개 명세의 미확인을 모든 Binance 기능의 부재로 단정하지 않는다. 현행 선물형 보호·5초 전량 청산 규칙을 옵션 롱 다리로 대체하는 것은 사용자 승인 전 금지이며 옵션 매도 실거래는 차단한다.
+- 계정 인증·주문·유료 구매·코드/운영 변경 없음. 문서 상대 링크·공백·변경 범위를 확인했고 코드 변경이 없어 코드 테스트는 수행하지 않았다. 다음 Phase 0: 보호 롱의 별도 보호 방식 인정 여부에 대한 사용자 결정. 10/23·10/24 점검 일정 불변.
 
 ## 2026-09-26 — BTC 옵션 매도 보호 다리 실행 불가 조건
 
