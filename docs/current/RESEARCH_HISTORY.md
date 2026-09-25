@@ -180,6 +180,32 @@ Learned: 기존 신호와 다른 정보라고 수익원이 되지는 않는다. 
 Do not retry: MACD 기간(8·17·9 등)·4h 봉·스톱·크기 변경, I1·I5·I6 을 같은 틀로 시험.
 근거: [46 후보 비교](../research/46-indicator-candidates.md), [47 사전등록·§6 판정](../research/47-i3-macd-preregistration.md).
 
+## FB · LQ — REJECTED (TRAIN, 2026-09-25)
+
+Hypothesis:
+- FB: BTCUSDT 무기한에서 24시간 고점(저점) 돌파에 OI 증가(30일 80%)와 funding 과열(90일 80%, 양수)이 겹친 뒤 6시간 안에 돌파가 실패하면, 갇힌 레버리지 포지션의 청산으로 반대 방향 12시간 순수익 > 0.
+- LQ: 1시간 OI 급감(1%)과 가격 급변(99%)을 청산 추정으로 보면 12시간 반전 또는 지속 순수익 > 0.
+- 공통 규칙: 다음 봉 시가 진입, 구조 극값 스톱, 편도 0.095% + funding.
+
+TRAIN 2021+2023 (1회, Holm 2개):
+- FB: 118건, 순평균 **−10.7 bps**(비용 전 +7.4), 두 해 모두 음수
+- LQ: 91건, Train 규칙으로 지속 방향이 정해졌고(반전은 비용 전 음수) 순평균 **−15.4 bps**(비용 전 +4.0), 2021 −69 / 2023 +17
+- 둘 다 **REJECT**
+- VALIDATION 2024 / OOS 2025~2026-08: 미실행(봉인 유지)
+- 보고: FB PF 0.83, MDD 22.7% · LQ 최악 거래 −12.3%, MDD 35.3%
+
+Learned:
+- FB 순수익 95% 상한 약 +18 bps: 비용을 넘는 효과는 이 자료가 배제한다.
+- OI·funding 은 단독(H2)으로 써도, 가격 사건의 조건으로 써도 BTCUSDT 몇 시간 방향에서 taker 비용을 넘지 못했다.
+- 청산 과거 자료가 없어 LQ 는 추정치다.
+
+Do not retry:
+- 백분위·창·실패 대기 6시간·보유 12시간·스톱 변경
+- LQ 방향 분리(급등 롱만 등)
+- Price/OI 괴리·funding 극단 단독 (H2 F3·F1)
+
+근거: [48 선택·사전 등록·§7 판정](../research/48-perp-positioning-events.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.

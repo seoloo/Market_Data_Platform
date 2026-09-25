@@ -1,8 +1,8 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: BTCUSDT 무기한 포지셔닝 이벤트 FB·LQ 사전 등록 — 문서 48).
+최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: BTCUSDT 무기한 포지셔닝 이벤트 FB·LQ Train 판정 REJECT — 문서 48 §7).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3 기각.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3·FB·LQ 기각.
 
 ## 이번 작업 (Claude — 선물 수익 전략 독립 트랙: FB·LQ 사전 등록)
 
@@ -15,7 +15,10 @@ D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIE
   - Validation 2024: 순수익 > 0, p < 0.05
   - OOS 2025~2026-08: 순수익 > 0, MDD ≤ 30%
 - 이벤트 빈도: FB Train 118 · Val 67 · OOS 85, LQ 91 · 43 · 65. 검출 가능 효과는 거래당 총 80~90 bps 수준.
-- 다음: Train 1회 실행(`python -m scripts.screen_perp_events train`).
+- **Train 1회 판정: FB·LQ 모두 REJECT** (48 §7). Validation·OOS 는 봉인된 채 남았다.
+  - FB: 순수익 −10.7 bps/거래(비용 전 +7.4), 두 해 모두 음수, 95% 상한 약 +18 bps
+  - LQ: 지속 방향 −15.4 bps(비용 전 +4.0), 2021 −69 / 2023 +17, 최악 거래 −12.3%
+- 다음: 사용자 결정 대기. 비슷한 OI·funding 조합은 반복하지 않는다. 다른 구조적 가설은 후보 비교부터 한다.
 
 ## 이전 작업 (Claude — I3 MACD 히스토그램 롱숏 판정)
 
