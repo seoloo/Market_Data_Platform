@@ -295,7 +295,13 @@ class BinanceUsdmReadOnly:
         return self._refuse()
 
     def place_stop_market(
-        self, symbol: str, side: str, stop_price: Decimal, client_order_id: str
+        self,
+        symbol: str,
+        side: str,
+        stop_price: Decimal,
+        client_order_id: str,
+        *,
+        quantity: Decimal | None = None,
     ) -> FuturesOrderResult:
         return self._refuse()
 

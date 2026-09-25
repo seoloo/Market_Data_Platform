@@ -36,7 +36,7 @@ _MAX_ID_LEN = 36
 _ID_PATTERN = re.compile(r"^[.A-Z:/a-z0-9_-]{1,36}$")
 """Binance USD-M newClientOrderId 허용 문자."""
 
-_PURPOSE_CODE = {"OPEN": "O", "REDUCE": "R", "CLOSE": "C", "PROTECT": "P"}
+_PURPOSE_CODE = {"OPEN": "O", "REDUCE": "R", "CLOSE": "C", "PROTECT": "P", "BRIDGE": "B"}
 
 _STATE_BY_STATUS = {
     OrderStatus.NEW: "SUBMITTED",
@@ -175,6 +175,47 @@ class FuturesOrderManager:
         )
         return self._send(
             record, lambda: self._exchange.place_stop_market(symbol, side, stop_price, cid)
+        )
+
+    def place_bridge_stop(
+        self,
+        *,
+        decision_ms: int,
+        symbol: str,
+        side: str,
+        stop_price: Decimal,
+        quantity: Decimal,
+        attempt: int = 0,
+    ) -> FuturesOrderRecord:
+        """보호 스톱을 교체하는 동안만 쓰는 **수량 지정 reduce-only** 스톱(다리)을 멱등하게 건다.
+
+        같은 방향 closePosition 스톱은 하나만 걸리므로(-4130) 새 가격 스톱을 먼저 걸 수 없다.
+        다리 스톱은 closePosition 스톱과 함께 걸린다(52 §4 실측) — 교체 중 보호가 비지 않는다.
+        미해소 주문이 있어도 막지 않는다(보호는 언제나 허용).
+        """
+        cid = futures_client_order_id(self._tag, decision_ms, symbol, "BRIDGE", side, attempt)
+        existing = self._store.get(cid)
+        if existing is not None:
+            if existing.state in TERMINAL_STATES or existing.is_working_stop:
+                return existing
+            return self._reconcile(existing)
+        record = self._new_record(
+            cid,
+            decision_ms,
+            symbol,
+            side,
+            order_type="STOP_MARKET",
+            purpose="BRIDGE",
+            reduce_only=True,
+            close_position=False,
+            qty=quantity,
+            stop_price=stop_price,
+        )
+        return self._send(
+            record,
+            lambda: self._exchange.place_stop_market(
+                symbol, side, stop_price, cid, quantity=quantity
+            ),
         )
 
     def cancel(self, client_order_id: str) -> FuturesOrderRecord:

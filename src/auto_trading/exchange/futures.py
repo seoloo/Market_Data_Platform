@@ -111,9 +111,19 @@ class FuturesExchange(Protocol):
     ) -> FuturesOrderResult: ...
 
     def place_stop_market(
-        self, symbol: str, side: str, stop_price: Decimal, client_order_id: str
+        self,
+        symbol: str,
+        side: str,
+        stop_price: Decimal,
+        client_order_id: str,
+        *,
+        quantity: Decimal | None = None,
     ) -> FuturesOrderResult:
-        """closePosition 보호 스톱을 건다. 발동 전까지 상태는 NEW 다."""
+        """보호 스톱을 건다. 발동 전까지 상태는 NEW 다.
+
+        ``quantity`` 가 없으면 closePosition(포지션 전체, 같은 방향 하나만 — -4130).
+        있으면 수량 지정 reduce-only 스톱 — closePosition 스톱과 함께 걸린다(52 §4, 다리 스톱).
+        """
         ...
 
     def cancel_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:

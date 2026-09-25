@@ -200,18 +200,31 @@ class FakeFuturesExchange:
         )
 
     def place_stop_market(
-        self, symbol: str, side: str, stop_price: Decimal, client_order_id: str
+        self,
+        symbol: str,
+        side: str,
+        stop_price: Decimal,
+        client_order_id: str,
+        *,
+        quantity: Decimal | None = None,
     ) -> FuturesOrderResult:
         self._accept_or_fail(client_order_id)
         f = self.symbol_filters[symbol]
         if stop_price <= 0 or stop_price != floor_to_step(stop_price, f.tick_size):
             raise OrderRejectedError("PRICE_FILTER")
+        if quantity is not None and (
+            quantity < f.min_qty or quantity != floor_to_step(quantity, f.step_size)
+        ):
+            raise OrderRejectedError("LOT_SIZE")
         # 테스트넷 실측(2026-09-24) 규칙과 검사 순서: 닫을 포지션(-4509) → 같은 방향 중복(-4130)
         # → 즉시 발동(-2021). closePosition 스톱은 그 방향으로 닫을 포지션이 있어야 걸린다.
+        # 수량 지정 reduce-only 스톱은 closePosition·다른 수량 스톱과 함께 걸린다(2026-09-25 실측).
         position = self._qty.get(symbol, _ZERO)
         if (side == "SELL" and position <= 0) or (side == "BUY" and position >= 0):
             raise OrderRejectedError("-4509 closePosition stop needs an open position to close")
-        if any(o.side == side and o.close_position for o in self.open_stops(symbol)):
+        if quantity is None and any(
+            o.side == side and o.close_position for o in self.open_stops(symbol)
+        ):
             raise OrderRejectedError("-4130 closePosition stop in this direction already exists")
         mark = self.prices[symbol]
         if (side == "SELL" and stop_price >= mark) or (side == "BUY" and stop_price <= mark):
@@ -224,11 +237,11 @@ class FakeFuturesExchange:
                 side=side,
                 order_type=FuturesOrderType.STOP_MARKET,
                 status=OrderStatus.NEW,
-                orig_qty=_ZERO,
+                orig_qty=_ZERO if quantity is None else quantity,
                 executed_qty=_ZERO,
                 avg_price=_ZERO,
                 reduce_only=True,
-                close_position=True,
+                close_position=quantity is None,
                 stop_price=stop_price,
                 fee=_ZERO,
                 fee_asset=_QUOTE,
@@ -277,9 +290,10 @@ class FakeFuturesExchange:
             if not closes:
                 done = replace(order, status=OrderStatus.EXPIRED)
             else:
-                qty = abs(position)
+                # closePosition 은 전량, 수량 스톱은 reduce-only 라 포지션을 넘지 않는다
+                qty = abs(position) if order.close_position else min(order.orig_qty, abs(position))
                 fee = qty * price * self.fee_rate
-                self._fill(symbol, -position, price)
+                self._fill(symbol, -qty if position > 0 else qty, price)
                 self.wallet -= fee
                 done = replace(
                     order, status=OrderStatus.FILLED, executed_qty=qty, avg_price=price, fee=fee
