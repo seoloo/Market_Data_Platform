@@ -1,10 +1,23 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: I3 MACD 롱숏 판정 REJECT — 문서 47 §6).
+최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: BTCUSDT 무기한 포지셔닝 이벤트 FB·LQ 사전 등록 — 문서 48).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3 기각.
 
-## 이번 작업 (Claude — I3 MACD 히스토그램 롱숏 판정)
+## 이번 작업 (Claude — 선물 수익 전략 독립 트랙: FB·LQ 사전 등록)
+
+- 사용자 요청: BTCUSDT 무기한에서 비용 차감 후 재현 가능한 edge. 후보 4개 중 [48](docs/research/48-perp-positioning-events.md)에서 둘을 골랐다.
+  - FB: 실패한 돌파 + OI 증가 + funding 과열
+  - LQ: 청산 추정 = 1시간 OI 급감 + 가격 급변
+  - Price/OI 괴리와 funding 극단은 H2 F3·F1(기각)과 같은 신호라 제외했다.
+- 규칙(Entry 다음 봉 시가 · Stop 구조 극값 · Exit 12시간)과 기각 기준을 고정했다.
+  - Train 2021+2023: 거래 ≥ 30, 순수익 > 0 + Holm, 두 해 모두 양수
+  - Validation 2024: 순수익 > 0, p < 0.05
+  - OOS 2025~2026-08: 순수익 > 0, MDD ≤ 30%
+- 이벤트 빈도: FB Train 118 · Val 67 · OOS 85, LQ 91 · 43 · 65. 검출 가능 효과는 거래당 총 80~90 bps 수준.
+- 다음: Train 1회 실행(`python -m scripts.screen_perp_events train`).
+
+## 이전 작업 (Claude — I3 MACD 히스토그램 롱숏 판정)
 
 - 사용자 승인("판정 진행해줘") 뒤 1회 판정 → **REJECT** ([47 §6](docs/research/47-i3-macd-preregistration.md)). M1·M2·M3·안전 모두 실패.
   **2022-03-08 계좌 정지**(MDD 30.0%), 숏 순손익 **−4,621**(F1b −2,188 의 두 배), 롱 +4,201(funding −1,586), CAGR −0.7%, 샤프 0.05.
