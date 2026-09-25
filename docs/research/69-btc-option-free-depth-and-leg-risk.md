@@ -2,6 +2,8 @@
 
 작성: 2026-09-25 · Phase 0. [68 연속 호가 감사](68-btc-option-continuity-and-risk.md)의 후속이다. **유료 자료 구매·계정 인증·원시 파일 저장·손익 계산·주문 없음.** 현재 Paper·데모·실거래 설정은 변경하지 않았다.
 
+> 후속 정정: [70 옵션 depth 스냅샷 의미 확인](70-btc-option-depth-snapshot-semantics.md)에서 공식 옵션 매퍼가 구형 `depth100`·신형 `depth20`의 **각 프레임을 상위 N레벨 스냅샷으로 처리**함을 확인했다. 아래 `SNAPSHOT_NOT_PROVEN`은 당시의 미확인 판정 기록이지 현재의 자료 형식 판정이 아니다. 체결 품질·계좌 위험 미해결은 그대로다.
+
 ## 판정
 
 `FREE_L2_LINK_PARTIAL / SNAPSHOT_NOT_PROVEN / ACCOUNT_RISK_NOT_CLEARED`.

@@ -1,7 +1,13 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Codex (BTC 옵션 무료 L2·단독 다리 위험 게이트).
-현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 자료 접근을 확인했으나 전체 체결·위험 게이트에서 보류.
+최종 갱신: 2026-09-25 · 작성: Codex (BTC 옵션 depth 스냅샷 의미 확인).
+현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 무료 상위 N레벨 스냅샷 의미를 확인했으나 체결 품질·계좌 위험 게이트에서 보류.
+
+## 2026-09-25 — BTC 옵션 무료 depth 스냅샷 의미 정정
+
+- [70](docs/research/70-btc-option-depth-snapshot-semantics.md): Tardis 공식 옵션 매퍼 소스는 구형 `depth100`·신형 `depth20`의 **각 원시 프레임을 `isSnapshot=true`로 처리**한다. Binance 신형 partial-depth 명세와 무료 월 1일 원시 표본(2025년 재연결 직전/직후, 2026년 첫 두 프레임)을 대조했다. 따라서 [69](docs/research/69-btc-option-free-depth-and-leg-risk.md)의 “초기 스냅샷 미증명”은 **자료 형식 의미에 관해 정정**한다. 공식 Node 클라이언트 실행이나 거래소와의 독립 교차검증은 하지 않았다.
+- 재연결 뒤 첫 프레임부터 **새 상위 N레벨 목록**으로 시작 가능하나, 직전 상태를 운반하지 않는다. 2025년 재관측 풋은 bid `5`/10·ask `2370`/0.24라 실행 품질이 불량하다. 전체 주문장·체결 가능성·계좌 위험은 여전히 미검증. 판정 `TOP_N_SNAPSHOT_SEMANTICS_CONFIRMED / EXECUTION_QUALITY_NOT_PROVEN / ACCOUNT_RISK_NOT_CLEARED`.
+- 구매·패키지 설치·원자료 저장·계정 인증·손익 계산·기존 운영 변경 없음. 다음: 사전 고정 무료 표본에서 스냅샷별 양방향 호가·스프레드·표시 수량·관측 간격을 계약 유형별로 집계하되, 월 1일 표본의 일반화 한계를 명시. 10/23·10/24 점검 일정 불변.
 
 ## 2026-09-25 — BTC 옵션 무료 L2 시퀀스·단독 다리 위험 게이트
 
