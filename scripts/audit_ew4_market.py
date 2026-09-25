@@ -58,9 +58,9 @@ WEEK_MS = 7 * 86_400_000
 H1 = 3_600_000
 
 
-def _shuffled_minutes(to_ms: int) -> Iterator[Candle]:
+def _shuffled_minutes(to_ms: int, seed: str = NULL_SEED) -> Iterator[Candle]:
     """같은 입력·같은 seed 면 같은 경로 — 여러 번 읽어도 결정적이다."""
-    rng = random.Random(NULL_SEED)
+    rng = random.Random(seed)
     level: float | None = None
     week: list[Candle] = []
 
