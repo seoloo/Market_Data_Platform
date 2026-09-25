@@ -1,7 +1,13 @@
 # 작업 현황
 
-최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 RFQ 다중 다리 자동화·체결 계약 감사).
+최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 보호 롱 오프라인 필요조건 검증).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-09-26 — BTC 옵션 보호 롱 오프라인 필요조건 검증
+
+- [78](docs/research/78-btc-option-long-first-offline-check.md): 사용자 요청에 따라 보호 롱의 **검증 후 조건부 적용** 순서를 A(계약·수량) → B/C(계좌 손실·청산) → D(비용 후 경제성)로 고정했다. 연구 전용 순수 검사기와 경계·`UNKNOWN`·부분 체결·속성 테스트로 A의 필요조건을 확인했다. 운영 주문 경로에는 연결하지 않았다.
+- 가상 수치 반례에서 초기 만기 손실이 equity 1% 이내여도 조기 청산 손실은 초과할 수 있음을 계산했다. 실제 계정·호가·거래 성과가 아닌 산술이다. 판정 `A_OFFLINE_INVARIANT_TESTED / ACCOUNT_PATH_UNVERIFIED / TIMED_EXIT_UNVERIFIED / ECONOMICS_UNTESTED / NO_TRADING_APPLICATION`. B/C의 공식·계정 근거와 장애 시험이 없으면 옵션 매도 적용 불가, 경제성까지 미달이면 후보 제외. 계정 인증·주문·유료 구매·기존 Paper/위험 정책 변경 없음. 10/23·10/24 일정 불변.
+- 검증: 전체 pytest 2,090건, leakage 77건, 신규 연구 테스트 10건(마지막 속성 검사 강화 후 재실행), strict mypy 321파일, ruff check/format, import-linter 5계약 통과. 문서 상대 링크·공백·변경 범위 확인.
 
 ## 2026-09-26 — BTC 옵션 RFQ 자동화·다리 체결 계약 공개 감사
 
