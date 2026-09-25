@@ -20,6 +20,7 @@ __all__ = [
     "BASE_W1",
     "CORRECTIVE",
     "MOTIVE",
+    "NESTED_PATTERNS",
     "SEED",
     "SPEED_PER_MINUTE",
     "SyntheticPath",
@@ -43,7 +44,7 @@ _Wave = tuple[str, float]  # (모양, 부호 있는 로그 크기)
 @dataclass(frozen=True, slots=True)
 class SyntheticPath:
     pattern: str
-    """IMPULSE | ZIGZAG | FLAT | TRIANGLE (첫 다리 상승)."""
+    """IMPULSE | ZIGZAG | FLAT | TRIANGLE | :data:`NESTED_PATTERNS` 이름 (첫 다리 상승)."""
     minutes: tuple[Candle, ...]
     four_hour: tuple[Candle, ...]
     vertex_minutes: tuple[int, ...]
@@ -94,8 +95,85 @@ def _triangle(rng: random.Random, amp: float) -> list[_Wave]:
     return [(CORRECTIVE, s * amp * (1 if k % 2 == 0 else -1)) for k, s in enumerate(sizes)]
 
 
-def _split(rng: random.Random, shape: str, amp: float) -> list[_Wave]:
+NESTED_PATTERNS: dict[str, tuple[str, int, str]] = {
+    "IMPULSE_W4_TRIANGLE": ("IMPULSE", 3, "TRIANGLE"),
+    "IMPULSE_W4_EXPFLAT": ("IMPULSE", 3, "EXPFLAT"),
+    "ZIGZAG_B_TRIANGLE": ("ZIGZAG", 1, "TRIANGLE"),
+    "ZIGZAG_B_EXPFLAT": ("ZIGZAG", 1, "EXPFLAT"),
+}
+"""문서 61: 이름 → (최상위 패턴, 안에 든 다리 색인, 안의 모양)."""
+
+
+def _inner(rng: random.Random, form: str, a: float) -> list[_Wave]:
+    """아래로 가는 조정 다리 안의 모양 (A 크기 a). 문서 61 §3."""
+    if form == "TRIANGLE":
+        sizes = [1.0]
+        for _ in range(4):
+            sizes.append(sizes[-1] * rng.uniform(0.55, 0.85))
+        return [(CORRECTIVE, a * s * (-1 if k % 2 == 0 else 1)) for k, s in enumerate(sizes)]
+    rb = rng.uniform(1.05, 1.382)
+    kc = rng.uniform(1.0, 1.618)
+    return [(CORRECTIVE, -a), (CORRECTIVE, a * rb), (MOTIVE, -a * kc)]
+
+
+def _lowest(start: float, legs: list[_Wave]) -> float:
+    level, low = start, start
+    for _, amp in legs:
+        level += amp
+        low = min(low, level)
+    return low
+
+
+def _nested(rng: random.Random, name: str) -> tuple[list[_Wave], dict[int, list[_Wave]]]:
+    """최상위 파동(1파·A = 1)과 안에 든 모양의 다리. 절대 규칙을 어기면 다시 뽑는다."""
+    top, _, form = NESTED_PATTERNS[name]
+    while True:
+        if top == "IMPULSE":
+            r2 = rng.uniform(0.382, 0.786)
+            k3 = rng.uniform(1.0, 2.618)
+            r4 = rng.uniform(0.236, 0.5)
+            k5 = rng.uniform(0.618, 1.0)
+            kids = _inner(rng, form, r4 * k3)
+            if _lowest(1 - r2 + k3, kids) <= 1.0:  # 4파가 1파 끝과 겹침
+                continue
+            net = sum(amp for _, amp in kids)
+            waves = [(MOTIVE, 1.0), (CORRECTIVE, -r2), (MOTIVE, k3), (form, net), (MOTIVE, k5)]
+            return waves, {3: kids}
+        rb = rng.uniform(0.382, 0.786)
+        kc = rng.uniform(0.618, 1.618)
+        kids = _inner(rng, form, rb)
+        net = sum(amp for _, amp in kids)
+        if (
+            _lowest(1.0, kids) <= 0.0 or 1.0 + net + kc <= 1.0
+        ):  # B 가 시작을 넘음 · C 가 A 끝 못 넘음
+            continue
+        return [(MOTIVE, 1.0), (form, net), (MOTIVE, kc)], {1: kids}
+
+
+def _split(rng: random.Random, shape: str, amp: float, strict: bool = False) -> list[_Wave]:
+    if strict:
+        return _motive_strict(rng, amp) if shape == MOTIVE else _zigzag_strict(rng, amp)
     return _motive(rng, amp) if shape == MOTIVE else _zigzag(rng, amp)
+
+
+_NO_TRUNCATION = 0.1
+"""문서 61 §3: 새 패턴의 하위 5파·C 는 3파·A 끝을 (단위의) 10% 이상 넘는다 — 절단형 없음."""
+
+
+def _motive_strict(rng: random.Random, amp: float) -> list[_Wave]:
+    while True:
+        waves = _motive(rng, amp)
+        unit = waves[0][1]
+        if (waves[4][1] + waves[3][1]) / unit > _NO_TRUNCATION:  # 5파 끝 − 3파 끝
+            return waves
+
+
+def _zigzag_strict(rng: random.Random, amp: float) -> list[_Wave]:
+    while True:
+        waves = _zigzag(rng, amp)
+        unit = waves[0][1]
+        if (waves[2][1] + waves[1][1]) / unit > _NO_TRUNCATION:  # C 끝 − A 끝
+            return waves
 
 
 def _durations(rng: random.Random, amps: list[float], total: int) -> list[int]:
@@ -107,19 +185,19 @@ def _durations(rng: random.Random, amps: list[float], total: int) -> list[int]:
 
 
 def _expand(
-    rng: random.Random, shape: str, amp: float, minutes: int, depth: int
+    rng: random.Random, shape: str, amp: float, minutes: int, depth: int, strict: bool = False
 ) -> list[tuple[float, int]]:
     """(로그 변화, 분) 직선 조각들. 깊이 0 이거나 너무 짧으면 직선 하나."""
     if depth == 0:
         return [(amp, minutes)]
-    kids = _split(rng, shape, amp)
+    kids = _split(rng, shape, amp, strict)
     if minutes < 2 * len(kids):
         return [(amp, minutes)]
     out: list[tuple[float, int]] = []
     for (kid_shape, kid_amp), d in zip(
         kids, _durations(rng, [a for _, a in kids], minutes), strict=True
     ):
-        out.extend(_expand(rng, kid_shape, kid_amp, d, depth - 1))
+        out.extend(_expand(rng, kid_shape, kid_amp, d, depth - 1, strict))
     return out
 
 
@@ -133,7 +211,13 @@ def build_path(
     """상승 impulse(5-3-5-3-5)·zigzag(5-3-5)·flat(3-3-5)·수렴 triangle(3-3-3-3-3) 하나와
     앞뒤 진입·이탈 직선."""
     w1 = BASE_W1 * scale
-    if pattern == "IMPULSE":
+    children: dict[int, list[_Wave]] = {}
+    if pattern in NESTED_PATTERNS:
+        top_waves, rel_children = _nested(rng, pattern)
+        unit = w1 / top_waves[0][1]
+        top_waves = [(s, a * unit) for s, a in top_waves]
+        children = {k: [(s, a * unit) for s, a in v] for k, v in rel_children.items()}
+    elif pattern == "IMPULSE":
         top_waves = _motive(rng, 1.0)
         unit = w1 / top_waves[0][1]
         top_waves = [(s, a * unit) for s, a in top_waves]
@@ -147,10 +231,30 @@ def build_path(
     lead = math.log(1 + 2 * parent_threshold)
     pieces: list[tuple[float, int]] = [(-lead, max(1, round(lead / SPEED_PER_MINUTE)))]
     nominal = [pieces[0][1]]
-    for shape, amp in top_waves:
-        minutes = max(1, round(abs(amp) / SPEED_PER_MINUTE * rng.uniform(0.7, 1.3)))
-        pieces.extend(_expand(rng, shape, amp, minutes, 2))
-        nominal.append(nominal[-1] + minutes)
+    nested = pattern in NESTED_PATTERNS
+    inner_edges: dict[
+        int, tuple[int, int]
+    ] = {}  # 안 모양 파동 → (첫 안쪽 다리, 마지막 안쪽 다리) 길이
+    for index, (shape, amp) in enumerate(top_waves):
+        before = len(pieces)
+        if index in children:
+            kids = children[index]
+            span = sum(abs(a) for _, a in kids)
+            minutes = max(2 * len(kids), round(span / SPEED_PER_MINUTE * rng.uniform(0.7, 1.3)))
+            kid_minutes: list[int] = []
+            for (kid_shape, kid_amp), d in zip(
+                kids, _durations(rng, [a for _, a in kids], minutes), strict=True
+            ):
+                kid_pieces = _expand(rng, kid_shape, kid_amp, d, 1, strict=True)
+                pieces.extend(kid_pieces)
+                kid_minutes.append(sum(m for _, m in kid_pieces))
+            inner_edges[index] = (kid_minutes[0], kid_minutes[-1])
+        else:
+            minutes = max(1, round(abs(amp) / SPEED_PER_MINUTE * rng.uniform(0.7, 1.3)))
+            pieces.extend(_expand(rng, shape, amp, minutes, 2, strict=nested))
+        # 새 패턴은 실제 조각 길이 합 (정답 꼭짓점을 조각 경계에서 찾는다), 기존 패턴은 그대로
+        added = sum(m for _, m in pieces[before:])
+        nominal.append(nominal[-1] + (added if nested else minutes))
     exit_minutes = max(1, round(lead / SPEED_PER_MINUTE))
     pieces.append((-lead, exit_minutes))
     total = sum(m for _, m in pieces)
@@ -200,9 +304,14 @@ def build_path(
         *((a + b) // 2 for a, b in pairwise(nominal)),
         len(minutes_out),
     ]
+    windows = [range(bounds[i], bounds[i + 1]) for i in range(len(kinds))]
+    for index, (first, last) in inner_edges.items():
+        # 문서 61 §3: 안 모양 쪽 창은 첫·마지막 안쪽 다리 절반까지 (삼각형 C 끝·플랫 B 끝 제외)
+        start, end = windows[index], windows[index + 1]
+        windows[index] = range(start.start, min(start.stop, nominal[index] + max(1, first // 2)))
+        windows[index + 1] = range(max(end.start, nominal[index + 1] - last // 2), end.stop)
     vertex_minutes: list[int] = []
-    for i, kind in enumerate(kinds):
-        window = range(bounds[i], bounds[i + 1])
+    for kind, window in zip(kinds, windows, strict=True):
         if kind is SwingKind.HIGH:
             best = max(window, key=lambda t: (minutes_out[t].high, -t))
         else:

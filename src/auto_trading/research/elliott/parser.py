@@ -27,6 +27,7 @@ __all__ = [
     "FLAT_C_MAX",
     "FLAT_C_MIN",
     "LEG_NEEDS",
+    "NESTED_ALLOWED",
     "FinePivot",
     "Label",
     "Parse",
@@ -80,6 +81,21 @@ LEG_NEEDS.update(
     }
 )
 
+_CORRECTIVE_FORMS = frozenset({Label.ZIGZAG, Label.FLAT, Label.TRIANGLE})
+NESTED_ALLOWED: dict[Label, tuple[frozenset[Label], ...]] = {
+    Label.IMPULSE: (
+        frozenset({Label.IMPULSE}),
+        frozenset({Label.ZIGZAG}),
+        frozenset({Label.IMPULSE}),
+        _CORRECTIVE_FORMS,
+        frozenset({Label.IMPULSE}),
+    ),
+    Label.ZIGZAG: (frozenset({Label.IMPULSE}), _CORRECTIVE_FORMS, frozenset({Label.IMPULSE})),
+    Label.FLAT: tuple(frozenset({need}) for need in LEG_NEEDS[Label.FLAT]),
+    Label.TRIANGLE: tuple(frozenset({need}) for need in LEG_NEEDS[Label.TRIANGLE]),
+}
+"""문서 61 (EW-4n): 다리 자리별로 검증으로 치는 모양 — 4파·B파에 플랫·수렴 삼각형 허용."""
+
 FLAT_B_MIN, FLAT_B_MAX = 0.618, 1.618
 """문서 60 §3.1 F1·F2: B/A 범위."""
 FLAT_C_MIN, FLAT_C_MAX = 0.382, 2.618
@@ -95,6 +111,7 @@ class WaveParser:
         bars: Sequence[Candle],
         *,
         lenient_three: bool = True,
+        nested: bool = False,
     ) -> None:
         for a, b in pairwise(pivots):
             if (
@@ -106,9 +123,14 @@ class WaveParser:
         self._p = tuple(pivots)
         self._bars = tuple(bars)
         self._lenient = lenient_three
+        self._nested = nested
         self._ends = [self._extremal_ends(i) for i in range(len(self._p))]
+        self._end_sets = [frozenset(e) for e in self._ends]
         self._relaxed = [self._start_ends(i) for i in range(len(self._p))]
+        self._qf = [float(pivot.price) for pivot in self._p]
         self.labels = cache(self._labels)
+        self.nested_forms = cache(self._nested_forms)
+        self.expanded_ends = cache(self._expanded_ends)
         self.impulses = cache(self._impulses)
         self.zigzags = cache(self._zigzags)
 
@@ -234,13 +256,134 @@ class WaveParser:
                 ends.append(j)
         return tuple(ends)
 
-    def _leg(self, i: int, j: int, need: Label, *, relaxed: bool = False) -> Label | None:
-        """후보용 다리: 원자·(시작) 극단 구간이면 받고, 요구 모양 파싱 여부만 라벨로 남긴다."""
+    def _leg(
+        self,
+        i: int,
+        j: int,
+        need: Label,
+        *,
+        relaxed: bool = False,
+        alts: frozenset[Label] = frozenset(),
+    ) -> Label | None:
+        """후보용 다리: 원자·(시작) 극단 구간이면 받고, 요구 모양 파싱 여부만 라벨로 남긴다.
+
+        ``alts`` (문서 61): 요구 모양이 아니면 플랫 → 수렴 삼각형 순으로 읽어 본다.
+        확장 플랫으로 읽히는 구간은 시작 극단이 아니어도 받는다.
+        """
         if j == i + 1:
             return Label.ATOM
-        if not (j in self._relaxed[i] if relaxed else self.extremal(i, j)):
+        span_ok = j in self._relaxed[i] if relaxed else self.extremal(i, j)
+        if not span_ok and not (Label.FLAT in alts and j in self.expanded_ends(i)):
             return None
-        return need if need in self.labels(i, j) else Label.OPAQUE
+        if need in self.labels(i, j):
+            return need
+        if alts:
+            forms = self.nested_forms(i, j)
+            for form in (Label.FLAT, Label.TRIANGLE):
+                if form in alts and form in forms:
+                    return form
+        return Label.OPAQUE
+
+    # ------------------------------------------------------------ EW-4n 다리 안 모양 (문서 61)
+
+    def _lq(self, d: int, k: int) -> float:
+        return d * self._qf[k]
+
+    def _nested_forms(self, i: int, j: int) -> frozenset[Label]:
+        """i→j 를 플랫·수렴 삼각형으로 읽을 수 있는가. 하위 다리는 엄격(원자 또는 파싱됨)."""
+        if j - i < 3 or (j - i) % 2 == 0:
+            return frozenset()
+        d = self._direction(i)
+        ends, sets = self._ends, self._end_sets
+        out: set[Label] = set()
+        q0 = self._lq(d, i)
+        for b1 in ends[i]:
+            if b1 >= j - 1:
+                break
+            if self._corrective_ok(i, b1) is None:
+                continue
+            a = self._lq(d, b1) - q0
+            for b2 in ends[b1]:
+                if b2 >= j:
+                    break
+                ratio = (self._lq(d, b1) - self._lq(d, b2)) / a
+                if ratio > FLAT_B_MAX:
+                    break
+                if ratio < FLAT_B_MIN or j not in sets[b2]:
+                    continue
+                c = (self._lq(d, j) - self._lq(d, b2)) / a
+                if not FLAT_C_MIN <= c <= FLAT_C_MAX:
+                    continue
+                if self._corrective_ok(b1, b2) is not None and self._motive_ok(b2, j) is not None:
+                    out.add(Label.FLAT)
+                    break
+            if Label.FLAT in out:
+                break
+        if j - i >= 5 and self._triangle_reading(i, j, d):
+            out.add(Label.TRIANGLE)
+        return frozenset(out)
+
+    def _triangle_reading(self, i: int, j: int, d: int) -> bool:
+        ends, sets = self._ends, self._end_sets
+        q = self._lq
+        for b1 in ends[i]:
+            if b1 >= j - 3:
+                break
+            if self._corrective_ok(i, b1) is None:
+                continue
+            for b2 in ends[b1]:  # 새 저점 순 — A 시작을 넘으면 그 뒤도 넘는다
+                if b2 >= j - 2 or q(d, b2) <= q(d, i):
+                    break
+                if self._corrective_ok(b1, b2) is None:
+                    continue
+                for b3 in ends[b2]:  # 새 고점 순 — A 끝에 닿으면 그 뒤도 닿는다
+                    if b3 >= j - 1 or q(d, b3) >= q(d, b1):
+                        break
+                    if self._corrective_ok(b2, b3) is None:
+                        continue
+                    for b4 in ends[b3]:
+                        if b4 >= j or q(d, b4) <= q(d, b2):
+                            break
+                        if (
+                            j in sets[b4]
+                            and q(d, j) < q(d, b3)
+                            and self._corrective_ok(b3, b4) is not None
+                            and self._corrective_ok(b4, j) is not None
+                        ):
+                            return True
+        return False
+
+    def _expanded_ends(self, i: int) -> tuple[int, ...]:
+        """i 에서 시작해 **확장 플랫**(B 가 A 시작을 넘음)으로 읽히는 끝 j 들 (시작 극단 아님)."""
+        d = self._direction(i)
+        ends = self._ends
+        q0 = self._lq(d, i)
+        found: set[int] = set()
+        for b1 in ends[i]:
+            if self._corrective_ok(i, b1) is None:
+                continue
+            a = self._lq(d, b1) - q0
+            for b2 in ends[b1]:
+                if self._lq(d, b2) >= q0:
+                    continue
+                ratio = (self._lq(d, b1) - self._lq(d, b2)) / a
+                if ratio > FLAT_B_MAX:
+                    break
+                if self._corrective_ok(b1, b2) is None:
+                    continue
+                for jj in ends[b2]:
+                    c = (self._lq(d, jj) - self._lq(d, b2)) / a
+                    if c > FLAT_C_MAX:
+                        break
+                    if c >= FLAT_C_MIN and self._motive_ok(b2, jj) is not None:
+                        found.add(jj)
+        return tuple(sorted(found))
+
+    def _with_expanded(self, ends: tuple[int, ...], i: int) -> tuple[int, ...]:
+        if not self._nested:
+            return ends
+        extra = self.expanded_ends(i)
+        return tuple(sorted(set(ends) | set(extra))) if extra else ends
 
     def top_candidates(self, i: int, j: int, *, relaxed: bool = False) -> tuple[Parse, ...]:
         """절대 규칙만으로 만든 최상위 후보 전부 (impulse·zigzag). 내부 미검증 다리도 포함.
@@ -254,6 +397,8 @@ class WaveParser:
         q = [d * pivot.price for pivot in self._p]
         as_of = self._p[j].confirmed_four_hour_close_ms
         closed = tuple(bar for bar in self._bars if bar.close_ms <= as_of)
+        alts_b = NESTED_ALLOWED[Label.ZIGZAG][1] if self._nested else frozenset()
+        alts_4 = NESTED_ALLOWED[Label.IMPULSE][3] if self._nested else frozenset()
         found: list[Parse] = []
         for b1 in ends[i]:
             if b1 >= j:
@@ -261,16 +406,16 @@ class WaveParser:
             la = self._leg(i, b1, Label.IMPULSE, relaxed=relaxed)
             if la is None:
                 continue
-            for b2 in ends[b1]:
+            for b2 in self._with_expanded(ends[b1], b1):
                 if b2 >= j:
                     break
-                lb = self._leg(b1, b2, Label.ZIGZAG, relaxed=relaxed)
-                if lb is None:
-                    continue
+                lb_zz = self._leg(b1, b2, Label.ZIGZAG, relaxed=relaxed, alts=alts_b)
                 lc = self._leg(b2, j, Label.IMPULSE, relaxed=relaxed)
-                if lc is not None and q[j] > q[b1] and q[b2] > q[i]:
-                    found.append(Parse(Label.ZIGZAG, (i, b1, b2, j), (la, lb, lc)))
-                if q[b2] <= q[i]:
+                if lb_zz is not None and lc is not None and q[j] > q[b1] and q[b2] > q[i]:
+                    found.append(Parse(Label.ZIGZAG, (i, b1, b2, j), (la, lb_zz, lc)))
+                # 충격파 2파 자리: 지그재그만 (문서 61 §2)
+                lb = self._leg(b1, b2, Label.ZIGZAG, relaxed=relaxed) if alts_b else lb_zz
+                if lb is None or q[b2] <= q[i]:
                     continue
                 for b3 in ends[b2]:
                     if b3 >= j - 1:
@@ -280,12 +425,12 @@ class WaveParser:
                     l3 = self._leg(b2, b3, Label.IMPULSE, relaxed=relaxed)
                     if l3 is None:
                         continue
-                    for b4 in ends[b3]:
+                    for b4 in self._with_expanded(ends[b3], b3):
                         if b4 >= j:
                             break
                         if q[b4] <= q[b1]:
                             continue
-                        l4 = self._leg(b3, b4, Label.ZIGZAG, relaxed=relaxed)
+                        l4 = self._leg(b3, b4, Label.ZIGZAG, relaxed=relaxed, alts=alts_4)
                         l5 = self._leg(b4, j, Label.IMPULSE, relaxed=relaxed)
                         if l4 is None or l5 is None:
                             continue
