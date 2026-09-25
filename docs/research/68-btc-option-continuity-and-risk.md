@@ -1,5 +1,7 @@
 # 68 — BTC 옵션 연속 호가·계좌 위험 Phase 0 감사
 
+후속: [69 무료 L2 시퀀스·단독 다리 위험 게이트](69-btc-option-free-depth-and-leg-risk.md). 아래의 남은 게이트는 68 작성 당시 계획이며 69에서 무료 소표본만 추가 점검했다.
+
 작성: 2026-09-25. [66 자료 접근](66-btc-option-vol-premium-feasibility.md)·[67 대표성](67-btc-option-quote-quality-sample.md)의 후속이다. **연속 10분의 표시 호가와 공개 계약 규칙만** 검사했다. 체결·손익·전략 파라미터는 계산하지 않았고, Paper·데모·실거래 경로는 변경하지 않았다.
 
 ## 결론
