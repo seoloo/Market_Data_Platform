@@ -11,7 +11,8 @@
 2026-09-24 사용자 결정으로 저녁 시각으로 옮겼다
 (출근 때문에 아침에 PC 를 켤 수 없다).
 테스트넷 훈련 결과(``reports/testnet/drill-*.json``)와
-T/v2 그림자 운영(``reports/shadow/t2/``, docs/research/51)도
+T/v2 그림자 운영(``reports/shadow/t2/``, docs/research/51),
+데모 T/v2(55·57)·Elliott BTC 데모(56)도
 한 줄씩 요약한다.
 훈련 실패는 경고(1)까지만 올린다.
 종료 코드: 0 이상 없음 · 1 경고 · 2 조치 필요(중단 기준·실행 누락·원장 불일치·알림 실패).
@@ -38,6 +39,8 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.ops.paper_watch import (
     Finding,
     LedgerSummary,
+    check_demo_ew,
+    check_demo_t2,
     check_o1,
     check_shadow,
     check_t2,
@@ -61,6 +64,8 @@ ENV = REPO / ".env"
 OUT = REPO / "reports" / "watchdog"
 DRILLS = REPO / "reports" / "testnet"
 SHADOW = REPO / "reports" / "shadow" / "t2"
+DEMO_T2 = REPO / "reports" / "demo_t2"
+DEMO_EW = REPO / "reports" / "demo_ew"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
 _EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
@@ -159,6 +164,48 @@ def shadow_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return check_shadow(report, now_ms)
 
 
+def demo_t2_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """데모 T/v2 (실거래 1단계 실행기 예행연습, docs/research/55·57) 최신 보고서와 미해결 주문."""
+    paths = sorted(DEMO_T2.glob("20*.json"))
+    report = None
+    if paths:
+        try:
+            report = json.loads(paths[-1].read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return [], [Finding("WARN", "데모 T/v2", f"읽을 수 없는 보고서 {paths[-1].name}")]
+    unresolved = 0
+    try:
+        conn = connect_read_only(DB)
+        try:
+            unresolved = conn.execute(
+                "SELECT COUNT(*) FROM spot_orders WHERE mode = 'demo'"
+                " AND state IN ('PENDING', 'SUBMITTED', 'UNKNOWN', 'PARTIALLY_FILLED')"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+    except (AutoTradingError, sqlite3.Error):
+        pass  # DB 문제는 collect() 가 이미 CRITICAL 로 올린다
+    return check_demo_t2(report, int(unresolved), now_ms)
+
+
+def demo_ew_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """Elliott BTC 선물 데모 상주 실행기 (docs/research/56) 상태·사건."""
+    state_path = DEMO_EW / "state.json"
+    if not state_path.exists():
+        return check_demo_ew(None, [], now_ms)
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        events_path = DEMO_EW / "events.jsonl"
+        events = (
+            [json.loads(x) for x in events_path.read_text(encoding="utf-8").splitlines() if x]
+            if events_path.exists()
+            else []
+        )
+    except (OSError, ValueError):
+        return [], [Finding("WARN", "데모 Elliott", "상태·사건 기록을 읽을 수 없다")]
+    return check_demo_ew(state, events, now_ms)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -191,6 +238,10 @@ def main() -> int:
     shadow_lines, shadow_findings = shadow_status(now_ms)
     drill_lines += shadow_lines
     findings += shadow_findings
+    for status_fn in (demo_t2_status, demo_ew_status):
+        demo_lines, demo_findings = status_fn(now_ms)
+        drill_lines += demo_lines
+        findings += demo_findings
     code = exit_code(findings)
     text = render_report(summaries, findings, now_ms, extra=drill_lines)
 

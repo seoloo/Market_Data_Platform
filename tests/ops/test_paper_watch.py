@@ -350,3 +350,58 @@ class TestShadow:
     def test_any_order_sent_is_critical(self) -> None:
         found = check_shadow(self.report(orders_sent_to_exchange=1), self.NOW)[1]
         assert [f.level for f in found] == ["CRITICAL"]
+
+
+# ---------------------------------------------------------------- 데모 (55·56·57)
+
+
+def test_demo_t2_line_summarises_orders_and_flags_problems() -> None:
+    from auto_trading.ops.paper_watch import check_demo_t2
+
+    now = 1_790_300_000_000
+    report = {
+        "at_ms": now - 3_600_000,
+        "decision_date": "2026-09-24",
+        "status": "OK",
+        "equity": "5000",
+        "orders": [
+            {"chased": "False", "cost_price_bps": "-0.1", "cost_fee_bps": "10.0"},
+            {"chased": "True", "cost_price_bps": "2.1", "cost_fee_bps": "10.0"},
+        ],
+    }
+    lines, findings = check_demo_t2(report, 0, now)
+    assert "주문 2건(지정가만 1)" in lines[0] and "평균 비용 11.0bp" in lines[0]
+    assert findings == []
+    _, findings = check_demo_t2({**report, "status": "DEGRADED", "note": "x"}, 2, now)
+    assert {f.level for f in findings} == {"WARN"} and len(findings) == 2
+    _, findings = check_demo_t2(report, 0, now + 2 * 86_400_000)
+    assert "밀림" in findings[0].message
+
+
+def test_demo_ew_flags_dead_runner_errors_and_slow_protection() -> None:
+    from auto_trading.ops.paper_watch import check_demo_ew
+
+    now = 1_790_300_000_000
+    state = {
+        "phase": "OPEN",
+        "last_scan_ms": now - 3_600_000,
+        "entry": "61000",
+        "stop": "58000",
+        "target": "70708",
+    }
+    events = [
+        {"kind": "trigger", "at_ms": now - 100, "setup": {"direction": 1}},
+        {"kind": "entry_filled", "at_ms": now - 50, "protect_ms": 1200},
+    ]
+    lines, findings = check_demo_ew(state, events, now)
+    assert "보유 중" in lines[0] and "셋업 1" in lines[0] and findings == []
+    stale = {**state, "last_scan_ms": now - 6 * 3_600_000}
+    slow = [
+        *events,
+        {"kind": "entry_filled", "at_ms": now - 10, "protect_ms": 7000},
+        {"kind": "error", "at_ms": now - 5, "error": "timeout"},
+    ]
+    _, findings = check_demo_ew(stale, slow, now)
+    messages = " | ".join(f.message for f in findings)
+    assert "소식 없음" in messages and "7.0초" in messages and "오류 1건" in messages
+    assert {f.level for f in findings} == {"WARN"}

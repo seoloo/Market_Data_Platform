@@ -442,6 +442,11 @@ class EwDemoRunner:
         if self.state.get("phase") == "IDLE":
             self.place_setup(latest)
 
+    def heartbeat(self, now_ms: int) -> None:
+        """스캔을 마친 시각 — 일일 점검이 실행기가 살아 있는지 본다."""
+        self.state["last_scan_ms"] = now_ms
+        self._save()
+
     def reconcile(self) -> None:
         """시작할 때: 거래소 상태와 기록을 맞춘다. 보호 없는 포지션이 있으면 바로 보호한다."""
         pos = self._position()
@@ -518,6 +523,7 @@ def main(argv: list[str]) -> int:
         try:
             if now >= next_scan:
                 runner.on_scan(scan(fetch_minutes(client, now)))
+                runner.heartbeat(now)
                 boundary = now - now % H4 + H4
                 next_scan = boundary + SCAN_DELAY_MS
             runner.check()

@@ -34,6 +34,8 @@ __all__ = [
     "WARN_DRAWDOWN",
     "Finding",
     "LedgerSummary",
+    "check_demo_ew",
+    "check_demo_t2",
     "check_o1",
     "check_t2",
     "check_testnet_drill",
@@ -341,3 +343,83 @@ def render_report(
     for f in sorted(findings, key=lambda f: order[f.level]):
         lines.append(f"- {f.level} [{f.ledger}] {f.message}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- 데모 (docs/research/55·56·57)
+
+DEMO_EW_STALE_MS = 5 * 3_600_000
+"""Elliott 데모 실행기는 4 시간마다 스캔한다 — 5 시간 넘게 소식이 없으면 멈춘 것으로 본다."""
+PROTECT_LIMIT_MS = 5_000
+"""TRADING_CORE 보호 공백 5 초."""
+
+
+def check_demo_t2(
+    report: Mapping[str, Any] | None, unresolved: int, now_ms: int
+) -> tuple[list[str], list[Finding]]:
+    """데모 T/v2 (실거래 1단계 실행기 예행연습) 최신 보고서 한 줄과 판정. 데모라 WARN 까지만."""
+    ledger = "데모 T/v2"
+    if report is None:
+        return [], [Finding("INFO", ledger, "데모 T/v2 기록이 아직 없다")]
+    findings: list[Finding] = []
+    at = int(report.get("at_ms") or 0)
+    behind = now_ms // _DAY_MS - at // _DAY_MS
+    if behind >= 1:
+        findings.append(Finding("WARN", ledger, f"{behind}일 밀림 — 마지막 {_date(at)}"))
+    status = str(report.get("status"))
+    if status in ("DEGRADED", "HALTED"):
+        findings.append(Finding("WARN", ledger, f"{status}: {report.get('note')}"))
+    if unresolved:
+        findings.append(Finding("WARN", ledger, f"해소되지 않은 데모 주문 {unresolved}건"))
+    orders = report.get("orders") or []
+    equity = float(report.get("equity") or 0)
+    line = f"데모 T/v2: {report.get('decision_date')} {status} · 자본 {equity:,.2f} USDT"
+    if orders:
+        maker = sum(1 for o in orders if o.get("chased") != "True")
+        costs = [
+            float(o["cost_price_bps"]) + float(o["cost_fee_bps"])
+            for o in orders
+            if o.get("cost_price_bps") not in (None, "None")
+        ]
+        line += f" · 주문 {len(orders)}건(지정가만 {maker})"
+        if costs:
+            line += f" · 평균 비용 {sum(costs) / len(costs):.1f}bp"
+    return [line], findings
+
+
+def check_demo_ew(
+    state: Mapping[str, Any] | None, events: Sequence[Mapping[str, Any]], now_ms: int
+) -> tuple[list[str], list[Finding]]:
+    """Elliott BTC 선물 데모 상주 실행기 상태 한 줄과 판정 (docs/research/56).
+
+    데모라 WARN 까지만 올린다.
+    """
+    ledger = "데모 Elliott"
+    if state is None:
+        return [], [Finding("INFO", ledger, "Elliott 데모 기록이 아직 없다")]
+    findings: list[Finding] = []
+    last = int(state.get("last_scan_ms") or 0)
+    if not last or now_ms - last > DEMO_EW_STALE_MS:
+        when = _date(last) if last else "기록 없음"
+        findings.append(Finding("WARN", ledger, f"상주 실행기 소식 없음 — 마지막 스캔 {when}"))
+    day_ago = now_ms - _DAY_MS
+    recent = [e for e in events if int(e.get("at_ms") or 0) >= day_ago]
+    errors = [e for e in recent if e.get("kind") == "error"]
+    if errors:
+        findings.append(
+            Finding("WARN", ledger, f"최근 24시간 오류 {len(errors)}건: {errors[-1].get('error')}")
+        )
+    for e in recent:
+        if e.get("kind") == "entry_filled" and int(e.get("protect_ms") or 0) > PROTECT_LIMIT_MS:
+            findings.append(
+                Finding(
+                    "WARN", ledger, f"보호 주문까지 {int(e['protect_ms']) / 1000:.1f}초 (> 5초)"
+                )
+            )
+    triggers = sum(1 for e in recent if e.get("kind") == "trigger")
+    setups = sum(1 for e in recent if e.get("kind") == "trigger" and e.get("setup"))
+    phase = str(state.get("phase", "IDLE"))
+    what = {"IDLE": "대기", "PENDING": "예약 중", "OPEN": "보유 중"}.get(phase, phase)
+    line = f"데모 Elliott BTC: {what} · 24시간 발동 {triggers} · 셋업 {setups}"
+    if phase in ("PENDING", "OPEN"):
+        line += f" · 진입 {state.get('entry')} 손절 {state.get('stop')} 목표 {state.get('target')}"
+    return [line], findings
