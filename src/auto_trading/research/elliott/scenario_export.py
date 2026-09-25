@@ -282,6 +282,14 @@ def export_scenario_set(
         for scenario, parse in items
     }
     status = SetStatus.SCENARIOS if items else SetStatus.INSUFFICIENT_ANCHORS
+    ew4_note = (
+        (
+            "플랫·삼각형 후보 빈도는 무작위 대조와 같거나 낮다(문서 60 §8)"
+            " — 목록에 있다는 것이 그 모양의 근거가 아니다",
+        )
+        if any(parse.pattern in _EW4 for _, parse in items)
+        else ()
+    )
     result = ScenarioSet(
         schema_version=SCHEMA_VERSION,
         track="EW-WA-CONTEXT",
@@ -299,6 +307,7 @@ def export_scenario_set(
             "시나리오 순서는 scenario_id 순 — 순위 정보가 아니다",
             f"목록 밖 후보 {scenarios.outside} 개 + 문법 밖 해석(other_or_unknown)",
             "invalidation·FIB_LEVEL 은 분석 전용 — 주문·손절 아님",
+            *ew4_note,
         ),
     )
     return result, sidecar

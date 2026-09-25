@@ -1,4 +1,4 @@
-"""BTCUSDT USD-M 2020-01~ 전체 발동의 EW-3d′ 시나리오 묶음(상위 50)을 파일로 내보낸다.
+"""BTCUSDT USD-M 2020-01~ 전체 발동의 시나리오 묶음(상위 50)을 파일로 내보낸다 — EW-4 (문서 60 §7).
 
 * ``data/research/elliott_scenarios/binance_usdm_BTCUSDT.sets.jsonl.gz``
   — 평가자(JEV 등) 입력, 순위 정보 없음
@@ -6,6 +6,7 @@
   — 기준 순위 규칙 사이드카 (섀도 비교 전용, 평가자에게 주지 않는다)
 
 DB 는 읽기 전용. 수익률을 계산하지 않는다.
+이전 판은 ``*.ew3d.*``(EW-3d′)·``*.ew3e.*``(EW-3e) 로 보존.
 """
 
 from __future__ import annotations
@@ -56,12 +57,14 @@ def main() -> int:
                 chunk, _groups(minutes, chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
             )
             chunk_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
-            # EW-3e (문서 58 채택): 마감당 모든 새 4h 꼭짓점 발동 · 시작 창 720
+            # EW-3e 발동(58: 새 4h 꼭짓점마다 · 시작 창 720) + EW-4 플랫·삼각형(60)
             triggers = causal_triggers(replay, chunk_hours, chunk, all_new_pivots=True)
-            lists = scenario_lists(triggers, chunk_hours, lookback_bars=EW3E_LOOKBACK_BARS)
+            lists = scenario_lists(
+                triggers, chunk_hours, lookback_bars=EW3E_LOOKBACK_BARS, ew4=True
+            )
             for trig, scen in zip(triggers, lists, strict=True):
                 data_set, sidecar = export_scenario_set(
-                    trig, scen, venue="binance_usdm", instrument="BTCUSDT", rule_profile="EW-3e"
+                    trig, scen, venue="binance_usdm", instrument="BTCUSDT", rule_profile="EW-4"
                 )
                 data = to_json_dict(data_set)
                 problems = validate_scenario_set_dict(data)
