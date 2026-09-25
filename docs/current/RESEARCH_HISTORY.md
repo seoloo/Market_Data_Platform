@@ -170,6 +170,16 @@ Learned: 추세를 따르는 BTC·ETH 숏은 느린 속도(T/v1 ≈ 0)와 빠른
 Do not retry: lookback·스톱·크기·밴드 변경, F1a(5·10·20). 방향이 F1b 와 거의 같은 지표(RSI 50 기준, 46 §2.1)도 같은 가설이다.
 근거: [44 후보 비교](../research/44-f1-fast-trend-candidates.md), [45 사전등록·§6 판정](../research/45-f1b-preregistration.md).
 
+## I3 — REJECTED (2026-09-25)
+
+Hypothesis: MACD(12,26,9) 히스토그램 부호로 BTC·ETH 무기한을 1x 롱숏(45 F1b 와 같은 틀: ±20% 비상 스톱, mark price 청산·정지)하면 비용·funding 후 순수익 > 0 이고 숏 다리도 돈을 번다.
+선정: 46 후보 비교(수익 미계산)에서 요청 지표 6개 중 기존 신호와 겹치지 않으면서(T 와 상관 0.09) 숏 꼬리가 한정된 유일한 후보.
+판정 2020-03~2026-08 (1회): 평균 − 2SE = −0.035% → M1 실패, 2023~2026 거래 없음, **숏 순손익 −4,621**, 2022-03-08 계좌 정지(MDD 30.0%) → **REJECT**.
+샤프 0.05, CAGR −0.7%. 롱 가격 +6,035 · funding −1,586 · 비용 −248. 비용 참고 줄(0.023%)에서도 숏 음수. T/v2 와 상관 0.09 이지만 반반 샤프 0.91 < T/v2 1.27.
+Learned: 기존 신호와 다른 정보라고 수익원이 되지는 않는다. 일봉 가격 신호로 든 BTC·ETH 선물 숏은 T/v1·F1b·I3·TA 모두 수익원이 아니었다. 요청 지표 가운데 나머지는 T·F1b 와 같은 신호(I1·I5·I6), 표본 부족(I4), 치명적 숏 꼬리(I2)였다(46).
+Do not retry: MACD 기간(8·17·9 등)·4h 봉·스톱·크기 변경, I1·I5·I6 을 같은 틀로 시험.
+근거: [46 후보 비교](../research/46-indicator-candidates.md), [47 사전등록·§6 판정](../research/47-i3-macd-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
