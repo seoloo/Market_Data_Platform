@@ -1,7 +1,12 @@
 # 작업 현황
 
-최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 보호 롱 오프라인 필요조건 검증).
+최종 갱신: 2026-09-26 · 작성: Codex (BTC 옵션 계정 읽기 전용·공개 최소 담보 점검).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-09-26 — BTC 옵션 계정 읽기 전용 접근·공개 최소 담보 점검
+
+- [79](docs/research/79-btc-option-account-readonly-gate.md): 기존 키가 읽기 전용·IP 제한이며 거래/출금 권한이 꺼진 것을 확인하고 공식 옵션 `marginAccount` GET을 1회 시도했다. HTTP 401 / `-2015`로 거부되어 계정 equity·가용잔고·매도 모드는 **미확인**이다. 비공개 옵션 조회를 반복하거나 키 권한을 확대하지 않았다.
+- 공개 `exchangeInfo`·BTC 지수에서 당시 거래 중인 668계약의 최소 기초수량 0.01 BTC와 10% 증거금식의 **하한**을 계산했다: 센트 단위 올림 시 숏 포지션 초기증거금 ≥84.06 USDT, 현행 10%/1.5배 게이트의 최소 equity ≥840.51·available ≥126.08 USDT. 마크·보호 롱·수수료·기존 노출 제외값으로 실제 계정 적격 판정은 아니다. 판정 `ACCOUNT_READ_DENIED_-2015 / PUBLIC_MARGIN_FLOOR_ONLY / SHORT_ELIGIBILITY_UNVERIFIED / NO_TRADING_APPLICATION`. 주문·이체·설정·코드/Paper 변경 없음. 10/23·10/24 일정 불변.
 
 ## 2026-09-26 — BTC 옵션 보호 롱 오프라인 필요조건 검증
 
