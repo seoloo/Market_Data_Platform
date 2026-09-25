@@ -123,6 +123,16 @@ class TestOrders:
         assert "quantity" not in p  # closePosition 과 함께 쓸 수 없다
         assert r.status is OrderStatus.NEW
 
+    def test_quantity_stop_is_reduce_only_without_close_position(self) -> None:
+        """공백 없는 스톱 교체 훈련(52)용 수량 지정 스톱."""
+        api, seen = adapter({("POST", "/fapi/v1/algoOrder"): httpx.Response(200, json=ALGO)})
+        api.place_stop_market(
+            "BTCUSDT", "SELL", Decimal("75000.0"), "tsr-1-C", quantity=Decimal("0.010")
+        )
+        p = params(seen[-1])
+        assert p["quantity"] == "0.01" and p["reduceOnly"] == "true"
+        assert "closePosition" not in p and p["workingType"] == "MARK_PRICE"
+
 
 class TestSendClassification:
     @pytest.mark.parametrize(

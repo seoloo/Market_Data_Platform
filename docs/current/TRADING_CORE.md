@@ -87,6 +87,7 @@ FLAT → OPENING → 첫 체결 UNPROTECTED → 스톱 확인 OPEN → CLOSING �
 - 첫 체결 즉시 거래소 측 STOP_MARKET, closePosition=true, MARK_PRICE 기준 보호주문을 등록하는 기존 설계를 유지한다.
   **API 확인(2026-09-24)**: Binance 는 2025-12-09 부터 조건부 주문을 **Algo Order API**(`/fapi/v1/algoOrder`, `clientAlgoId`)로 옮겼고, 일반 주문 엔드포인트로 보내면 `-4120` 으로 거부한다. 걸린 목록은 `/fapi/v1/openAlgoOrders`(문서 페이지의 `algoOpenOrders` 는 실측 404), 없는 주문 조회는 `-2013`. 구현: `exchange/futures.py`(스톱 경로 분리)·`binance_usdm.py`.
   **테스트넷 실측(2026-09-24, `scripts/testnet_drill.py` 20/20)**: closePosition 스톱은 (1) **닫을 포지션이 있어야** 걸리고(`-4509`), (2) **같은 방향으로 하나만** 걸리며(`-4130`), (3) 검사 순서는 -4509 → -4130 → 즉시 발동(-2021). 포지션이 0 이 되면 거래소가 스톱을 **자동 정리**한다. 따라서 보호 스톱은 첫 체결 **뒤에만** 걸 수 있고, 교체는 취소 후 재등록이다.
+  **추가 실측(2026-09-25, [52 §4](../research/52-o2-continuation-safety.md))**: **수량 지정 reduce-only** STOP_MARKET 은 closePosition 스톱과 함께 걸리고 두 개도 함께 걸린다. 그래서 '새 가격 수량 스톱(다리) → 옛 closePosition 취소 → 새 closePosition → 다리 취소' 순서로 **공백 없이** 교체할 수 있다. 취소 → 재등록만 쓰면 공백은 약 0.1초였다.
 - **거래소는 체결된 client_order_id 재사용을 받는다**(테스트넷 실측). 거래소 중복 검사로 영구 멱등을 얻을 수 없다는 아래 원칙이 실제로 맞다 — 로컬 선기록이 필수다.
 - 보호 등록 실패는 최대 3회·총 3초 내 재시도, 실패하면 전량 시장가 청산 후 HALTED. 보호 공백 상한은 별도로 적용한다.
 - 부분 체결·청산과 잔여 진입 주문의 경합을 검사한다. 잔여 진입 주문을 방치해 청산 후 다시 노출되지 않게 한다.

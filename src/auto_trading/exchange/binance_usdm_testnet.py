@@ -116,23 +116,35 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
         return result
 
     def place_stop_market(
-        self, symbol: str, side: str, stop_price: Decimal, client_order_id: str
+        self,
+        symbol: str,
+        side: str,
+        stop_price: Decimal,
+        client_order_id: str,
+        *,
+        quantity: Decimal | None = None,
     ) -> FuturesOrderResult:
-        data = self._send(
-            "POST",
-            "/fapi/v1/algoOrder",
-            {
-                "algoType": "CONDITIONAL",
-                "symbol": symbol,
-                "side": side,
-                "type": "STOP_MARKET",
-                "triggerPrice": _qty(stop_price),
-                "closePosition": "true",
-                "workingType": "MARK_PRICE",
-                "clientAlgoId": client_order_id,
-            },
-        )
-        return self._stop(data)
+        """보호 스톱. 기본은 closePosition(포지션 전체).
+
+        ``quantity`` 를 주면 **수량 지정 reduce-only** 스톱이다.
+        매일 스톱 교체를 공백 없이 할 수 있는지 재는 훈련(docs/research/52)에서 쓴다.
+        운영 실행기는 아직 closePosition 만 쓴다.
+        """
+        params: dict[str, Any] = {
+            "algoType": "CONDITIONAL",
+            "symbol": symbol,
+            "side": side,
+            "type": "STOP_MARKET",
+            "triggerPrice": _qty(stop_price),
+            "workingType": "MARK_PRICE",
+            "clientAlgoId": client_order_id,
+        }
+        if quantity is None:
+            params["closePosition"] = "true"
+        else:
+            params["quantity"] = _qty(quantity)
+            params["reduceOnly"] = "true"
+        return self._stop(self._send("POST", "/fapi/v1/algoOrder", params))
 
     def _cancel(self, path: str, params: Mapping[str, Any]) -> Any:
         """취소 요청. 성공하면 응답 본문, 거래소에 없으면 None.
