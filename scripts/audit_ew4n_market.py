@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +34,7 @@ from scripts.audit_ew_edge_power import (  # noqa: E402
     _groups,
 )
 
+from auto_trading.core.types import Candle  # noqa: E402
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.parser import Label  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
@@ -45,22 +48,20 @@ NESTED_LEG = {Label.IMPULSE: 3, Label.ZIGZAG: 1}
 """충격파 4파 · 지그재그 B파."""
 
 
-def main(argv: list[str]) -> int:
-    if not argv or argv[0] not in ("btc", "null") or (argv[0] == "null" and len(argv) < 2):
-        raise SystemExit("usage: audit_ew4n_market.py btc | null <1|2|3>")
-    four, hours, to_ms = _btc_bars()
-    minutes = _btc_minutes(to_ms)
-    source = "BTCUSDT"
-    if argv[0] == "null":
-        source = f"ew61-null-{argv[1]}"
-        four = tuple(_aggregate(_shuffled_minutes(to_ms, source), H4))
-        hours = tuple(_aggregate(_shuffled_minutes(to_ms, source), H1))
-        minutes = _shuffled_minutes(to_ms, source)
+def count_nested(
+    four: Sequence[Candle],
+    hours: Sequence[Candle],
+    minutes: Iterator[Candle],
+    *,
+    threshold: Decimal = EW0_THRESHOLD_PCT,
+    time_scale: int = 1,
+) -> tuple[Counter[str], dict[str, Counter[str]]]:
+    """발동마다 EW-4n 상위 10 의 안 모양 읽기를 센다. ``time_scale`` 은 연도 계산용(문서 62)."""
     count: Counter[str] = Counter()
     per_year: dict[str, Counter[str]] = {}
     for chunk in _chunks(four):
         (replay,) = replay_minute_groups_ladder(
-            chunk, _groups(minutes, chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
+            chunk, _groups(minutes, chunk), chunk[-1].close_ms, (threshold,)
         )
         chunk_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
         triggers = causal_triggers(replay, chunk_hours, chunk, all_new_pivots=True)
@@ -68,7 +69,7 @@ def main(argv: list[str]) -> int:
             triggers, chunk_hours, lookback_bars=EW3E_LOOKBACK_BARS, ew4=True, nested=True
         )
         for trig, scen in zip(triggers, lists, strict=True):
-            year = str(datetime.fromtimestamp(trig.close_ms / 1000, UTC).year)
+            year = str(datetime.fromtimestamp(trig.close_ms * time_scale / 1000, UTC).year)
             top = _top_parses(scen, 10)
             readings = {c.leg_labels[NESTED_LEG[c.pattern]] for c in top if c.pattern in NESTED_LEG}
             flags = {
@@ -81,6 +82,10 @@ def main(argv: list[str]) -> int:
             for key, on in flags.items():
                 count[key] += on
                 per_year.setdefault(year, Counter())[key] += on
+    return count, per_year
+
+
+def report(source: str, count: Counter[str], per_year: dict[str, Counter[str]]) -> None:
     n = count["triggers"]
     sys.stdout.write(
         json.dumps(
@@ -96,6 +101,20 @@ def main(argv: list[str]) -> int:
         )
         + "\n"
     )
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] not in ("btc", "null") or (argv[0] == "null" and len(argv) < 2):
+        raise SystemExit("usage: audit_ew4n_market.py btc | null <1|2|3>")
+    four, hours, to_ms = _btc_bars()
+    minutes = _btc_minutes(to_ms)
+    source = "BTCUSDT"
+    if argv[0] == "null":
+        source = f"ew61-null-{argv[1]}"
+        four = tuple(_aggregate(_shuffled_minutes(to_ms, source), H4))
+        hours = tuple(_aggregate(_shuffled_minutes(to_ms, source), H1))
+        minutes = _shuffled_minutes(to_ms, source)
+    report(source, *count_nested(four, hours, minutes))
     return 0
 
 

@@ -58,7 +58,9 @@ WEEK_MS = 7 * 86_400_000
 H1 = 3_600_000
 
 
-def _shuffled_minutes(to_ms: int, seed: str = NULL_SEED) -> Iterator[Candle]:
+def _shuffled_minutes(
+    to_ms: int, seed: str = NULL_SEED, block_ms: int = WEEK_MS
+) -> Iterator[Candle]:
     """같은 입력·같은 seed 면 같은 경로 — 여러 번 읽어도 결정적이다."""
     rng = random.Random(seed)
     level: float | None = None
@@ -82,7 +84,7 @@ def _shuffled_minutes(to_ms: int, seed: str = NULL_SEED) -> Iterator[Candle]:
             )
 
     for m in _btc_minutes(to_ms):
-        if week and m.open_ms // WEEK_MS != week[0].open_ms // WEEK_MS:
+        if week and m.open_ms // block_ms != week[0].open_ms // block_ms:
             yield from flush()
             week = []
         week.append(m)
