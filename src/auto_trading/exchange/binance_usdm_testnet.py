@@ -146,6 +146,71 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
             params["reduceOnly"] = "true"
         return self._stop(self._send("POST", "/fapi/v1/algoOrder", params))
 
+    def place_limit_order(
+        self, symbol: str, side: str, quantity: Decimal, price: Decimal, client_order_id: str
+    ) -> FuturesOrderResult:
+        """post-only 지정가(GTX) 진입. 바로 체결될 가격이면 거래소가 만료시킨다.
+
+        Elliott 데모(docs/research/56)의 되돌림 예약 진입에서 쓴다.
+        """
+        data = self._send(
+            "POST",
+            "/fapi/v1/order",
+            {
+                "symbol": symbol,
+                "side": side,
+                "type": "LIMIT",
+                "timeInForce": "GTX",
+                "quantity": _qty(quantity),
+                "price": _qty(price),
+                "newClientOrderId": client_order_id,
+                "newOrderRespType": "RESULT",
+            },
+        )
+        return self._order(data)
+
+    def place_take_profit_market(
+        self, symbol: str, side: str, trigger_price: Decimal, client_order_id: str
+    ) -> FuturesOrderResult:
+        """목표가 전량 청산 (closePosition, MARK_PRICE 발동). 스톱과 같은 Algo 경로."""
+        params: dict[str, Any] = {
+            "algoType": "CONDITIONAL",
+            "symbol": symbol,
+            "side": side,
+            "type": "TAKE_PROFIT_MARKET",
+            "triggerPrice": _qty(trigger_price),
+            "workingType": "MARK_PRICE",
+            "clientAlgoId": client_order_id,
+            "closePosition": "true",
+        }
+        return self._stop(self._send("POST", "/fapi/v1/algoOrder", params))
+
+    def asset_balance(self, asset: str) -> Decimal:
+        """자산 하나의 지갑 잔고 (USDC 계약용 — ``account()`` 합계는 USDT 기준이다)."""
+        rows = self._request("/fapi/v2/balance", signed=True)
+        for r in rows:
+            if r.get("asset") == asset:
+                return Decimal(str(r["balance"]))
+        return Decimal(0)
+
+    def trade_fills(self, symbol: str, exchange_order_id: str) -> list[dict[str, Any]]:
+        """체결 내역(최근 7일) 그대로 — 수수료 자산을 가리지 않는다 (USDC 계약용)."""
+        rows = self._request(
+            "/fapi/v1/userTrades", {"symbol": symbol, "orderId": exchange_order_id}, signed=True
+        )
+        return [
+            {
+                "price": Decimal(str(r["price"])),
+                "qty": Decimal(str(r["qty"])),
+                "quote": Decimal(str(r["quoteQty"])),
+                "commission": Decimal(str(r["commission"])),
+                "commission_asset": str(r["commissionAsset"]),
+                "maker": bool(r["maker"]),
+                "realized_pnl": Decimal(str(r.get("realizedPnl", "0"))),
+            }
+            for r in rows
+        ]
+
     def _cancel(self, path: str, params: Mapping[str, Any]) -> Any:
         """취소 요청. 성공하면 응답 본문, 거래소에 없으면 None.
 

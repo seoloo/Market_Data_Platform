@@ -123,6 +123,45 @@ class TestOrders:
         assert "quantity" not in p  # closePosition 과 함께 쓸 수 없다
         assert r.status is OrderStatus.NEW
 
+    def test_limit_entry_is_post_only_gtx(self) -> None:
+        """Elliott 데모(56) 되돌림 예약 진입."""
+        new = {**FILLED, "status": "NEW", "executedQty": "0", "avgPrice": "0", "type": "LIMIT"}
+        api, seen = adapter({("POST", "/fapi/v1/order"): httpx.Response(200, json=new)})
+        r = api.place_limit_order("BTCUSDC", "BUY", Decimal("0.0120"), Decimal("61234.50"), "ew-1")
+        p = params(seen[-1])
+        assert (p["type"], p["timeInForce"]) == ("LIMIT", "GTX")
+        assert p["quantity"] == "0.012" and p["price"] == "61234.5"
+        assert "reduceOnly" not in p
+        assert r.status is OrderStatus.NEW
+
+    def test_take_profit_is_close_position_on_mark_price(self) -> None:
+        api, seen = adapter({("POST", "/fapi/v1/algoOrder"): httpx.Response(200, json=ALGO)})
+        api.place_take_profit_market("BTCUSDC", "SELL", Decimal("70500.0"), "ew-1-T")
+        p = params(seen[-1])
+        assert (p["type"], p["closePosition"], p["workingType"]) == (
+            "TAKE_PROFIT_MARKET",
+            "true",
+            "MARK_PRICE",
+        )
+        assert p["triggerPrice"] == "70500" and "quantity" not in p
+
+    def test_trade_fills_keep_non_usdt_commission(self) -> None:
+        rows = [
+            {
+                "price": "61234.5",
+                "qty": "0.012",
+                "quoteQty": "734.814",
+                "commission": "0.1469",
+                "commissionAsset": "USDC",
+                "maker": True,
+                "realizedPnl": "0",
+            }
+        ]
+        api, _ = adapter({("GET", "/fapi/v1/userTrades"): httpx.Response(200, json=rows)})
+        (fill,) = api.trade_fills("BTCUSDC", "11")
+        assert fill["commission_asset"] == "USDC" and fill["maker"] is True
+        assert fill["quote"] == Decimal("734.814")
+
     def test_quantity_stop_is_reduce_only_without_close_position(self) -> None:
         """공백 없는 스톱 교체 훈련(52)용 수량 지정 스톱."""
         api, seen = adapter({("POST", "/fapi/v1/algoOrder"): httpx.Response(200, json=ALGO)})
