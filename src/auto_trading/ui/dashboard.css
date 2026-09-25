@@ -50,6 +50,7 @@ cursor:pointer;color:var(--mute);margin-left:4px}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .cal div{border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:center}
 .foot{color:var(--mute);font-size:12px;margin-top:6px}
+.nowrap{white-space:nowrap}
 details summary{cursor:pointer;color:var(--mute)}
 @media(max-width:900px){.layout{grid-template-columns:1fr}nav{display:flex;overflow-x:auto}
 nav .logo{display:none}.grid2{grid-template-columns:1fr}}

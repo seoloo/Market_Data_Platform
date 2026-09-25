@@ -14,6 +14,7 @@ from pathlib import Path
 
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
+from auto_trading.ui.demo_render import demo_card, demo_page
 
 __all__ = ["PAGES", "render_page"]
 
@@ -23,6 +24,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("positions", "/positions", "포지션 · 주문"),
     ("testnet", "/testnet", "테스트넷 검증"),
     ("risk", "/risk", "위험 · 알림"),
+    ("demo", "/demo", "데모 · 실거래 준비"),
     ("research", "/research", "연구 기록"),
 )
 _KST = timedelta(hours=9)
@@ -100,8 +102,8 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         '<span class="badge">읽기 전용</span><span class="badge red">실거래 비활성</span></header>'
         f"{errors}{body}"
         '<div class="foot">60초마다 새로 읽는다 · '
-        "데이터: Paper 원장(가상 체결)·테스트넷 기록·일일 점검 보고. "
-        "PAPER 와 TESTNET 자산은 합산하지 않는다.</div></main></div></body></html>"
+        "데이터: Paper 원장(가상 체결)·테스트넷 기록·데모(가짜 돈)·일일 점검 보고. "
+        "PAPER·TESTNET·DEMO 자산은 합산하지 않는다.</div></main></div></body></html>"
     )
 
 
@@ -327,7 +329,12 @@ def _overview(data: DashboardData) -> str:
         "각 전략은 독립 원장으로 운영하며 자산을 합산하지 않는다."
         "<br>PAPER 자산과 TESTNET 자산은 절대 합산하지 않는다.</div></div>"
     )
-    cards = "".join(_ledger_card(lg) for lg in data.ledgers) + phase7 + note
+    cards = (
+        "".join(_ledger_card(lg) for lg in data.ledgers)
+        + phase7
+        + demo_card(data.demo, data.now_ms)
+        + note
+    )
     return (
         f'{banner}<div class="cards">{cards}</div>'
         f'<div class="grid2"><div>{_chart_panel(data)}{_positions_table(data)}{_events(data)}</div>'
@@ -498,6 +505,7 @@ _RENDER = {
     "positions": _positions,
     "testnet": _testnet,
     "risk": _risk,
+    "demo": lambda data: demo_page(data.demo, data.now_ms),
     "research": _research,
 }
 

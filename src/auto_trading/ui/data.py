@@ -29,6 +29,7 @@ from auto_trading.storage.repositories.paper_overlay_days import (
     OverlayPaperDay,
     OverlayPaperDayRepository,
 )
+from auto_trading.ui.demo_data import DemoView, load_demo
 
 __all__ = [
     "BacktestRow",
@@ -158,6 +159,8 @@ class DashboardData:
     errors: tuple[str, ...] = field(default_factory=tuple)
     cash_yield: str = ""
     """이자 가정 설명 (없으면 빈 문자열)."""
+    demo: DemoView = field(default_factory=DemoView)
+    """데모·그림자·실거래 준비 (docs/research/51·55~59)."""
 
 
 def _day(decision_ms: int) -> int:
@@ -428,14 +431,17 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
     errors: list[str] = []
     ledgers: list[LedgerView] = []
     benchmark: tuple[Point, ...] = ()
+    demo = DemoView()
     schedule, reserve, yield_note = _schedule(root / "config" / "cash_yield.yaml", errors)
     db = root / "data" / "trading.db"
     try:
         conn = connect_read_only(db)
     except AutoTradingError as exc:
         errors.append(f"DB 를 열 수 없다: {exc}")
+        demo = load_demo(root, None)
     else:
         try:
+            demo = load_demo(root, conn)
             t2 = list(reversed(PaperDayRepository(conn).recent("t2_long", 1_000_000)))
             if t2:
                 ledgers.append(_t2_view(t2))
@@ -467,6 +473,7 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
         watch=_watch(reports / "watchdog", errors),
         research=_research(root / "docs" / "current" / "RESEARCH_HISTORY.md", errors),
         backtests=_backtests(reports, errors),
-        errors=tuple(errors),
+        errors=(*errors, *demo.errors),
         cash_yield=yield_note,
+        demo=demo,
     )
