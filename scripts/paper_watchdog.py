@@ -66,6 +66,8 @@ O2_LEDGER = "o2_stop"
 _EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
 """O/v1 다음에 점검하는 원장 (O/v3 는 docs/research/31 한 달 관찰)."""
 PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
+OVERLAY_START_MS = int(datetime(2026, 9, 26, tzinfo=UTC).timestamp() * 1000)
+"""O/v2 선물 실행기 테스트넷 운영 시작 (docs/research/54). 이전 기록은 개발 중 실행이다."""
 """Phase 7 매일 훈련 운영 시작 (docs/research/26). 이전 기록은 개발 중 실행이다."""
 
 
@@ -124,6 +126,27 @@ def drill_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return lines, findings
 
 
+def overlay_drill_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """O/v2 선물 실행기 테스트넷 훈련(``overlay-*.json``) 요약. 실패는 경고까지만."""
+    reports, broken = [], []
+    for path in sorted(DRILLS.glob("overlay-2*.json")):
+        try:
+            reports.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            broken.append(path.name)
+    lines, findings = check_testnet_drill(
+        reports,
+        now_ms,
+        since_ms=OVERLAY_START_MS,
+        window_days=7,
+        ledger="선물 실행기",
+        label="선물 실행기 훈련",
+    )
+    if broken:
+        findings.append(Finding("WARN", "선물 실행기", f"읽을 수 없는 기록 {broken}"))
+    return lines, findings
+
+
 def shadow_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     """최신 그림자 운영 보고서 요약 (docs/research/51). 없으면 등록 전으로 본다."""
     paths = sorted(SHADOW.glob("*.json"))
@@ -162,6 +185,9 @@ def main() -> int:
     summaries, findings = collect(now_ms)
     drill_lines, drill_findings = drill_status(now_ms)
     findings += drill_findings
+    overlay_lines, overlay_findings = overlay_drill_status(now_ms)
+    drill_lines += overlay_lines
+    findings += overlay_findings
     shadow_lines, shadow_findings = shadow_status(now_ms)
     drill_lines += shadow_lines
     findings += shadow_findings

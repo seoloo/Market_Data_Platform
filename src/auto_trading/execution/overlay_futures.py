@@ -102,6 +102,7 @@ class OverlayFuturesExecutor:
         halted_reason: Callable[[], str | None],
         protect_attempts: int = 3,
         protect_window_ms: int = 3_000,
+        settle: Callable[[], None] = lambda: None,
     ) -> None:
         self._ex = exchange
         self._m = manager
@@ -111,6 +112,7 @@ class OverlayFuturesExecutor:
         self._halted_reason = halted_reason
         self._attempts = protect_attempts
         self._window_ms = protect_window_ms
+        self._settle = settle
 
     # ------------------------------------------------------------ 하루 실행
 
@@ -235,15 +237,43 @@ class OverlayFuturesExecutor:
             return floor_to_step(t.stop_price, f.tick_size)
         return floor_to_step(self._ex.mark_price(pos.symbol) * Decimal("0.8"), f.tick_size)
 
+    def _listed(self, symbol: str) -> set[str] | None:
+        """거래소의 걸린 스톱 목록 (조회 실패면 None).
+
+        테스트넷 실측(2026-09-25, 54 §3): 취소 직후 **개별 조회**는 잠시 NEW 로 보이고,
+        막 건 스톱의 취소가 '없음'으로 올 때도 있다.
+        걸린 목록(openAlgoOrders)은 바로 맞았다 — 그래서 목록을 기준으로 삼는다.
+        """
+        try:
+            return {o.client_order_id for o in self._ex.open_stops(symbol)}
+        except ExchangeError:
+            return None
+
     def _stops(self, symbol: str) -> list[FuturesOrderRecord]:
-        return self._m.working_stops(symbol)
+        """로컬 기록상 걸린 스톱 중 거래소 목록에도 있는 것."""
+        local = self._m.working_stops(symbol)
+        listed = self._listed(symbol)
+        return local if listed is None else [r for r in local if r.client_order_id in listed]
+
+    def _cancel(self, record: FuturesOrderRecord, leg: LegReport, label: str) -> bool:
+        """취소하고 거래소 목록으로 확인한다. 목록에서 사라졌으면 True."""
+        r = self._m.cancel(record.client_order_id)
+        gone = r.state != "SUBMITTED"
+        if not gone:
+            self._settle()
+            listed = self._listed(record.symbol)
+            gone = listed is not None and record.client_order_id not in listed
+        leg.orders.append(
+            f"{label} → {r.state}"
+            + ("" if r.state != "SUBMITTED" or not gone else " (목록에서 사라짐 — 취소로 본다)")
+        )
+        return gone
 
     def _maintain_stop(self, decision_ms: int, t: FuturesLegTarget, leg: LegReport) -> None:
         symbol, pos = t.symbol, leg.after
         if pos == 0:
             for s in self._stops(symbol):
-                r = self._m.cancel(s.client_order_id)
-                leg.orders.append(f"포지션 0 — 스톱 정리 {s.purpose} → {r.state}")
+                self._cancel(s, leg, f"포지션 0 — 스톱 정리 {s.purpose}")
             return
         if pos < 0:
             leg.notes.append("숏 포지션 — O 선물 다리는 롱만이다. 사람이 확인한다")
@@ -279,9 +309,7 @@ class OverlayFuturesExecutor:
             return
         # 2) 옛 스톱 취소 (다리가 보호 중)
         for s in stops:
-            r = self._m.cancel(s.client_order_id)
-            leg.orders.append(f"옛 스톱 취소 {s.purpose} {s.stop_price} → {r.state}")
-            if r.state == "SUBMITTED":
+            if not self._cancel(s, leg, f"옛 스톱 취소 {s.purpose} {s.stop_price}"):
                 leg.notes.append(f"옛 스톱 취소 실패 {s.client_order_id} — 다음 실행이 다시 정리")
         # 3) 새 closePosition
         new = self._m.place_protective_stop(
@@ -297,9 +325,7 @@ class OverlayFuturesExecutor:
             leg.stop = f"{price} 다리"
             return
         # 4) 다리 취소
-        r = self._m.cancel(bridge.client_order_id)
-        leg.orders.append(f"다리 취소 → {r.state}")
-        if r.state == "SUBMITTED":
+        if not self._cancel(bridge, leg, "다리 취소"):
             leg.notes.append(
                 "다리 취소 실패 — 다음 실행이 정리 (reduce-only 라 반대 포지션은 생기지 않는다)"
             )

@@ -254,6 +254,16 @@ class TestTestnetDrill:
         _, findings = check_testnet_drill([report], now, since_ms=START)
         assert "ExchangeError" in findings[0].message
 
+    def test_other_drill_uses_its_own_label_and_ledger(self) -> None:
+        """O/v2 선물 실행기 훈련(54)도 같은 형식이다 — 이름만 바꿔 쓴다."""
+        now = at_utc("20260927T002000Z")
+        report = drill("20260925T001400Z", failed=("스톱",))
+        lines, findings = check_testnet_drill(
+            [report], now, since_ms=START, ledger="선물 실행기", label="선물 실행기 훈련"
+        )
+        assert lines[0].startswith("선물 실행기 훈련: ")
+        assert {f.ledger for f in findings} == {"선물 실행기"}
+
     def test_a_missed_day_warns(self) -> None:
         now = at_utc("20260927T002000Z")
         _, findings = check_testnet_drill([drill("20260925T001400Z")], now, since_ms=START)

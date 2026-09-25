@@ -224,13 +224,17 @@ def check_testnet_drill(
     *,
     since_ms: int = 0,
     window_days: int = DRILL_WINDOW_DAYS,
+    ledger: str = "테스트넷",
+    label: str = "테스트넷 훈련",
 ) -> tuple[list[str], list[Finding]]:
     """테스트넷 훈련 보고서들로 한 줄 요약과 판정을 만든다.
+
+    같은 보고서 형식(at·ok·checks)을 쓰는 다른 훈련(O/v2 선물 실행기, 54)도
+    ``ledger``·``label`` 만 바꿔 쓴다.
 
     훈련 실패는 **WARN 까지만** 올린다 — Paper 원장의 안전과는 별개인 Phase 7 운영 문제다.
     ``since_ms`` 이전 기록(등록 전 개발 중 실행)은 기간 통계에 넣지 않는다.
     """
-    ledger = "테스트넷"
     if not reports:
         return [], [Finding("INFO", ledger, "훈련 기록이 아직 없다")]
     ordered = sorted(reports, key=lambda r: str(r["at"]))
@@ -258,7 +262,7 @@ def check_testnet_drill(
         if at >= since_ms and at // _DAY_MS >= first_day:
             by_day[at // _DAY_MS] = bool(r.get("ok"))  # 그날 마지막 실행
     mark = "✓" if ok else "✗"
-    line = f"테스트넷 훈련: {_date(latest_ms)} {passed}/{len(checks)} {mark}"
+    line = f"{label}: {_date(latest_ms)} {passed}/{len(checks)} {mark}"
     if now_ms >= since_ms:
         line += f" · 최근 {window_days}일 중 실행 {len(by_day)}일 · 통과 {sum(by_day.values())}일"
     else:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import sqlite3
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -12,7 +13,7 @@ from hypothesis import strategies as st
 
 from auto_trading.core.errors import OrderRejectedError
 from auto_trading.exchange.fake_futures import FakeFuturesExchange
-from auto_trading.exchange.futures import FuturesFilters, FuturesOrderResult
+from auto_trading.exchange.futures import FuturesFilters, FuturesOrderResult, OrderStatus
 from auto_trading.execution.futures_guard import FuturesSupervisor
 from auto_trading.execution.futures_orders import FuturesOrderManager
 from auto_trading.execution.overlay_futures import (
@@ -282,3 +283,72 @@ def test_quantity_stop_fires_reduce_only_on_fake(qty: str) -> None:
     )
     r.ex.set_mark_price(S, Decimal(39_000))  # 둘 다 발동
     assert r.position() == 0
+
+
+class LaggyExchange(SpyExchange):
+    """테스트넷 실측(54 §3) 흉내: 막 건 스톱의 취소가 '없음'(None)으로 오지만 실제로는 취소되고,
+    취소된 스톱의 개별 조회는 한동안 NEW 로 보인다. 걸린 목록(open_stops)은 바로 맞다."""
+
+    stale_lookups: int = 3
+    _stale: dict[str, int]
+
+    def cancel_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        before = self.orders.get(client_order_id)
+        super().cancel_stop(symbol, client_order_id)
+        if not hasattr(self, "_stale"):
+            self._stale = {}
+        self._stale[client_order_id] = self.stale_lookups
+        del before
+        return None  # 성공했는데 '없음'으로 답한다
+
+    def get_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
+        order = super().get_stop(symbol, client_order_id)
+        left = getattr(self, "_stale", {}).get(client_order_id, 0)
+        if order is not None and left:
+            self._stale[client_order_id] = left - 1
+            return replace(order, status=OrderStatus.NEW)
+        return order
+
+
+def laggy_rig() -> Rig:
+    r = Rig()
+    lag = LaggyExchange(
+        wallet=Decimal(1_000_000), prices={S: Decimal(50_000)}, symbol_filters=FILTERS
+    )
+    r.ex = lag
+    ticks = itertools.count(1)
+    r.m = FuturesOrderManager(
+        lag, r.store, mode="paper", strategy_id="o2", strategy_tag="o2", clock=lambda: next(ticks)
+    )
+    sup = FuturesSupervisor(
+        lag,
+        r.m,
+        r.store,
+        RiskEventRepository(r.conn),
+        mode="paper",
+        symbols=[S],
+        require_stop=True,
+        orphan_policy="flatten",
+        clock=lambda: 0,
+    )
+    r.x = OverlayFuturesExecutor(
+        lag, r.m, r.store, sup, clock=lambda: 0, halted_reason=lambda: None
+    )
+    return r
+
+
+def test_eventually_consistent_exchange_does_not_cause_duplicate_replacement() -> None:
+    """테스트넷 1일차 결과(54 §3)의 재현: 취소 응답·조회가 늦어도 목록을 기준으로 판단한다."""
+    r = laggy_rig()
+    first = r.run("0.1", "40000")
+    assert r.stops() == [(True, Decimal(40_000), Decimal(0))]
+    assert first.state == "OK", first  # 다리 취소가 '없음'이어도 목록에서 사라졌으니 정상
+    n = len(r.store.all())
+    again = r.x.run(
+        T0 + r.day * DAY + 1,
+        [FuturesLegTarget(S, Decimal("0.1"), Decimal(40_000))],
+        increases_allowed=True,
+    )
+    assert len(r.store.all()) == n, "같은 목표·같은 스톱인데 새 주문을 냈다"
+    assert again.legs[0].stop == "40000 유지"
+    assert r.stops() == [(True, Decimal(40_000), Decimal(0))] and r.ex.gaps == 0
