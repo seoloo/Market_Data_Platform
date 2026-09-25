@@ -56,6 +56,7 @@ __all__ = [
     "split_weights",
     "step_overlay_day",
     "vol_spikes",
+    "weak_trends",
 ]
 
 _DAY_MS = 86_400_000
@@ -89,6 +90,11 @@ class OverlayConfig:
     vol_spike_adverse_only: bool = False
     """True 면 급등이면서 최근 ``vol_spike_days``일 가격이 내렸을 때만 끈다(43 §6 B′).
     변동성이 커도 방향(롱)이 맞으면 선물 추가분을 유지한다."""
+    futures_full_trend_only: bool = False
+    """선물부터 줄이기 (docs/research/64): T/v2 추세 신호(20·60·120일)가 **모두** 상승일 때만
+    선물 추가분을 든다. 하나라도 아니면 다음 체결에서 그 종목 노출 배수를 1.0 으로 둔다
+    (현물은 T/v2 그대로).
+    ``False``면 없음(O/v2·O/v3)."""
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -131,7 +137,7 @@ class OverlayResult:
     stop_hits: int = 0
     """비상 스톱이 발동한 (종목, 날) 수."""
     spike_days: int = 0
-    """변동성 급등으로 노출 배수를 1.0 으로 둔 (종목, 날) 수 (43)."""
+    """노출 배수를 1.0 으로 둔 (종목, 날) 수 — 변동성 급등(43) 또는 선물부터 줄이기(64)."""
 
 
 def split_weights(
@@ -424,6 +430,18 @@ def vol_spikes(closes: Mapping[str, Sequence[float]], cfg: OverlayConfig) -> fro
     return frozenset(out)
 
 
+def weak_trends(closes: Mapping[str, Sequence[float]], cfg: OverlayConfig) -> frozenset[str]:
+    """64: 마지막 종가까지 T/v2 추세 신호가 모두 상승은 아닌 종목 (이력 부족이면 판정 안 함)."""
+    if not cfg.futures_full_trend_only:
+        return frozenset()
+    need = max(max(cfg.trend.lookbacks), cfg.trend.vol_days) + 1
+    return frozenset(
+        s
+        for s, series in closes.items()
+        if len(series) >= need and not all(series[-1] > series[-1 - k] for k in cfg.trend.lookbacks)
+    )
+
+
 def simulate_overlay(
     spot_bars: Mapping[str, Mapping[int, OverlayBar]],
     perp_bars: Mapping[str, Mapping[int, OverlayBar]],
@@ -460,7 +478,7 @@ def simulate_overlay(
             perp_prev_close={s: perp_bars[s][prev_day].close for s in symbols},
             perp={s: perp_bars[s][day] for s in symbols},
             funding_rates=rates,
-            spiked=vol_spikes(history, cfg),
+            spiked=vol_spikes(history, cfg) | weak_trends(history, cfg),
         )
         outcome = step_overlay_day(state, day, market, cfg, result)
         # 6. 다음 목표

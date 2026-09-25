@@ -321,6 +321,45 @@ class TestVolSpike:
         assert vol_spikes({"R": rally, "C": crash}, down) == frozenset({"C"})
 
 
+class TestFuturesFirst:
+    """64: T/v2 세 추세 신호가 모두 상승일 때만 선물 추가분, 아니면 그 종목 배수 1.0."""
+
+    def test_off_is_identical_to_o2(self) -> None:
+        closes = {"AUSDT": wave(400, 0.004), "BUSDT": zigzag(400)}
+        base = run(closes, OverlayConfig())
+        same = run(closes, replace(OverlayConfig(), futures_full_trend_only=False))
+        assert same.equity == base.equity and same.spike_days == 0
+
+    def test_steady_uptrend_keeps_futures(self) -> None:
+        closes = {"AUSDT": wave(400, 0.004, wobble=0.0)}
+        base = run(closes, OverlayConfig(trend=FREE_T2))
+        ff = run(closes, OverlayConfig(trend=FREE_T2, futures_full_trend_only=True))
+        assert ff.spike_days == 0
+        assert ff.equity == base.equity
+
+    def test_weak_trends_flags_only_mixed_signal_symbols(self) -> None:
+        from auto_trading.backtest.overlay import weak_trends
+
+        up = wave(200, 0.004, wobble=0.0)
+        mixed = up[:-15] + [up[-16] * (1 - 0.01 * (k + 1)) for k in range(15)]  # 20일 신호만 꺾임
+        cfg = OverlayConfig(futures_full_trend_only=True)
+        assert mixed[-1] < mixed[-21] and mixed[-1] > mixed[-61]
+        assert weak_trends({"U": up, "M": mixed}, cfg) == frozenset({"M"})
+        assert weak_trends({"M": mixed}, OverlayConfig()) == frozenset()
+        assert weak_trends({"M": mixed[:100]}, cfg) == frozenset()  # 120일 이력 부족
+
+    def test_mixed_trend_removes_futures_but_keeps_spot(self) -> None:
+        closes = {"AUSDT": zigzag(400)}
+        cfg = OverlayConfig(trend=FREE_T2)
+        base = run(closes, cfg)
+        ff = run(closes, replace(cfg, futures_full_trend_only=True))
+        assert ff.spike_days > 0
+        assert max(ff.exposure) <= max(base.exposure) + 1e-12
+        t2 = run(closes, replace(T2_ALONE, trend=FREE_T2))
+        # 선물을 꺼도 노출이 T/v2 (현물만) 아래로 가지 않는다 (밴드 흔들림만 허용)
+        assert min(e - t for e, t in zip(ff.exposure, t2.exposure, strict=True)) >= -0.01
+
+
 def test_realistic_costs_is_reference_only() -> None:
     from auto_trading.backtest.trend import realistic_costs
 
