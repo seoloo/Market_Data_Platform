@@ -1,8 +1,46 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: O/v2 안전성 검증 V4 — 선물 실행기 테스트넷 운영 등록, 실거래소 차이 2건 수정(54)).
-현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3·FB·LQ·MD 기각.
+최종 갱신: 2026-09-25 밤 · 작성: Claude (이번 작업: 인계 정리 — 문서 55~65 반영, 타입 검사 복구, 데모 계좌 ETH 충돌 수정).
+현재: **Phase 6 — Paper T/v2(09-22~)·O/v1·O/v2·O/v3(09-23~)** · Phase 8 준비(그림자·데모·O/v2 안전성 검증) · **10/23 O/v3 보고 · 10/24 4주 점검(기준 고정, 문서 65)**.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3·FB·LQ·MD·B′·F2·F3 기각. Elliott→수익 모델은 이 자료로 판정 불가(63).
+
+## 이번 작업 (Claude — 인계 정리: 문서 55~65 반영 · 타입 검사 복구 · 데모 계좌 충돌 수정)
+
+- **인계:** 09-25 오후~밤 다른 세션 작업(문서 55~65, 커밋 29개)이 PROGRESS 에 없어서 아래에 요약했다.
+- **타입 검사 복구:** mypy strict 오류 30개(파일 10개)를 고쳤다. 동작 변경은 없다.
+  - 대상: 오늘 추가된 데모·실거래 실행기·Elliott·점검 테스트, 데모 스크립트 2개
+  - 고친 것: 테스트 가짜 객체의 타입 표기, lambda → def
+- **데모 계좌 ETH 충돌 수정 ([59 §3 후속](docs/research/59-demo-o2-futures-leg.md)):**
+  - 수동 스톱 훈련 2개(스톱 발동·스톱 교체)가 데모 O/v2 와 같은 ETHUSDT 를 썼다. 손으로 돌리면 O/v2 의 ETH 롱과 비상 스톱을 닫을 수 있었다
+  - → XRPUSDT 로 옮기고, 시작 때 우리 기록 밖 포지션·스톱이 있으면 멈추게 했다. 실패 정리도 그 확인 뒤에만 한다
+  - 테스트 4건. 실계좌 데모에서 읽기로 확인: ETH 에서는 멈추고 XRP 에서는 통과
+- 오늘 밤 자동 실행(09-25): 11개 작업 모두 정상.
+  - 선물 실행기 훈련 7/7
+  - **그림자 운영 첫 실행: Paper 와 목표 차이 0**, 주문 0건
+  - 데모 O/v2 ETH 0.236 유지
+
+## 다른 세션 작업 요약 (09-25 오후~밤, 문서 55~65)
+
+- **데모 트랙 3개 (가짜 돈, Binance 데모):**
+  - [55](docs/research/55-demo-t2-limit-execution.md) 데모 T/v2 현물 — 지정가 L240 체결 비용 실측. 21:12
+  - [56](docs/research/56-demo-elliott-fib-btc.md) Elliott+피보 2·4파 되돌림 BTCUSDC 5x, 위험 1%. 상주 실행기. **검증이 아닌 관찰용**
+  - [59](docs/research/59-demo-o2-futures-leg.md) O/v2 선물 추가분을 실제 T/v2 목표로 ETHUSDT(BTC 는 10/08 뒤). 21:14
+  - 공유 데모 계좌 감독자 결함 수정(`shared_account`)
+- **[57](docs/research/57-phase8-t2-live-executor.md) Phase 8 1단계 실행기:** `execution/live_t2.py`.
+  - 실제 잔고, 지정가 L240, 선기록, 재시작 이어받기, fail-closed, 긴급 정지. 장애 시험 9건
+  - 데모로 예행연습 중. **실계좌 주문 어댑터는 승인 전까지 없다**
+- **Elliott 판독기:**
+  - [58](docs/research/58-ew3e-candidate-generator.md) EW-3e 채택
+  - [60](docs/research/60-ew4-flat-triangle.md)·[61](docs/research/61-ew4-nested-triangle-flat.md) EW-4·EW-4n (플랫·삼각형·안 삼각형)
+  - [62](docs/research/62-ew4n-daily-degree-null.md) 일봉 대조: BTC 에서 모양 빈도가 뒤섞기 대조보다 높지 않음 → 모양의 근거로 쓰지 않음
+  - [63](docs/research/63-elliott-to-model-feasibility.md) **Elliott 을 필터·손절로 쓰는 길도 이 자료로는 판정 불가 → 중단**
+- **[64](docs/research/64-o-futures-first-derisk.md) 선물부터 줄이기 F2·F3 REJECT.**
+  - **O/v3(2배)는 과거 경로에서 2022-11-09 계좌 정지.** 이전 "O/v3 CAGR 30.1%" 는 정지 경로의 숫자다 → 10/23 보고에 적는다
+- **[65](docs/research/65-1023-1024-review-criteria.md) 10/23·10/24 점검 기준 고정 (결과 보기 전):**
+  - 기준: Paper P1~P6 · 그림자 S1~S5 · 데모 K1~K4
+  - 결정 메뉴 D1~D5: 1단계 자격, O/v2 만 2단계 후보, O/v3 관찰 종료 권고
+  - 보고서 `python -m scripts.review_phase6 --until <결정일>`
+- 대시보드 '데모·실거래 준비' 화면. 일일 점검에 데모 T/v2·Elliott·O/v2 줄 추가.
 
 ## 이번 작업 (Claude — O/v2 이어가기: 현물 대비 정리 · 남은 안전성 검증)
 

@@ -42,7 +42,15 @@ Phase 7 훈련은 그 뒤 아직 돌지 않았다). 또 다른 트랙의 포지�
 데모 계좌를 쓰는 네 스크립트에 켰다: Phase 7 훈련(`testnet_drill.py`), V4 훈련(`testnet_overlay_drill.py`), 스톱 훈련(`testnet_stop_drill.py`), 이 데모.
 테스트: 공유 계좌면 다른 트랙의 보호 없는 포지션을 건드리지 않고, 기본값이면 여전히 원인 불명으로 정리한다.
 
-데모 계좌 종목 배분(2026-09-25): Phase 7 BTCUSDT · V4 SOLUSDT·BNBUSDT(10/02 까지) · Elliott BTCUSDC · **O/v2 ETHUSDT** · 현물 T/v2 BTC·ETH(현물 지갑).
+데모 계좌 종목 배분(2026-09-25): Phase 7 BTCUSDT · V4 SOLUSDT·BNBUSDT(10/02 까지) · Elliott BTCUSDC · **O/v2 ETHUSDT** · 현물 T/v2 BTC·ETH(현물 지갑)
+· **수동 스톱 훈련 2종(스톱 발동 26 §3, 스톱 교체 52 §4) XRPUSDT**.
+
+**후속 수정 (2026-09-25 밤):** 수동 스톱 훈련 두 개(`testnet_stop_drill.py`·`testnet_stop_replace_drill.py`)가 여전히 **ETHUSDT** 를 쓰고 있었다.
+- 손으로 돌리면 준비·정리 단계가 이 데모의 ETH 롱과 비상 스톱을 닫았을 것이다.
+  shared_account 는 감독자(정합성 복구)만 막고, 훈련 자체의 정리 단계는 막지 않는다.
+- 수정 1: 두 훈련을 **XRPUSDT**(아무 트랙도 안 씀)로 옮겼다.
+- 수정 2: 시작할 때 이 종목에 **우리 기록 밖의 포지션·스톱이 있으면 아무것도 하지 않고 멈추고**, 실패 정리도 이 확인을 통과한 뒤에만 한다.
+- 실계좌 데모에서 읽기로만 확인했다. ETHUSDT 에서는 멈추고(O/v2 0.236 · 스톱 `o2d-…-PS`), XRPUSDT 에서는 통과했다.
 
 ## 4. 알림 문구 개선 (2026-09-25, 사용자 지적 "왜 롱만 들어갔는지 … 이유를 간략하게라도")
 

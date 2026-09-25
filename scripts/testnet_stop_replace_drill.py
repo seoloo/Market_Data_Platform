@@ -1,6 +1,7 @@
 """O/v2 안전성 검증 — 매일 보호 스톱 교체를 공백 없이 할 수 있는가 (테스트넷, docs/research/52).
 
-**가짜 돈만 쓴다.** 스톱 발동 훈련(:mod:`testnet_stop_drill`)과 같은 키·어댑터·DB·종목(ETHUSDT).
+**가짜 돈만 쓴다.** 스톱 발동 훈련(:mod:`testnet_stop_drill`)과 같은 키·어댑터·DB·종목(XRPUSDT —
+데모 O/v2 가 ETHUSDT 를 들고 있어 2026-09-25 에 옮겼다).
 발동시키지 않는다 — 모든 스톱은 mark 의 약 20% 아래(O/v2 거리)에 걸고, 끝나면 모두 취소·청산한다.
 
 O/v2 는 매일 스톱 가격을 "전날 종가 × 0.8" 로 다시 건다.
@@ -84,6 +85,7 @@ class ReplaceDrill(StopDrill):
             self.api.cancel_stop(SYMBOL, s.client_order_id)
 
     def run(self) -> None:
+        self.guard_foreign()
         m = self.manager()
         print("1. 계좌 준비")
         if not self.check("one-way 모드", not self.api.dual_side_position()):
@@ -97,7 +99,7 @@ class ReplaceDrill(StopDrill):
         self.recover()
         self.check("정리 뒤 평탄", self.position() == 0 and not self.working(), SYMBOL)
 
-        print("2. ETH 롱")
+        print("2. 롱")
         qty = self.entry_qty()
         opened = m.submit_market(
             decision_ms=self.decision, symbol=SYMBOL, side="BUY", quantity=qty, purpose="OPEN"
@@ -190,11 +192,13 @@ def main() -> int:
         error = f"{type(exc).__name__}: {exc}"
         print(f"중단: {error}")
         try:
+            if not drill.safe_to_clean:
+                raise ConfigError("다른 트랙 확인 전에 멈췄다 — 정리하지 않는다")
             drill.cancel_all_stops()
             drill.flatten(drill.manager(), purpose_attempt=1)
             drill.recover()
         except Exception as cleanup:
-            print(f"정리 실패 — 테스트넷 ETH 포지션·스톱을 확인한다: {cleanup}")
+            print(f"정리 실패 — 테스트넷 {SYMBOL} 포지션·스톱을 확인한다: {cleanup}")
     finally:
         api.close()
         conn.close()

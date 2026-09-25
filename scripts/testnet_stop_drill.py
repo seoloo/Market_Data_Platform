@@ -1,13 +1,16 @@
 """Phase 7 스톱 발동 훈련 — 가격이 실제로 보호 스톱에 닿을 때를 테스트넷에서 확인한다 (26 §3).
 
 **가짜 돈만 쓴다.** 매일 훈련(:mod:`testnet_drill`)과 같은 테스트넷 키·어댑터·DB를 쓰되
-종목을 **ETHUSDT** 로 나눠 서로의 포지션을 건드리지 않는다. 매일 자동 실행(21시대 KST) 근처에는
-시작하지 않는다. 필요할 때 손으로 돌리는 선택형 훈련이며 스케줄에 넣지 않는다.
+종목을 **XRPUSDT** 로 나눠 서로의 포지션을 건드리지 않는다
+(2026-09-25 ETHUSDT → XRPUSDT: 데모 O/v2 가 ETHUSDT 를 들고 있다, 문서 59 §3).
+매일 자동 실행(21시대 KST) 근처에는 시작하지 않는다.
+필요할 때 손으로 돌리는 선택형 훈련이며 스케줄에 넣지 않는다.
 
 순서 (각 단계 PASS/FAIL):
 
-1. 계좌 준비: one-way, 교차 증거금·레버리지 3배, ETH 포지션·스톱 정리
-2. 최소 명목의 약 1.3배 ETH 롱
+0. 다른 트랙 확인: 이 종목에 우리 기록 밖의 포지션·스톱이 있으면 **아무것도 하지 않고 멈춘다**
+1. 계좌 준비: one-way, 교차 증거금·레버리지 3배, 이 종목 포지션·스톱 정리
+2. 최소 명목의 약 1.3배 롱
 3. 현재 mark 가격 바로 아래(기본 0.15%)에 closePosition 보호 스톱 (Algo API)
 4. 발동할 때까지 기다린다 (기본 최대 60분, 5초마다 조회). 스톱은 옮기지 않는다
 5. 발동 뒤: 스톱 기록 FILLED · 체결 수량 = 포지션 · 체결가 기록 · 포지션 평탄 · 남은 스톱 0
@@ -46,7 +49,11 @@ from auto_trading.core.errors import ConfigError  # noqa: E402
 from auto_trading.core.money import floor_to_step  # noqa: E402
 from auto_trading.exchange.binance_usdm_testnet import BinanceUsdmTestnet  # noqa: E402
 from auto_trading.exchange.futures import FuturesPosition  # noqa: E402
-from auto_trading.execution.futures_guard import FuturesSupervisor, RecoveryReport  # noqa: E402
+from auto_trading.execution.futures_guard import (  # noqa: E402
+    FuturesSupervisor,
+    RecoveryReport,
+    expected_positions,
+)
 from auto_trading.execution.futures_orders import FuturesOrderManager  # noqa: E402
 from auto_trading.storage.db import connect  # noqa: E402
 from auto_trading.storage.migrations import apply_migrations  # noqa: E402
@@ -61,7 +68,10 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-SYMBOL = "ETHUSDT"
+SYMBOL = "XRPUSDT"
+"""데모 계좌 종목 배분(문서 59 §3)에서 아무 트랙도 쓰지 않는 종목."""
+OWN_PREFIXES = ("ts-", "tsr-")
+"""이 훈련들(스톱 발동·스톱 교체)이 거는 주문 ID 앞머리."""
 TAG = "ts"
 POLL_SECONDS = 5.0
 DAILY_DRILL_UTC_MINUTES = (12 * 60 - 5, 12 * 60 + 30)
@@ -104,6 +114,8 @@ class StopDrill:
     checks: list[dict[str, Any]] = field(default_factory=list)
     observations: dict[str, Any] = field(default_factory=dict)
     outcome: str = "INCOMPLETE"
+    safe_to_clean: bool = False
+    """다른 트랙 확인을 통과한 뒤에만 실패 정리(청산·스톱 취소)를 한다."""
 
     def manager(self) -> FuturesOrderManager:
         return FuturesOrderManager(
@@ -190,7 +202,29 @@ class StopDrill:
                 print(f"  조회 실패, 계속 대기: {type(exc).__name__}: {exc}")
         return record, int((time.time() - started) * 1000), last_mark
 
+    def guard_foreign(self) -> None:
+        """이 종목에 다른 트랙의 포지션·스톱이 있으면 멈춘다 (정리 단계가 남의 것을 닫지 않게)."""
+        own = [
+            r
+            for r in self.store.all()
+            if r.symbol == SYMBOL and r.client_order_id.startswith(OWN_PREFIXES)
+        ]
+        mine = expected_positions(own, []).get(SYMBOL, Decimal(0))
+        position = self.position()
+        foreign_stops = [
+            s.client_order_id
+            for s in self.api.open_stops(SYMBOL)
+            if not s.client_order_id.startswith(OWN_PREFIXES)
+        ]
+        if position != mine or foreign_stops:
+            raise ConfigError(
+                f"{SYMBOL} 에 다른 트랙의 포지션·스톱이 있다 (포지션 {position}, 우리 기록 {mine},"
+                f" 모르는 스톱 {foreign_stops}) — 아무것도 하지 않고 멈춘다"
+            )
+        self.safe_to_clean = True
+
     def run(self) -> None:
+        self.guard_foreign()
         m = self.manager()
         print("1. 계좌 준비")
         if not self.check("one-way 모드", not self.api.dual_side_position()):
@@ -203,7 +237,7 @@ class StopDrill:
         self.recover()
         self.check("정리 뒤 평탄", self.position() == 0 and not self.api.open_stops(SYMBOL), SYMBOL)
 
-        print("2. ETH 롱")
+        print("2. 롱")
         qty = self.entry_qty()
         opened = m.submit_market(
             decision_ms=self.decision, symbol=SYMBOL, side="BUY", quantity=qty, purpose="OPEN"
@@ -312,10 +346,12 @@ def main() -> int:
         error = f"{type(exc).__name__}: {exc}"
         print(f"중단: {error}")
         try:  # 흔적을 남기지 않는다 — 실패해도 포지션·스톱 정리를 한 번 시도한다
+            if not drill.safe_to_clean:
+                raise ConfigError("다른 트랙 확인 전에 멈췄다 — 정리하지 않는다")
             drill.flatten(drill.manager(), purpose_attempt=1)
             drill.recover()
         except Exception as cleanup:
-            print(f"정리 실패 — 테스트넷 ETH 포지션·스톱을 확인한다: {cleanup}")
+            print(f"정리 실패 — 테스트넷 {SYMBOL} 포지션·스톱을 확인한다: {cleanup}")
     finally:
         api.close()
         conn.close()
