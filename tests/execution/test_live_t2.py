@@ -76,7 +76,15 @@ class Venue:
         p = PRICE[symbol]
         return [(p - Decimal("0.05"), Decimal(10))], [(p + Decimal("0.05"), Decimal(10))]
 
-    def _result(self, cid, symbol, side, qty, status, executed):
+    def _result(
+        self,
+        cid: str,
+        symbol: str,
+        side: str,
+        qty: Decimal,
+        status: OrderStatus,
+        executed: Decimal,
+    ) -> SpotOrderResult:
         r = SpotOrderResult(
             cid,
             f"x{len(self.orders)}",
@@ -92,7 +100,9 @@ class Venue:
         self.orders[cid] = r
         return r
 
-    def place_limit_maker(self, symbol, side, quantity, price, client_order_id):
+    def place_limit_maker(
+        self, symbol: str, side: str, quantity: Decimal, price: Decimal, client_order_id: str
+    ) -> SpotOrderResult:
         if self.reject_posts > 0:
             self.reject_posts -= 1
             raise OrderRejectedError("would match")
@@ -107,7 +117,9 @@ class Venue:
         self.prices[client_order_id] = price
         return self._result(client_order_id, symbol, side, quantity, OrderStatus.NEW, Decimal(0))
 
-    def place_market_order(self, symbol, side, quantity, client_order_id):
+    def place_market_order(
+        self, symbol: str, side: str, quantity: Decimal, client_order_id: str
+    ) -> SpotOrderResult:
         self.placed.append(client_order_id)
         self.prices[client_order_id] = PRICE[symbol] + Decimal("0.05")
         return self._result(client_order_id, symbol, side, quantity, OrderStatus.FILLED, quantity)
@@ -196,7 +208,8 @@ def two_days(conn, halt, venue: Venue, notes: list[str], sleep=None) -> Clock:
 
 def test_first_day_records_only_then_second_day_buys_as_maker(env) -> None:
     conn, halt = env
-    venue, notes = Venue(fill_after=2), []
+    venue = Venue(fill_after=2)
+    notes: list[str] = []
     clock = Clock(after(200))
     day = make(conn, halt, venue, clock, notes).run_once(clock.ms)
     assert day.status == "NO_PRIOR_DECISION" and venue.placed == []
@@ -218,7 +231,8 @@ def test_first_day_records_only_then_second_day_buys_as_maker(env) -> None:
 
 def test_same_day_rerun_sends_nothing(env) -> None:
     conn, halt = env
-    venue, notes = Venue(), []
+    venue = Venue()
+    notes: list[str] = []
     clock = two_days(conn, halt, venue, notes)
     placed = list(venue.placed)
     make(conn, halt, venue, clock, notes).run_once(clock.ms)
@@ -227,7 +241,8 @@ def test_same_day_rerun_sends_nothing(env) -> None:
 
 def test_crash_while_waiting_is_resumed_without_duplicate(env) -> None:
     conn, halt = env
-    venue, notes = Venue(fill_after=5), []
+    venue = Venue(fill_after=5)
+    notes: list[str] = []
 
     def crash(_s: float) -> None:
         raise CrashError
@@ -246,7 +261,8 @@ def test_crash_while_waiting_is_resumed_without_duplicate(env) -> None:
 
 def test_restart_after_deadline_cancels_and_chases(env) -> None:
     conn, halt = env
-    venue, notes = Venue(fill_after=10**9), []
+    venue = Venue(fill_after=10**9)
+    notes: list[str] = []
 
     def crash(_s: float) -> None:
         raise CrashError
@@ -265,7 +281,8 @@ def test_restart_after_deadline_cancels_and_chases(env) -> None:
 def test_halt_file_blocks_new_orders(env) -> None:
     conn, halt = env
     halt.write_text("거래소 점검", encoding="utf-8")
-    venue, notes = Venue(), []
+    venue = Venue()
+    notes: list[str] = []
     clock = Clock(after(200))
     make(conn, halt, venue, clock, notes).run_once(clock.ms)
     clock.ms = after(201)
@@ -276,7 +293,8 @@ def test_halt_file_blocks_new_orders(env) -> None:
 
 def test_unknown_send_that_reached_exchange_is_followed(env) -> None:
     conn, halt = env
-    venue, notes = Venue(unknown_on_post=True, unknown_but_placed=True), []
+    venue = Venue(unknown_on_post=True, unknown_but_placed=True)
+    notes: list[str] = []
     two_days(conn, halt, venue, notes)
     assert len(venue.placed) == 2
     assert {r.state for r in SpotOrderRepository(conn).all()} == {"FILLED"}
@@ -284,7 +302,8 @@ def test_unknown_send_that_reached_exchange_is_followed(env) -> None:
 
 def test_unknown_send_not_on_exchange_is_not_resent(env) -> None:
     conn, halt = env
-    venue, notes = Venue(unknown_on_post=True, unknown_but_placed=False), []
+    venue = Venue(unknown_on_post=True, unknown_but_placed=False)
+    notes: list[str] = []
     two_days(conn, halt, venue, notes)
     states = sorted(r.state for r in SpotOrderRepository(conn).all())
     assert states.count("NOT_PLACED") == 1
@@ -294,7 +313,8 @@ def test_unknown_send_not_on_exchange_is_not_resent(env) -> None:
 
 def test_unresolvable_lookup_blocks_next_day(env) -> None:
     conn, halt = env
-    venue, notes = Venue(fill_after=10**9), []
+    venue = Venue(fill_after=10**9)
+    notes: list[str] = []
 
     def crash(_s: float) -> None:
         raise CrashError
@@ -310,7 +330,8 @@ def test_unresolvable_lookup_blocks_next_day(env) -> None:
 
 def test_post_only_rejected_three_times_then_market(env) -> None:
     conn, halt = env
-    venue, notes = Venue(reject_posts=3), []
+    venue = Venue(reject_posts=3)
+    notes: list[str] = []
     two_days(conn, halt, venue, notes)
     records = {r.client_order_id: r.state for r in SpotOrderRepository(conn).all()}
     assert "REJECTED" in records.values()
@@ -319,7 +340,8 @@ def test_post_only_rejected_three_times_then_market(env) -> None:
 
 def test_quiet_day_says_why_nothing_was_ordered(env) -> None:
     conn, halt = env
-    venue, notes = Venue(), []
+    venue = Venue()
+    notes: list[str] = []
     clock = two_days(conn, halt, venue, notes)  # 둘째 날 목표대로 샀다
     # 가짜 거래소는 잔고를 갱신하지 않는다 — 다음 날 체결할 목표(둘째 날 결정)대로 보유를 맞춘다
     decided = PaperDayRepository(conn).get(OPT.strategy_id, START + 202 * D - 1)

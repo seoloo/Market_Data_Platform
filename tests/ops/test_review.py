@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from auto_trading.ops.review import (
     DAY_MS,
     LedgerRow,
@@ -21,7 +23,7 @@ def _rows(n: int, equity: list[float] | None = None, **kw: object) -> list[Ledge
 
 
 def _status(review: object, cid: str) -> str:
-    return next(c.status for c in review.criteria if c.id == cid)  # type: ignore[attr-defined]
+    return str(next(c.status for c in review.criteria if c.id == cid))  # type: ignore[attr-defined]
 
 
 def test_p1_needs_28_days_and_p5_flags_missing_days() -> None:
@@ -57,7 +59,7 @@ def test_p2_p3_p4_for_overlay() -> None:
 
 
 def test_watch_review_missing_day_and_critical_need_a_human() -> None:
-    reports = {
+    reports: dict[str, dict[str, Any]] = {
         "2026-09-22": {"findings": []},
         "2026-09-23": {"findings": [{"level": "CRITICAL", "ledger": "T/v2", "message": "밀림"}]},
     }
@@ -71,7 +73,9 @@ def test_watch_review_missing_day_and_critical_need_a_human() -> None:
 
 
 def _shadow(bps: str, *, today: bool, gaps: list[str] | None = None) -> dict[str, object]:
-    book = {"probe_10000": {"buy_bps": "0.10", "sell_bps": "0.20"}}
+    book: dict[str, dict[str, str | None]] = {
+        "probe_10000": {"buy_bps": "0.10", "sell_bps": "0.20"}
+    }
     if today:
         book["today_order"] = {"buy_bps": bps, "sell_bps": None}
     return {

@@ -323,8 +323,8 @@ class EwDemoRunner:
         """손절·목표를 건다 (이미 있으면 건너뛴다). 건 것들의 이름."""
         ids = self.state["ids"]
         close_side = "SELL" if Decimal(self.state["qty"]) and self._long() else "BUY"
-        placed = []
-        for name, place in (
+        placed: list[str] = []
+        actions: tuple[tuple[str, Callable[[], object]], ...] = (
             (
                 "stop",
                 lambda: self.api.place_stop_market(
@@ -337,7 +337,8 @@ class EwDemoRunner:
                     SYMBOL, close_side, Decimal(self.state["target"]), ids["tp"]
                 ),
             ),
-        ):
+        )
+        for name, place in actions:
             existing = self.api.get_stop(SYMBOL, ids[name])
             if existing is not None and existing.status is OrderStatus.NEW:
                 continue

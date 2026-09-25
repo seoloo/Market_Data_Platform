@@ -8,6 +8,7 @@ import pytest
 from scripts.audit_ew3c_hourly import hour_bars
 
 from auto_trading.core.enums import Timeframe
+from auto_trading.core.types import Candle
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder
 from auto_trading.research.elliott.parser import NESTED_ALLOWED, Label
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT
@@ -24,7 +25,7 @@ from auto_trading.research.elliott.synthetic import NESTED_PATTERNS, build_path
 _FORM = {"TRIANGLE": Label.TRIANGLE, "EXPFLAT": Label.FLAT}
 
 
-def _truth(name: str, seed: str) -> tuple[Trigger, list[object], tuple[int, ...]]:
+def _truth(name: str, seed: str) -> tuple[Trigger, list[Candle], tuple[int, ...]]:
     path = build_path(random.Random(seed), name, 1.0, 0.08, 0.0)
     four, hours = path.four_hour, hour_bars(path.minutes)
     groups = (path.minutes[240 * i : 240 * (i + 1)] for i in range(len(four)))

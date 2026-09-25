@@ -87,7 +87,10 @@ def test_all_new_pivots_option_only_adds_triggers() -> None:
     (replay,) = replay_minute_groups_ladder(four, groups, four[-1].close_ms, (EW0_THRESHOLD_PCT,))
     base = causal_triggers(replay, hours, four)
     every = causal_triggers(replay, hours, four, all_new_pivots=True)
-    as_key = lambda t: (t.close_ms, t.segment[-1].hour_open_ms)  # noqa: E731
+
+    def as_key(t: Trigger) -> tuple[int, int]:
+        return (t.close_ms, t.segment[-1].hour_open_ms)
+
     assert {as_key(t) for t in base} <= {as_key(t) for t in every}
     assert all(t.segment[-1].four_hour_visible for t in every)
     assert all(t.segment[-1].available_at_ms == t.close_ms for t in every)  # 그 마감에 알려진 것만

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 from decimal import Decimal
+from typing import Any
 
 from auto_trading.ops.paper_watch import (
     STOP_DRAWDOWN,
@@ -359,7 +360,7 @@ def test_demo_t2_line_summarises_orders_and_flags_problems() -> None:
     from auto_trading.ops.paper_watch import check_demo_t2
 
     now = 1_790_300_000_000
-    report = {
+    report: dict[str, Any] = {
         "at_ms": now - 3_600_000,
         "decision_date": "2026-09-24",
         "status": "OK",
@@ -411,7 +412,7 @@ def test_demo_o2_line_and_fired_stop_warning() -> None:
     from auto_trading.ops.paper_watch import check_demo_o2
 
     now = 1_790_300_000_000
-    report = {
+    report: dict[str, Any] = {
         "at_ms": now - 3_600_000,
         "decision_date": "2026-09-24",
         "report": {

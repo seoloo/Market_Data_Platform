@@ -28,7 +28,9 @@ class FakeVenue:
     def order_book(self, symbol: str, limit: int = 100):
         return [(BID, Decimal(1))], [(ASK, Decimal(1))]
 
-    def _new(self, cid: str, side: str, qty: Decimal, status: OrderStatus, executed: Decimal):
+    def _new(
+        self, cid: str, side: str, qty: Decimal, status: OrderStatus, executed: Decimal
+    ) -> SpotOrderResult:
         r = SpotOrderResult(
             cid,
             str(len(self.orders) + 1),
@@ -44,7 +46,9 @@ class FakeVenue:
         self.orders[cid] = r
         return r
 
-    def place_limit_maker(self, symbol, side, quantity, price, client_order_id):
+    def place_limit_maker(
+        self, symbol: str, side: str, quantity: Decimal, price: Decimal, client_order_id: str
+    ) -> SpotOrderResult:
         if self.reject_posts > 0:
             self.reject_posts -= 1
             raise OrderRejectedError("would match")
@@ -52,7 +56,9 @@ class FakeVenue:
         self.prices[client_order_id] = price
         return self._new(client_order_id, side, quantity, OrderStatus.NEW, Decimal(0))
 
-    def place_market_order(self, symbol, side, quantity, client_order_id):
+    def place_market_order(
+        self, symbol: str, side: str, quantity: Decimal, client_order_id: str
+    ) -> SpotOrderResult:
         self.placed.append(client_order_id)
         self.prices[client_order_id] = ASK if side == "BUY" else BID
         return self._new(client_order_id, side, quantity, OrderStatus.FILLED, quantity)

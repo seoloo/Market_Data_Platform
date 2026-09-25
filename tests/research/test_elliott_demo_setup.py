@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from auto_trading.research.elliott.demo_setup import setup_from_set
 
 
-def scen(i: int, state: str, direction: int, a: str = "100", b: str = "120") -> dict:
+def scen(i: int, state: str, direction: int, a: str = "100", b: str = "120") -> dict[str, Any]:
     return {
         "scenario_id": f"s{i}",
         "current_state": state,
@@ -19,7 +20,7 @@ def scen(i: int, state: str, direction: int, a: str = "100", b: str = "120") -> 
     }
 
 
-def make(states: list[tuple[str, int]], **kw) -> tuple[dict, dict]:
+def make(states: list[tuple[str, int]], **kw: str) -> tuple[dict[str, Any], dict[str, int]]:
     scenarios = [scen(i, s, d, **kw) for i, (s, d) in enumerate(states)]
     ranks = {s["scenario_id"]: i + 1 for i, s in enumerate(scenarios)}
     return {"as_of_ms": 5, "scenarios": scenarios}, ranks

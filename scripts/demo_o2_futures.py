@@ -231,7 +231,10 @@ def main(argv: list[str]) -> int:
     )
     conn = connect(DB)
     apply_migrations(conn)
-    clock = lambda: int(time.time() * 1000)  # noqa: E731
+
+    def clock() -> int:
+        return int(time.time() * 1000)
+
     store = FuturesOrderRepository(conn)
     manager = FuturesOrderManager(
         futures, store, mode="demo", strategy_id=STRATEGY, strategy_tag=TAG, clock=clock

@@ -122,7 +122,12 @@ SETUP = EwSetup(
 
 def runner(tmp_path: Path, api: FakeApi):
     notes: list[str] = []
-    r = EwDemoRunner(api, Store(tmp_path), notes.append, clock=lambda: 1_790_000_100_000)
+    r = EwDemoRunner(
+        api,  # type: ignore[arg-type]  # 테스트용 가짜 API
+        Store(tmp_path),
+        notes.append,
+        clock=lambda: 1_790_000_100_000,
+    )
     return r, notes
 
 
@@ -245,5 +250,5 @@ def test_agreement_counts_top10_impulse_ends() -> None:
             + [("WAVE_C_END_CANDIDATE", 1)] * 8
         )
     ]
-    ranks = {s["scenario_id"]: i for i, s in enumerate(scen)}
+    ranks = {str(s["scenario_id"]): i for i, s in enumerate(scen)}
     assert agreement({"scenarios": scen}, ranks) == (10, 3, 1)
