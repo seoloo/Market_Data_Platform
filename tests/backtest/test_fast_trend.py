@@ -92,3 +92,13 @@ def test_liquidation_on_last_price_when_configured() -> None:
     cfg = replace(F1B, stop=None, liquidate_on_mark=False, max_weight=1.0, target_vol=10.0)
     assert run(closes, wick=wick, cfg=cfg).liquidations == 1
     assert run(closes, wick=wick, cfg=replace(cfg, liquidate_on_mark=True)).liquidations == 0
+
+
+def test_worst_intraday_drawdown_stops_counting_after_halt() -> None:
+    # 1x 롱 보유 중 하루 −40% 급락 → 계좌 정지. 그 뒤는 포지션이 없으니 최악 낙폭을 더 세지 않는다
+    up = path(200, 0.01, wobble=0.0)
+    crash = [up[-1] * 0.6] * 40
+    cfg = replace(F1B, max_weight=1.0, target_vol=10.0, stop=None)
+    r = run(up + crash, cfg=cfg)
+    assert r.halted_day is not None
+    assert 0.3 <= r.worst_intraday_drawdown < 1.0

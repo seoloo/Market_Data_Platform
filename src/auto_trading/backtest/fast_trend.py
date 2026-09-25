@@ -227,11 +227,12 @@ def simulate_fast_trend(
             halted = True
         # 4. 계좌 정지
         worst = _worst_equity(equity, qty, today, on_mark=True) if not halted else 0.0
-        worst_last = _worst_equity(equity, qty, today, on_mark=False) if not halted else 0.0
-        result.worst_intraday_drawdown = max(result.worst_intraday_drawdown, 1 - worst / peak)
-        result.worst_intraday_drawdown_last = max(
-            result.worst_intraday_drawdown_last, 1 - worst_last / peak
-        )
+        if not halted:  # 정지 뒤에는 포지션이 없다 — 최악 낙폭을 더 세지 않는다
+            worst_last = _worst_equity(equity, qty, today, on_mark=False)
+            result.worst_intraday_drawdown = max(result.worst_intraday_drawdown, 1 - worst / peak)
+            result.worst_intraday_drawdown_last = max(
+                result.worst_intraday_drawdown_last, 1 - worst_last / peak
+            )
         if not halted and worst <= (1 - cfg.halt_drawdown) * peak:
             result.halted_day = day
             halted = True
