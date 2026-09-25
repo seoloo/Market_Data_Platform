@@ -52,7 +52,11 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.research.elliott.demo_setup import EwSetup, setup_from_set  # noqa: E402
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
-from auto_trading.research.elliott.scanner import causal_triggers, scenario_lists  # noqa: E402
+from auto_trading.research.elliott.scanner import (  # noqa: E402
+    EW3E_LOOKBACK_BARS,
+    causal_triggers,
+    scenario_lists,
+)
 from auto_trading.research.elliott.scenario_contract import to_json_dict  # noqa: E402
 from auto_trading.research.elliott.scenario_export import export_scenario_set  # noqa: E402
 
@@ -69,7 +73,8 @@ MAX_HOLD_MS = 30 * 86_400_000
 POLL_S = 2.0
 SCAN_DELAY_MS = 90_000
 """4h 마감 뒤 이만큼 기다렸다가 스캔한다 (공개 자료 반영 여유)."""
-LOOKBACK_DAYS = 90
+LOOKBACK_DAYS = 150
+"""EW-3e 시작 창 120 일 + 여유 (문서 58)."""
 H4 = Timeframe.H4.ms
 TAG = "[데모·선물 BTC 5x] 연구 56 Elliott+피보 2·4파 되돌림"
 
@@ -124,11 +129,12 @@ def scan(minutes: list[Candle]) -> list[tuple[int, EwSetup | None, int]]:
         chunk, _groups(iter(minutes), chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
     )
     ch_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
-    triggers = causal_triggers(replay, ch_hours, chunk)
+    triggers = causal_triggers(replay, ch_hours, chunk, all_new_pivots=True)  # EW-3e
     out = []
-    for trig, scen in zip(triggers, scenario_lists(triggers, ch_hours), strict=True):
+    lists = scenario_lists(triggers, ch_hours, lookback_bars=EW3E_LOOKBACK_BARS)
+    for trig, scen in zip(triggers, lists, strict=True):
         data_set, ranks = export_scenario_set(
-            trig, scen, venue="binance_usdm", instrument=SIGNAL_SYMBOL
+            trig, scen, venue="binance_usdm", instrument=SIGNAL_SYMBOL, rule_profile="EW-3e"
         )
         data = to_json_dict(data_set)
         out.append((trig.close_ms, setup_from_set(data, ranks), len(data["scenarios"])))

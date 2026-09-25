@@ -39,6 +39,7 @@ from auto_trading.research.elliott.scenario_contract import (
 __all__ = ["FIB_LEVELS", "RULE_PROFILE", "export_scenario_set"]
 
 RULE_PROFILE = "EW-3d'"
+"""기본값(재현용). EW-3e 로 만든 묶음은 ``rule_profile="EW-3e"`` 를 넘긴다 (문서 58)."""
 FIB_LEVELS = (Decimal("0.382"), Decimal("0.5"), Decimal("0.618"))
 _LABELS = {
     Label.IMPULSE: ("0", "1", "2", "3", "4", "5"),
@@ -153,6 +154,7 @@ def export_scenario_set(
     venue: str,
     instrument: str,
     flags: Sequence[str] = (),
+    rule_profile: str = RULE_PROFILE,
 ) -> tuple[ScenarioSet, dict[str, int]]:
     """(평가자 입력 묶음, 사이드카 {scenario_id: 기준 순위 규칙의 비관적 순위}).
 
@@ -177,7 +179,7 @@ def export_scenario_set(
     result = ScenarioSet(
         schema_version=SCHEMA_VERSION,
         track="EW-WA-CONTEXT",
-        rule_profile=RULE_PROFILE,
+        rule_profile=rule_profile,
         venue=venue,
         instrument=instrument,
         timeframe=f"{Timeframe.H4.value}+{Timeframe.H1.value}",

@@ -25,7 +25,11 @@ from scripts.audit_ew_edge_power import _btc_bars, _btc_minutes, _chunks, _group
 
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
-from auto_trading.research.elliott.scanner import causal_triggers, scenario_lists  # noqa: E402
+from auto_trading.research.elliott.scanner import (  # noqa: E402
+    EW3E_LOOKBACK_BARS,
+    causal_triggers,
+    scenario_lists,
+)
 from auto_trading.research.elliott.scenario_contract import (  # noqa: E402
     scenario_set_digest,
     to_json_dict,
@@ -52,10 +56,12 @@ def main() -> int:
                 chunk, _groups(minutes, chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
             )
             chunk_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
-            triggers = causal_triggers(replay, chunk_hours, chunk)
-            for trig, scen in zip(triggers, scenario_lists(triggers, chunk_hours), strict=True):
+            # EW-3e (문서 58 채택): 마감당 모든 새 4h 꼭짓점 발동 · 시작 창 720
+            triggers = causal_triggers(replay, chunk_hours, chunk, all_new_pivots=True)
+            lists = scenario_lists(triggers, chunk_hours, lookback_bars=EW3E_LOOKBACK_BARS)
+            for trig, scen in zip(triggers, lists, strict=True):
                 data_set, sidecar = export_scenario_set(
-                    trig, scen, venue="binance_usdm", instrument="BTCUSDT"
+                    trig, scen, venue="binance_usdm", instrument="BTCUSDT", rule_profile="EW-3e"
                 )
                 data = to_json_dict(data_set)
                 problems = validate_scenario_set_dict(data)
