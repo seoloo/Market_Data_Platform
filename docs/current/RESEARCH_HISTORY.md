@@ -161,6 +161,15 @@ Learned: 과거에는 보험이 낙폭을 줄이지 못하고 비용만 들었�
 Do not retry: 같은 데이터로 거리(15%·25%)·불리폭 변경.
 근거: [27 사전등록·§7 결과](../research/27-o2-catastrophe-stop-preregistration.md).
 
+## F1b — REJECTED (2026-09-25)
+
+Hypothesis: BTC·ETH 10·20·40일 추세 롱숏(USD-M 무기한 1x, ±20% 비상 스톱, mark price 청산·정지)은 비용·funding 후 순수익 > 0 이고 숏 다리도 돈을 번다.
+판정 2020-03~2026-08 (1회): 일간 평균 − 2SE = −0.028% → F1 실패, 2023~2026 음수, **숏 순손익 −2,188**, 2023-05-28 계좌 정지(MDD 31%) → **REJECT**.
+샤프 0.24, CAGR 2.9%. 롱 가격 +7,156 · funding −2,371 · 비용 −588. T/v2 와 상관 0.45 — 섞으면 T/v2 단독보다 나빠진다.
+Learned: 추세를 따르는 BTC·ETH 숏은 느린 속도(T/v1 ≈ 0)와 빠른 속도 모두 수익원이 아니다 — 급반등이 하락 추세 이익을 되돌린다. 선물 롱은 funding 으로 가격 이익의 1/3 을 낸다.
+Do not retry: lookback·스톱·크기·밴드 변경, F1a(5·10·20). 방향이 F1b 와 거의 같은 지표(RSI 50 기준, 46 §2.1)도 같은 가설이다.
+근거: [44 후보 비교](../research/44-f1-fast-trend-candidates.md), [45 사전등록·§6 판정](../research/45-f1b-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.

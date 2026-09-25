@@ -1,10 +1,26 @@
 # 작업 현황
 
-최종 갱신: 2026-09-24 · 작성: Codex (이번 작업: Elliott 4h 후보 창의 시장 입력 가용성 감사, 커밋·푸시 없음).
-현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
-D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1 기각.
+최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: 지표 후보 비교 측정 — 문서 46).
+현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
+D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b 기각.
 
-## 이번 작업 (Codex — Elliott 독립 연구 Phase 0 시장 창 가용성)
+## 이번 작업 (Claude — 지표로 선물 방향 정하기: 후보 비교 측정)
+
+- 사용자 요청(44 §4) RSI·MACD·MA·EMA·일목을 [46 후보 비교](docs/research/46-indicator-candidates.md)로 측정. **수익·샤프·낙폭 미계산.**
+  후보는 가족마다 교과서 기본값 하나로 먼저 고정(I1 RSI 50 · I2 RSI 30/70 역추세 · I3 MACD 히스토그램 · I4 SMA 50/200 · I5 EMA 20/50 · I6 일목 구름).
+- 결과: I1 ≈ F1b(같은 방향 91%, 기각 전략 재시험), I5·I6 ≈ T(89·92%, 숏 0 근처로 이미 판정). I2 는 유일하게 새 정보지만
+  강세장 숏이라 숏 41번 중 9번이 +50% 이상 역행(최대 +225%). I4 는 숏 14번 — 판정 불가. **I3 만 T 와 거의 무관(상관 0.09)하고 꼬리가 F1b 수준.**
+- 6개 동시 시험(Holm)은 최소 검출 샤프 1.27 — 하나로 좁혀야 판정 가능. 권고 A: I3 MACD 롱숏 사전 등록(45 틀 재사용, 기각 가능성 큼).
+  B: I2 롱만(표본 약 25번), C: 트랙 마무리. **사용자 선택 대기.**
+- 코드: `backtest/indicator_signals.py`(순수·causal) + 테스트 22건(고정값·Decimal 지표와 일치·미래 무관성), `scripts/measure_indicator_candidates.py`(DB 읽기 전용).
+  T·F1b 회전율·전환 수가 44 측정과 같음을 확인.
+
+## 이전 작업 (Opus — F1 빠른 추세 롱숏, 문서 44·45)
+
+- [44 후보 비교](docs/research/44-f1-fast-trend-candidates.md) → [45 F1b 사전 등록·판정](docs/research/45-f1b-preregistration.md) **REJECT**:
+  숏 순손익 −2,188, 2023-05-28 계좌 정지(MDD 31%), 롱 funding −2,371. 추세를 따르는 BTC·ETH 숏은 두 속도 모두 수익원이 아니다.
+
+## 이전 작업 (Codex — Elliott 독립 연구 Phase 0 시장 창 가용성)
 
 - [33 §12~13](docs/research/33-elliott-phase0-data-and-profile.md)에 **WA 결과 열람 전** 4h 후보 창 가용성 집계 단위·차단 규칙을 고정한 뒤, [읽기 전용 감사](scripts/audit_ew0_candidate_coverage.py)를 2020~2021 Binance USD-M BTCUSDT 대용 4h/1m에 실행. 기존 `mode=ro`·`query_only=ON` 시장 로더만 사용했고 WA 체결·PnL/운영 DB·Paper·전략을 건드리지 않음.
 - 4,386개 4h 마감 중 후보 ≥2/≥4/≥6 창은 **882/369/147개 마감**. `UNKNOWN` 1,229개, 비-UNKNOWN 구간 542개, 4/6 후보에 도달한 구간 29/11개. 같은 창의 반복 마감이며 독립 파동·검정 표본 수 아님.
