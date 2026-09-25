@@ -34,6 +34,7 @@ temperature=0만으로 재현성이 보장되지는 않는다. 저장된 응답�
 - **T/v2 실거래 그림자 운영(2026-09-25 구현, Phase 8 준비)**: `scripts/run_shadow_t2.py run --allocation <USDT>` 매일 21:10 KST. 주문 0건. Paper 와 같은 실행기를 실거래 예정 금액으로(mode='shadow', 원장 `t2_shadow_<금액>`), 실계좌 **읽기만**(키 권한·시계·잔고), 호가 미끄러짐 추정, Paper 목표 대조. 일일 점검에 한 줄 추가 — 키에 읽기 외 권한·IP 제한 없음·주문 기록은 CRITICAL, 나머지 WARN 까지. 기준·대응: [51](../research/51-phase8-shadow-t2-registration.md).
 - **실거래 키 권한 계획(제안, Phase 8 승인 때 확정)**: 1단계(T/v2 현물) = 현물 거래만. 2단계(O/v2) = 현물·선물 거래 + "Permits Universal Transfer"(본인 지갑 사이 이체, [53](../research/53-o2-wallet-transfer-design.md)). **어느 단계든 출금 끔·IP 제한.** 키 권한을 켜는 것은 사용자가 한다. 그림자 운영 점검 기준은 단계 승인 때 바꾼다.
 - **긴급 정지 스위치(2026-09-25)**: `data/HALT` 파일이 있으면 정지(첫 줄 = 사유), 지우면 해제. 코드는 이 파일을 만들거나 지우지 않는다. 그림자 운영은 그날 체결하지 않고, Phase 8 실행기는 신규 주문을 멈춘다(청산은 허용). `ops/kill_switch.py`.
+- **10/23·10/24 점검 보고(2026-09-25, 문서 65)**: `python -m scripts.review_phase6 --until 2026-10-22`(10/23 21:30 KST 이후, O/v3 한 달) · `--until 2026-10-23`(10/24, 4 주 점검·Phase 8 1단계 자격). 결과 `reports/review/<결정일>.md`. DB 읽기 전용, 기준은 문서 65 에 고정.
 - 실거래 경로의 Telegram critical/위험 알림, JSONL 구조화 로그, WS 지연·마지막 봉·잔고·보호주문·디스크·DB 오류 관찰은 구현/운영 검증 대기.
 - 일별 회계와 위험 초기화는 UTC. 표시 시간대가 위험 계산 기준을 바꾸면 안 된다.
 
