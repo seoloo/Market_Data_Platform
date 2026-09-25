@@ -9,6 +9,7 @@ from auto_trading.ops.paper_watch import (
     STOP_DRAWDOWN,
     Finding,
     check_o1,
+    check_shadow,
     check_t2,
     check_testnet_drill,
     exit_code,
@@ -296,3 +297,46 @@ class TestTestnetDrill:
         summary, findings = check_t2(rows, now_for(rows))
         text = render_report([summary], findings, now_for(rows), extra=["테스트넷 훈련: 요약"])
         assert text.splitlines()[-1] == "테스트넷 훈련: 요약"
+
+
+class TestShadow:
+    NOW = 1_790_000_000_000
+
+    def report(self, **kw: object) -> dict[str, object]:
+        base: dict[str, object] = {
+            "at_ms": self.NOW,
+            "status": "OK",
+            "allocation": "1000",
+            "orders_sent_to_exchange": 0,
+            "findings": [],
+            "day": {"equity": "1000.5"},
+        }
+        base.update(kw)
+        return base
+
+    def test_no_report_is_info(self) -> None:
+        lines, found = check_shadow(None, self.NOW)
+        assert lines == [] and [f.level for f in found] == ["INFO"]
+
+    def test_line_and_clean_report(self) -> None:
+        lines, found = check_shadow(self.report(), self.NOW)
+        assert found == []
+        assert lines[0].startswith("그림자 운영: ") and "예정 1000 USDT" in lines[0]
+        assert "1,000.50" in lines[0]
+
+    def test_behind_and_failed_are_warnings(self) -> None:
+        old = self.report(at_ms=self.NOW - 2 * 86_400_000, status="FAILED", error="x")
+        assert [f.level for f in check_shadow(old, self.NOW)[1]] == ["WARN", "WARN"]
+
+    def test_security_findings_pass_through_as_critical(self) -> None:
+        rep = self.report(
+            findings=[
+                {"level": "CRITICAL", "message": "IP 제한 없음"},
+                {"level": "INFO", "message": "잔고"},
+            ]
+        )
+        assert [f.level for f in check_shadow(rep, self.NOW)[1]] == ["CRITICAL"]
+
+    def test_any_order_sent_is_critical(self) -> None:
+        found = check_shadow(self.report(orders_sent_to_exchange=1), self.NOW)[1]
+        assert [f.level for f in found] == ["CRITICAL"]

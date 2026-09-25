@@ -214,3 +214,31 @@ def test_ledger_balances_follow_fills_and_fees() -> None:
     balance = ledger_balances(records, initial_quote=Decimal(10_000))
     assert balance["BTC"] == Decimal("0.06")
     assert balance["USDT"] == Decimal(10_000) - 5000 - Decimal("7.5") + 2100 - Decimal("3.15")
+
+
+def test_shadow_mode_keeps_a_separate_ledger() -> None:
+    """그림자 운영(51)은 같은 실행기를 다른 mode·금액으로 돌린다 — Paper 원장과 섞이지 않는다."""
+    conn = connect(":memory:")
+    apply_migrations(conn, now_ms=1)
+    market = Market(CLOSES)
+    orders, days = SpotOrderRepository(conn), PaperDayRepository(conn)
+    paper = PaperT2Runner(market, orders, days, clock=lambda: 1)
+    shadow = PaperT2Runner(
+        market,
+        orders,
+        days,
+        clock=lambda: 1,
+        initial_quote=Decimal(1_000),
+        strategy_id="t2_shadow_1000",
+        strategy_tag="t2s",
+        mode="shadow",
+    )
+    for day in range(130, 150):
+        market.day = day
+        p = paper.run_once(now_after(day))
+        s = shadow.run_once(now_after(day))
+        assert p.targets == s.targets  # 같은 신호
+    rows = orders.all()
+    assert {r.mode for r in rows} == {"paper", "shadow"}
+    assert all(r.strategy_id == "t2_shadow_1000" for r in rows if r.mode == "shadow")
+    assert float(s.equity) == pytest.approx(float(p.equity) / 10, rel=0.02)  # 금액만 1/10

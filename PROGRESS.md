@@ -1,10 +1,27 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: 사용자 결정 — 몇 시간 단위 BTCUSDT 방향 탐색 중단, Paper 결과 대기).
+최종 갱신: 2026-09-25 · 작성: Claude (이번 작업: 보호주문 충돌 결정 자료(50) · T/v2 실거래 그림자 운영(51)).
 현재: **Phase 6 — T/v2 Paper(2026-09-22~) · O/v1 별도 원장 Paper(2026-09-23~) 병행 운영** · 2026-10-23 O/v3 보고 · 2026-10-24 4주 점검 · T/v1·F 전향 관찰.
 D22는 중단·제외. 승인된 수익 전략 없음. A1 종료(DATA_INSUFFICIENT), WA·K·M·TA·P1·F1b·I3·FB·LQ·MD 기각.
 
-## 이번 작업 (Claude — 선물 트랙: 거시 지표 발표 첫 반응 MD 사전 등록)
+## 이번 작업 (Claude — Phase 8 준비: 보호주문 충돌 정리 · T/v2 그림자 운영)
+
+- [50 결정 자료](docs/research/50-overlay-protective-order-decision.md): O 오버레이는 TRADING_CORE 네 규칙에 걸린다.
+  - 보호주문 필수, 거래 위험 1%, 증거금 10%, 청산거리 비율 2.0
+  - O/v2 는 보호주문을 채운다. 스톱이 발동하면 계좌의 3~9% 를 잃는다. 레버리지 2.4배 초과(과거 0.2% 날)에서 비율 규칙을 어긴다
+  - 권고 A: Phase 8 1단계는 T/v2 현물만, O/v2 계열은 2단계. **사용자 결정 대기**
+- [51 그림자 운영](docs/research/51-phase8-shadow-t2-registration.md): `scripts/run_shadow_t2.py` — 주문 0건.
+  - Paper 실행기를 실거래 예정 금액으로 돌린다 (mode='shadow')
+  - 실계좌 읽기 점검 (키 권한·시계·잔고), 호가 미끄러짐, Paper 목표 대조
+  - 긴급 정지 스위치 `data/HALT`, 일일 점검에 한 줄 추가
+- 첫 시험(임시 DB): 키 읽기 전용·IP 제한 ✓, 시계 ✓, 호가 미끄러짐 BTC 0.00 · ETH 0.02 bps (10,000 USDT 까지), 주문 0건.
+- 코드: `execution/shadow_t2.py`(순수 점검), `ops/kill_switch.py`, `PaperT2Runner(mode=…)`, `BinanceSpotReadOnly.order_book`, `check_shadow`. 테스트 +20건 (전체 1,960).
+- **남은 일(사용자):**
+  1. 실거래 예정 금액 결정
+  2. 스케줄 `AutoTrading_Shadow_T2` 등록 (51 §6)
+  3. 50 의 A/B 결정
+
+## 이전 작업 (Claude — 선물 트랙: 거시 지표 발표 첫 반응 MD 사전 등록)
 
 - 사용자 선택 "A로 가자" → [49](docs/research/49-macro-release-drift.md).
   - 가설: CPI·NFP·PCE·FOMC 발표 첫 15분 BTC 반응이 4시간 동안 지속되거나 반전한다

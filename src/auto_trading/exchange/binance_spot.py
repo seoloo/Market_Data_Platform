@@ -122,6 +122,15 @@ class BinanceSpotReadOnly:
     def last_price(self, symbol: str) -> Decimal:
         return Decimal(self._request("/api/v3/ticker/price", {"symbol": symbol})["price"])
 
+    def order_book(
+        self, symbol: str, limit: int = 100
+    ) -> tuple[list[tuple[Decimal, Decimal]], list[tuple[Decimal, Decimal]]]:
+        """호가 (매수 호가, 매도 호가) — 각 (가격, 수량), 좋은 가격부터. 공개 API, 키 불필요."""
+        data = self._request("/api/v3/depth", {"symbol": symbol, "limit": limit})
+        bids = [(Decimal(p), Decimal(q)) for p, q in data["bids"]]
+        asks = [(Decimal(p), Decimal(q)) for p, q in data["asks"]]
+        return bids, asks
+
     def closed_daily(self, symbol: str, as_of_ms: int, limit: int = 200) -> list[Candle]:
         """``as_of_ms`` 까지 **마감된** 일봉 (공개 API, 키 불필요). 진행 중인 봉은 버린다."""
         rows = self._request(

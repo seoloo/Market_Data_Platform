@@ -85,6 +85,7 @@ class PaperT2Runner:
         cost_rate: Decimal = Decimal("0.0015"),
         strategy_id: str = "t2_long",
         strategy_tag: str = "t2l",
+        mode: str = "paper",
     ) -> None:
         self._market = market
         self._orders = orders
@@ -95,12 +96,13 @@ class PaperT2Runner:
         self._cost = cost_rate
         self._strategy_id = strategy_id
         self._tag = strategy_tag
+        self._mode = mode
 
     def _records(self) -> list[SpotOrderRecord]:
         return [
             r
             for r in self._orders.all()
-            if r.mode == "paper" and r.strategy_id == self._strategy_id
+            if r.mode == self._mode and r.strategy_id == self._strategy_id
         ]
 
     def run_once(self, now_ms: int) -> PaperDay:
@@ -118,7 +120,7 @@ class PaperT2Runner:
         manager = SpotOrderManager(
             fake,
             self._orders,
-            mode="paper",
+            mode=self._mode,
             strategy_id=self._strategy_id,
             strategy_tag=self._tag,
             clock=self._clock,

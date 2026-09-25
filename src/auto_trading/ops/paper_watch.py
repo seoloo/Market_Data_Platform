@@ -266,6 +266,44 @@ def check_testnet_drill(
     return [line], findings
 
 
+def check_shadow(report: Mapping[str, Any] | None, now_ms: int) -> tuple[list[str], list[Finding]]:
+    """T/v2 실거래 그림자 운영 보고서(최신 1개)로 한 줄 요약과 판정 (docs/research/51).
+
+    그림자 운영은 주문을 보내지 않으므로 대부분 **WARN 까지만** 올린다.
+    다만 Phase 8 승인 전 실계좌 키에 읽기 외 권한이 켜졌거나 IP 제한이 없으면
+    보고서의 CRITICAL 을 그대로 올린다(보안 문제).
+    """
+    ledger = "그림자"
+    if report is None:
+        return [], [Finding("INFO", ledger, "그림자 운영 기록이 아직 없다")]
+    at = int(report.get("at_ms") or 0)
+    status = str(report.get("status"))
+    findings: list[Finding] = []
+    behind = now_ms // _DAY_MS - at // _DAY_MS
+    if behind >= 1:
+        findings.append(
+            Finding("WARN", ledger, f"그림자 운영 {behind}일 밀림 — 마지막 {_date(at)}")
+        )
+    if status == "FAILED":
+        findings.append(Finding("WARN", ledger, f"실행 실패: {report.get('error')}"))
+    for f in report.get("findings", []):
+        level = f.get("level")
+        if level == "CRITICAL":
+            findings.append(Finding("CRITICAL", ledger, str(f.get("message"))))
+        elif level == "WARN":
+            findings.append(Finding("WARN", ledger, str(f.get("message"))))
+    if int(report.get("orders_sent_to_exchange") or 0) != 0:
+        findings.append(
+            Finding("CRITICAL", ledger, "그림자 운영이 거래소에 주문을 보냈다고 기록됨")
+        )
+    day = report.get("day") or {}
+    equity = day.get("equity")
+    line = f"그림자 운영: {_date(at)} {status} · 예정 {report.get('allocation')} USDT"
+    if equity is not None:
+        line += f" · 가상 자본 {float(equity):,.2f}"
+    return [line], findings
+
+
 def exit_code(findings: Sequence[Finding]) -> int:
     """작업 스케줄러 '마지막 결과'로 보이게 한다: CRITICAL 2, WARN 1, 이상 없음 0."""
     levels = {f.level for f in findings}

@@ -7,10 +7,12 @@
     python scripts/paper_watchdog.py --test-telegram # 텔레그램 설정 확인용 시험 메시지
 
 윈도우 작업 스케줄러로 매일 21:20(KST) 실행한다 — T/v2(21:00)·O/v1(21:02)·O/v2(21:04)·O/v3(21:06)·
-테스트넷 훈련(21:08) 뒤.
+테스트넷 훈련(21:08)·그림자 운영(21:10) 뒤.
 2026-09-24 사용자 결정으로 저녁 시각으로 옮겼다
 (출근 때문에 아침에 PC 를 켤 수 없다).
-테스트넷 훈련 결과(``reports/testnet/drill-*.json``)도 한 줄로 요약한다.
+테스트넷 훈련 결과(``reports/testnet/drill-*.json``)와
+T/v2 그림자 운영(``reports/shadow/t2/``, docs/research/51)도
+한 줄씩 요약한다.
 훈련 실패는 경고(1)까지만 올린다.
 종료 코드: 0 이상 없음 · 1 경고 · 2 조치 필요(중단 기준·실행 누락·원장 불일치·알림 실패).
 보고서: ``reports/watchdog/<날짜>.txt``·``<날짜>.json``(대시보드용),
@@ -37,6 +39,7 @@ from auto_trading.ops.paper_watch import (
     Finding,
     LedgerSummary,
     check_o1,
+    check_shadow,
     check_t2,
     check_testnet_drill,
     exit_code,
@@ -57,6 +60,7 @@ DB = REPO / "data" / "trading.db"
 ENV = REPO / ".env"
 OUT = REPO / "reports" / "watchdog"
 DRILLS = REPO / "reports" / "testnet"
+SHADOW = REPO / "reports" / "shadow" / "t2"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
 _EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
@@ -120,6 +124,18 @@ def drill_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return lines, findings
 
 
+def shadow_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """최신 그림자 운영 보고서 요약 (docs/research/51). 없으면 등록 전으로 본다."""
+    paths = sorted(SHADOW.glob("*.json"))
+    if not paths:
+        return check_shadow(None, now_ms)
+    try:
+        report = json.loads(paths[-1].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [], [Finding("WARN", "그림자", f"읽을 수 없는 보고서 {paths[-1].name}")]
+    return check_shadow(report, now_ms)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -146,6 +162,9 @@ def main() -> int:
     summaries, findings = collect(now_ms)
     drill_lines, drill_findings = drill_status(now_ms)
     findings += drill_findings
+    shadow_lines, shadow_findings = shadow_status(now_ms)
+    drill_lines += shadow_lines
+    findings += shadow_findings
     code = exit_code(findings)
     text = render_report(summaries, findings, now_ms, extra=drill_lines)
 
