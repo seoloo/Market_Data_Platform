@@ -252,7 +252,9 @@ def main() -> int:
     parser.add_argument("--flatten", action="store_true", help="관찰 끝: 모두 청산")
     args = parser.parse_args()
     now = int(time.time() * 1000)
-    if overlaps_daily_drill(now, 5):
+    # 실제 실행은 10초 안팎. 20:45 스케줄(+최대 59초 지연)이
+    # 20:55 차단 구간 전에 끝나도록 2분으로 본다
+    if overlaps_daily_drill(now, 2):
         raise SystemExit(
             "매일 자동 실행(21:00~21:20 KST) 구간과 겹친다 — 20:45 KST 나 21:30 KST 이후에"
         )
