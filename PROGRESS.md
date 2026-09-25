@@ -1,7 +1,12 @@
 # 작업 현황
 
-최종 갱신: 2026-09-25 · 작성: Codex (BTC 옵션 depth 스냅샷 의미 확인).
-현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 무료 상위 N레벨 스냅샷 의미를 확인했으나 체결 품질·계좌 위험 게이트에서 보류.
+최종 갱신: 2026-09-25 · 작성: Codex (BTC 옵션 무료 depth 고정 표본 품질 감사).
+현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 무료 상위 N레벨 호가 품질을 제한적으로 측정했으나 체결 품질·계좌 위험 게이트에서 보류.
+
+## 2026-09-25 — BTC 옵션 무료 depth 고정 표본 품질 감사
+
+- [71](docs/research/71-btc-option-fixed-depth-quality.md): [69](docs/research/69-btc-option-free-depth-and-leg-risk.md)의 고정 3일·6계약·각 10분을 재조회해 스냅샷별 양방향 여부, 표시 스프레드·최우선 수량, BBO 변화, 연결 내 관측 간격을 집계했다. 2024년 두 계약은 각 2프레임·끝까지 약 579초 무관측. 2025년 풋은 bid 없는 27/3,315프레임, 공급처 연결 중단 1회. 2026년 두 계약의 유효 프레임 스프레드 중위는 옵션 프리미엄 대비 약 1,818/690bps.
+- 판정 `FREE_DEPTH_MEASURABLE / EXECUTION_QUALITY_INSUFFICIENT_TO_INFER / ACCOUNT_RISK_NOT_CLEARED`. 표시 호가·수량은 실제 체결·수익·독립 거래 표본이 아니다. 구매·원자료 저장·계정 인증·주문·기존 운영 변경 없음. 다음: [67](docs/research/67-btc-option-quote-quality-sample.md)의 사전 고정 만기·행사가 범주로 무료 표본의 대표성 한계를 점검하고, 옵션 보호/담보 충돌은 별도 승인 전까지 차단. 10/23·10/24 점검 일정 불변.
 
 ## 2026-09-25 — BTC 옵션 무료 depth 스냅샷 의미 정정
 
