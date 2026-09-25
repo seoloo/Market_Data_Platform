@@ -17,7 +17,7 @@ from auto_trading.core.enums import Timeframe
 from auto_trading.features.structure import SwingKind
 from auto_trading.research.elliott.grammar import WavePattern
 from auto_trading.research.elliott.h4_evidence import FourHourPivotEvidence
-from auto_trading.research.elliott.parser import LEG_NEEDS, FinePivot, Label, Parse
+from auto_trading.research.elliott.parser import NESTED_ALLOWED, FinePivot, Label, Parse
 from auto_trading.research.elliott.ranking import guideline_distance
 from auto_trading.research.elliott.ranking_v2 import guideline_distance_v2
 from auto_trading.research.elliott.scanner import ScenarioList, Trigger
@@ -168,8 +168,9 @@ def _one(parse: Parse, pivots: Sequence[FinePivot], as_of_ms: int, total: int,
         FourHourPivotEvidence(p.kind, p.price, p.hour_open_ms, p.available_at_ms) for p in bounds
     ]
     ew4 = parse.pattern in _EW4
-    need = LEG_NEEDS[parse.pattern]
-    verified = [lab is want for lab, want in zip(parse.leg_labels, need, strict=True)]
+    # 문서 61: 4파·B파의 플랫·삼각형 읽기도 검증 (그 밖의 자리는 요구 모양 하나 — 이전과 같다)
+    allowed = NESTED_ALLOWED[parse.pattern]
+    verified = [lab in ok for lab, ok in zip(parse.leg_labels, allowed, strict=True)]
     checks = [HardCheck("TOP_LEVEL_HARD_RULES", CheckStatus.PASS)] + [
         HardCheck(f"LEG_{i}_SUBDIVISION", CheckStatus.PASS if ok else CheckStatus.UNVERIFIED)
         for i, ok in enumerate(verified, 1)
@@ -282,7 +283,7 @@ def export_scenario_set(
         for scenario, parse in items
     }
     status = SetStatus.SCENARIOS if items else SetStatus.INSUFFICIENT_ANCHORS
-    ew4_note = (
+    ew4_note: tuple[str, ...] = (
         (
             "플랫·삼각형 후보 빈도는 무작위 대조와 같거나 낮다(문서 60 §8)"
             " — 목록에 있다는 것이 그 모양의 근거가 아니다",
@@ -290,6 +291,11 @@ def export_scenario_set(
         if any(parse.pattern in _EW4 for _, parse in items)
         else ()
     )
+    if any(parse.pattern not in _EW4 and set(parse.leg_labels) & set(_EW4) for _, parse in items):
+        ew4_note += (
+            "4파·B파의 플랫·삼각형 읽기 빈도도 무작위 대조보다 낮다(문서 61 §7)"
+            " — 하위 구조 검증일 뿐 그 모양의 근거가 아니다",
+        )
     result = ScenarioSet(
         schema_version=SCHEMA_VERSION,
         track="EW-WA-CONTEXT",
