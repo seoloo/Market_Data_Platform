@@ -136,6 +136,8 @@ class ResearchEntry:
     verdict: str
     date: str
     summary: str
+    about: str = ""
+    """무엇을 연구했나 — 결과 (``요약:`` 줄, 없으면 가설 앞부분)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +339,24 @@ def _summary(block: Sequence[str]) -> str:
     return ""
 
 
+_ABOUT_MAX = 90
+
+
+def _about(block: Sequence[str]) -> str:
+    """``요약:`` 줄. 없으면 가설 첫 문장을 줄여 쓴다."""
+    for line in block:
+        if line.startswith("요약:"):
+            return line.removeprefix("요약:").strip()
+    for i, line in enumerate(block):
+        if line.startswith("Hypothesis"):
+            text = line.split(":", 1)[1].strip()
+            if not text:  # 여러 줄 가설 — 다음 줄 목록
+                text = next((b.lstrip("- ").strip() for b in block[i + 1 :] if b.strip()), "")
+            text = text.replace("**", "").replace("`", "").split(". ")[0]
+            return text if len(text) <= _ABOUT_MAX else text[: _ABOUT_MAX - 1] + "…"
+    return ""
+
+
 def _research(path: Path, errors: list[str]) -> tuple[ResearchEntry, ...]:
     """RESEARCH_HISTORY 의 ``## 이름 — 판정 (날짜)`` 항목과 그 아래 첫 판정 줄."""
     if not path.is_file():
@@ -358,7 +378,11 @@ def _research(path: Path, errors: list[str]) -> tuple[ResearchEntry, ...]:
             block.append(follow)
         date = _DATE.search(m.group(3))
         summary = _summary(block)
-        out.append(ResearchEntry(m.group(1), m.group(2), date.group(0) if date else "", summary))
+        out.append(
+            ResearchEntry(
+                m.group(1), m.group(2), date.group(0) if date else "", summary, _about(block)
+            )
+        )
     return tuple(out)
 
 

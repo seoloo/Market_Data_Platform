@@ -487,7 +487,15 @@ def _research(data: DashboardData) -> str:
         "".join(
             f"<tr><td>{escape(r.title)}</td>"
             f"<td>{_dot(color.get(r.verdict, 'warn'))}{escape(r.verdict)}</td>"
-            f"<td class='mute'>{escape(r.date)}</td><td>{escape(r.summary)}</td></tr>"
+            f"<td class='mute nowrap'>{escape(r.date)}</td>"
+            f"<td>{escape(r.about or r.summary)}"
+            + (
+                f"<details><summary>판정 근거</summary>"
+                f"<div class='mute'>{escape(r.summary)}</div></details>"
+                if r.about and r.summary
+                else ""
+            )
+            + "</td></tr>"
             for r in reversed(data.research)
         )
         or "<tr><td colspan=4 class='mute'>기록 없음</td></tr>"
@@ -495,7 +503,7 @@ def _research(data: DashboardData) -> str:
     return (
         '<div class="panel"><h2>연구 판정 (RESEARCH_HISTORY)</h2>'
         "<table><tr><th>연구</th><th>판정</th>"
-        f"<th>날짜</th><th>요약</th></tr>{rows}</table>"
+        f"<th>날짜</th><th>무엇을 연구했나 — 결과</th></tr>{rows}</table>"
         '<div class="foot">기각된 연구는 파라미터만 바꿔 다시 하지 않는다. '
         "자세한 내용은 docs/current/RESEARCH_HISTORY.md</div></div>"
     )
