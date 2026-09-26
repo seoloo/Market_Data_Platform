@@ -19,6 +19,7 @@ D22는 INCOMPLETE / EXCLUDED. 옛 H1 코드가 남아 있다는 이유로 현행
 Phase 번호/게이트는 BACKTEST_AND_TESTING을 따른다. 임의 진행률이나 미검증 통과를 만들지 않는다.
 게이트 미통과 상태에서 다음 Phase로 넘어가지 않는다. 예외 이동은 사용자 승인 필요.
 매 작업 종료 시 PROGRESS를 갱신하되, 사용자가 읽기 전용을 요구하면 그 지시가 우선한다.
+연구 판정·전략 상태·운영 단계·일정이 바뀌면 [BRIEFING_FOR_LLM](docs/BRIEFING_FOR_LLM.md)(다른 AI 에 붙여 넣는 요약)도 같은 커밋에서 고친다.
 
 ## 2. 변경할 수 없는 핵심 원칙
 
@@ -86,5 +87,6 @@ temperature=0만으로 결정론을 보장하지 않는다. 저장 응답 재생
 - [BACKTEST_AND_TESTING](docs/current/BACKTEST_AND_TESTING.md): 연구와 Phase 게이트.
 - [OPERATIONS](docs/current/OPERATIONS.md): 운영·보안·보존 정책.
 - [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md): 연구 판정 요약.
+- [BRIEFING_FOR_LLM](docs/BRIEFING_FOR_LLM.md): 외부 AI 대화용 파생 요약(기준 문서 아님).
 - config/: 실행 설정, src/auto_trading/: 구현, tests/: 검증.
 - [Archive](docs/archive/README.md): 필요할 때만 과거 근거 조회.
