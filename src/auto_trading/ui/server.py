@@ -23,6 +23,7 @@ __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost"})
 _ROUTES = {href: key for key, href, _ in PAGES}
+_ROUTES.update({"/accumulate": "overseas", "/qndx": "overseas"})
 _HEADERS = {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",

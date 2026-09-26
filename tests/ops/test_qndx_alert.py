@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -200,7 +201,15 @@ def test_page_renders_each_plan(tmp_path: Path) -> None:
         folder = tmp_path / "reports" / "accumulate" / plan.symbol
         folder.mkdir(parents=True)
         (folder / "2026-09-29.json").write_text(
-            json.dumps({"date": "2026-09-29", "status": a.status, "advice": a.to_dict()}),
+            json.dumps(
+                {
+                    "date": "2026-09-29",
+                    "at_ms": int(datetime(2026, 9, 29, 12, tzinfo=UTC).timestamp() * 1000),
+                    "status": a.status,
+                    "advice": a.to_dict(),
+                    "holding_qty": 2 if plan.symbol == "QNDX" else 0,
+                }
+            ),
             encoding="utf-8",
         )
         (tmp_path / "data" / "accumulate").mkdir(parents=True, exist_ok=True)
@@ -208,6 +217,21 @@ def test_page_renders_each_plan(tmp_path: Path) -> None:
             json.dumps(s.to_dict()), encoding="utf-8"
         )
     html = accumulate_page(SimpleNamespace(root=tmp_path))
-    assert "QNDX · 오늘 1주 살 차례" in html and "40,000원" in html
+    assert "QNDX · 1주 살 차례" in html and "40,000원" in html
     assert "BTQ" in html and "$4.00" in html
+    assert "QNDX" in html and "2주" in html
+    assert "2026-09-29 21:00 KST" in html
+    assert 'id="qndx"' in html and 'id="btq"' in html
     assert "아직 기록이 없다" in accumulate_page(SimpleNamespace(root=tmp_path / "none"))
+
+
+def test_overseas_report_date_is_escaped_when_timestamp_invalid(tmp_path: Path) -> None:
+    folder = tmp_path / "reports" / "accumulate" / "QNDX"
+    folder.mkdir(parents=True)
+    (folder / "2026-09-29.json").write_text(
+        json.dumps({"date": "<script>bad</script>", "at_ms": "invalid", "status": "WAIT"}),
+        encoding="utf-8",
+    )
+    html = accumulate_page(SimpleNamespace(root=tmp_path))
+    assert "<script>" not in html
+    assert "&lt;script&gt;bad&lt;/script&gt;" in html

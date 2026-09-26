@@ -28,7 +28,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("testnet", "/testnet", "테스트넷 검증"),
     ("risk", "/risk", "위험 · 알림"),
     ("demo", "/demo", "데모 · 실거래 준비"),
-    ("accumulate", "/accumulate", "적립 매수"),
+    ("overseas", "/overseas", "해외 주식"),
     ("research", "/research", "연구 기록"),
 )
 _KST = timedelta(hours=9)
@@ -86,9 +86,16 @@ def _dot(level: str) -> str:
 
 
 def _layout(data: DashboardData, page: str, body: str) -> str:
-    nav = "".join(
+    main_nav = "".join(
         f'<a href="{href}" class="{"on" if key == page else ""}">{escape(label)}</a>'
         for key, href, label in PAGES
+        if key != "overseas"
+    )
+    nav = (
+        f'<div class="nav-group"><div class="nav-heading">자동매매</div>{main_nav}</div>'
+        '<div class="nav-group nav-stock"><div class="nav-heading">해외 주식</div>'
+        f'<a href="/overseas" class="{"on" if page == "overseas" else ""}">'
+        "적립 현황</a></div>"
     )
     title = next(label for key, _, label in PAGES if key == page)
     errors = (
@@ -96,6 +103,21 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         if data.errors
         else ""
     )
+    trading_badge = (
+        '<span class="badge">저장된 적립 기록</span>'
+        if page == "overseas"
+        else '<span class="badge red">실거래 비활성</span>'
+    )
+    if page == "overseas":
+        foot = (
+            "60초마다 저장된 적립 보고서를 다시 읽는다 · "
+            "이 화면은 KIS 계좌를 실시간 조회하거나 주문하지 않는다."
+        )
+    else:
+        foot = (
+            "60초마다 새로 읽는다 · 데이터: Paper 원장(가상 체결)·테스트넷 기록·"
+            "데모(가짜 돈)·일일 점검 보고. PAPER·TESTNET·DEMO 자산은 합산하지 않는다."
+        )
     return (
         '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -103,11 +125,9 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
         f'<div class="layout"><nav><div class="logo">AUTO <b>TRADING</b></div>{nav}</nav><main>'
         f'<header><h1>{escape(title)}</h1><span class="date">{_kst(data.now_ms)} KST</span>'
-        '<span class="badge">읽기 전용</span><span class="badge red">실거래 비활성</span></header>'
+        f'<span class="badge">읽기 전용</span>{trading_badge}</header>'
         f"{errors}{body}"
-        '<div class="foot">60초마다 새로 읽는다 · '
-        "데이터: Paper 원장(가상 체결)·테스트넷 기록·데모(가짜 돈)·일일 점검 보고. "
-        "PAPER·TESTNET·DEMO 자산은 합산하지 않는다.</div></main></div></body></html>"
+        f'<div class="foot">{foot}</div></main></div></body></html>'
     )
 
 
@@ -519,7 +539,7 @@ _RENDER = {
     "risk": _risk,
     "demo": lambda data: demo_page(data.demo, data.now_ms),
     "running": running_page,
-    "accumulate": accumulate_page,
+    "overseas": accumulate_page,
     "research": _research,
 }
 

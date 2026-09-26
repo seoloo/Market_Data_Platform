@@ -164,9 +164,22 @@ class TestRender:
     def test_every_page_renders_and_escapes(self, root: Path, page: str) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), page)
         assert html.startswith("<!doctype html>")
-        assert "읽기 전용" in html and "실거래 비활성" in html
+        assert "읽기 전용" in html
+        if page == "overseas":
+            assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
+        else:
+            assert "실거래 비활성" in html
         assert EVIL not in html  # 모든 동적 문자열은 이스케이프
         assert "<form" not in html and "<script" not in html
+
+    def test_overseas_has_separate_navigation_group(self, root: Path) -> None:
+        html = render_page(load_dashboard(root, P0 + 11 * D), "overseas")
+        nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+        assert '<div class="nav-heading">자동매매</div>' in nav
+        assert '<div class="nav-heading">해외 주식</div>' in nav
+        assert nav.count('href="/overseas"') == 1
+        assert 'href="/accumulate"' not in nav
+        assert "QNDX" in html and "BTQ" in html
 
     def test_overview_has_draft_sections(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview")
@@ -221,6 +234,13 @@ class TestServer:
         with pytest.raises(urllib.error.HTTPError) as err:
             urllib.request.urlopen(base + "/admin")
         assert err.value.code == 404
+
+    @pytest.mark.parametrize("path", ["/accumulate", "/qndx"])
+    def test_previous_accumulation_links_still_work(self, base: str, path: str) -> None:
+        with urllib.request.urlopen(base + path) as response:
+            html = response.read().decode("utf-8")
+        assert response.status == 200
+        assert "해외 주식 · 적립 현황" in html
 
     @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE", "PATCH"])
     def test_write_methods_are_rejected(self, base: str, method: str) -> None:
