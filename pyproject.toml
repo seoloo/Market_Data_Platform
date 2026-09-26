@@ -197,4 +197,5 @@ source_modules = [
 forbidden_modules = [
     "auto_trading.research.elliott",
     "auto_trading.research.option_protection",
+    "auto_trading.research.staking_carry",
 ]
