@@ -78,6 +78,7 @@ def readiness_findings(
     allocation: Decimal,
     halted_reason: str | None,
     rejected_orders: Iterable[str] = (),
+    account_error: str | None = None,
 ) -> list[ShadowFinding]:
     """실거래였다면 문제가 됐을 것들. 그림자 운영 자체는 멈추지 않는다(보고만).
 
@@ -88,6 +89,16 @@ def readiness_findings(
         out.append(
             ShadowFinding(
                 "WARN", f"긴급 정지 스위치 켜짐 — 실거래였다면 주문 안 함: {halted_reason}"
+            )
+        )
+    if account_error is not None and "-2015" in account_error:
+        # Binance -2015: 키·IP·권한 중 하나가 맞지 않음.
+        # 집 PC 는 공인 IP 가 바뀔 수 있다 (문서 84 §3)
+        out.append(
+            ShadowFinding(
+                "WARN",
+                "실계좌 키가 거부됨(-2015) — 집 공인 IP 가 바뀌었을 수 있다."
+                " Binance API 관리에서 키의 IP 목록을 확인",
             )
         )
     if restrictions is None:

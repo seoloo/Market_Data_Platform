@@ -68,3 +68,14 @@ class TestReadiness:
     def test_halt_and_tracking_gaps_are_warnings(self) -> None:
         out = findings(halted_reason="점검", rejected_orders=["BTCUSDT 목표 0.2 vs 실제 0.1"])
         assert [lvl for lvl, _ in out] == ["WARN", "WARN"]
+
+
+def test_ip_whitelist_rejection_is_named() -> None:
+    """문서 84 §3: 집 공인 IP 가 바뀌면 -2015 — 원인을 짐작할 수 있게 적는다."""
+    out = findings(
+        restrictions=None,
+        balances=None,
+        account_error="Binance 오류 401 code=-2015: Invalid API-key, IP, or permissions",
+    )
+    assert any("공인 IP" in msg for _, msg in out)
+    assert not any("공인 IP" in msg for _, msg in findings(account_error="timeout"))

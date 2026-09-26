@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import subprocess
 import sys
 import time
 from dataclasses import asdict
@@ -50,6 +51,7 @@ from auto_trading.ops.paper_watch import (
     expected_decision_ms,
     render_report,
 )
+from auto_trading.ops.pc_health import pc_findings
 from auto_trading.storage.db import connect_read_only
 from auto_trading.storage.repositories.paper_days import PaperDayRepository
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDayRepository
@@ -228,6 +230,47 @@ def demo_o2_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return check_demo_o2(report, now_ms)
 
 
+_PC_QUERY = r"""
+$tasks = @(Get-ScheduledTask | Where-Object { $_.TaskName -like 'AutoTrading*' } | ForEach-Object {
+  $i = $_ | Get-ScheduledTaskInfo
+  [pscustomobject]@{ name=$_.TaskName; last_run=$i.LastRunTime.ToString('o');
+    last_result=[int64]$i.LastTaskResult; start_when_available=$_.Settings.StartWhenAvailable;
+    wake=$_.Settings.WakeToRun; logon=[string]$_.Principal.LogonType } })
+$since = (Get-Date).AddHours(-24)
+$filter = @{LogName='System'; Id=41; StartTime=$since}
+$bad = @(Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue).Count
+$boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString('MM-dd HH:mm')
+[pscustomobject]@{ tasks=$tasks; shutdowns=$bad; boot=$boot } | ConvertTo-Json -Depth 4 -Compress
+"""
+
+
+def pc_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """예약 작업·비정상 종료 요약 (문서 84). 읽기만 한다. 윈도우가 아니거나 조회 실패면 정보로만."""
+    if sys.platform != "win32":
+        return [], []
+    try:
+        done = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", _PC_QUERY],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+            check=True,
+        )
+        data = json.loads(done.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        return [], [Finding("INFO", "PC", f"PC 상태를 읽지 못함: {type(exc).__name__}")]
+    tasks = data.get("tasks") or []
+    if isinstance(tasks, dict):  # 작업이 하나면 배열이 아니라 객체로 온다
+        tasks = [tasks]
+    return pc_findings(
+        tasks,
+        now_ms=now_ms,
+        unexpected_shutdowns_24h=int(data.get("shutdowns") or 0),
+        last_boot=data.get("boot"),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -257,6 +300,9 @@ def main() -> int:
     overlay_lines, overlay_findings = overlay_drill_status(now_ms)
     drill_lines += overlay_lines
     findings += overlay_findings
+    pc_lines, pc_found = pc_status(now_ms)
+    drill_lines += pc_lines
+    findings += pc_found
     shadow_lines, shadow_findings = shadow_status(now_ms)
     drill_lines += shadow_lines
     findings += shadow_findings

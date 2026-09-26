@@ -171,6 +171,7 @@ def run(allocation: Decimal) -> int:
                 sizes[e["symbol"]]["today_order"] = Decimal(e["quote"])
         report["slippage"] = {s: _slippage(market, s, sizes[s]) for s in symbols}
         findings = readiness_findings(
+            account_error=report.get("account_error"),
             restrictions=restrictions,
             clock_offset_ms=offset,
             balances=balances,
