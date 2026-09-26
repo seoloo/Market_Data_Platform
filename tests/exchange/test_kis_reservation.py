@@ -142,3 +142,27 @@ def test_read_only_class_still_refuses_orders(tmp_path: Path) -> None:
     )
     with pytest.raises(TradingDisabledError):
         ro.place_order("QNDX", 1)
+
+
+def test_buying_power_counts_integrated_margin(tmp_path: Path) -> None:
+    """통합증거금 계좌: 외화 기준 0 이어도 원화 포함 최대 수량으로 본다 (2026-09-26 실측 모양)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/inquire-psamount")
+        assert request.headers["tr_id"] == "TTTS3007R"
+        return httpx.Response(
+            200,
+            json={
+                "rt_cd": "0",
+                "output": {
+                    "max_ord_psbl_qty": "0",
+                    "ovrs_ord_psbl_amt": "0.00",
+                    "ovrs_max_ord_psbl_qty": "7",
+                    "frcr_ord_psbl_amt1": "207.375669",
+                    "exrt": "1360.0000000000",
+                },
+            },
+        )
+
+    bp = make(tmp_path, handler).buying_power("QNDX", "NASD", Decimal("25.97"))
+    assert bp.max_qty == Decimal("7") and bp.usd_available == Decimal("207.375669")

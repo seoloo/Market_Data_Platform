@@ -466,10 +466,17 @@ class KisReservationBuyer(KisOverseasReadOnly):
             },
         )
         out = data.get("output") or {}
+
+        def larger(*keys: str) -> Decimal | None:
+            values = [v for v in (_dec(out.get(k)) for k in keys) if v is not None]
+            return max(values) if values else None
+
+        # 통합증거금(원화로 주문)이면 ``max_ord_psbl_qty``·``ovrs_ord_psbl_amt`` 는 0 이고
+        # ``ovrs_max_ord_psbl_qty``·``frcr_ord_psbl_amt1`` 에 잡힌다 (2026-09-26 실측).
         return BuyingPower(
-            max_qty=_dec(out.get("max_ord_psbl_qty")),
+            max_qty=larger("max_ord_psbl_qty", "ovrs_max_ord_psbl_qty"),
             exrt=_dec(out.get("exrt")),
-            usd_available=_dec(out.get("ovrs_ord_psbl_amt")),
+            usd_available=larger("ovrs_ord_psbl_amt", "frcr_ord_psbl_amt1"),
         )
 
     def reserve_buy(
