@@ -1,6 +1,6 @@
 """대시보드 화면 HTML (순수 함수). 모든 동적 문자열은 이스케이프한다.
 
-구성은 사용자가 고른 초안을 따른다: 왼쪽 메뉴 6개, 상단 카드, 전략별 자산 변화(100 기준),
+구성은 사용자가 고른 초안을 따른다: 왼쪽 메뉴, 실행 현황, 상단 카드, 전략별 자산 변화(100 기준),
 시스템 상태, 테스트넷 검증 체크리스트, 포지션·보호 상태, 최근 이벤트.
 **보여 주기만 한다** — 버튼·폼·쓰기 요청이 없다.
 """
@@ -15,11 +15,13 @@ from pathlib import Path
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
+from auto_trading.ui.running import running_page
 
 __all__ = ["PAGES", "render_page"]
 
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("overview", "/", "운영 개요"),
+    ("running", "/running", "실행 현황"),
     ("compare", "/compare", "전략 비교"),
     ("positions", "/positions", "포지션 · 주문"),
     ("testnet", "/testnet", "테스트넷 검증"),
@@ -506,6 +508,7 @@ _RENDER = {
     "testnet": _testnet,
     "risk": _risk,
     "demo": lambda data: demo_page(data.demo, data.now_ms),
+    "running": running_page,
     "research": _research,
 }
 

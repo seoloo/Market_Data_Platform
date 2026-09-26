@@ -126,6 +126,8 @@ class WatchView:
     findings: tuple[tuple[str, str, str], ...]
     """(level, ledger, message)."""
     lines: tuple[str, ...]
+    at_ms: int | None = None
+    """점검이 돈 시각."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +163,8 @@ class DashboardData:
     """이자 가정 설명 (없으면 빈 문자열)."""
     demo: DemoView = field(default_factory=DemoView)
     """데모·그림자·실거래 준비 (docs/research/51·55~59)."""
+    root: Path | None = None
+    """저장소 루트 — 실행 현황 화면이 보고서 파일을 찾는 곳."""
 
 
 def _day(decision_ms: int) -> int:
@@ -306,6 +310,7 @@ def _watch(folder: Path, errors: list[str], limit: int = 30) -> tuple[WatchView,
                         for f in d.get("findings", [])
                     ),
                     lines,
+                    int(d["at_ms"]) if d.get("at_ms") else None,
                 )
             )
         except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -476,4 +481,5 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
         errors=(*errors, *demo.errors),
         cash_yield=yield_note,
         demo=demo,
+        root=root,
     )

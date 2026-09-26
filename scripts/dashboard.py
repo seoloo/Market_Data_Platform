@@ -4,10 +4,13 @@
 
     python scripts/dashboard.py                  # http://127.0.0.1:8787 를 열고 브라우저를 띄운다
     python scripts/dashboard.py --no-browser     # 서버만
-    python scripts/dashboard.py --export out     # 서버 없이 화면 6개를 HTML 파일로 저장
+    python scripts/dashboard.py --export out     # 서버 없이 화면들을 HTML 파일로 저장
 
 127.0.0.1 전용·GET 만·DB 읽기 전용이다. 매매·Paper 실행기와 따로 돌고, 꺼도 아무 영향이 없다.
 끌 때는 이 창에서 Ctrl+C.
+
+창 없이 띄우기(바탕화면 바로 가기·``scripts/open_dashboard.cmd``)는 ``pythonw`` 로 실행한다.
+이미 떠 있으면 새 서버를 만들지 않고 브라우저만 연다 — 몇 번을 눌러도 서버는 하나다.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -46,6 +50,15 @@ def export(folder: Path) -> int:
     return 0
 
 
+def already_running(port: int) -> bool:
+    """그 포트에 이 대시보드가 이미 떠 있는가 (다른 프로그램이면 False)."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/running", timeout=2) as resp:
+            return str(resp.headers.get("Server", "")).startswith("AutoTradingDashboard")
+    except OSError:
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8787)
@@ -54,6 +67,12 @@ def main() -> int:
     args = parser.parse_args()
     if args.export:
         return export(args.export)
+    if already_running(args.port):
+        url = f"http://127.0.0.1:{args.port}/"
+        print(f"대시보드가 이미 떠 있다: {url}")
+        if not args.no_browser:
+            webbrowser.open(url)
+        return 0
     server = make_server(REPO, port=args.port)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"대시보드: {url}  (읽기 전용 · 끄기 Ctrl+C)")
