@@ -43,6 +43,7 @@ __all__ = [
     "PRICE_EXCHANGE",
     "KisOverseasReadOnly",
     "KisTokenCache",
+    "QuoteDetail",
 ]
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
@@ -57,8 +58,21 @@ _TOKEN_TOO_SOON = "EGW00133"
 _REFRESH_MARGIN_MS = 10 * 60_000
 _DAY_MS = 86_400_000
 _TR_PRICE = "HHDFS00000300"
+_TR_PRICE_DETAIL = "HHDFS76200200"
 _TR_DAILY = "HHDFS76240000"
 _TR_BALANCE = "TTTS3012R"
+
+
+@dataclass(frozen=True, slots=True)
+class QuoteDetail:
+    symbol: str
+    exchange: str
+    last: Decimal
+    prev_close: Decimal | None
+    fx_rate: Decimal | None
+    """KIS 당일 고시 환율 (원/달러, ``t_rate``). 실제 환전 적용 환율과 조금 다를 수 있다."""
+    krw_price: Decimal | None
+    """원화 환산 당일 가격 (``t_xprc``)."""
 
 
 def _key_fingerprint(app_key: str) -> str:
@@ -225,6 +239,26 @@ class KisOverseasReadOnly:
         if last is None or last <= 0:
             raise ExchangeError(f"KIS 시세 없음: {symbol} ({excd}) — 거래소 코드를 확인")
         return OverseasQuote(symbol.upper(), excd, last, _dec(out.get("base")))
+
+    def quote_detail(self, symbol: str, exchange: str) -> QuoteDetail:
+        """현재가상세 (HHDFS76200200) — 원화 환산 가격·당일 환율이 함께 온다 (문서 89 적립 알림)."""
+        data = self._get(
+            "/uapi/overseas-price/v1/quotations/price-detail",
+            _TR_PRICE_DETAIL,
+            {"AUTH": "", "EXCD": exchange, "SYMB": symbol.upper()},
+        )
+        out = data.get("output") or {}
+        last = _dec(out.get("last"))
+        if last is None or last <= 0:
+            raise ExchangeError(f"KIS 시세 없음: {symbol} ({exchange})")
+        return QuoteDetail(
+            symbol=symbol.upper(),
+            exchange=exchange,
+            last=last,
+            prev_close=_dec(out.get("base")),
+            fx_rate=_dec(out.get("t_rate")),
+            krw_price=_dec(out.get("t_xprc")),
+        )
 
     def _daily_page(
         self, symbol: str, excd: str, bymd: str, adjusted: bool

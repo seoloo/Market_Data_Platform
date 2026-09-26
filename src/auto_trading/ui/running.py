@@ -159,6 +159,16 @@ TRACKS: tuple[Track, ...] = (
         "데모 Elliott",
     ),
     Track(
+        "qndx",
+        "QNDX 적립 알림",
+        "실계좌 읽기",
+        "매일 1만 원 가상 적립 · 1주 살 차례면 텔레그램 (주문 없음, 문서 89)",
+        "21:00",
+        "2026-09-26",
+        None,
+        "glob:qndx_alert/20*.json",
+    ),
+    Track(
         "watchdog",
         "일일 점검",
         "점검",

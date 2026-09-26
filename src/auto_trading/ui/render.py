@@ -15,6 +15,7 @@ from pathlib import Path
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
+from auto_trading.ui.qndx_render import qndx_page
 from auto_trading.ui.running import running_page
 
 __all__ = ["PAGES", "render_page"]
@@ -27,6 +28,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("testnet", "/testnet", "테스트넷 검증"),
     ("risk", "/risk", "위험 · 알림"),
     ("demo", "/demo", "데모 · 실거래 준비"),
+    ("qndx", "/qndx", "QNDX 적립"),
     ("research", "/research", "연구 기록"),
 )
 _KST = timedelta(hours=9)
@@ -517,6 +519,7 @@ _RENDER = {
     "risk": _risk,
     "demo": lambda data: demo_page(data.demo, data.now_ms),
     "running": running_page,
+    "qndx": qndx_page,
     "research": _research,
 }
 
