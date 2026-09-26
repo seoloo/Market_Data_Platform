@@ -1,6 +1,6 @@
 # 82 — H1 다시 보기: 위험 한도를 올려 배율을 높이면 무엇을 받아들이게 되나 (2026-09-26)
 
-작성: 2026-09-26 (Claude) · 상태: **분석 — 판정·배율 선택용이 아니다.** 한도를 정하는 사용자 결정을 돕는 자료다.
+작성: 2026-09-26 (Claude) · 상태: **분석 — 판정·배율 선택용이 아니다.** · **사용자 결정 B (2026-09-26, "B로 하자")**: O/v3(2배) Paper 를 계좌 정지 40% · 중단선 35% 로 계속 관찰([31](31-o3-2x-paper-observation.md) §4, [65](65-1023-1024-review-criteria.md) §9). 보완으로 H2 사전 등록([83](83-h2-drawdown-linked-leverage-preregistration.md)).
 사용자 요청: "H1 다시 연구해보자 지금 연구한 것들 많으니까 좀 보완할 수도 있으니까." ([81](81-long-only-higher-leverage-candidates.md) §1)
 코드: `python -m scripts.analyze_h1_leverage` (DB 읽기 전용).
 

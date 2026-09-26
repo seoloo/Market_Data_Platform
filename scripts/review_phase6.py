@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from auto_trading.backtest.overlay import O2_STOP, O3_2X, OverlayConfig
+from auto_trading.backtest.overlay import O2_STOP, O3_2X_LIMIT40, OverlayConfig
 from auto_trading.execution.paper_overlay import verify_ledger
 from auto_trading.ops.review import (
     DAY_MS,
@@ -42,16 +42,19 @@ REPO = Path(__file__).resolve().parent.parent
 DB = REPO / "data" / "trading.db"
 REPORTS = REPO / "reports"
 OUT = REPORTS / "review"
-OVERLAYS: tuple[tuple[str, str, OverlayConfig], ...] = (
-    ("O/v1", "o1_overlay", OverlayConfig()),
-    ("O/v2", "o2_stop", O2_STOP),
-    ("O/v3", "o3_2x", O3_2X),
+OVERLAYS: tuple[tuple[str, str, OverlayConfig, float], ...] = (
+    ("O/v1", "o1_overlay", OverlayConfig(), 0.25),
+    ("O/v2", "o2_stop", O2_STOP, 0.25),
+    # 2026-09-26 사용자 결정(문서 82 §4 B, 결과 보기 전): O/v3 는 계좌 정지 40% · 중단선 35%
+    ("O/v3", "o3_2x", O3_2X_LIMIT40, 0.35),
 )
 FIXED_FACTS = (
     "O/v3(2 배)는 과거 백테스트 경로에서 2022-11-09 계좌 정지(봉 안 −30.3%)"
     " — 이전 보고의 CAGR 30.1%·MDD 29.9% 는 정지 경로의 숫자다 (문서 64 §6).",
     "선물부터 줄이기로도 2 배의 MDD 는 27.1% (> 25%)"
     " — 2 배는 지금 위험 한도 안에 들어오지 않는다 (문서 64).",
+    "2026-09-26 사용자 결정(문서 82 §4 B): O/v3 는 10/23 에 끝내지 않고 계좌 정지 40% ·"
+    " 중단선 35% 로 관찰을 이어 간다 — 과거 경로에서 필요했던 정지선은 31.1% 였다(문서 82 §2).",
     "한 달(4 주) 수익으로는 최소 검출 샤프가 수십이다"
     " — 원장 사이 수익 차이는 판단 근거가 아니다 (문서 31 §2).",
 )
@@ -84,7 +87,7 @@ def _ledgers(conn: Any, until_ms: int) -> list[LedgerReview]:
     if review:
         out.append(review)
     repo = OverlayPaperDayRepository(conn)
-    for name, sid, cfg in OVERLAYS:
+    for name, sid, cfg, mdd_stop in OVERLAYS:
         rows = [r for r in repo.all(sid) if r.decision_ms <= until_ms]
         problems = verify_ledger(rows, cfg=cfg) if rows else []
         review = ledger_review(
@@ -103,6 +106,7 @@ def _ledgers(conn: Any, until_ms: int) -> list[LedgerReview]:
             until_ms=until_ms,
             overlay=True,
             verify_problems=len(problems),
+            mdd_stop=mdd_stop,
         )
         if review:
             out.append(review)

@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from auto_trading.backtest.overlay import O2_STOP, O3_2X, OverlayConfig
+from auto_trading.backtest.overlay import O2_STOP, O3_2X_LIMIT40, OverlayConfig
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
@@ -64,7 +64,8 @@ class Ledger:
 LEDGERS = {
     "o1": Ledger("O/v1", "o1_overlay", OverlayConfig(), REPO / "reports" / "paper" / "o1"),
     "o2": Ledger("O/v2", "o2_stop", O2_STOP, REPO / "reports" / "paper" / "o2"),
-    "o3": Ledger("O/v3", "o3_2x", O3_2X, REPO / "reports" / "paper" / "o3"),
+    # 2026-09-26 부터 계좌 정지 40% (docs/research/82 §4 B). 정지가 난 적 없어 과거 행과 결과가 같다
+    "o3": Ledger("O/v3", "o3_2x", O3_2X_LIMIT40, REPO / "reports" / "paper" / "o3"),
 }
 _DAY = 86_400_000
 

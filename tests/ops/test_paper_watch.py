@@ -185,6 +185,26 @@ class TestO2:
         assert any(f.level == "WARN" and "비상 스톱" in f.message for f in findings)
 
 
+class TestO3Limits:
+    """문서 82 §4 B (2026-09-26): O/v3 원장만 중단선 35% · 경고선 30%, 정지 40% 문구."""
+
+    def test_same_drawdown_is_critical_for_o2_but_warn_for_o3(self) -> None:
+        from auto_trading.ops.paper_watch import _drawdown_findings
+
+        assert [f.level for f in _drawdown_findings("O/v2", 0.31)] == ["CRITICAL"]
+        assert [f.level for f in _drawdown_findings("O/v3", 0.31, 0.35, 0.30)] == ["WARN"]
+        assert [f.level for f in _drawdown_findings("O/v3", 0.36, 0.35, 0.30)] == ["CRITICAL"]
+        assert _drawdown_findings("O/v3", 0.29, 0.35, 0.30) == []
+
+    def test_watchdog_registers_o3_with_raised_limits(self) -> None:
+        from scripts.paper_watchdog import _EXTRA_LEDGERS
+
+        o3 = next(x for x in _EXTRA_LEDGERS if x[0] == "O/v3")
+        assert o3[2].halt_drawdown == 0.40 and o3[3:] == (0.35, 0.30)
+        o2 = next(x for x in _EXTRA_LEDGERS if x[0] == "O/v2")
+        assert o2[2].halt_drawdown == 0.30 and o2[3:] == (0.25, 0.20)
+
+
 class TestReport:
     def test_exit_codes_follow_the_worst_level(self) -> None:
         assert exit_code([]) == 0

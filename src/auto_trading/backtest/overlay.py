@@ -44,6 +44,7 @@ from auto_trading.backtest.trend import TrendConfig, target_weight
 __all__ = [
     "O2_STOP",
     "O3_2X",
+    "O3_2X_LIMIT40",
     "T2_ALONE",
     "OverlayBar",
     "OverlayConfig",
@@ -104,7 +105,16 @@ O2_STOP = OverlayConfig(catastrophe_stop=0.20)
 """O/v2: O/v1 + 선물 추가분 비상 스톱 −20% (docs/research/27, 전향 관찰 28)."""
 
 O3_2X = OverlayConfig(exposure=2.0, catastrophe_stop=0.20)
-"""O/v3: O/v2 규칙에 노출만 2배 — 한 달 운영 관찰용 (docs/research/31). 판정된 전략이 아니다."""
+"""O/v3: O/v2 규칙에 노출만 2배 — 한 달 운영 관찰용 (docs/research/31). 판정된 전략이 아니다.
+
+과거 결과(31·42·64)를 재현하는 설정이라 바꾸지 않는다.
+2026-09-26 부터 Paper 는 ``O3_2X_LIMIT40`` 을 쓴다."""
+
+O3_2X_LIMIT40 = OverlayConfig(exposure=2.0, catastrophe_stop=0.20, halt_drawdown=0.40)
+"""O/v3 Paper 의 새 한도 (docs/research/82 §4 B, 2026-09-26 사용자 결정 "B로 하자"): 계좌 정지 40%.
+
+전향 관찰 중단선은 35%(점검 코드가 쓴다). 실거래 계좌 한도(TRADING_CORE 30%)는 바꾸지 않는다 —
+이 설정은 **관찰 원장 전용**이다. 정지가 난 적이 없는 동안은 ``O3_2X`` 와 결과가 같다."""
 
 
 @dataclass(frozen=True, slots=True)

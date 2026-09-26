@@ -98,17 +98,19 @@ def _gaps(ledger: str, decisions: Sequence[int]) -> list[Finding]:
     return []
 
 
-def _drawdown_findings(ledger: str, drawdown: float) -> list[Finding]:
-    if drawdown >= STOP_DRAWDOWN:
+def _drawdown_findings(
+    ledger: str, drawdown: float, stop: float = STOP_DRAWDOWN, warn: float = WARN_DRAWDOWN
+) -> list[Finding]:
+    if drawdown >= stop:
         return [
             Finding(
                 "CRITICAL",
                 ledger,
-                f"고점 대비 −{drawdown:.1%} ≥ 중단선 {STOP_DRAWDOWN:.0%} — 관찰 중단·재검토",
+                f"고점 대비 −{drawdown:.1%} ≥ 중단선 {stop:.0%} — 관찰 중단·재검토",
             )
         ]
-    if drawdown >= WARN_DRAWDOWN:
-        return [Finding("WARN", ledger, f"고점 대비 −{drawdown:.1%} (중단선 {STOP_DRAWDOWN:.0%})")]
+    if drawdown >= warn:
+        return [Finding("WARN", ledger, f"고점 대비 −{drawdown:.1%} (중단선 {stop:.0%})")]
     return []
 
 
@@ -151,6 +153,8 @@ def check_o1(
     ledger: str = "O/v1",
     recent_days: int = 7,
     cfg: OverlayConfig | None = None,
+    stop_drawdown: float = STOP_DRAWDOWN,
+    warn_drawdown: float = WARN_DRAWDOWN,
 ) -> tuple[LedgerSummary | None, list[Finding]]:
     """O/v1·O/v2 Paper 원장. ``rows``는 결정일 오름차순 전체 (원장 재계산에 첫날부터 필요).
 
@@ -171,7 +175,10 @@ def check_o1(
             )
         )
     if last.state.get("halted_day") is not None:
-        findings.append(Finding("CRITICAL", ledger, "계좌 정지(봉 안 −30%) 발생 — 25 §3 즉시 중단"))
+        halt = cfg.halt_drawdown if cfg is not None else 0.30
+        findings.append(
+            Finding("CRITICAL", ledger, f"계좌 정지(봉 안 −{halt:.0%}) 발생 — 즉시 중단·재검토")
+        )
     problems = verify_ledger(rows, cfg=cfg)
     if problems:
         findings.append(
@@ -191,7 +198,7 @@ def check_o1(
         findings.append(Finding("INFO", ledger, "일 손실 2% — 오늘 노출 증가 거래 없음"))
     peak = float(last.state["peak"])
     drawdown = 1 - last.equity / peak if peak > 0 else 0.0
-    findings += _drawdown_findings(ledger, drawdown)
+    findings += _drawdown_findings(ledger, drawdown, stop_drawdown, warn_drawdown)
     prev = rows[-2].equity if len(rows) > 1 else None
     change = last.equity / prev - 1 if prev else None
     tally = last.tally

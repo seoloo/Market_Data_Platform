@@ -142,3 +142,18 @@ def test_demo_orders_from_new_and_legacy_records() -> None:
     assert abs(stats["price_bps"] - 1.0) < 1e-12  # 명목 가중 (2·200 + 0·200) / 400
     bad, _ = demo_t2_review([], unresolved=1, degraded_days=["2026-09-25"])
     assert bad[0].status == "CHECK" and bad[1].status == "NA"
+
+
+def test_o3_uses_its_own_raised_mdd_line() -> None:
+    """문서 82 §4 B (2026-09-26): O/v3 는 중단선 35%.
+
+    같은 26% 낙폭이 O/v2 에선 FAIL, O/v3 에선 PASS.
+    """
+    eq = [10_000.0, 9_000.0, 7_400.0] + [8_000.0] * 25
+    rows = _rows(28, eq, liquidations=0)
+    o2 = ledger_review("O/v2", rows, until_ms=D0 + 27 * DAY_MS, overlay=True, verify_problems=0)
+    o3 = ledger_review(
+        "O/v3", rows, until_ms=D0 + 27 * DAY_MS, overlay=True, verify_problems=0, mdd_stop=0.35
+    )
+    assert o2 is not None and o3 is not None
+    assert _status(o2, "P3") == "FAIL" and _status(o3, "P3") == "PASS"

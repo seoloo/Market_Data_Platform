@@ -82,6 +82,7 @@ def ledger_review(
     until_ms: int,
     overlay: bool,
     verify_problems: int | None,
+    mdd_stop: float = MDD_STOP,
 ) -> LedgerReview | None:
     """P1~P5 (문서 65 §3). ``verify_problems`` 는 O 원장의 재계산 불일치 수(T/v2 는 None)."""
     rows = sorted((r for r in rows if r.decision_ms <= until_ms), key=lambda r: r.decision_ms)
@@ -110,8 +111,8 @@ def ledger_review(
         ),
         Criterion(
             "P3",
-            "PASS" if mdd < MDD_STOP else "FAIL",
-            f"종가 MDD {mdd:.2%} (중단선 {MDD_STOP:.0%})",
+            "PASS" if mdd < mdd_stop else "FAIL",
+            f"종가 MDD {mdd:.2%} (중단선 {mdd_stop:.0%})",
         ),
         Criterion(
             "P4",

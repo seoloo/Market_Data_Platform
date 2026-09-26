@@ -32,7 +32,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from auto_trading.backtest.overlay import O2_STOP, O3_2X
+from auto_trading.backtest.overlay import O2_STOP, O3_2X_LIMIT40
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
@@ -70,8 +70,14 @@ DEMO_EW = REPO / "reports" / "demo_ew"
 DEMO_O2 = REPO / "reports" / "demo_o2"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
-_EXTRA_LEDGERS = (("O/v2", O2_LEDGER, O2_STOP), ("O/v3", "o3_2x", O3_2X))
-"""O/v1 다음에 점검하는 원장 (O/v3 는 docs/research/31 한 달 관찰)."""
+_EXTRA_LEDGERS = (
+    ("O/v2", O2_LEDGER, O2_STOP, 0.25, 0.20),
+    ("O/v3", "o3_2x", O3_2X_LIMIT40, 0.35, 0.30),
+)
+"""O/v1 다음에 점검하는 원장: (이름, 원장, 규칙, 중단선, 경고선).
+
+O/v3 는 2026-09-26 사용자 결정(docs/research/82 §4 B)으로
+계좌 정지 40% · 중단선 35% 로 관찰을 이어 간다."""
 PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
 OVERLAY_START_MS = int(datetime(2026, 9, 26, tzinfo=UTC).timestamp() * 1000)
 """O/v2 선물 실행기 테스트넷 운영 시작 (docs/research/54). 이전 기록은 개발 중 실행이다."""
@@ -102,14 +108,16 @@ def collect(now_ms: int) -> tuple[list[LedgerSummary | None], list[Finding]]:
             summary, found = check_o1(o1_rows, now_ms)
             summaries.append(summary)
             findings.extend(found)
-        for name, strategy_id, cfg in _EXTRA_LEDGERS:
+        for name, strategy_id, cfg, stop, warn in _EXTRA_LEDGERS:
             try:
                 rows = OverlayPaperDayRepository(conn).all(strategy_id)
             except sqlite3.Error as exc:
                 findings.append(Finding("CRITICAL", name, f"원장 조회 실패: {exc}"))
                 continue
             if rows:
-                summary, found = check_o1(rows, now_ms, ledger=name, cfg=cfg)
+                summary, found = check_o1(
+                    rows, now_ms, ledger=name, cfg=cfg, stop_drawdown=stop, warn_drawdown=warn
+                )
                 summaries.append(summary)
                 findings.extend(found)
             else:  # 스케줄 등록 전 — 경고하지 않는다 (28 §4)
