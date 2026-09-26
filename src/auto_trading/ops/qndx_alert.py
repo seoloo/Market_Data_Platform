@@ -1,9 +1,10 @@
-"""QNDX 적립 알림·자동 매수 판단 (docs/research/89) — 순수 계산, I/O 없음.
+"""적립 매수 판단 (docs/research/89) — 종목별 계획, 순수 계산, I/O 없음.
 
 규칙 (사용자 결정 2026-09-26):
 
-* 시작일부터 **달력으로 매일 1 만 원**이 가상으로 쌓인다. 월 한도 30 만 원.
-* 쌓인 금액 ≥ 1 주 가격(원화 환산 + 수수료 0.25%)이면 "오늘 1 주 살 차례".
+* 종목마다 시작일부터 **달력으로 매일 정해진 금액**이 가상으로 쌓인다
+  (QNDX 1 만 원·월 30 만 원 · BTQ 1 달러·월 31 달러, :data:`PLANS`).
+* 쌓인 금액 ≥ 1 주 가격(+ 수수료 0.25%)이면 "오늘 1 주 살 차례".
   자동 매수가 켜져 있으면 그날 밤 **예약 매수 1 주**(:func:`should_order`), 아니면 알림만.
 * 체결은 다음 실행에서 잔고 수량이 늘어난 것으로 확인하고 실제 매입 금액만큼 적립금에서 뺀다.
   예약주문은 당일만 유효하므로, 다음 날까지 수량이 늘지 않았으면 그 주문은 만료로 본다.
@@ -18,22 +19,21 @@ from datetime import date
 from typing import Any
 
 __all__ = [
-    "DAILY_KRW",
     "FEE",
-    "MONTHLY_CAP_KRW",
+    "PLANS",
     "Advice",
     "Buy",
     "Order",
+    "Plan",
     "State",
     "advise",
     "message",
+    "money",
     "reconcile",
     "resolve_orders",
     "should_order",
 ]
 
-DAILY_KRW = 10_000.0
-MONTHLY_CAP_KRW = 300_000.0
 FEE = 0.0025
 """한국투자증권 해외주식 일반 수수료 (사용자 확인 수준, 문서 87)."""
 LIMIT_BUFFER = 0.03
@@ -44,14 +44,43 @@ OPEN_ORDER = frozenset({"SENT", "UNKNOWN"})
 
 
 @dataclass(frozen=True, slots=True)
+class Plan:
+    symbol: str
+    quote_exchange: str
+    """시세용 거래소 코드 (NAS·NYS·AMS)."""
+    order_exchange: str
+    """주문·잔고용 거래소 코드 (NASD·NYSE·AMEX)."""
+    currency: str
+    """적립 통화: KRW(원화 환산) · USD(달러 그대로)."""
+    daily: float
+    monthly_cap: float
+    max_limit_usd: float
+    """지정가 상한 — 설정 실수로 비싼 주문이 나가지 않게."""
+
+
+PLANS: tuple[Plan, ...] = (
+    Plan("QNDX", "NAS", "NASD", "KRW", 10_000.0, 300_000.0, 40.0),
+    Plan("BTQ", "NAS", "NASD", "USD", 1.0, 31.0, 6.0),
+)
+"""2026-09-26: QNDX 약 25.2 USD · BTQ 약 2.74 USD.
+월 한도는 QNDX 사용자 지정, BTQ 는 하루 금액 × 31."""
+
+
+def money(x: float, currency: str) -> str:
+    return f"{x:,.0f}원" if currency == "KRW" else f"${x:,.2f}"
+
+
+@dataclass(frozen=True, slots=True)
 class Buy:
     date: str
     """잔고에서 늘어난 것을 발견한 날 (KST)."""
     qty: float
     cost_usd: float
     fx_rate: float
-    cost_krw: float
-    """cost_usd × 환율 × (1 + 수수료) — 환율은 발견한 날 KIS 고시 환율(근사)."""
+    cost: float
+    """적립 통화로 뺀 금액 = cost_usd (× 환율, 원화 계획) × (1 + 수수료).
+
+    환율은 발견한 날 고시 환율(근사)."""
 
 
 @dataclass(slots=True)
@@ -80,30 +109,39 @@ class State:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> State:
+        buys = []
+        for b in d.get("buys", []):
+            b = dict(b)
+            if "cost_krw" in b:  # 2026-09-26 첫 판(원화만)의 이름
+                b["cost"] = b.pop("cost_krw")
+            buys.append(Buy(**b))
         return cls(
             symbol=str(d["symbol"]),
             start_date=str(d["start_date"]),
             baseline_qty=float(d["baseline_qty"]),
             last_qty=float(d["last_qty"]),
             last_cost_usd=float(d["last_cost_usd"]),
-            buys=[Buy(**b) for b in d.get("buys", [])],
+            buys=buys,
             orders=[Order(**o) for o in d.get("orders", [])],
         )
 
 
 @dataclass(frozen=True, slots=True)
 class Advice:
+    symbol: str
+    currency: str
     status: str
     """BUY · WAIT · CAP."""
     today: str
-    accrued_krw: float
-    price_krw: float
-    """1 주 원화 가격 + 수수료."""
+    accrued: float
+    price: float
+    """1 주 가격 + 수수료 (적립 통화)."""
     last_usd: float
     fx_rate: float
     limit_usd: float
     days_to_go: int
-    month_spent_krw: float
+    month_spent: float
+    monthly_cap: float
     weekend: bool
     """KST 토·일 밤 — 미국 장이 열리지 않는다."""
     bought_qty: float
@@ -117,18 +155,24 @@ def _days(start: str, today: str) -> int:
     return (date.fromisoformat(today) - date.fromisoformat(start)).days + 1
 
 
-def reconcile(state: State, today: str, qty: float, avg_usd: float, fx_rate: float) -> list[str]:
+def _in_plan(usd: float, fx_rate: float, plan: Plan) -> float:
+    return usd * fx_rate if plan.currency == "KRW" else usd
+
+
+def reconcile(
+    state: State, plan: Plan, today: str, qty: float, avg_usd: float, fx_rate: float
+) -> list[str]:
     """잔고(수량·평균 매입가)로 새 매수를 찾는다. 늘면 적립금에서 빼고, 줄면 알리기만 한다."""
     notes: list[str] = []
     cost_total = qty * avg_usd
     dq = qty - state.last_qty
     if dq > 1e-9:
         cost_usd = max(cost_total - state.last_cost_usd, 0.0)
-        cost_krw = cost_usd * fx_rate * (1 + FEE)
-        state.buys.append(Buy(today, dq, cost_usd, fx_rate, cost_krw))
+        cost = _in_plan(cost_usd, fx_rate, plan) * (1 + FEE)
+        state.buys.append(Buy(today, dq, cost_usd, fx_rate, cost))
         notes.append(
             f"{state.symbol} {dq:g}주 매수 확인 — {cost_usd:,.2f} USD"
-            f" ≈ {cost_krw:,.0f}원 적립금에서 뺌"
+            f" ({money(cost, plan.currency)}) 적립금에서 뺌"
         )
     elif dq < -1e-9:
         notes.append(f"{state.symbol} 보유가 {-dq:g}주 줄었다(매도?) — 적립금에는 반영하지 않는다")
@@ -140,7 +184,6 @@ def resolve_orders(state: State, today: str, bought_now: bool) -> list[str]:
     """지난날 낸 예약주문(당일 유효)을 정리한다.
 
     이번 확인에서 수량이 늘었으면 FILLED, 아니면 EXPIRED.
-
     :func:`reconcile` 바로 뒤에 부른다 (``bought_now`` = 이번 확인에서 새 매수가 있었나).
     """
     notes: list[str] = []
@@ -149,7 +192,9 @@ def resolve_orders(state: State, today: str, bought_now: bool) -> list[str]:
         filled = bought_now and k == len(open_past) - 1
         order.status = "FILLED" if filled else "EXPIRED"
         if not filled:
-            notes.append(f"{order.date} 예약 매수는 체결되지 않고 만료 — 오늘 다시 판단한다")
+            notes.append(
+                f"{state.symbol} {order.date} 예약 매수는 체결되지 않고 만료 — 오늘 다시 판단"
+            )
     return notes
 
 
@@ -172,47 +217,51 @@ def should_order(
     return True, "예약 매수 1주"
 
 
-def advise(state: State, today: str, last_usd: float, fx_rate: float, *, weekday: int) -> Advice:
+def advise(
+    state: State, plan: Plan, today: str, last_usd: float, fx_rate: float, *, weekday: int
+) -> Advice:
     """``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6)."""
-    accrued = DAILY_KRW * _days(state.start_date, today) - sum(b.cost_krw for b in state.buys)
-    price_krw = last_usd * fx_rate * (1 + FEE)
-    month = today[:7]
-    month_spent = sum(b.cost_krw for b in state.buys if b.date[:7] == month)
-    if month_spent + price_krw > MONTHLY_CAP_KRW:
+    accrued = plan.daily * _days(state.start_date, today) - sum(b.cost for b in state.buys)
+    price = _in_plan(last_usd, fx_rate, plan) * (1 + FEE)
+    month_spent = sum(b.cost for b in state.buys if b.date[:7] == today[:7])
+    if month_spent + price > plan.monthly_cap:
         status = "CAP"
-    elif accrued >= price_krw:
+    elif accrued >= price:
         status = "BUY"
     else:
         status = "WAIT"
-    short = max(price_krw - accrued, 0.0)
+    short = max(price - accrued, 0.0)
     return Advice(
+        symbol=plan.symbol,
+        currency=plan.currency,
         status=status,
         today=today,
-        accrued_krw=accrued,
-        price_krw=price_krw,
+        accrued=accrued,
+        price=price,
         last_usd=last_usd,
         fx_rate=fx_rate,
         limit_usd=math.floor(last_usd * (1 + LIMIT_BUFFER) * 100) / 100,
-        days_to_go=math.ceil(short / DAILY_KRW),
-        month_spent_krw=month_spent,
+        days_to_go=math.ceil(short / plan.daily - 1e-9),
+        month_spent=month_spent,
+        monthly_cap=plan.monthly_cap,
         weekend=weekday >= 5,
         bought_qty=sum(b.qty for b in state.buys),
     )
 
 
-def message(advice: Advice, symbol: str, notes: list[str], *, order_line: str | None = None) -> str:
-    """``order_line`` 이 있으면 자동 매수 결과 줄, 없으면 앱에서 직접 사는 안내."""
-    a = advice
+def message(advice: Advice, notes: list[str], *, order_line: str | None = None) -> str:
+    """종목 한 덩어리. ``order_line`` 이 있으면 자동 매수 결과 줄, 없으면 앱에서 직접 사는 안내."""
+    a, c = advice, advice.currency
     head = {
-        "BUY": f"🟢 {symbol} 오늘 1주 살 차례",
-        "WAIT": f"⏳ {symbol} 적립 중 — 약 {a.days_to_go}일 뒤 1주",
-        "CAP": f"⏸ {symbol} 이번 달 한도({MONTHLY_CAP_KRW:,.0f}원) — 다음 달에",
+        "BUY": f"🟢 {a.symbol} 오늘 1주 살 차례",
+        "WAIT": f"⏳ {a.symbol} 적립 중 — 약 {a.days_to_go}일 뒤 1주",
+        "CAP": f"⏸ {a.symbol} 이번 달 한도({money(a.monthly_cap, c)}) — 다음 달에",
     }[a.status]
+    per_share = f"{a.last_usd:.2f} USD" + (f" × {a.fx_rate:,.2f}원" if c == "KRW" else "")
     lines = [
         head,
-        f"적립 {a.accrued_krw:,.0f}원 / 1주 {a.price_krw:,.0f}원"
-        f" ({a.last_usd:.2f} USD × {a.fx_rate:,.2f}원, 수수료 포함)",
-        f"이번 달 매수 {a.month_spent_krw:,.0f}원 · 지금까지 적립 매수 {a.bought_qty:g}주",
+        f"적립 {money(a.accrued, c)} / 1주 {money(a.price, c)} ({per_share}, 수수료 포함)",
+        f"이번 달 매수 {money(a.month_spent, c)} · 지금까지 적립 매수 {a.bought_qty:g}주",
     ]
     if a.status == "BUY":
         if order_line is not None:
@@ -221,7 +270,7 @@ def message(advice: Advice, symbol: str, notes: list[str], *, order_line: str | 
             if a.weekend:
                 lines.append("주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
             lines.append(
-                f"앱: 해외주식 → {symbol} → 매수 1주, 지정가 {a.limit_usd:.2f} USD 이하"
+                f"앱: 해외주식 → {a.symbol} → 매수 1주, 지정가 {a.limit_usd:.2f} USD 이하"
                 " (장 전이면 예약주문)"
             )
     lines += notes
