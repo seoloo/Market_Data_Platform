@@ -30,3 +30,21 @@ ETH 또는 SOL **1개를 Binance 해당 상품으로 전환·보유·환매한�
 - [B3 — Binance BNSOL 출시 공지](https://www.binance.com/en/support/announcement/detail/de5969a9c20f42088fcf039101370e15)
 - [Binance ETH `rateHistory` API](https://developers.binance.com/en/docs/catalog/investment-and-services-staking/api/rest-api/eth-staking)
 - [Binance SOL `rateHistory` API](https://developers.binance.com/en/docs/catalog/investment-and-services-staking/api/rest-api/sol-staking)
+
+## 고정 후 1회 관찰 결과 (2026-09-26)
+
+선행 계산 계약 커밋 `38422a7`을 푸시한 뒤 `python -m scripts.observe_staking_ratio`로 실행했다. 고정 SHA-256 두 개·매일 UTC 행·경계일을 검사해 통과했고, 별도 PowerShell Decimal 나눗셈으로 전체 증가율을 재검산했다. 재현 JSON은 Git 제외 `reports/research/staking/ratio-observation-38422a7.json`에 보존한다.
+
+| 코인 단위 환산비율 증가 | 2024-09-13→2026-08-31, 717일 | 전체 구간 연환산 |
+|---|---:|---:|
+| WBETH:ETH | +5.3492% ETH | +2.6882%/년 |
+| BNSOL:SOL | +12.7866% SOL | +6.3170%/년 |
+
+| 자산 | 2024-09-13→2025-01-01 (110일) | 2025-01-01→2026-01-01 (365일) | 2026-01-01→2026-08-31 (242일) |
+|---|---:|---:|---:|
+| WBETH:ETH | +0.8738% ETH | +2.7202% ETH | +1.6709% ETH |
+| BNSOL:SOL | +2.3393% SOL | +6.4680% SOL | +3.5132% SOL |
+
+해석: 위 값은 **환산비율에 내재된 상품 보상 증가분**이다. 별도로 `annualPercentageRate`를 더하거나, SOL 프로모션 boost 보상을 포함하지 않았다. 공식 상품 설명상 검증인 보상에서 차감하는 상품 수수료는 환산비율에 반영되지만, 전환 반올림·시장 매매 스프레드·환매 대기/할인·이체/환전 비용은 계산하지 않았다.[B1][B2][B3] 기초 코인 보유를 포기하지 않고 더 많은 ETH/SOL 수량을 받는다는 *가상 환매 산술*일 뿐, USDT/KRW 기준 투자 수익이나 헤지 계좌 순수익이 아니다. 두 코인의 가격 변동·유동성·위험이 다르므로 **SOL 상품의 수치가 더 크다고 투자 우위로 판정하지 않는다**. 업비트 SOL의 현재 표시율 4.52% 또는 2026년 개인 실지급과도 직접 비교하지 않는다. 전략 검정력·실거래 안전성 게이트는 여전히 미통과다.
+
+검증: 전체 pytest 2,208건, leakage 77건, mypy 175파일(소스와 관련 스크립트), ruff check/format 458파일, import-linter 5계약 통과. 고정 입력의 예상 수익·출시 전 비율 배제·결측/해시 거부·결과 파일 불변성을 단위 테스트했다. 실계좌, 키, 주문, 기존 전략/운영 설정은 사용·수정하지 않았다.
