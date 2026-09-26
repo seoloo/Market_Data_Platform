@@ -301,6 +301,17 @@ Learned: 여러 자산군을 섞을 때는 종목별 크기 규칙이 아니라 
 Do not retry: 같은 자료로 위험 균등·합 상한·밴드 변경·자산 빼기/더하기로 Q2 재판정, lookback·봉 해석(역일) 바꾸기.
 근거: [86 사전등록·§9 판정](../research/86-tradfi-trend-replication-preregistration.md).
 
+## RD — REJECTED (2026-09-26)
+
+요약: SPY·QQQ 를 RSI 35 이하일 때만 사서 보유(적립) — 매달 바로 사는 쪽이 99개 10년 창 모두에서 더 남음
+
+Hypothesis: 매달 1,000 USD 를 넣을 때, 전날 RSI(14) ≤ 35 인 날에만 쌓인 현금을 전부 사는 쪽(R)이 입금한 날 바로 사는 쪽(D)보다 마지막 평가액이 크다(팔지 않음, 수수료 0.25%).
+판정 2008-06~2026-08 (1회): R/D SPY 0.971 · QQQ 0.979 → R1 실패. 10년 창 99개 중 R 우세 SPY 0 · QQQ 0 → R2 실패 → **REJECT**.
+Failure: 눌림목 할인보다 기다리는 동안 놓친 상승이 컸다. RSI ≤ 35 가 없는 기간이 길었다(SPY 최장 538일, 2013·2017년 0일). 국채 이자를 줘도 거의 같다.
+Learned: 강세 추세의 주가지수 적립에서는 매수 시점을 고르는 것보다 꾸준히 바로 사는 것이 낫다(이 기간).
+Do not retry: RSI 문턱(30·40)·기간·입금 주기·자산을 바꿔 같은 자료로 재판정.
+근거: [87 사전등록·§8 판정](../research/87-rsi-dip-accumulation-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
