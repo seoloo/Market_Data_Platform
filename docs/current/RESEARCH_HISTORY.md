@@ -289,6 +289,18 @@ Do not retry:
 
 근거: [81 후보 비교](../research/81-long-only-higher-leverage-candidates.md), [82 H1 분석](../research/82-h1-raise-limits-leverage-analysis.md), [83 사전등록·§6 판정](../research/83-h2-drawdown-linked-leverage-preregistration.md).
 
+## X — REJECTED (Q2) · Q1 재현 1/4 (2026-09-26)
+
+요약: T/v2 추세 규칙을 금·은·SPY·QQQ 에 그대로 — 넷 다 양(+)이지만 증명은 QQQ 만, 섞으면 노출이 커져 샤프↓·MDD 2배
+
+Hypothesis: T/v2(20·60·120봉 부호 평균, 변동성 15%, 상한 0.5, 밴드 5%p, 비용 0.15%)를 튜닝 없이 금·은·SPY·QQQ(KIS 수정주가 일봉)에 적용하면 Q1 자산마다 비용 후 수익 > 0, Q2 BTC·ETH 와 6자산(비중 합 ≤ 1)으로 섞으면 샤프↑·MDD↓.
+판정 Q1 (2008-06~2026-08, 4개 동시 검정 2.5 SE): GLD·SLV·SPY 는 X1 실패(하한 −0.7·−1.7·−0.1bp), **QQQ 만 통과**(+0.2bp). 네 자산 모두 두 반쪽 양수. 샤프 0.29·0.08·0.50·0.68, MDD 17.8·40.5·11.7·9.2%.
+판정 Q2 (2018~2026-08): 6자산 샤프 1.11 < BTC·ETH 1.20, MDD 30.8% > 15.9%, 앞 반쪽 샤프도 낮음 → **REJECT**. 평균 노출 0.82 vs 0.19, 실제 보유 합 최대 1.23.
+Failure: 상관은 낮았다(−0.2~0.2). 종목별 변동성 목표가 저변동 ETF 에 상한 가까운 비중을 줘, 섞은 계좌가 훨씬 많은 위험을 들었다.
+Learned: 여러 자산군을 섞을 때는 종목별 크기 규칙이 아니라 **계좌 전체 위험 예산**이 핵심이다. 단일 자산 추세는 금·주가지수에서도 낙폭 축소 성질은 보이나 수익 증명은 어렵다(18년에도).
+Do not retry: 같은 자료로 위험 균등·합 상한·밴드 변경·자산 빼기/더하기로 Q2 재판정, lookback·봉 해석(역일) 바꾸기.
+근거: [86 사전등록·§9 판정](../research/86-tradfi-trend-replication-preregistration.md).
+
 ## 비용·프로젝트 결정 이력
 
 [19 maker 비용 추정](../archive/research/19-maker-cost-measurement.md)의 초기 낙관적 결과는 [20 신호 시점 체결](../archive/research/20-signal-time-fills.md)의 역선택 측정으로 대체됐다. 비용 절감 경로는 당시 REJECTED.
