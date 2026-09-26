@@ -1,4 +1,6 @@
-"""QNDX 적립 화면 (docs/research/89) — 보고서·상태 파일만 읽는다. 주문 없음.
+"""QNDX 적립 화면 (docs/research/89) — 보고서·상태 파일만 읽는다(화면은 주문하지 않는다).
+
+평가 손익·수익률은 **일부러 보여 주지 않는다** — 사용자 요청("계좌를 보면 팔고 싶어서").
 
 출처: ``reports/qndx_alert/<KST 날짜>.json`` (매일 밤 9 시 알림) · ``data/qndx_alert/state.json``.
 모든 동적 문자열은 이스케이프한다.
@@ -18,6 +20,13 @@ _STATUS = {
     "WAIT": ("적립 중", "var(--o2)"),
     "CAP": ("이번 달 한도", "var(--warn)"),
     "FAILED": ("조회 실패", "var(--bad)"),
+}
+_ORDER = {
+    "SENT": "예약 매수 접수",
+    "UNKNOWN": "결과 모름",
+    "REJECTED": "거절",
+    "FILLED": "체결",
+    "EXPIRED": "만료",
 }
 
 
@@ -58,11 +67,13 @@ def qndx_page(data: Any) -> str:
     else:
         lead = ""
     days = a.get("days_to_go")
+    auto = bool(latest.get("auto_buy"))
     next_line = (
         f"지정가 {float(a.get('limit_usd') or 0):.2f} USD 이하로 1주"
         if status == "BUY"
         else (f"약 {days}일 뒤" if days is not None else "—")
     )
+    next_line += " · 자동 매수 " + ("켜짐" if auto else "꺼짐 (앱에서 직접)")
     cards = (
         f'<div class="card" style="border-left-color:{color}"><h3>{escape(label)}</h3>'
         f'<div class="sub">{escape(str(latest.get("date", "")))} 밤 9시'
@@ -104,22 +115,33 @@ def qndx_page(data: Any) -> str:
         f"시작 때 이미 있던 {float(state.get('baseline_qty') or 0):g}주는 적립에 넣지 않는다. "
         "환율은 확인한 날 KIS 고시 환율(근사).</div></div>"
     )
+    orders = {str(o.get("date")): o for o in state.get("orders") or []}
     hist = []
     for p in reversed(paths[-30:]):
         r = _read(p) or {}
         ra = r.get("advice") or {}
+        day = str(r.get("date", p.stem))
         name = _STATUS.get(str(r.get("status")), (str(r.get("status")), ""))[0]
+        o = orders.get(day)
+        order = (
+            f"{_ORDER.get(str(o.get('status')), str(o.get('status')))}"
+            f" · {float(o.get('limit_usd') or 0):.2f} USD"
+            if o
+            else "—"
+        )
         hist.append(
-            f"<tr><td class='nowrap'>{escape(str(r.get('date', p.stem)))}</td>"
+            f"<tr><td class='nowrap'>{escape(day)}</td>"
             f"<td>{escape(name)}</td><td class='num'>{_won(ra.get('accrued_krw'))}</td>"
             f"<td class='num'>{_won(ra.get('price_krw'))}</td>"
+            f"<td>{escape(order)}</td>"
             f"<td class='mute'>{'보냄' if r.get('notified') else '—'}</td></tr>"
         )
     hist_panel = (
         '<div class="panel"><h2>매일 기록 (최근 30일)</h2><table>'
         "<tr><th>날짜</th><th>상태</th><th class='num'>적립금</th><th class='num'>1주 가격</th>"
-        f"<th>텔레그램</th></tr>{''.join(hist)}</table>"
-        "<div class='foot'>한국투자증권 <b>조회만</b> 한다 — 주문은 앱에서 직접. "
-        "매일 밤 9시(KST) 한 번 확인한다.</div></div>"
+        f"<th>예약 매수</th><th>텔레그램</th></tr>{''.join(hist)}</table>"
+        "<div class='foot'>매일 밤 9시(KST) 한 번 확인한다. 자동 매수가 켜져 있으면 살 차례인 날 "
+        "QNDX 예약 매수 1주(현재가 +3% 지정가, 당일 유효)를 낸다 — 매도는 하지 않는다. "
+        "체결은 다음 날 잔고로 확인한다.</div></div>"
     )
     return f'{lead}<div class="cards">{cards}</div>{bar}{buys_panel}{hist_panel}'

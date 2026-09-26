@@ -7,8 +7,10 @@
 * 오류 처리: 토큰 만료·무효(EGW00123·EGW00121)면 캐시를 버리고 **한 번** 다시 받아 재시도한다.
   초당 한도(EGW00201)·네트워크 오류는 짧게 기다렸다 최대 3번까지 다시 묻는다
   (조회만 하므로 안전하다).
-* **주문 경로가 없다.** :meth:`KisOverseasReadOnly.place_order` 는 ``KIS_TRADING_ENABLED`` 와
-  상관없이 항상 막는다 — 실전 주문 코드는 별도 승인 뒤 따로 더한다.
+* :meth:`KisOverseasReadOnly.place_order` 는 ``KIS_TRADING_ENABLED`` 와 상관없이 항상 막는다.
+  유일한 주문 경로는 :class:`KisReservationBuyer` — 사용자 요청(2026-09-26, 문서 89)으로 더한
+  **미국 주식 예약 매수 1 주 전용**이다(허용 종목·가격 상한·``KIS_TRADING_ENABLED=true`` 필수,
+  매도·정정·취소 없음).
 * 비밀값(앱 키·시크릿·토큰)은 예외 메시지·repr·로그에 싣지 않는다.
   토큰 캐시 파일은 ``data/`` (git 제외) 에 둔다.
 """
@@ -29,7 +31,12 @@ from typing import Any
 import httpx
 
 from auto_trading.config.secrets import KisCredentials
-from auto_trading.core.errors import DataIntegrityError, ExchangeError, RateLimitError
+from auto_trading.core.errors import (
+    DataIntegrityError,
+    ExchangeError,
+    OrderStateUnknownError,
+    RateLimitError,
+)
 from auto_trading.core.types import Candle
 from auto_trading.exchange.overseas import (
     OverseasBalance,
@@ -41,9 +48,12 @@ from auto_trading.exchange.overseas import (
 __all__ = [
     "BASE_URL",
     "PRICE_EXCHANGE",
+    "BuyingPower",
     "KisOverseasReadOnly",
+    "KisReservationBuyer",
     "KisTokenCache",
     "QuoteDetail",
+    "ReservationResult",
 ]
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
@@ -398,3 +408,126 @@ class KisOverseasReadOnly:
 
     def close(self) -> None:
         self.client.close()
+
+
+# ---------------------------------------------------------------- 예약 매수 전용 (문서 89)
+
+_TR_RESV_BUY_US = "TTTT3014U"
+_TR_PSAMOUNT = "TTTS3007R"
+
+
+@dataclass(frozen=True, slots=True)
+class BuyingPower:
+    """해외주식 매수가능금액조회 결과 (없는 값은 None)."""
+
+    max_qty: Decimal | None
+    exrt: Decimal | None
+    usd_available: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class ReservationResult:
+    accepted: bool
+    code: str
+    message: str
+    output: dict[str, Any]
+
+
+@dataclass(slots=True)
+class KisReservationBuyer(KisOverseasReadOnly):
+    """미국 주식 **예약 매수 1 주만** 내는 어댑터 (문서 89 QNDX 적립). 매도·정정·취소 코드는 없다.
+
+    지키지 않으면 요청을 보내지 않고 :class:`TradingDisabledError`:
+
+    * ``KIS_TRADING_ENABLED=true`` — 사용자가 ``.env`` 에서 직접 켠다
+    * ``allowed_symbols`` 안의 종목 · 수량 정확히 1 · 0 < 지정가 ≤ ``max_limit_usd``
+
+    예약주문(``TTTT3014U``)은 미국 **지정가만**, **당일 유효**다(접수 10:00~23:20 KST,
+    서머타임 10:00~22:20, 16:30~16:45 제한). 정규장 시작 때 거래소로 간다.
+    주문 POST 는 **다시 보내지 않는다** — 네트워크 오류면 :class:`OrderStateUnknownError`.
+    토큰 무효·초당 한도처럼 거래소가 **거절한** 응답만 한 번 더 보낸다.
+    """
+
+    allowed_symbols: frozenset[str] = frozenset()
+    max_limit_usd: Decimal = Decimal(0)
+
+    def buying_power(self, symbol: str, order_exchange: str, price: Decimal) -> BuyingPower:
+        """매수가능금액조회 (``TTTS3007R``, 조회만)."""
+        creds = self.credentials
+        data = self._get(
+            "/uapi/overseas-stock/v1/trading/inquire-psamount",
+            _TR_PSAMOUNT,
+            {
+                "CANO": creds.cano,
+                "ACNT_PRDT_CD": creds.product_code,
+                "OVRS_EXCG_CD": order_exchange,
+                "OVRS_ORD_UNPR": f"{price:.2f}",
+                "ITEM_CD": symbol.upper(),
+            },
+        )
+        out = data.get("output") or {}
+        return BuyingPower(
+            max_qty=_dec(out.get("max_ord_psbl_qty")),
+            exrt=_dec(out.get("exrt")),
+            usd_available=_dec(out.get("ovrs_ord_psbl_amt")),
+        )
+
+    def reserve_buy(
+        self, symbol: str, order_exchange: str, qty: int, limit: Decimal
+    ) -> ReservationResult:
+        creds = self.credentials
+        symbol = symbol.upper()
+        if not creds.trading_enabled:
+            raise TradingDisabledError("KIS_TRADING_ENABLED 가 true 가 아니다 — 주문하지 않는다")
+        if symbol not in self.allowed_symbols:
+            raise TradingDisabledError(f"허용되지 않은 종목: {symbol}")
+        if qty != 1:
+            raise TradingDisabledError(f"수량은 1 주만 허용한다 (요청 {qty})")
+        if not Decimal(0) < limit <= self.max_limit_usd:
+            raise TradingDisabledError(f"지정가 {limit} 가 허용 범위 (0, {self.max_limit_usd}] 밖")
+        body = {
+            "CANO": creds.cano,
+            "ACNT_PRDT_CD": creds.product_code,
+            "PDNO": symbol,
+            "OVRS_EXCG_CD": order_exchange,
+            "FT_ORD_QTY": str(qty),
+            "FT_ORD_UNPR3": f"{limit:.2f}",
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00",
+        }
+        retried = False
+        while True:
+            headers = {
+                "content-type": "application/json; charset=utf-8",
+                "authorization": f"Bearer {self._access_token()}",
+                "appkey": creds.app_key,
+                "appsecret": creds.app_secret,
+                "tr_id": _TR_RESV_BUY_US,
+                "custtype": "P",
+            }
+            try:
+                response = self.client.post(
+                    f"{self.base_url}/uapi/overseas-stock/v1/trading/order-resv",
+                    json=body,
+                    headers=headers,
+                )
+            except httpx.HTTPError as exc:
+                raise OrderStateUnknownError(
+                    f"KIS 예약주문 전송 결과 모름 ({type(exc).__name__}) — 다시 보내지 않는다"
+                ) from exc
+            try:
+                data = response.json() if response.content else {}
+            except ValueError:
+                data = {}
+            code = str(data.get("msg_cd") or response.status_code)
+            text = str(data.get("msg1") or "").strip()
+            if response.is_success and str(data.get("rt_cd")) == "0":
+                return ReservationResult(True, code, text, dict(data.get("output") or {}))
+            if (code in _TOKEN_ERRORS or code in _RATE_ERRORS) and not retried:
+                retried = True  # 거절된 요청이라 다시 보내도 중복이 아니다
+                if code in _TOKEN_ERRORS:
+                    self._drop_token()
+                else:
+                    self.sleep(1.0)
+                continue
+            return ReservationResult(False, code, text, dict(data.get("output") or {}))

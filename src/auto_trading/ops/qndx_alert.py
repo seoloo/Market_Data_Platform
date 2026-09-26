@@ -1,11 +1,12 @@
-"""QNDX 적립 알림 (docs/research/89) — 순수 계산, I/O 없음. **주문하지 않는다.**
+"""QNDX 적립 알림·자동 매수 판단 (docs/research/89) — 순수 계산, I/O 없음.
 
 규칙 (사용자 결정 2026-09-26):
 
 * 시작일부터 **달력으로 매일 1 만 원**이 가상으로 쌓인다. 월 한도 30 만 원.
-* 쌓인 금액 ≥ 1 주 가격(원화 환산 + 수수료 0.25%)이면 "오늘 1 주 살 차례" 알림.
-* 사용자가 앱에서 직접 사면, 다음 실행에서 잔고 수량이 늘어난 것을 보고
-  실제 매입 금액만큼 적립금에서 뺀다.
+* 쌓인 금액 ≥ 1 주 가격(원화 환산 + 수수료 0.25%)이면 "오늘 1 주 살 차례".
+  자동 매수가 켜져 있으면 그날 밤 **예약 매수 1 주**(:func:`should_order`), 아니면 알림만.
+* 체결은 다음 실행에서 잔고 수량이 늘어난 것으로 확인하고 실제 매입 금액만큼 적립금에서 뺀다.
+  예약주문은 당일만 유효하므로, 다음 날까지 수량이 늘지 않았으면 그 주문은 만료로 본다.
   시작할 때 이미 가진 수량은 적립에 넣지 않는다(기준 수량).
 """
 
@@ -22,18 +23,24 @@ __all__ = [
     "MONTHLY_CAP_KRW",
     "Advice",
     "Buy",
+    "Order",
     "State",
     "advise",
     "message",
     "reconcile",
+    "resolve_orders",
+    "should_order",
 ]
 
 DAILY_KRW = 10_000.0
 MONTHLY_CAP_KRW = 300_000.0
 FEE = 0.0025
 """한국투자증권 해외주식 일반 수수료 (사용자 확인 수준, 문서 87)."""
-LIMIT_BUFFER = 0.02
-"""권장 지정가 = 현재가 × (1 + 2%) — 장 시작 때 체결되게 여유를 둔다(실제 체결은 시장 가격)."""
+LIMIT_BUFFER = 0.03
+"""지정가 = 현재가 × (1 + 3%) — 장 시작 때 체결되게 여유를 둔다(매수 지정가가 시장가보다 높으면
+실제 체결은 시장 가격). 밤사이 3% 넘게 오르면 체결되지 않고 다음 날 다시 한다."""
+OPEN_ORDER = frozenset({"SENT", "UNKNOWN"})
+"""체결·만료가 아직 확인되지 않은 주문 상태."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +55,17 @@ class Buy:
 
 
 @dataclass(slots=True)
+class Order:
+    date: str
+    """주문을 낸 날 (KST)."""
+    limit_usd: float
+    status: str
+    """SENT(접수) · UNKNOWN(전송 결과 모름) · REJECTED · FILLED · EXPIRED."""
+    code: str = ""
+    message: str = ""
+
+
+@dataclass(slots=True)
 class State:
     symbol: str
     start_date: str
@@ -55,6 +73,7 @@ class State:
     last_qty: float
     last_cost_usd: float
     buys: list[Buy] = field(default_factory=list)
+    orders: list[Order] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -68,6 +87,7 @@ class State:
             last_qty=float(d["last_qty"]),
             last_cost_usd=float(d["last_cost_usd"]),
             buys=[Buy(**b) for b in d.get("buys", [])],
+            orders=[Order(**o) for o in d.get("orders", [])],
         )
 
 
@@ -116,6 +136,42 @@ def reconcile(state: State, today: str, qty: float, avg_usd: float, fx_rate: flo
     return notes
 
 
+def resolve_orders(state: State, today: str, bought_now: bool) -> list[str]:
+    """지난날 낸 예약주문(당일 유효)을 정리한다.
+
+    이번 확인에서 수량이 늘었으면 FILLED, 아니면 EXPIRED.
+
+    :func:`reconcile` 바로 뒤에 부른다 (``bought_now`` = 이번 확인에서 새 매수가 있었나).
+    """
+    notes: list[str] = []
+    open_past = [o for o in state.orders if o.status in OPEN_ORDER and o.date < today]
+    for k, order in enumerate(open_past):
+        filled = bought_now and k == len(open_past) - 1
+        order.status = "FILLED" if filled else "EXPIRED"
+        if not filled:
+            notes.append(f"{order.date} 예약 매수는 체결되지 않고 만료 — 오늘 다시 판단한다")
+    return notes
+
+
+def should_order(
+    state: State, advice: Advice, *, trading_enabled: bool, halted: str | None
+) -> tuple[bool, str]:
+    """(오늘 자동 예약 매수를 낼까, 이유). 하루 1 건, 열린 주문이 있으면 내지 않는다."""
+    if advice.status != "BUY":
+        return False, "살 차례가 아니다"
+    if not trading_enabled:
+        return False, "자동 매수 꺼짐 (.env KIS_TRADING_ENABLED=true 가 아니다) — 앱에서 직접"
+    if halted is not None:
+        return False, f"긴급 정지 켜짐 (data/HALT: {halted})"
+    if advice.weekend:
+        return False, "주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 자동으로 산다"
+    if any(o.date == advice.today for o in state.orders):
+        return False, "오늘은 이미 주문했다"
+    if any(o.status in OPEN_ORDER for o in state.orders):
+        return False, "확인되지 않은 주문이 있다 — 다음 날 잔고로 확인한 뒤"
+    return True, "예약 매수 1주"
+
+
 def advise(state: State, today: str, last_usd: float, fx_rate: float, *, weekday: int) -> Advice:
     """``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6)."""
     accrued = DAILY_KRW * _days(state.start_date, today) - sum(b.cost_krw for b in state.buys)
@@ -144,7 +200,8 @@ def advise(state: State, today: str, last_usd: float, fx_rate: float, *, weekday
     )
 
 
-def message(advice: Advice, symbol: str, notes: list[str]) -> str:
+def message(advice: Advice, symbol: str, notes: list[str], *, order_line: str | None = None) -> str:
+    """``order_line`` 이 있으면 자동 매수 결과 줄, 없으면 앱에서 직접 사는 안내."""
     a = advice
     head = {
         "BUY": f"🟢 {symbol} 오늘 1주 살 차례",
@@ -158,11 +215,14 @@ def message(advice: Advice, symbol: str, notes: list[str]) -> str:
         f"이번 달 매수 {a.month_spent_krw:,.0f}원 · 지금까지 적립 매수 {a.bought_qty:g}주",
     ]
     if a.status == "BUY":
-        if a.weekend:
-            lines.append("주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
-        lines.append(
-            f"앱: 해외주식 → {symbol} → 매수 1주, 지정가 {a.limit_usd:.2f} USD 이하"
-            " (장 전이면 예약주문)"
-        )
+        if order_line is not None:
+            lines.append(order_line)
+        else:
+            if a.weekend:
+                lines.append("주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
+            lines.append(
+                f"앱: 해외주식 → {symbol} → 매수 1주, 지정가 {a.limit_usd:.2f} USD 이하"
+                " (장 전이면 예약주문)"
+            )
     lines += notes
     return "\n".join(lines)
