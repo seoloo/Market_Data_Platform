@@ -187,19 +187,16 @@ def _one(
     return text, report
 
 
-def run(telegram: bool) -> int:
-    _migrate()
-    now = _kst_now()
+ATTEMPTS = 5
+RETRY_WAIT_S = 60.0
+"""증권사 일시 오류(2026-09-26 21:00 EGW00300)에 대비해 실패한 종목만 1 분 간격으로 다시 판단한다.
+같은 날 주문은 :func:`should_order` 가 1 건으로 막으므로 다시 판단해도 중복 주문이 없다."""
+
+
+def _attempt(pending: list[Plan], now: datetime, results: dict[str, str]) -> dict[str, str]:
+    """``pending`` 종목을 한 번 판단한다. 성공은 ``results`` 에, 실패 {종목: 이유} 는 돌려준다."""
     today = now.strftime("%Y-%m-%d")
-    day_path = REPORTS / f"{today}.json"
-    notified = False  # 오늘 텔레그램을 이미 보냈나 (텔레그램 없는 시험 실행은 치지 않는다)
-    if day_path.exists():
-        try:
-            notified = bool(json.loads(day_path.read_text(encoding="utf-8")).get("notified"))
-        except ValueError:
-            notified = False
-    blocks: list[str] = []
-    failed = False
+    errors: dict[str, str] = {}
     try:
         creds = load_kis_credentials(REPO / ".env")
         broker = KisReservationBuyer(
@@ -210,30 +207,69 @@ def run(telegram: bool) -> int:
         )
         try:
             balance = broker.overseas_balance()
-            for plan in PLANS:
+            for plan in pending:
                 try:
                     text, report = _one(broker, plan, balance, now, creds.trading_enabled)
                 except AutoTradingError as exc:
-                    failed = True
-                    text = f"⚠ {plan.symbol} 적립 판단 실패: {exc}"
-                    report = {"date": today, "symbol": plan.symbol, "status": "FAILED"}
-                    report |= {"error": str(exc), "message": text}
+                    errors[plan.symbol] = str(exc)
+                    continue
                 folder = REPORTS / plan.symbol
                 folder.mkdir(parents=True, exist_ok=True)
                 (folder / f"{today}.json").write_text(
                     json.dumps(report, ensure_ascii=False, indent=1) + "\n", "utf-8"
                 )
-                blocks.append(text)
+                results[plan.symbol] = text
         finally:
             broker.close()
     except AutoTradingError as exc:
-        failed = True
-        blocks.append(f"⚠ 적립 매수 실행 실패: {exc}")
-    text = "\n\n".join(blocks)
-    send = telegram and (not notified or failed)
+        errors |= {p.symbol: str(exc) for p in pending if p.symbol not in results}
+    return errors
+
+
+def run(telegram: bool, *, attempts: int = ATTEMPTS, wait_s: float = RETRY_WAIT_S) -> int:
+    _migrate()
+    now = _kst_now()
+    today = now.strftime("%Y-%m-%d")
+    day_path = REPORTS / f"{today}.json"
+    notified = last_failed = False  # 텔레그램 없는 시험 실행은 보낸 것으로 치지 않는다
+    if day_path.exists():
+        try:
+            prev = json.loads(day_path.read_text(encoding="utf-8"))
+            notified = bool(prev.get("notified"))
+            last_failed = bool(prev.get("last_sent_failed", prev.get("failed")))  # 옛 형식
+        except ValueError:
+            pass
+    results: dict[str, str] = {}
+    errors: dict[str, str] = {}
+    for k in range(attempts):
+        pending = [p for p in PLANS if p.symbol not in results]
+        errors = _attempt(pending, now, results)
+        if not errors:
+            break
+        if k < attempts - 1:
+            print(f"실패 {sorted(errors)} — {wait_s:.0f}초 뒤 다시 ({k + 2}/{attempts})")
+            time.sleep(wait_s)
+    for symbol, why in errors.items():
+        text = f"⚠ {symbol} 적립 판단 실패 ({attempts}번 시도): {why}"
+        report = {"date": today, "symbol": symbol, "status": "FAILED", "error": why}
+        folder = REPORTS / symbol
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"{today}.json").write_text(
+            json.dumps(report | {"message": text}, ensure_ascii=False, indent=1) + "\n", "utf-8"
+        )
+        results[symbol] = text
+    failed = bool(errors)
+    text = "\n\n".join(results[p.symbol] for p in PLANS)
+    send = telegram and (not notified or failed or last_failed)  # 실패 뒤 성공이면 다시 알린다
     _notify(text, send)
     REPORTS.mkdir(parents=True, exist_ok=True)
-    day = {"date": today, "notified": notified or send, "failed": failed, "message": text}
+    day = {
+        "date": today,
+        "notified": notified or send,
+        "last_sent_failed": failed if send else last_failed,
+        "failed": failed,
+        "message": text,
+    }
     day_path.write_text(json.dumps(day, ensure_ascii=False, indent=1) + "\n", "utf-8")
     print(text)
     return 1 if failed else 0

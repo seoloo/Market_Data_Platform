@@ -166,3 +166,32 @@ def test_buying_power_counts_integrated_margin(tmp_path: Path) -> None:
 
     bp = make(tmp_path, handler).buying_power("QNDX", "NASD", Decimal("25.97"))
     assert bp.max_qty == Decimal("7") and bp.usd_available == Decimal("207.375669")
+
+
+def test_read_retries_gateway_error_but_order_is_not_resent(tmp_path: Path) -> None:
+    """EGW00300(HTTP 500)은 조회만 다시 묻는다. 주문 POST 는 거절 응답으로 한 번만 돌려준다."""
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if len(calls) < 3:
+            return httpx.Response(
+                500, json={"rt_cd": "1", "msg_cd": "EGW00300", "msg1": "Gateway 라우팅 오류"}
+            )
+        if request.url.path == PATH:
+            return ok()
+        return httpx.Response(200, json={"rt_cd": "0", "output": {"max_ord_psbl_qty": "2"}})
+
+    buyer = make(tmp_path, handler)
+    assert buyer.buying_power("QNDX", "NASD", Decimal("25")).max_qty == Decimal("2")
+    assert len(calls) == 3  # 두 번 실패 뒤 세 번째 성공
+
+    order_calls: list[str] = []
+
+    def order_500(request: httpx.Request) -> httpx.Response:
+        order_calls.append(request.url.path)
+        return httpx.Response(500, json={"rt_cd": "1", "msg_cd": "EGW00300", "msg1": "오류"})
+
+    with pytest.raises(OrderStateUnknownError):  # 접수 여부 모름 → 다음 날 잔고로 확인
+        make(tmp_path / "o", order_500).reserve_buy("QNDX", "NASD", 1, Decimal("25"))
+    assert order_calls == [PATH]

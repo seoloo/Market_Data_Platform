@@ -64,6 +64,8 @@ _BALANCE_EXCHANGES = ("NASD", "NYSE", "AMEX")
 """잔고 조회용 거래소 코드 (시세용 코드와 다르다)."""
 _TOKEN_ERRORS = frozenset({"EGW00121", "EGW00123"})
 _RATE_ERRORS = frozenset({"EGW00201"})
+_GATEWAY_ERRORS = frozenset({"EGW00300"})
+"""Gateway 라우팅 오류 (2026-09-26 21:00 KST 해외 잔고 조회, HTTP 500 — 몇 분 뒤 정상)."""
 _TOKEN_TOO_SOON = "EGW00133"
 _REFRESH_MARGIN_MS = 10 * 60_000
 _DAY_MS = 86_400_000
@@ -225,6 +227,11 @@ class KisOverseasReadOnly:
                 continue
             if code in _RATE_ERRORS or response.status_code == 429:
                 raise RateLimitError(f"KIS 초당 한도 초과: {tr_id}")
+            if (
+                response.status_code >= 500 or code in _GATEWAY_ERRORS
+            ) and attempt < self.max_attempts:
+                self.sleep(2.0 * attempt)  # 게이트웨이·서버 오류 — 조회라 다시 물어도 안전하다
+                continue
             text = str(data.get("msg1") or "").strip()
             raise ExchangeError(f"KIS 오류 {response.status_code} {code}: {text} ({tr_id})")
 
@@ -530,6 +537,11 @@ class KisReservationBuyer(KisOverseasReadOnly):
             text = str(data.get("msg1") or "").strip()
             if response.is_success and str(data.get("rt_cd")) == "0":
                 return ReservationResult(True, code, text, dict(data.get("output") or {}))
+            if response.status_code >= 500 and code not in _TOKEN_ERRORS:
+                raise OrderStateUnknownError(
+                    f"KIS 예약주문 서버 오류 {response.status_code} {code}: {text}"
+                    " — 접수 여부 모름, 다시 보내지 않는다"
+                )
             if (code in _TOKEN_ERRORS or code in _RATE_ERRORS) and not retried:
                 retried = True  # 거절된 요청이라 다시 보내도 중복이 아니다
                 if code in _TOKEN_ERRORS:

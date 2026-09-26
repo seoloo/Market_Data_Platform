@@ -235,3 +235,37 @@ def test_overseas_report_date_is_escaped_when_timestamp_invalid(tmp_path: Path) 
     html = accumulate_page(SimpleNamespace(root=tmp_path))
     assert "<script>" not in html
     assert "&lt;script&gt;bad&lt;/script&gt;" in html
+
+
+def test_run_retries_failed_plans_then_notifies_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import scripts.qndx_alert as mod
+
+    monkeypatch.setattr(mod, "REPORTS", tmp_path / "reports")
+    monkeypatch.setattr(mod, "DATA", tmp_path / "data")
+    monkeypatch.setattr(mod, "_migrate", lambda: None)
+    sent: list[bool] = []
+    monkeypatch.setattr(mod, "_notify", lambda text, send: sent.append(send))
+    tries: list[list[str]] = []
+
+    def attempt(pending: list[Plan], now: Any, results: dict[str, str]) -> dict[str, str]:
+        tries.append([p.symbol for p in pending])
+        if len(tries) == 1:
+            return {p.symbol: "KIS 오류 500 EGW00300" for p in pending}
+        for p in pending:
+            results[p.symbol] = f"{p.symbol} ok"
+        return {}
+
+    monkeypatch.setattr(mod, "_attempt", attempt)
+    assert mod.run(True, wait_s=0) == 0
+    assert tries == [["QNDX", "BTQ"], ["QNDX", "BTQ"]] and sent == [True]
+
+    # 실패만 알린 날: 다음 실행이 성공하면 한 번 더 알린다
+    tries.clear()
+    monkeypatch.setattr(mod, "_attempt", lambda pending, now, results: {"QNDX": "x", "BTQ": "x"})
+    assert mod.run(True, attempts=1, wait_s=0) == 1
+    monkeypatch.setattr(mod, "_attempt", attempt)
+    tries.append(["done"])  # 두 번째 호출부터 성공하도록
+    assert mod.run(True, wait_s=0) == 0
+    assert sent[-2:] == [True, True]
