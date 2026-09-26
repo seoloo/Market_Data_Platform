@@ -13,6 +13,7 @@
 | 실행 | `scripts/testnet_drill.py` 매일 09:14 KST → **2026-09-24 부터 21:08 KST**(점검 21:20 앞, 사용자 결정). 기준(§2)은 그대로 |
 | 기록 | `reports/testnet/drill-<시각>.json`, DB `data/testnet.db` (운영 DB 와 분리) |
 | 보고 | 매일 점검 보고(텔레그램)에 한 줄: 최근 결과 · 14일 중 실행/통과 일수. 실패·밀림은 경고 |
+| 최종 판정 | `python -m scripts.review_phase7 --until 2026-10-08` (2026-09-26 추가, [85](85-phase8-stage1-go-live-plan.md)). 기준(§2)을 그대로 채점한다. 실패 원인은 `26-phase7-causes.json` 에 적고 §6 에도 남긴다 |
 
 ## 1. 매일 훈련이 확인하는 것 (12단계, 20개 판정)
 
