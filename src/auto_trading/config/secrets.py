@@ -14,8 +14,10 @@ from auto_trading.core.errors import ConfigError
 
 __all__ = [
     "BinanceCredentials",
+    "KisCredentials",
     "TelegramCredentials",
     "load_binance_credentials",
+    "load_kis_credentials",
     "load_telegram_credentials",
     "read_env_file",
 ]
@@ -83,3 +85,50 @@ def load_telegram_credentials(
     if not token or not chat:
         return None
     return TelegramCredentials(token, chat)
+
+
+@dataclass(frozen=True, slots=True)
+class KisCredentials:
+    """한국투자증권 Open API (실전). 계좌번호는 앞 8자리(CANO) + 상품코드 2자리."""
+
+    app_key: str
+    app_secret: str
+    cano: str
+    product_code: str
+    trading_enabled: bool
+
+    def __repr__(self) -> str:
+        return (
+            "KisCredentials(app_key=***, app_secret=***, "
+            f"account=****{self.cano[-2:]}-{self.product_code}, "
+            f"trading_enabled={self.trading_enabled})"
+        )
+
+    __str__ = __repr__
+
+
+def load_kis_credentials(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> KisCredentials:
+    """KIS 자격: ``KIS_APP_KEY``·``KIS_APP_SECRET``·``KIS_ACCOUNT_NO``·``KIS_TRADING_ENABLED``.
+
+    계좌번호는 숫자 10자리(``-`` 허용).
+
+    빠진 이름을 모두 적어 ConfigError 를 낸다(값은 메시지에 넣지 않는다).
+    ``KIS_TRADING_ENABLED`` 는 정확히 ``true`` 일 때만 참이다 — 그 밖의 값·누락은 거짓(주문 차단).
+    """
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    names = ("KIS_APP_KEY", "KIS_APP_SECRET", "KIS_ACCOUNT_NO")
+    missing = [n for n in names if not merged.get(n, "").strip()]
+    if missing:
+        raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
+    account = merged["KIS_ACCOUNT_NO"].replace("-", "").strip()
+    if len(account) != 10 or not account.isdigit():
+        raise ConfigError("KIS_ACCOUNT_NO 는 숫자 10자리(앞 8자리 계좌 + 상품코드 2자리)여야 한다")
+    return KisCredentials(
+        app_key=merged["KIS_APP_KEY"].strip(),
+        app_secret=merged["KIS_APP_SECRET"].strip(),
+        cano=account[:8],
+        product_code=account[8:],
+        trading_enabled=merged.get("KIS_TRADING_ENABLED", "").strip().lower() == "true",
+    )
