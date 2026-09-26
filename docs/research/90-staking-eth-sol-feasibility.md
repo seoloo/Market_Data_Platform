@@ -10,7 +10,7 @@
 - 업비트 SOL 표시 연 추정 보상률 **4.52%**는 2026-09-26 사용자가 전달한 현재 참고값이다. 계좌를 직접 조회하거나 지급 내역으로 검산한 값이 아니며, 과거 실현 수익률·미래 보장 수익률도 아니다.
 - 업비트 표시 보상률은 서비스 수수료 차감 후 값이다. 4.52%에서 수수료 10%를 다시 빼지 않는다. 반대로 원시 네트워크 보상을 쓴다면 사업자 수수료 반영이 필요하다.[U1][U2]
 - ETH의 업비트 실수령 보상률은 아직 미확인이다. Ethereum 웹 표시 APR 약 2.5%는 네트워크 참고값이지 업비트·Binance 상품 실수령률이 아니다.[E1] 이 수치로 ETH와 SOL의 우열을 판정하지 않는다.
-- 기존 DB에는 ETH·SOL 현물/선물 가격과 펀딩 이력이 있지만 스테이킹 지급·환산비율 이력이 없고, 펀딩 행의 `mark_price`도 전부 비어 있다. 후속 감사에서 **Binance 상품 WBETH/BNSOL의 일별 환산비율과 공통 기간의 공개 funding 정산 mark**를 별도 연구 스냅숏으로 확보했다(§5.3). 이는 업비트 실제 보상이 아니며 장중 청산 경로도 없으므로 비용 후 수익이나 청산 안전성 PASS/REJECT를 내리지 않는다.
+- 기존 DB에는 ETH·SOL 현물/선물 가격과 펀딩 이력이 있지만 스테이킹 지급·환산비율 이력이 없고, 펀딩 행의 `mark_price`도 전부 비어 있다. 후속 감사에서 **Binance 상품 WBETH/BNSOL의 일별 환산비율, 공통 기간의 funding 정산 mark와 선물 mark 1시간봉**을 별도 연구 스냅숏으로 확보했다(§5.3~5.4). 이는 업비트 실제 보상이 아니며 틱별 청산 경로도 없으므로 비용 후 수익이나 청산 안전성 PASS/REJECT를 내리지 않는다.
 - 신규 기여는 검증 보상이다. 선물 펀딩 수익 부분은 기존 K·M과 겹친다. **K·M 판정을 되돌리는 연구가 아니라, 보상을 더한 증가분이 추가 비용·위험에 합당한지** 검증한다.
 
 ## 2. 사용자에게 중요한 상품 조건
@@ -146,14 +146,21 @@ GROUP BY symbol;
 
 공동 비교에 사용할 수 있는 **자료의 겹침**은 2024-08-28~2026-08-31이다. 이것은 수익이 좋게 나온 기간을 고른 것이 아니라 BNSOL 이력의 첫 관측일과 2026-08 스냅숏 종료일의 교집합이다. 날짜 누락 0은 *관측 시작 후* 연속이라는 뜻이지 상품 출시 이후 완전성·보상 정확성을 보증하지 않는다. 두 상품의 과거 수수료·MEV·환산비율 적용/환매 가능 시점은 별도로 확인해야 한다. ETH·SOL 일별 관측을 독립 표본 수로 간주하지 않는다.
 
-정산 시점 mark는 확보했지만, **정산 사이 급등·급락의 선물 mark 경로/유지증거금**, WBETH/BNSOL 매매가격·할인·환매 시점, 업비트 실제 SOL 지급 내역, KRW·USDT 환산/국내외 가격 차이 자료는 아직 없다. 이 상태로 크로스거래소 헤지·청산·총자본 손익을 계산하지 않는다. 업비트 SOL 4.52% 현재 표시율을 위 과거 구간에 대입하거나 BNSOL 비율로 업비트 수익을 대신하지 않는다. `DATA_INSUFFICIENT`와 전략 `REJECT`를 구별한다.
+정산 시점 mark를 확보했고 §5.4에서 1시간 mark 고저도 수집했다. 그러나 **분·틱 단위 경로와 과거 유지증거금**, WBETH/BNSOL 매매가격·할인·환매 시점, 업비트 실제 SOL 지급 내역, KRW·USDT 환산/국내외 가격 차이 자료는 아직 없다. 이 상태로 크로스거래소 헤지·청산·총자본 손익을 계산하지 않는다. 업비트 SOL 4.52% 현재 표시율을 위 과거 구간에 대입하거나 BNSOL 비율로 업비트 수익을 대신하지 않는다. `DATA_INSUFFICIENT`와 전략 `REJECT`를 구별한다.
+
+### 5.4 업비트 실지급 접근과 장중 mark 가용성 (2026-09-26 후속)
+
+- [업비트 공식 안내][U5]는 로그인 후 **스테이킹 현황**에서 신청·해제·보상 내역을 확인하는 경로를 제시한다. 확인한 [공식 Open API 목록][U7]에는 스테이킹 보상 이력 조회 계약이 없다. 화면의 파일 내려받기 기능까지 확인한 것은 아니므로 CSV 내보내기를 단정하지 않는다. 계정 로그인·비공식 내부 API 호출·API 키 발급/권한 변경은 하지 않았다.
+- 사용자가 원한다면 업비트 화면에서 **SOL 보상 지급 시각·지급 수량·MEV 여부, 스테이킹 활성화/해제 시각·수량**만 제공받아 로컬 비공개 자료로 대조할 수 있다. 이름·계좌번호·총 잔고·원가·거래내역·키/QR/인증정보는 제공할 필요가 없고 Git에 올리지 않는다. 현재 4.52% 표시율이나 누적보상 한 점은 과거 일별 실지급 시계열이 아니다. 사용자의 실제 스테이킹 시작 전 기간은 업비트 **실계좌 수익이 존재하지 않으므로**, Binance 2024~2026 이력과 동일한 과거 검증 표본으로 취급하지 않는다. 이 경우 업비트 비교는 향후 지급분을 누적하는 전향 관찰이다.
+- [Binance 공개 mark 1시간봉 API][B7]를 `python -m scripts.audit_staking_mark_klines`로 **ETHUSDT·SOLUSDT 각 17,616봉**, 2024-08-28 00:00~2026-08-31 23:00 UTC에 수집했다. 기대 시간봉과 비교한 누락 0, 각 파일 SHA-256 재검산 일치. 정상화한 OHLC와 출처·수집시각·체크섬은 Git 제외 `data/research/staking/`에 있고 ETH 약 2.07 MB·SOL 약 1.99 MB다. 사용자 계좌나 운영 DB는 읽거나 바꾸지 않았다.
+- **청산 판정은 여전히 불가.** 1시간봉 고저는 한 시간 내 시각·순서·틱 경로를 알 수 없다. 실제 숏 청산에는 포지션 수량·진입가·격리 증거금·펀딩 차감·유지증거금 tier/maintenance amount·보호주문/체결이 필요하다.[B8] [현재 notional/leverage bracket API][B9]는 사용자별 서명 조회이며 **과거 tier 이력 조회 계약이 아니다**. 현행 tier를 2024년부터 소급 적용하거나 단순 `1/레버리지`를 청산가로 쓰지 않는다. mark 봉은 가능한 스트레스 경로를 설계할 자료이지 안전 통과 증거가 아니다.
 
 ## 6. 다음 구현·검증 계획과 중단 기준
 
-1. **Phase 0 데이터 감사:** §5.3의 Binance 환산비율·정산 mark 수집은 완료했다. 다음에는 상품별 비율의 공개시각·수수료·MEV 포함 여부, 업비트 실제 지급 내역의 안전한 대조 가능성, 환매/할인, 장중 mark·증거금, KRW/USDT/프리미엄을 확인한다. 무상 자료로 검증할 수 없으면 `DATA_INSUFFICIENT`, 전략 기각과 구분한다. 키 권한을 거래/출금으로 올리지 않는다.
+1. **Phase 0 데이터 감사:** §5.3~5.4의 Binance 환산비율·정산 mark·1시간 mark 수집과 업비트 공식 보상 내역 경로 확인은 완료했다. 다음에는 상품별 비율의 공개시각·수수료·MEV 포함 여부, 사용자 제공 시 업비트 실지급의 안전한 대조, 환매/할인, 더 세밀한 mark·과거 증거금 조건, KRW/USDT/프리미엄을 확인한다. 무상 자료로 검증할 수 없으면 `DATA_INSUFFICIENT`, 전략 기각과 구분한다. 키 권한을 거래/출금으로 올리지 않는다.
 2. **보관 계약:** 현재 정상화된 응답 행과 소스/수집시각/기간/체크섬을 Git 제외 연구 디렉터리에 보존한다. API 원문 전체 보존은 아직 구현하지 않았으며 후속 자료에는 별도 계약이 필요하다. 개인 지급 내역·계좌 식별자·API 시크릿은 Git 제외. 현행 시장 DB/스케줄에 자동 수집을 추가하지 않는다.
 3. **성과 열람 전 사전등록 준비:** 공통 자료 기간, 세전 통화, 동일 자본, 자금 배분, 헤지 시각·수량 내림, 청산/보호 stop 이후 행동, 환매 지연·수수료, 비용 2배 검사, 미열람 전향 구간을 고정한다. 기존 전략 수치를 복사해 신규 한도로 쓰지 않는다.
-4. **검정력:** 일/epoch 보상을 독립 거래로 세지 않는다. 같은 시장에 노출된 ETH·SOL도 독립 표본 2배로 취급하지 않는다. 자기상관을 고려한 기간 블록의 계좌 순수익·대조군 대비 증가분으로 유효 표본/SE를 추정하고 80% 게이트를 확인한다. 현재 SD·보상 이력·공통 구간 미확보로 **미계산/미통과**다. 장기 캐리에 Phase 4 실제 거래 n≥100 기준을 어떻게 적용할지 사전 결정이 필요하며 임의 면제하지 않는다.
+4. **검정력:** 일/epoch 보상을 독립 거래로 세지 않는다. 같은 시장에 노출된 ETH·SOL도 독립 표본 2배로 취급하지 않는다. 자기상관을 고려한 기간 블록의 계좌 순수익·대조군 대비 증가분으로 유효 표본/SE를 추정하고 80% 게이트를 확인한다. Binance 상품의 공통 가격/비율 구간은 확보했지만 **SD·업비트 실보상·완전한 헤지 원장 미확보**로 미계산/미통과다. 장기 캐리에 Phase 4 실제 거래 n≥100 기준을 어떻게 적용할지 사전 결정이 필요하며 임의 면제하지 않는다.
 5. **이후에만 구현:** Pure Core 계산과 외부 자료 읽기를 분리하고 기존 연구 회계 구조를 재사용한다. Decimal 금액/수량, UTC ms, 실제 정산 시각, 양쪽 지갑 분리. 보상 누적·수수료 중복 방지·음수 funding·헤지 변화·급등 청산·환매 지연·stop 이후 잔여 롱·미래 무관성·결정론을 테스트한다. 기존 T/v2·O/v2 코드/설정 변경 없이 독립 연구 경로로 둔다.
 
 경제성 판단은 전체 자본 기준 비용 후 수익과 위험, 동일 비스테이킹 캐리 대비 증가분으로 한다. 최소 요구수익·낙폭·자금잠김 허용치와 통계 판정은 결과를 보기 전 사용자와 확정한다. 자료가 충분해도 보호주문/위험 한도와 구조가 충돌하거나 스트레스에서 청산 위험을 감당할 수 없으면 실행 후보로 승격하지 않는다. 펀딩이 음수여도 보상을 무조건 확보한다고 가정하거나, 수익률이 낮다는 이유로 레버리지를 올려 통과시키지 않는다.
@@ -168,6 +175,7 @@ GROUP BY symbol;
 - [U4 — 업비트 스테이킹/언스테이킹 시간](https://support.upbit.com/hc/ko/articles/4413819191193)
 - [U5 — 업비트 서비스·내역 안내](https://support.upbit.com/hc/ko/articles/4413988492953)
 - [U6 — 업비트 일봉 API](https://docs.upbit.com/kr/reference/list-candles-days)
+- [U7 — 업비트 공식 Open API 개요](https://docs.upbit.com/kr/kr/reference/api-overview)
 - [E1 — Ethereum 스테이킹](https://ethereum.org/staking/)
 - [B1 — Binance ETH 스테이킹](https://www.binance.com/en/earn/ethereum-staking)
 - [B2 — Binance SOL 스테이킹 안내](https://www.binance.com/en/support/faq/detail/d0ce7037f53142058ae93575f2b3096e)
@@ -175,5 +183,8 @@ GROUP BY symbol;
 - [B4 — BNSOL rate history, SOL Staking API](https://developers.binance.com/en/docs/catalog/investment-and-services-staking/api/rest-api/sol-staking)
 - [B5 — Binance funding 부호](https://www.binance.com/en/academy/glossary/funding-fees)
 - [B6 — Binance USD-M fundingRate 시장 데이터 API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)
+- [B7 — Binance USD-M markPriceKlines 시장 데이터 API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)
+- [B8 — Binance USD-M 청산가·유지증거금 설명](https://www.binance.com/en-ZA/support/faq/detail/b3c689c1f50a44cabb3a84e663b81d93)
+- [B9 — Binance USD-M notional/leverage bracket 계정 API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account)
 
-초기 타당성 조사에서는 문서만 변경했다. 후속 §5.3에서는 연구용 읽기 전용 감사 스크립트·테스트와 로컬 Git 제외 자료를 추가했다. 전체 pytest 2,200건(누출 77건 포함), strict mypy 173파일, ruff check/format, import-linter 5계약과 스냅숏 해시 검증을 통과했다. **과거 성과 실험/전략 코드/실계좌 조회/주문/스테이킹 신청·해제/자산 이동/키 설정/스케줄 변경/유료 구매는 하지 않았다.**
+초기 타당성 조사에서는 문서만 변경했다. 후속 §5.3~5.4에서는 연구용 읽기 전용 감사 스크립트·테스트와 로컬 Git 제외 자료를 추가했다. 최신 검증은 전체 pytest 2,203건(누출 77건 포함), strict mypy 173파일, ruff check/format 456파일, import-linter 5계약과 스냅숏 해시 검사다. **과거 성과 실험/전략 코드/실계좌 조회/주문/스테이킹 신청·해제/자산 이동/키 설정/스케줄 변경/유료 구매는 하지 않았다.**
