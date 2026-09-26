@@ -368,3 +368,51 @@ def test_realistic_costs_is_reference_only() -> None:
     assert (base.spot_cost, base.perp_cost) == (0.0015, 0.00095)  # 판정 기준 그대로 (42 §8)
     assert (ref.spot_cost, ref.perp_cost) == (0.0011, 0.00023)
     assert replace(ref, spot_cost=base.spot_cost, perp_cost=base.perp_cost) == base
+
+
+class TestDrawdownThrottle:
+    """83 H2: 계좌 낙폭 d 에 따라 배수 1 + (e − 1)·max(0, 1 − d/zero)."""
+
+    def test_off_is_identical(self) -> None:
+        closes = {"AUSDT": wave(400, 0.004), "BUSDT": zigzag(400)}
+        base = run(closes, OverlayConfig(exposure=2.5))
+        same = run(closes, replace(OverlayConfig(exposure=2.5), dd_throttle_zero=None))
+        assert same.equity == base.equity
+
+    def test_steady_uptrend_at_new_highs_uses_full_exposure(self) -> None:
+        # 낙폭이 없으면(매일 신고가) 배수를 줄이지 않는다
+        closes = {"AUSDT": wave(400, 0.004, wobble=0.0)}
+        cfg = OverlayConfig(exposure=2.5, trend=FREE_T2, daily_loss_limit=math.inf)
+        base = run(closes, cfg)
+        h2 = run(closes, replace(cfg, dd_throttle_zero=0.10))
+        assert h2.equity == base.equity
+
+    def test_deep_drawdown_cuts_exposure_to_spot_only(self) -> None:
+        # 상승 중 급락(사흘 −15%): 긴 추세 신호는 아직 상승이라 T/v2 는 들고 있지만,
+        # 계좌 낙폭이 10% 를 넘은 날부터 H2 노출은 같은 날 T/v2(현물만)를 넘지 않는다
+        up = wave(300, 0.004, wobble=0.0)
+        drop = [up[-1] * (1 - 0.05 * (k + 1)) for k in range(3)]
+        flat = [drop[-1]] * 30
+        closes = {"AUSDT": up + drop + flat}
+        cfg = OverlayConfig(exposure=2.5, trend=FREE_T2, daily_loss_limit=math.inf)
+        h2 = run(closes, replace(cfg, dd_throttle_zero=0.10))
+        t2 = run(closes, replace(T2_ALONE, trend=FREE_T2))
+        checked = 0
+        for k in range(1, len(h2.equity)):
+            drawdown = 1 - h2.equity[k] / max(h2.equity[: k + 1])
+            if drawdown >= 0.11 and t2.exposure[k] > 0:
+                assert h2.exposure[k] <= t2.exposure[k] + 0.06  # 밴드(5%p) 흔들림만 허용
+                checked += 1
+        assert checked > 0
+        full = run(closes, cfg)
+        assert max(full.exposure[-30:]) > max(h2.exposure[-30:])  # 줄이지 않으면 더 든다
+
+    def test_linear_midpoint(self) -> None:
+        # d = 5% (영점 10% 의 절반)이면 배수 2.5 → 1.75 : split_weights 로 같은 결과
+        spot_w, fut_w = split_weights({"A": 0.4}, 1.75, 3.0)
+        assert spot_w["A"] + fut_w["A"] == pytest.approx(0.4 * 1.75)
+        from auto_trading.backtest.overlay import H2_DDLEV
+
+        e = 1.0 + (H2_DDLEV.exposure - 1.0) * max(0.0, 1 - 0.05 / (H2_DDLEV.dd_throttle_zero or 1))
+        assert e == pytest.approx(1.75)
+        assert H2_DDLEV.halt_drawdown == 0.30 and H2_DDLEV.catastrophe_stop == 0.20

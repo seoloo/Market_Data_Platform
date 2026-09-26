@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from auto_trading.backtest.trend import TrendConfig, target_weight
 
 __all__ = [
+    "H2_DDLEV",
     "O2_STOP",
     "O3_2X",
     "O3_2X_LIMIT40",
@@ -96,6 +97,11 @@ class OverlayConfig:
     선물 추가분을 든다. 하나라도 아니면 다음 체결에서 그 종목 노출 배수를 1.0 으로 둔다
     (현물은 T/v2 그대로).
     ``False``면 없음(O/v2·O/v3)."""
+    dd_throttle_zero: float | None = None
+    """83 H2: 계좌 낙폭 연동 배수. 체결 때 종가 고점 대비 낙폭 d 로 노출 배수를
+    ``1 + (exposure − 1) × max(0, 1 − d / dd_throttle_zero)`` 로 줄인다.
+    d = 0 이면 ``exposure``, d ≥ ``dd_throttle_zero`` 면 1.0 (현물만).
+    ``None``(기본)이면 없음 — 기존 설정과 비트 단위로 같다."""
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -115,6 +121,13 @@ O3_2X_LIMIT40 = OverlayConfig(exposure=2.0, catastrophe_stop=0.20, halt_drawdown
 
 전향 관찰 중단선은 35%(점검 코드가 쓴다). 실거래 계좌 한도(TRADING_CORE 30%)는 바꾸지 않는다 —
 이 설정은 **관찰 원장 전용**이다. 정지가 난 적이 없는 동안은 ``O3_2X`` 와 결과가 같다."""
+
+
+H2_DDLEV = OverlayConfig(exposure=2.5, catastrophe_stop=0.20, dd_throttle_zero=0.10)
+"""H2: 고점일 때 2.5배, 계좌 낙폭 10% 에서 1.0배(현물만)까지 직선으로 줄인다.
+
+docs/research/83 사전 등록. 그 밖의 규칙은 O/v2 와 같다
+(비상 스톱 −20% · 선물 레버리지 ≤ 3 × 선물 지갑 · 일 손실 2% · 계좌 정지 30%)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,17 +345,22 @@ def step_overlay_day(
     tally.loss_limit_days += no_increase
     # 5. 체결
     if target is not None and equity > 0:
+        base = exposure
+        if cfg.dd_throttle_zero is not None and exposure > 1.0 and peak > 0:
+            # 83 H2: 체결 시점(오늘 종가) 자본의 고점 대비 낙폭으로 배수를 줄인다
+            drawdown = max(0.0, 1 - equity / peak)
+            base = 1.0 + (exposure - 1.0) * max(0.0, 1 - drawdown / cfg.dd_throttle_zero)
         per_symbol = None
         if market.spiked:
-            per_symbol = {s: 1.0 if s in market.spiked else exposure for s in symbols}
+            per_symbol = {s: 1.0 if s in market.spiked else base for s in symbols}
             tally.spike_days += sum(1 for s in symbols if s in market.spiked)
-        spot_w, fut_w = split_weights(target, exposure, cfg.max_futures_leverage, per_symbol)
+        spot_w, fut_w = split_weights(target, base, cfg.max_futures_leverage, per_symbol)
         tally.capped_days += any(spot_w[s] < target[s] - 1e-12 for s in symbols)
         traded = False
         for s in symbols:
             current = (sq[s] * spot_px[s] + fq[s] * perp_px[s]) / equity
             want = spot_w[s] + fut_w[s]
-            band = tc.band * (exposure if per_symbol is None else per_symbol[s])
+            band = tc.band * (base if per_symbol is None else per_symbol[s])
             if abs(want - current) < band and _sign(want) == _sign(current):
                 continue
             if no_increase and want > current:

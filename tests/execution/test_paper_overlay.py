@@ -10,6 +10,7 @@ import json
 import math
 import random
 import sqlite3
+from dataclasses import replace
 from decimal import Decimal
 from itertools import pairwise
 
@@ -384,3 +385,19 @@ class TestO2Ledger:
         assert verify_ledger(rows, cfg=O3_2X) == []
         assert verify_ledger(rows, cfg=O2_STOP) != []  # 1.5배 규칙으로는 재현되지 않는다
         assert max(r.tally["exposure"] for r in rows) > 1.5  # 실제로 2배 쪽으로 컸다
+
+    def test_h2_drawdown_linked_ledger_matches_research(self) -> None:
+        """83 H2 도 같은 하루 함수라 Paper = 연구 (비트 단위), 규칙이 다르면 재현되지 않는다."""
+        from auto_trading.backtest.overlay import H2_DDLEV
+
+        market = self.crash_market()
+        conn = connect(":memory:")
+        apply_migrations(conn, now_ms=1)
+        repo = OverlayPaperDayRepository(conn)
+        runner = PaperOverlayRunner(market, repo, clock=lambda: 1, cfg=H2_DDLEV, strategy_id="h2")
+        for k in range(130):
+            runner.run_once(now_after(P0 + k * D))
+        rows = repo.all("h2")
+        assert [r.equity for r in rows] == research(market, P0 + 129 * D, H2_DDLEV).equity
+        assert verify_ledger(rows, cfg=H2_DDLEV) == []
+        assert verify_ledger(rows, cfg=replace(H2_DDLEV, dd_throttle_zero=None)) != []
