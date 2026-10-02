@@ -65,3 +65,5 @@ nav .logo{display:none}nav .nav-group{display:flex;align-items:center;flex:0 0 a
 nav .nav-group+.nav-group{margin:0 0 0 12px;padding:0 0 0 12px;border-top:0;border-left:1px solid var(--line)}
 nav .nav-heading{padding:0 8px 0 0;white-space:nowrap}nav a{white-space:nowrap}
 .grid2{grid-template-columns:1fr}}
+.btn{background:#16305a;color:#fff;border:1px solid var(--o1);border-radius:8px;padding:8px 14px;
+font:inherit;cursor:pointer}.btn:hover{background:#1d3d70}

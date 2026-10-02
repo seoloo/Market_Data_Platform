@@ -20,6 +20,7 @@ from typing import Any
 
 __all__ = [
     "FEE",
+    "ORDER_WINDOW",
     "PLANS",
     "Advice",
     "Buy",
@@ -41,6 +42,9 @@ LIMIT_BUFFER = 0.03
 실제 체결은 시장 가격). 밤사이 3% 넘게 오르면 체결되지 않고 다음 날 다시 한다."""
 OPEN_ORDER = frozenset({"SENT", "UNKNOWN"})
 """체결·만료가 아직 확인되지 않은 주문 상태."""
+ORDER_WINDOW = ("10:00", "22:20")
+"""KIS 미국 예약주문 접수 시간 (KST). 끝은 서머타임 22:20 · 평시 23:20 — 1 년 내내 짧은 쪽을 쓴다.
+밖에서 보내면 거절되고 그날 주문 1 건을 써 버린다 (아침에 PC 를 켜서 밀린 작업이 돌 때)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,8 +209,12 @@ def should_order(
     trading_enabled: bool,
     halted: str | None,
     retry_confirmed_etp_rejection: bool = False,
+    kst_hhmm: str | None = None,
 ) -> tuple[bool, str]:
-    """(오늘 자동 예약 매수를 낼까, 이유). 하루 1 건, 열린 주문이 있으면 내지 않는다."""
+    """(오늘 자동 예약 매수를 낼까, 이유). 하루 1 건, 열린 주문이 있으면 내지 않는다.
+
+    ``kst_hhmm`` (지금 KST "HH:MM") 이 주면 :data:`ORDER_WINDOW` 밖에서는 내지 않는다.
+    """
     if advice.status != "BUY":
         return False, "살 차례가 아니다"
     if not trading_enabled:
@@ -215,6 +223,10 @@ def should_order(
         return False, f"긴급 정지 켜짐 (data/HALT: {halted})"
     if advice.weekend:
         return False, "주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 자동으로 산다"
+    start, end = ORDER_WINDOW
+    if kst_hhmm is not None and not start <= kst_hhmm < end:
+        later = "오늘 밤 9시 실행에서 산다" if kst_hhmm < start else "내일 다시 판단 (적립 이어짐)"
+        return False, f"예약주문 접수 시간({start}~{end}) 밖 — {later}"
     today_orders = [o for o in state.orders if o.date == advice.today]
     retry_allowed = (
         retry_confirmed_etp_rejection

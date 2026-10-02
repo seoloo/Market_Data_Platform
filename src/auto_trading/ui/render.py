@@ -125,7 +125,7 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
         f'<div class="layout"><nav><div class="logo">AUTO <b>TRADING</b></div>{nav}</nav><main>'
         f'<header><h1>{escape(title)}</h1><span class="date">{_kst(data.now_ms)} KST</span>'
-        f'<span class="badge">읽기 전용</span>{trading_badge}</header>'
+        f'<span class="badge">읽기 전용 · 다시 실행 버튼 1개</span>{trading_badge}</header>'
         f"{errors}{body}"
         f'<div class="foot">{foot}</div></main></div></body></html>'
     )

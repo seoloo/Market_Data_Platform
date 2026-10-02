@@ -53,7 +53,7 @@ def test_page_rejects_truncated_out_of_range_and_invalid_values() -> None:
 
 class _FakeReader:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, int], bool]] = []
+        self.calls: list[tuple[str, Mapping[str, Any], bool]] = []
 
     def _request(
         self, path: str, params: Mapping[str, Any] | None = None, *, signed: bool = False

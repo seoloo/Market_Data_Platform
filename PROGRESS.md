@@ -1,7 +1,15 @@
 # 작업 현황
 
-최종 갱신: 2026-09-29 · 작성: Codex (QNDX 해외 ETP 신청 후 당일 재시도).
+최종 갱신: 2026-10-02 · 작성: Opus (대시보드 놓친 작업 다시 실행).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-10-02 — 대시보드 "놓친 작업 다시 실행" 버튼 · 적립 주문 접수 시간 보호
+
+- 사용자: "오후 9시에 PC 를 못 켜면 버튼을 눌렀을 때 그 시간에 못 한 작업을 실행". 확인: 10/01 은 PC 를 21:56 에 켰고 StartWhenAvailable 로 13개 작업이 **21:50:50 에 한꺼번에** 돌았다 — 점검이 Paper 기록보다 먼저 돌아 CRITICAL(종료 2), 테스트넷 훈련이 같은 계좌·DB 오버레이 훈련 주문에 막혀 실패(종료 1, `ReconciliationError`). 동시 시작이 원인.
+- `ops/catchup.py`(고르기·순서·하나씩 기다리기) · `ui/catchup.py`(실행기·화면) · `POST /catchup`(토큰·같은 출처·CSP `form-action 'self'`). 대시보드의 유일한 쓰기 동작 — D10 "GET 만" 원칙의 예외로 CURRENT_SPEC·OPERATIONS·server 설명에 적었다. 결과 코드 상수는 `ops/task_result.py` 로 분리(ui → ops → execution import 금지 계약 유지).
+- 적립 매수 `should_order(kst_hhmm=)`: 예약 접수 10:00~22:20 KST 밖이면 주문하지 않는다 — 아침에 PC 를 켜 밀린 작업이 돌 때 거절로 그날 1 건을 버리던 구멍.
+- 실기 확인: 작업 스케줄러 조회 13개 → 지금 대상 2개(테스트넷 훈련·점검, 둘 다 실패 코드). 무해한 `TradFi_Snapshot`(공개 호가 읽기) 1개를 실행기로 시작 → 끝날 때까지 기다려 결과 0 확인.
+- 검증: 전체 pytest·leakage, mypy(기존 테스트 타입 1건 함께 고침), ruff check/format, import-linter 5계약 통과.
 
 ## 2026-09-29 — QNDX 해외 ETP 미신청 거절 후 당일 1회 재시도
 

@@ -6,8 +6,10 @@ import hashlib
 import json
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -15,10 +17,12 @@ import pytest
 
 from auto_trading.backtest.overlay import O2_STOP
 from auto_trading.execution.paper_overlay import PaperOverlayRunner
+from auto_trading.ops.catchup import Task
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
 from auto_trading.storage.repositories.paper_days import PaperDay, PaperDayRepository
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDayRepository
+from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import load_dashboard
 from auto_trading.ui.render import PAGES, render_page
@@ -207,10 +211,29 @@ class TestChart:
         assert svg.count(">01.01<") == 1  # 같은 날짜 눈금은 한 번만
 
 
+_KST = timezone(timedelta(hours=9))
+_MISSED = Task(
+    "AutoTrading_Paper_T2", ("21:00",), datetime(2026, 9, 30, 21, 0, tzinfo=_KST), 0, False
+)
+
+
 class TestServer:
     @pytest.fixture
-    def base(self, root: Path) -> Iterator[str]:
-        server = make_server(root, port=0)
+    def runner(self, root: Path) -> CatchupRunner:
+        """작업 스케줄러 대신 가짜 — 어젯밤 21:00 Paper_T2 를 놓쳤다."""
+        started: list[list[str]] = []
+
+        def run(names: list[str], **_: object) -> None:
+            started.append(names)
+
+        morning = datetime(2026, 10, 2, 9, 0, tzinfo=_KST)
+        r = CatchupRunner(root, query=lambda: [_MISSED], run=run, clock=lambda: morning)
+        r.started = started  # type: ignore[attr-defined]
+        return r
+
+    @pytest.fixture
+    def base(self, root: Path, runner: CatchupRunner) -> Iterator[str]:
+        server = make_server(root, port=0, catchup=runner)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
@@ -218,6 +241,22 @@ class TestServer:
         finally:
             server.shutdown()
             server.server_close()
+
+    @staticmethod
+    def _post(base: str, token: str, origin: str | None = None) -> int:
+        body = urllib.parse.urlencode({"token": token}).encode()
+        request = urllib.request.Request(base + "/catchup", data=body, method="POST")
+        request.add_header("Origin", origin or base)
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *args: object, **kwargs: object) -> None:
+                return None
+
+        try:
+            with urllib.request.build_opener(NoRedirect).open(request) as response:
+                return int(response.status)
+        except urllib.error.HTTPError as err:
+            return err.code
 
     def test_refuses_non_local_bind(self, root: Path) -> None:
         with pytest.raises(ValueError, match=r"127.0.0.1"):
@@ -227,7 +266,7 @@ class TestServer:
         for _, href, _ in PAGES:
             with urllib.request.urlopen(base + href) as response:
                 assert response.status == 200
-                assert "form-action 'none'" in response.headers["Content-Security-Policy"]
+                assert "form-action 'self'" in response.headers["Content-Security-Policy"]
                 assert response.headers["Cache-Control"] == "no-store"
 
     def test_unknown_path_is_404(self, base: str) -> None:
@@ -242,9 +281,33 @@ class TestServer:
         assert response.status == 200
         assert "해외 주식 · 적립 현황" in html
 
-    @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE", "PATCH"])
+    @pytest.mark.parametrize("method", ["PUT", "DELETE", "PATCH"])
     def test_write_methods_are_rejected(self, base: str, method: str) -> None:
         request = urllib.request.Request(base + "/", data=b"x", method=method)
         with pytest.raises(urllib.error.HTTPError) as err:
             urllib.request.urlopen(request)
         assert err.value.code == 501
+
+    def test_post_elsewhere_is_404(self, base: str) -> None:
+        request = urllib.request.Request(base + "/", data=b"token=x", method="POST")
+        with pytest.raises(urllib.error.HTTPError) as err:
+            urllib.request.urlopen(request)
+        assert err.value.code == 404
+
+    def test_running_page_shows_missed_task_and_button(self, base: str) -> None:
+        with urllib.request.urlopen(base + "/running") as response:
+            html = response.read().decode("utf-8")
+        assert "놓친 작업 다시 실행" in html
+        assert "Paper_T2" in html and "놓침" in html
+        assert 'action="/catchup"' in html
+
+    def test_catchup_needs_token_and_same_origin(self, base: str, runner: CatchupRunner) -> None:
+        started = runner.started  # type: ignore[attr-defined]
+        assert self._post(base, "wrong") == 403
+        assert self._post(base, runner.token, origin="http://evil.example") == 403
+        assert self._post(base, runner.token, origin="null") == 403
+        assert started == []
+        assert self._post(base, runner.token) == 303
+        assert runner._thread is not None
+        runner._thread.join(5)
+        assert started == [["AutoTrading_Paper_T2"]]

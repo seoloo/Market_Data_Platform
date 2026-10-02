@@ -29,6 +29,7 @@ from auto_trading.ui.qndx_render import accumulate_page
 
 QNDX, BTQ = PLANS
 PRICE, FX = 25.0, 1_400.0  # 1주 35,000원 (+수수료 87.5원)
+NIGHT = datetime(2026, 9, 29, 21, 0, tzinfo=UTC)  # KST 밤 9시 (_kst_now 꼴) — 예약 접수 시간 안
 
 
 def _state(symbol: str = "QNDX") -> State:
@@ -127,6 +128,26 @@ def test_should_order_gates() -> None:
     assert should_order(s, a, trading_enabled=True, halted=None)[1] == "오늘은 이미 주문했다"
 
 
+@pytest.mark.parametrize(
+    ("hhmm", "ok", "why"),
+    [
+        ("07:33", False, "오늘 밤"),
+        ("10:00", True, ""),
+        ("22:19", True, ""),
+        ("22:20", False, "내일"),
+    ],
+)
+def test_no_order_outside_reservation_window(hhmm: str, ok: bool, why: str) -> None:
+    """아침에 PC 를 켜 밀린 작업이 돌 때 — 접수 시간 밖에서 보내 그날 1 건을 버리지 않는다."""
+    s = _state()
+    a = _buy_advice(s)
+    sent, reason = should_order(s, a, trading_enabled=True, halted=None, kst_hhmm=hhmm)
+    assert sent is ok
+    assert why in reason
+    if not ok:
+        assert "접수 시간" in reason
+
+
 def test_only_confirmed_qndx_etp_rejection_can_retry_once() -> None:
     s = _state()
     a = _buy_advice(s)
@@ -201,12 +222,12 @@ def test_script_order_is_written_before_sending(
 ) -> None:
     mod = _script(monkeypatch, tmp_path)
     s, broker = _state(), _FakeBroker(outcome=outcome)
-    line = mod._maybe_order(broker, QNDX, s, _buy_advice(s), True)
+    line = mod._maybe_order(broker, QNDX, s, _buy_advice(s), True, NIGHT)
     assert broker.sent == 1 and word in line
     assert s.orders[-1].status == status and s.orders[-1].limit_usd == 25.75
     saved = json.loads((tmp_path / "QNDX.json").read_text(encoding="utf-8"))
     assert saved["orders"][-1]["date"] == "2026-09-29"  # 보내기 전에 기록됨
-    again = mod._maybe_order(broker, QNDX, s, _buy_advice(s), True)  # 같은 날 두 번째 실행
+    again = mod._maybe_order(broker, QNDX, s, _buy_advice(s), True, NIGHT)  # 같은 날 두 번째 실행
     assert broker.sent == 1 and "이미 주문" in again
 
 
@@ -217,10 +238,10 @@ def test_script_etp_retry_sends_once_then_blocks(
     s, broker = _state(), _FakeBroker()
     s.orders.append(Order("2026-09-29", 25.75, "REJECTED", "APBK1672"))
     a = _buy_advice(s)
-    line = mod._maybe_order(broker, QNDX, s, a, True, retry_confirmed_etp_rejection=True)
+    line = mod._maybe_order(broker, QNDX, s, a, True, NIGHT, retry_confirmed_etp_rejection=True)
     assert line is not None and "접수" in line and broker.sent == 1
     assert [o.status for o in s.orders] == ["REJECTED", "SENT"]
-    second = mod._maybe_order(broker, QNDX, s, a, True, retry_confirmed_etp_rejection=True)
+    second = mod._maybe_order(broker, QNDX, s, a, True, NIGHT, retry_confirmed_etp_rejection=True)
     assert second is not None and "이미 주문" in second and broker.sent == 1
 
 
@@ -229,13 +250,13 @@ def test_script_skips_without_money_disabled_halt_or_over_limit(
 ) -> None:
     mod = _script(monkeypatch, tmp_path)
     s, broker = _state(), _FakeBroker(max_qty="0")
-    assert "통합증거금" in mod._maybe_order(broker, QNDX, s, _buy_advice(s), True)
+    assert "통합증거금" in mod._maybe_order(broker, QNDX, s, _buy_advice(s), True, NIGHT)
     assert broker.sent == 0 and s.orders == []
-    assert mod._maybe_order(broker, QNDX, s, _buy_advice(s), False) is None  # 꺼짐 → 앱 안내
+    assert mod._maybe_order(broker, QNDX, s, _buy_advice(s), False, NIGHT) is None  # 꺼짐 → 앱 안내
     cheap = Plan("QNDX", "NAS", "NASD", "KRW", 10_000.0, 300_000.0, 20.0)
-    assert "상한" in mod._maybe_order(_FakeBroker(), cheap, s, _buy_advice(s), True)
+    assert "상한" in mod._maybe_order(_FakeBroker(), cheap, s, _buy_advice(s), True, NIGHT)
     (tmp_path / "HALT").write_text("점검", encoding="utf-8")
-    assert "긴급 정지" in mod._maybe_order(_FakeBroker(), QNDX, s, _buy_advice(s), True)
+    assert "긴급 정지" in mod._maybe_order(_FakeBroker(), QNDX, s, _buy_advice(s), True, NIGHT)
 
 
 def test_page_renders_each_plan(tmp_path: Path) -> None:

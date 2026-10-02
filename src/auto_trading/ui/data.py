@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -30,6 +30,9 @@ from auto_trading.storage.repositories.paper_overlay_days import (
     OverlayPaperDayRepository,
 )
 from auto_trading.ui.demo_data import DemoView, load_demo
+
+if TYPE_CHECKING:
+    from auto_trading.ui.catchup import CatchupView
 
 __all__ = [
     "BacktestRow",
@@ -167,6 +170,8 @@ class DashboardData:
     """데모·그림자·실거래 준비 (docs/research/51·55~59)."""
     root: Path | None = None
     """저장소 루트 — 실행 현황 화면이 보고서 파일을 찾는 곳."""
+    catchup: CatchupView | None = None
+    """놓친 작업 다시 실행 (서버가 채운다. 없으면 버튼을 그리지 않는다)."""
 
 
 def _day(decision_ms: int) -> int:

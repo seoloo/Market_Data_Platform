@@ -18,6 +18,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from auto_trading.ui.catchup import catchup_panel
 from auto_trading.ui.data import DashboardData, LedgerView
 
 __all__ = ["MILESTONES", "TRACKS", "RunRow", "Track", "load_running", "running_page"]
@@ -414,7 +415,7 @@ def running_page(data: DashboardData) -> str:
         or "<tr><td colspan=3 class='mute'>남은 일정 없음</td></tr>"
     )
     side = (
-        '<div class="panel"><h2>PC 상태</h2>'
+        catchup_panel(data.catchup) + '<div class="panel"><h2>PC 상태</h2>'
         f"<div>{escape(pc) if pc else '<span class=mute>점검 보고에 PC 줄 없음</span>'}</div>"
         '<div class="foot">21:20 점검이 읽은 예약 작업·비정상 종료 (문서 84)</div></div>'
         f'<div class="panel"><h2>다가오는 일정</h2><table>{ms_rows}</table></div>'

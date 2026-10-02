@@ -106,6 +106,7 @@ def _maybe_order(
     state: State,
     advice: Advice,
     enabled: bool,
+    now: datetime,
     *,
     retry_confirmed_etp_rejection: bool = False,
 ) -> str | None:
@@ -118,6 +119,7 @@ def _maybe_order(
         trading_enabled=enabled,
         halted=halted_reason(HALT),
         retry_confirmed_etp_rejection=retry_confirmed_etp_rejection,
+        kst_hhmm=now.strftime("%H:%M"),
     )
     if not ok:
         return None if not enabled else f"⏸ 자동 매수 안 함 — {reason}"
@@ -188,6 +190,7 @@ def _one(
         state,
         advice,
         enabled,
+        now,
         retry_confirmed_etp_rejection=retry_confirmed_etp_rejection,
     )
     _save(state)

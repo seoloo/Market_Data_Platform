@@ -17,28 +17,14 @@ from datetime import datetime
 from typing import Any
 
 from auto_trading.ops.paper_watch import Finding
+from auto_trading.ops.task_result import ALREADY_RUNNING as _ALREADY_RUNNING
+from auto_trading.ops.task_result import RESIDENT as _RESIDENT
+from auto_trading.ops.task_result import RESULT_OK, result_text
 
 __all__ = ["RESULT_OK", "pc_findings", "result_text"]
 
 _HOUR_MS = 3_600_000
-RESULT_OK = {
-    0: "성공",
-    0x41301: "실행 중",
-    0x41303: "아직 실행 전",
-}
-_ALREADY_RUNNING = 0x800710E0
-"""작업이 이미 돌고 있어 새 실행을 건너뜀(MultipleInstances=IgnoreNew). 상주 실행기는 정상이다."""
-_RESIDENT = ("AutoTrading_Demo_EW",)
-"""한 번 띄우면 계속 도는 상주 실행기 (시간마다 살아 있는지 확인용으로 다시 띄운다)."""
 _DAILY_GRACE_MS = 26 * _HOUR_MS
-
-
-def result_text(code: int) -> str:
-    if code in RESULT_OK:
-        return RESULT_OK[code]
-    if code == _ALREADY_RUNNING:
-        return "이미 실행 중"
-    return f"실패 코드 0x{code & 0xFFFFFFFF:08X}"
 
 
 def _ms(text: str | None) -> int | None:
