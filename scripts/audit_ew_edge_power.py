@@ -1,5 +1,7 @@
 """문서 34 수익 가능성 시험 — §6 합성 구간 찾기 점검, §5 시장 사건 수·검정력 (수익률 미열람).
 
+``power-spot``: 문서 93 A — 같은 판독기·규칙, 자료만 현물 BTCUSDT 1m 2017-08 ~ 2026-08.
+
 ``synthetic``: 개발 seed 합성 경로에서 진짜 5파(C) 끝 발동의 1순위 해석.
 ``power``: BTCUSDT 2020-01~2026-09 사건·대조 수와 MDE. **사건 뒤 수익률은 계산하지 않는다.**
 DB 는 읽기 전용이며 WA·D22·전략 경로를 조회하지 않는다.
@@ -216,6 +218,34 @@ def _eth_minutes() -> Iterator[Candle]:
                 )
 
 
+SPOT_BTC_DIR = REPO_ROOT / "data" / "external" / "binance_vision" / "spot" / "BTCUSDT" / "1m"
+_MICROS = 10**14
+"""2025-01 부터 현물 파일의 시각은 마이크로초다 — 이보다 크면 1,000 으로 나눈다."""
+
+
+def _vision_minutes(directory: Path, symbol: str) -> Iterator[Candle]:
+    """data.binance.vision 1m zip 을 월 순서대로 읽는다 (헤더 줄은 건너뜀, 마이크로초 시각 처리)."""
+    for path in sorted(directory.glob(f"{symbol}-1m-*.zip")):
+        with zipfile.ZipFile(path) as archive:
+            (name,) = archive.namelist()
+            for line in archive.read(name).decode("ascii").splitlines():
+                cells = line.split(",")
+                if not cells[0].isdigit():
+                    continue
+                open_ms = int(cells[0])
+                if open_ms > _MICROS:
+                    open_ms //= 1000
+                yield Candle(
+                    open_ms=open_ms,
+                    close_ms=open_ms + Timeframe.M1.ms - 1,
+                    open=Decimal(cells[1]),
+                    high=Decimal(cells[2]),
+                    low=Decimal(cells[3]),
+                    close=Decimal(cells[4]),
+                    volume=Decimal(cells[5]),
+                )
+
+
 def _aggregate(minutes: Iterator[Candle], step: int) -> list[Candle]:
     out: list[Candle] = []
     bucket: list[Candle] = []
@@ -373,10 +403,66 @@ def power_pooled() -> dict[str, object]:
     }
 
 
+def power_spot() -> dict[str, object]:
+    """문서 93 A. 34 §3~§5 그대로, 자료만 현물 2017-08 ~ 2026-08. 수익률은 계산하지 않는다."""
+
+    def minutes() -> Iterator[Candle]:
+        return _vision_minutes(SPOT_BTC_DIR, "BTCUSDT")
+
+    four = tuple(_aggregate(minutes(), H4))
+    hours = tuple(_aggregate(minutes(), Timeframe.H1.ms))
+    results, blocked = _scan_asset(four, hours, minutes())
+    close_at = {bar.close_ms: float(bar.close) for bar in four}
+    usable = [r for r in results if r.close_ms + HORIZON * H4 in close_at]
+    fwd = [
+        math.log(close_at[c + HORIZON * H4] / v)
+        for c, v in close_at.items()
+        if c + HORIZON * H4 in close_at
+    ]
+    events = [r for r in usable if r.is_event]
+    ev = _pooled_thin([("BTCUSDT", r) for r in events])
+    co = _pooled_thin([("BTCUSDT", r) for r in usable if not r.is_event])
+    sd = pstdev(fwd)
+    n1, n2 = len(ev), len(co)
+    mde = 2.84 * sd * math.sqrt(1 / n1 + 1 / n2) if n1 and n2 else math.inf
+
+    def year(ms: int) -> str:
+        return datetime.fromtimestamp(ms / 1000, UTC).strftime("%Y")
+
+    cut = 1_577_836_800_000  # 2020-01-01 — 34 와 겹치는 구간과 새 구간을 나눠 보고만 한다
+    return {
+        "period_utc": f"{four[0].open_ms}/{four[-1].close_ms}",
+        "four_hour_bars": len(four),
+        "hour_bars": len(hours),
+        "chunks": len(_chunks(four)),
+        "blocked_four_hours": blocked,
+        "triggers": len(results),
+        "events": len(events),
+        "controls": len(usable) - len(events),
+        "top_pattern_mix": dict(
+            sorted(Counter("|".join(r.top_patterns) or "NONE" for r in results).items())
+        ),
+        "events_by_year": dict(sorted(Counter(year(r.close_ms) for r in events).items())),
+        "events_by_direction": dict(sorted(Counter(str(r.direction) for r in events).items())),
+        "n1_events_independent": n1,
+        "n2_controls_independent": n2,
+        "n1_before_2020": sum(1 for _, r in ev if r.close_ms < cut),
+        "sd_forward_30bar_log_return": round(sd, 5),
+        "mde": round(mde, 5),
+        "gate_mde_le_2pct": mde <= MDE_GATE,
+        "note": "문서 93 A. 사건 뒤 수익률은 계산하지 않았다.",
+    }
+
+
 def main(argv: list[str]) -> int:
-    modes = {"synthetic": synthetic, "power": power, "power-pooled": power_pooled}
+    modes = {
+        "synthetic": synthetic,
+        "power": power,
+        "power-pooled": power_pooled,
+        "power-spot": power_spot,
+    }
     if not argv or argv[0] not in modes:
-        raise SystemExit("usage: audit_ew_edge_power.py synthetic|power|power-pooled")
+        raise SystemExit("usage: audit_ew_edge_power.py synthetic|power|power-pooled|power-spot")
     result = modes[argv[0]]()
     sys.stdout.write(json.dumps(result, ensure_ascii=True, sort_keys=True) + "\n")
     return 0
