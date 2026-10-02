@@ -83,3 +83,10 @@ Register-ScheduledTask -TaskName "AutoTrading_Testnet_Overlay" -Action (New-Sche
 - 테스트넷 가격·체결·호가는 실계좌와 다르다. 이 훈련은 **주문·스톱의 상태 전이**를 검증한다. 체결 비용 검증이 아니다.
 - 스톱이 −20% 에 실제로 닿는 일은 7일 안에 드물다. 발동 경로는 26 의 발동 훈련(스톱을 가깝게 거는 선택형)으로 따로 확인했고, 다리·closePosition 동시 발동은 아직 실거래소에서 보지 못했다.
 - 관찰을 끝낼 때는 `--flatten` 으로 포지션·스톱을 정리한다.
+
+## 종료 (2026-10-02)
+
+- 9/26~10/02 7일 실행 끝. 사용자가 `AutoTrading_Testnet_Overlay` 작업을 끔(Disabled 확인) → 22:36 KST `--flatten` **2/2 통과**:
+  SOLUSDT 0.24 → 0 (CLOSE SELL FILLED), BNBUSDT 0, 남은 스톱 0, 복구 RUNNING. 기록 `reports/testnet/overlay-flatten-20261002T133637Z.json`. 테스트넷 지갑 4,999.93 USDT.
+- 매일 훈련(문서 26, ETH)은 그대로 10/08 까지 돈다.
+

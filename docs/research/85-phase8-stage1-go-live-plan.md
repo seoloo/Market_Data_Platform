@@ -157,7 +157,7 @@ Set-Content -Path "C:\Users\seolh\Documents\GitHub\Auto_Trading\data\HALT" -Valu
 |---|---|---|---|
 | G1 | Phase 7 테스트넷 14일 | 8/14일 기록. 실패 1일(10/01) — 원인 external 기록(`26-phase7-causes.json`, 26 §6): 놓친 작업 동시 시작으로 오버레이 훈련 주문과 겹침. P2·P3 PASS, P4 는 10/02 시작 상태 RUNNING·이슈 0 으로 흔적 없음 확인 | 10/08 21:30 뒤 `review_phase7 --until 2026-10-08` |
 | G2 | T/v2 Paper P1~P6 · 그림자 S1~S5 · 데모 K1 | 진행 중. 10/01 점검 CRITICAL 1회 — 원인 기록(65 §10, 동시 시작) | 10/24 21:30 뒤 `review_phase6 --until 2026-10-23` |
-| G3 | V4 선물 실행기 훈련 정리 | 9/26~10/02 7일 실행 끝 | **사용자가 `AutoTrading_Testnet_Overlay` 작업을 끈 뒤** `testnet_overlay_drill.py --flatten` (끄지 않으면 다음 날 20:45 에 다시 포지션을 연다) |
+| G3 | V4 선물 실행기 훈련 정리 | **완료 (10/02 22:36)** — 작업 끔(사용자) · `--flatten` 2/2 통과, 평탄·스톱 0 (54 종료) | — |
 | G4 | PC 상시 실행 | 13개 작업 S4U(로그인 없이)·놓치면 켤 때 실행·깨워서 실행. **새 사실:** 놓친 작업이 한꺼번에 돌면 순서가 깨진다(10/01) → 대시보드 "놓친 작업 다시 실행"(순서대로 하나씩) | PC 를 못 켠 날은 버튼 |
 | G5 | 사용자 명시 승인 + 금액 | — | 10/24 이후 채팅 |
 
