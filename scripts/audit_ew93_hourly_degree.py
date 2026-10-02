@@ -30,7 +30,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from statistics import pstdev
+from statistics import NormalDist, pstdev
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -208,7 +208,10 @@ def _stretched_minutes() -> Iterator[Candle]:
             yield replace(m, open_ms=base + j * M1, close_ms=base + (j + 1) * M1 - 1)
 
 
-def power() -> dict[str, object]:
+def _collect() -> tuple[
+    list[TriggerResult], list[TriggerResult], list[TriggerResult], dict[int, float], dict[str, int]
+]:
+    """(전체 결과, 독립 사건, 독립 대조, 4h 마감 → 종가, 자료 통계). 수익률은 계산하지 않는다."""
     real_hours = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.H1.ms)
     real_quarters = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.M15.ms)
     # 거래량 0 인 1h(거래소 점검 채움 봉 4 개)는 자료 공백 — 그 자리에서 끊는다 (93 §8)
@@ -226,33 +229,42 @@ def power() -> dict[str, object]:
         results.extend(evaluate_triggers(causal_triggers(replay, chunk_hours, chunk), chunk_hours))
     close_at = {bar.close_ms: float(bar.close) for bar in four}
     usable = [r for r in results if r.close_ms + HORIZON * H4 in close_at]
+    ev = [r for _, r in _pooled_thin([("BTCUSDT", r) for r in usable if r.is_event])]
+    co = [r for _, r in _pooled_thin([("BTCUSDT", r) for r in usable if not r.is_event])]
+    stats = {
+        "real_hour_bars": len(four),
+        "zero_volume_hours_dropped": sum(1 for h in real_hours if h.volume == 0),
+        "chunks": len(_chunks(four)),
+        "blocked_hours": blocked,
+        "usable": len(usable),
+    }
+    return results, ev, co, close_at, stats
+
+
+def _year(fake_ms: int) -> str:
+    return datetime.fromtimestamp(fake_ms / SCALE / 1000, UTC).strftime("%Y")
+
+
+def power() -> dict[str, object]:
+    results, ev, co, close_at, stats = _collect()
     fwd = [
         math.log(close_at[c + HORIZON * H4] / v)
         for c, v in close_at.items()
         if c + HORIZON * H4 in close_at
     ]
-    events = [r for r in usable if r.is_event]
-    ev = _pooled_thin([("BTCUSDT", r) for r in events])
-    co = _pooled_thin([("BTCUSDT", r) for r in usable if not r.is_event])
+    events = [r for r in results if r.is_event and r.close_ms + HORIZON * H4 in close_at]
     sd = pstdev(fwd)
     n1, n2 = len(ev), len(co)
     mde = 2.84 * sd * math.sqrt(1 / n1 + 1 / n2) if n1 and n2 else math.inf
-
-    def year(fake_ms: int) -> str:
-        return datetime.fromtimestamp(fake_ms / SCALE / 1000, UTC).strftime("%Y")
-
     return {
-        "real_hour_bars": len(four),
-        "zero_volume_hours_dropped": sum(1 for h in real_hours if h.volume == 0),
-        "chunks": len(_chunks(four)),
-        "blocked_hours": blocked,
+        **{k: v for k, v in stats.items() if k != "usable"},
         "triggers": len(results),
         "events": len(events),
-        "controls": len(usable) - len(events),
+        "controls": stats["usable"] - len(events),
         "top_pattern_mix": dict(
             sorted(Counter("|".join(r.top_patterns) or "NONE" for r in results).items())
         ),
-        "events_by_year": dict(sorted(Counter(year(r.close_ms) for r in events).items())),
+        "events_by_year": dict(sorted(Counter(_year(r.close_ms) for r in events).items())),
         "events_by_direction": dict(sorted(Counter(str(r.direction) for r in events).items())),
         "n1_events_independent": n1,
         "n2_controls_independent": n2,
@@ -263,15 +275,95 @@ def power() -> dict[str, object]:
     }
 
 
+VERDICT = REPO_ROOT / "reports" / "research" / "elliott" / "93" / "verdict_b.json"
+EXPECTED_N = (407, 2224)
+"""관문 계산(``power``, 2026-10-03)의 독립 사건·대조 수 — 판정 때 그대로 나와야 한다."""
+COST = 0.0019
+"""판정표 "차이 > 비용": 무기한 왕복 (편도 0.095% × 2). 참고 줄 현물 왕복 0.30%."""
+
+
+def _welch(r1: Sequence[float], r2: Sequence[float]) -> dict[str, object]:
+    def mean_var(xs: Sequence[float]) -> tuple[float, float]:
+        m = sum(xs) / len(xs)
+        return m, sum((x - m) ** 2 for x in xs) / (len(xs) - 1)
+
+    m1, v1 = mean_var(r1)
+    m2, v2 = mean_var(r2)
+    se = math.sqrt(v1 / len(r1) + v2 / len(r2))
+    t_stat = (m1 - m2) / se
+    df = (v1 / len(r1) + v2 / len(r2)) ** 2 / (
+        (v1 / len(r1)) ** 2 / (len(r1) - 1) + (v2 / len(r2)) ** 2 / (len(r2) - 1)
+    )
+    return {
+        "n1": len(r1),
+        "n2": len(r2),
+        "mean_event": round(m1, 6),
+        "mean_control": round(m2, 6),
+        "diff": round(m1 - m2, 6),
+        "welch_t": round(t_stat, 3),
+        "welch_df": round(df, 1),
+        "p_one_sided_normal_approx": round(1 - NormalDist().cdf(t_stat), 5),
+    }
+
+
+def verdict() -> dict[str, object]:
+    """문서 93 B §3 — 사용자 승인 뒤 **한 번만**. 판정 파일이 있으면 거부한다."""
+    if VERDICT.exists():
+        raise SystemExit(f"이미 판정했다: {VERDICT} — 같은 자료로 다시 판정하지 않는다")
+    _, ev, co, close_at, _ = _collect()
+    if (len(ev), len(co)) != EXPECTED_N:
+        raise SystemExit(f"사건·대조 수가 관문 계산과 다르다: {(len(ev), len(co))} != {EXPECTED_N}")
+
+    def outcome(r: TriggerResult, bars: int) -> float | None:
+        later = close_at.get(r.close_ms + bars * H4)
+        return None if later is None else -r.direction * math.log(later / close_at[r.close_ms])
+
+    def values(samples: Sequence[TriggerResult], bars: int) -> list[float]:
+        return [v for v in (outcome(r, bars) for r in samples) if v is not None]
+
+    main = _welch(values(ev, HORIZON), values(co, HORIZON))
+    diff = float(str(main["diff"]))
+    p = float(str(main["p_one_sided_normal_approx"]))
+
+    def by(samples: Sequence[TriggerResult], key: str) -> dict[str, list[float]]:
+        groups: dict[str, list[float]] = {}
+        for r in samples:
+            v = outcome(r, HORIZON)
+            if v is None:
+                continue
+            label = _year(r.close_ms) if key == "year" else str(r.direction)
+            groups.setdefault(label, []).append(v)
+        return {k: [len(g), round(sum(g) / len(g), 6)] for k, g in sorted(groups.items())}
+
+    record: dict[str, object] = {
+        "main_30h": main,
+        "significant_0_05": p < 0.05,
+        "diff_exceeds_cost_0_19pct": diff > COST,
+        "diff_exceeds_spot_cost_0_30pct_reference": diff > 0.003,
+        "secondary_descriptive": {
+            "horizon_6h": _welch(values(ev, 6), values(co, 6)),
+            "horizon_60h": _welch(values(ev, 60), values(co, 60)),
+            "event_by_year": by(ev, "year"),
+            "control_by_year": by(co, "year"),
+            "event_by_direction": by(ev, "direction"),
+            "control_by_direction": by(co, "direction"),
+        },
+        "note": "문서 93 B 1회 판정. p 는 정규 근사(자유도 큼). 보조는 기술 통계(판정 아님).",
+    }
+    VERDICT.parent.mkdir(parents=True, exist_ok=True)
+    VERDICT.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return record
+
+
 def diagnose() -> dict[str, object]:
     """b 실패 원인 나누기 — 진폭 절반만 · 거칠게만. 판정에 쓰지 않는다."""
     return {v: _synthetic_cell(v, keep_bars=False) for v in ("half_only", "coarse_only")}
 
 
 def main(argv: list[str]) -> int:
-    modes = {"synthetic": synthetic, "power": power, "diagnose": diagnose}
+    modes = {"synthetic": synthetic, "power": power, "diagnose": diagnose, "verdict": verdict}
     if not argv or argv[0] not in modes:
-        raise SystemExit("usage: audit_ew93_hourly_degree.py synthetic|power|diagnose")
+        raise SystemExit("usage: audit_ew93_hourly_degree.py synthetic|power|diagnose|verdict")
     sys.stdout.write(json.dumps(modes[argv[0]](), ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
