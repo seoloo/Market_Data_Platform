@@ -101,12 +101,24 @@ def _save(state: State) -> None:
 
 
 def _maybe_order(
-    broker: KisReservationBuyer, plan: Plan, state: State, advice: Advice, enabled: bool
+    broker: KisReservationBuyer,
+    plan: Plan,
+    state: State,
+    advice: Advice,
+    enabled: bool,
+    *,
+    retry_confirmed_etp_rejection: bool = False,
 ) -> str | None:
     """살 차례면 예약 매수 1 주. 텔레그램 줄을 돌려준다(자동 매수가 꺼져 있으면 None → 앱 안내)."""
     if advice.status != "BUY":
         return None
-    ok, reason = should_order(state, advice, trading_enabled=enabled, halted=halted_reason(HALT))
+    ok, reason = should_order(
+        state,
+        advice,
+        trading_enabled=enabled,
+        halted=halted_reason(HALT),
+        retry_confirmed_etp_rejection=retry_confirmed_etp_rejection,
+    )
     if not ok:
         return None if not enabled else f"⏸ 자동 매수 안 함 — {reason}"
     limit = Decimal(f"{advice.limit_usd:.2f}")
@@ -147,6 +159,8 @@ def _one(
     balance: OverseasBalance,
     now: datetime,
     enabled: bool,
+    *,
+    retry_confirmed_etp_rejection: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     today = now.strftime("%Y-%m-%d")
     detail = broker.quote_detail(plan.symbol, plan.quote_exchange)
@@ -168,7 +182,14 @@ def _one(
     notes = reconcile(state, plan, today, qty, avg, fx)
     notes += resolve_orders(state, today, bought_now=len(state.buys) > before)
     advice = advise(state, plan, today, last, fx, weekday=now.weekday())
-    order_line = _maybe_order(broker, plan, state, advice, enabled)
+    order_line = _maybe_order(
+        broker,
+        plan,
+        state,
+        advice,
+        enabled,
+        retry_confirmed_etp_rejection=retry_confirmed_etp_rejection,
+    )
     _save(state)
     text = message(advice, notes, order_line=order_line)
     report = {
@@ -179,7 +200,7 @@ def _one(
         "advice": advice.to_dict(),
         "notes": notes,
         "auto_buy": enabled,
-        "order": next((asdict(o) for o in state.orders if o.date == today), None),
+        "order": next((asdict(o) for o in reversed(state.orders) if o.date == today), None),
         "holding_qty": qty,
         "start_date": state.start_date,
         "message": text,
@@ -275,6 +296,65 @@ def run(telegram: bool, *, attempts: int = ATTEMPTS, wait_s: float = RETRY_WAIT_
     return 1 if failed else 0
 
 
+def retry_qndx_etp(today: str, *, telegram: bool) -> int:
+    """명시적으로 지정한 오늘에만 확정된 해외 ETP 거절을 QNDX 1주로 한 번 재시도한다."""
+    now = _kst_now()
+    if today != now.strftime("%Y-%m-%d"):
+        print("날짜가 현재 KST 날짜와 다르다 — 주문하지 않는다")
+        return 2
+    path = _state_path("QNDX")
+    if not path.exists():
+        print("QNDX 상태가 없다 — 주문하지 않는다")
+        return 2
+    state = State.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    prior = [o for o in state.orders if o.date == today]
+    if not (len(prior) == 1 and prior[0].status == "REJECTED" and prior[0].code == "APBK1672"):
+        print("오늘의 해외 ETP 미신청 확정 거절 1건이 아니다 — 주문하지 않는다")
+        return 2
+    if any(o.status in {"SENT", "UNKNOWN"} for o in state.orders):
+        print("미확인 주문이 있다 — 주문하지 않는다")
+        return 2
+    if halted_reason(HALT) is not None:
+        print("긴급 정지 상태 — 주문하지 않는다")
+        return 2
+    try:
+        creds = load_kis_credentials(REPO / ".env")
+        if not creds.trading_enabled:
+            print("KIS 자동 매수 스위치가 꺼져 있다 — 주문하지 않는다")
+            return 2
+        plan = next(p for p in PLANS if p.symbol == "QNDX")
+        broker = KisReservationBuyer(
+            creds,
+            KisTokenCache(REPO / "data" / "kis_token.json"),
+            allowed_symbols=frozenset({"QNDX"}),
+            max_limit_usd=Decimal(str(plan.max_limit_usd)),
+        )
+        try:
+            balance = broker.overseas_balance()
+            text, report = _one(
+                broker,
+                plan,
+                balance,
+                now,
+                True,
+                retry_confirmed_etp_rejection=True,
+            )
+        finally:
+            broker.close()
+    except AutoTradingError as exc:
+        print(f"조회 실패 — 주문 재시도 중단: {exc}")
+        return 1
+    folder = REPORTS / "QNDX"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{today}.json").write_text(
+        json.dumps(report | {"manual_etp_retry": True}, ensure_ascii=False, indent=1) + "\n",
+        "utf-8",
+    )
+    _notify(text, telegram)
+    print(text)
+    return 0 if report["order"] and report["order"]["status"] == "SENT" else 1
+
+
 def status() -> int:
     _migrate()
     for plan in PLANS:
@@ -297,9 +377,16 @@ def status() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "status"))
+    parser.add_argument("command", choices=("run", "status", "retry-qndx-etp"))
     parser.add_argument("--no-telegram", action="store_true")
+    parser.add_argument("--date", help="retry-qndx-etp 전용: 현재 KST 날짜 (YYYY-MM-DD)")
     args = parser.parse_args()
+    if args.command == "retry-qndx-etp":
+        if not args.date:
+            parser.error("retry-qndx-etp 에는 --date 가 필요하다")
+        return retry_qndx_etp(args.date, telegram=not args.no_telegram)
+    if args.date:
+        parser.error("--date 는 retry-qndx-etp 전용이다")
     return run(not args.no_telegram) if args.command == "run" else status()
 
 

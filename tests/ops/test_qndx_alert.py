@@ -127,6 +127,36 @@ def test_should_order_gates() -> None:
     assert should_order(s, a, trading_enabled=True, halted=None)[1] == "오늘은 이미 주문했다"
 
 
+def test_only_confirmed_qndx_etp_rejection_can_retry_once() -> None:
+    s = _state()
+    a = _buy_advice(s)
+    s.orders.append(Order(a.today, 25.75, "REJECTED", "APBK1672"))
+    assert should_order(s, a, trading_enabled=True, halted=None)[0] is False
+    assert should_order(
+        s, a, trading_enabled=True, halted=None, retry_confirmed_etp_rejection=True
+    )[0]
+    s.orders.append(Order(a.today, 25.75, "UNKNOWN"))
+    assert not should_order(
+        s, a, trading_enabled=True, halted=None, retry_confirmed_etp_rejection=True
+    )[0]
+    s.orders.pop()
+    s.orders[0].code = "OTHER"
+    assert not should_order(
+        s, a, trading_enabled=True, halted=None, retry_confirmed_etp_rejection=True
+    )[0]
+    s.orders[0].code = "APBK1672"
+    assert not should_order(
+        s, a, trading_enabled=False, halted=None, retry_confirmed_etp_rejection=True
+    )[0]
+    assert not should_order(
+        s, a, trading_enabled=True, halted="stop", retry_confirmed_etp_rejection=True
+    )[0]
+    s.symbol = "BTQ"
+    assert not should_order(
+        s, a, trading_enabled=True, halted=None, retry_confirmed_etp_rejection=True
+    )[0]
+
+
 def test_resolve_orders_fill_or_expire() -> None:
     s = _state()
     s.orders.append(Order("2026-09-29", 25.75, "SENT"))
@@ -178,6 +208,20 @@ def test_script_order_is_written_before_sending(
     assert saved["orders"][-1]["date"] == "2026-09-29"  # 보내기 전에 기록됨
     again = mod._maybe_order(broker, QNDX, s, _buy_advice(s), True)  # 같은 날 두 번째 실행
     assert broker.sent == 1 and "이미 주문" in again
+
+
+def test_script_etp_retry_sends_once_then_blocks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    mod = _script(monkeypatch, tmp_path)
+    s, broker = _state(), _FakeBroker()
+    s.orders.append(Order("2026-09-29", 25.75, "REJECTED", "APBK1672"))
+    a = _buy_advice(s)
+    line = mod._maybe_order(broker, QNDX, s, a, True, retry_confirmed_etp_rejection=True)
+    assert line is not None and "접수" in line and broker.sent == 1
+    assert [o.status for o in s.orders] == ["REJECTED", "SENT"]
+    second = mod._maybe_order(broker, QNDX, s, a, True, retry_confirmed_etp_rejection=True)
+    assert second is not None and "이미 주문" in second and broker.sent == 1
 
 
 def test_script_skips_without_money_disabled_halt_or_over_limit(

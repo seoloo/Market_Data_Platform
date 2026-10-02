@@ -199,7 +199,12 @@ def resolve_orders(state: State, today: str, bought_now: bool) -> list[str]:
 
 
 def should_order(
-    state: State, advice: Advice, *, trading_enabled: bool, halted: str | None
+    state: State,
+    advice: Advice,
+    *,
+    trading_enabled: bool,
+    halted: str | None,
+    retry_confirmed_etp_rejection: bool = False,
 ) -> tuple[bool, str]:
     """(오늘 자동 예약 매수를 낼까, 이유). 하루 1 건, 열린 주문이 있으면 내지 않는다."""
     if advice.status != "BUY":
@@ -210,7 +215,15 @@ def should_order(
         return False, f"긴급 정지 켜짐 (data/HALT: {halted})"
     if advice.weekend:
         return False, "주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 자동으로 산다"
-    if any(o.date == advice.today for o in state.orders):
+    today_orders = [o for o in state.orders if o.date == advice.today]
+    retry_allowed = (
+        retry_confirmed_etp_rejection
+        and state.symbol == "QNDX"
+        and len(today_orders) == 1
+        and today_orders[0].status == "REJECTED"
+        and today_orders[0].code == "APBK1672"
+    )
+    if today_orders and not retry_allowed:
         return False, "오늘은 이미 주문했다"
     if any(o.status in OPEN_ORDER for o in state.orders):
         return False, "확인되지 않은 주문이 있다 — 다음 날 잔고로 확인한 뒤"
