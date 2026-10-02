@@ -211,7 +211,8 @@ def _stretched_minutes() -> Iterator[Candle]:
 def power() -> dict[str, object]:
     real_hours = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.H1.ms)
     real_quarters = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.M15.ms)
-    four = tuple(_stretch(iter(real_hours)))
+    # 거래량 0 인 1h(거래소 점검 채움 봉 4 개)는 자료 공백 — 그 자리에서 끊는다 (93 §8)
+    four = tuple(_stretch(h for h in real_hours if h.volume > 0))
     hours = tuple(_stretch(iter(real_quarters)))
     results: list[TriggerResult] = []
     blocked = 0
@@ -242,6 +243,7 @@ def power() -> dict[str, object]:
 
     return {
         "real_hour_bars": len(four),
+        "zero_volume_hours_dropped": sum(1 for h in real_hours if h.volume == 0),
         "chunks": len(_chunks(four)),
         "blocked_hours": blocked,
         "triggers": len(results),
