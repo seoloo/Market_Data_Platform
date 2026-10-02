@@ -50,6 +50,7 @@ from scripts.audit_ew_edge_power import (  # noqa: E402
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.core.types import Candle  # noqa: E402
+from auto_trading.research.elliott import synthetic as synthetic_module  # noqa: E402
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
 from auto_trading.research.elliott.scanner import (  # noqa: E402
@@ -60,6 +61,8 @@ from auto_trading.research.elliott.scanner import (  # noqa: E402
 from auto_trading.research.elliott.synthetic import build_path  # noqa: E402
 
 DEV_SEED = 20260924
+CONFIRM_SEED = 20260925
+"""41 §2 의 확인 seed (정답 구간 채점용). 20260927 은 JEV 예약이라 쓰지 않는다."""
 SCALE = 4
 """시간 배율 — 실제 1h 를 판독기의 4h 로."""
 THRESHOLD_B = EW0_THRESHOLD_PCT / 2
@@ -91,13 +94,40 @@ def coarsen(minutes: Sequence[Candle], k: int = SCALE) -> list[Candle]:
 # ---------------------------------------------------------------- 합성
 
 
-def _synthetic_cell(variant: str) -> dict[str, object]:
-    """``a``: 34 §8 그대로 (재현 확인) · ``b``: 진폭·임계 절반 + 1m 경로 4 분 단위로 거칠게."""
-    rng = random.Random(DEV_SEED)
+_VARIANTS = {
+    "a": (False, False),
+    "b": (True, True),
+    "half_only": (True, False),
+    "coarse_only": (False, True),
+}
+"""(진폭·임계 절반, 1m 경로 거칠게). half_only·coarse_only 는 b 실패 원인 진단용(판정 아님)."""
+
+
+def _synthetic_cell(
+    variant: str, seed: int = DEV_SEED, keep_bars: bool = True
+) -> dict[str, object]:
+    """``a``: 34 §8 그대로 (재현 확인) · ``b``: 진폭·임계 절반 + 1m 경로 4 분 단위로 거칠게.
+
+    ``keep_bars``: 진폭을 줄일 때 생성기 속도(``SPEED_PER_MINUTE``)도 같이 줄여 파동 길이(봉 수)를
+    그대로 둔다. 실제 1h 파동을 4 배 늘려 넣으면 4h 파동과 같은 봉 수에 진폭만 절반이라서다.
+    False 는 2026-10-02 첫 실행(잘못된 설정: 진폭과 함께 길이도 절반)을 재현할 때만 쓴다.
+    """
+    half, coarse = _VARIANTS[variant]
+    original_speed = synthetic_module.SPEED_PER_MINUTE
+    if half and keep_bars:
+        synthetic_module.SPEED_PER_MINUTE = original_speed / 2
+    try:
+        return _synthetic_counts(half, coarse, seed)
+    finally:
+        synthetic_module.SPEED_PER_MINUTE = original_speed
+
+
+def _synthetic_counts(half: bool, coarse: bool, seed: int) -> dict[str, object]:
+    rng = random.Random(seed)
     out: Counter[str] = Counter()
-    threshold = EW0_THRESHOLD_PCT if variant == "a" else THRESHOLD_B
+    threshold = THRESHOLD_B if half else EW0_THRESHOLD_PCT
     for _degree, (scale, parent_threshold) in DEGREES.items():
-        if variant == "b":
+        if half:
             scale, parent_threshold = scale / 2, parent_threshold / 2
         for pattern in ("IMPULSE", "ZIGZAG"):
             for noise, count in CELLS:
@@ -105,7 +135,7 @@ def _synthetic_cell(variant: str) -> dict[str, object]:
                     path = build_path(rng, pattern, scale, parent_threshold, noise)
                     if noise == 0.0:
                         continue
-                    minutes = path.minutes if variant == "a" else coarsen(path.minutes)
+                    minutes = coarsen(path.minutes) if coarse else path.minutes
                     four = path.four_hour
                     hours = hour_bars(minutes)
                     groups = (minutes[240 * i : 240 * (i + 1)] for i in range(len(four)))
@@ -147,10 +177,16 @@ def _synthetic_cell(variant: str) -> dict[str, object]:
 
 
 def synthetic() -> dict[str, object]:
+    """문서 93 B §3 (정정판): b 를 개발 seed 와 확인 seed 에서 — **둘 다** 통과해야 시장 단계."""
+    dev = _synthetic_cell("b", DEV_SEED)
+    confirm = _synthetic_cell("b", CONFIRM_SEED)
     return {
         "a_reference_doc34": _synthetic_cell("a"),
-        "b_hourly_degree": _synthetic_cell("b"),
-        "note": "문서 93 B §3 합성 점검. b 의 check_pass 가 시장 단계의 선행 조건.",
+        "b_first_run_wrong_lengths": _synthetic_cell("b", DEV_SEED, keep_bars=False),
+        "b_dev_seed": dev,
+        "b_confirm_seed": confirm,
+        "check_pass": bool(dev["check_pass"]) and bool(confirm["check_pass"]),
+        "note": "문서 93 B §3 정정판. check_pass(두 seed 모두)가 시장 단계의 선행 조건.",
     }
 
 
@@ -225,10 +261,15 @@ def power() -> dict[str, object]:
     }
 
 
+def diagnose() -> dict[str, object]:
+    """b 실패 원인 나누기 — 진폭 절반만 · 거칠게만. 판정에 쓰지 않는다."""
+    return {v: _synthetic_cell(v, keep_bars=False) for v in ("half_only", "coarse_only")}
+
+
 def main(argv: list[str]) -> int:
-    modes = {"synthetic": synthetic, "power": power}
+    modes = {"synthetic": synthetic, "power": power, "diagnose": diagnose}
     if not argv or argv[0] not in modes:
-        raise SystemExit("usage: audit_ew93_hourly_degree.py synthetic|power")
+        raise SystemExit("usage: audit_ew93_hourly_degree.py synthetic|power|diagnose")
     sys.stdout.write(json.dumps(modes[argv[0]](), ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
