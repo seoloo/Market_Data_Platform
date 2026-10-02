@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import bisect
 import json
 import math
 import random
@@ -29,6 +30,7 @@ from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from statistics import NormalDist, pstdev
 
@@ -50,6 +52,7 @@ from scripts.audit_ew_edge_power import (  # noqa: E402
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.core.types import Candle  # noqa: E402
+from auto_trading.features.tsmom import trend_direction  # noqa: E402
 from auto_trading.research.elliott import synthetic as synthetic_module  # noqa: E402
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
 from auto_trading.research.elliott.pivots import EW0_THRESHOLD_PCT  # noqa: E402
@@ -282,6 +285,28 @@ COST = 0.0019
 """판정표 "차이 > 비용": 무기한 왕복 (편도 0.095% × 2). 참고 줄 현물 왕복 0.30%."""
 
 
+LOOKBACKS = (20, 60, 120)
+"""B2 의 일봉 추세 — T/v2 와 같은 20·60·120 일 수익률 부호 평균."""
+ALPHA_B2 = 0.025
+MDE_GATE_B2 = 0.01
+
+
+def _real_close(fake_close_ms: int) -> int:
+    return (fake_close_ms + 1) // SCALE - 1
+
+
+def _trend_lookup() -> tuple[list[int], list[Decimal]]:
+    days = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.D1.ms)
+    return [d.close_ms for d in days], [d.close for d in days]
+
+
+def _trend_at(lookup: tuple[list[int], list[Decimal]], real_ms: int) -> Decimal | None:
+    """``real_ms`` 전에 마감된 일봉만으로 본 추세 (인과적)."""
+    close_ms, closes = lookup
+    k = bisect.bisect_left(close_ms, real_ms)
+    return trend_direction(closes[:k], LOOKBACKS)
+
+
 def _welch(r1: Sequence[float], r2: Sequence[float]) -> dict[str, object]:
     def mean_var(xs: Sequence[float]) -> tuple[float, float]:
         m = sum(xs) / len(xs)
@@ -335,8 +360,39 @@ def verdict() -> dict[str, object]:
             groups.setdefault(label, []).append(v)
         return {k: [len(g), round(sum(g) / len(g), 6)] for k, g in sorted(groups.items())}
 
+    # B2 (93 §10): 되돌림(−d)이 일봉 추세와 같은 표본만. 수·MDE 먼저, 관문 통과 때만 수익률
+    lookup = _trend_lookup()
+
+    def aligned(r: TriggerResult) -> bool:
+        trend = _trend_at(lookup, _real_close(r.close_ms))
+        return trend is not None and -r.direction * trend > 0
+
+    ev_w = [r for r in ev if aligned(r)]
+    co_w = [r for r in co if aligned(r)]
+    fwd = [
+        math.log(close_at[c + HORIZON * H4] / v)
+        for c, v in close_at.items()
+        if c + HORIZON * H4 in close_at
+    ]
+    sd = pstdev(fwd)
+    mde_w = 2.84 * sd * math.sqrt(1 / len(ev_w) + 1 / len(co_w)) if ev_w and co_w else math.inf
+    b2: dict[str, object] = {
+        "n1_aligned": len(ev_w),
+        "n2_aligned": len(co_w),
+        "mde": round(mde_w, 5),
+        "gate_mde_le_1pct": mde_w <= MDE_GATE_B2,
+    }
+    if mde_w <= MDE_GATE_B2:
+        test_w = _welch(values(ev_w, HORIZON), values(co_w, HORIZON))
+        b2["test"] = test_w
+        b2["significant_0_025"] = float(str(test_w["p_one_sided_normal_approx"])) < ALPHA_B2
+        b2["diff_exceeds_cost_0_19pct"] = float(str(test_w["diff"])) > COST
+    else:
+        b2["result"] = "관문 미달 — 판정 불가, 수익률 미계산"
+
     record: dict[str, object] = {
         "main_30h": main,
+        "b2_aligned_with_daily_trend": b2,
         "significant_0_05": p < 0.05,
         "diff_exceeds_cost_0_19pct": diff > COST,
         "diff_exceeds_spot_cost_0_30pct_reference": diff > 0.003,
