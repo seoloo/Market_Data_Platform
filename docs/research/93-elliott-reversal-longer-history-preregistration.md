@@ -134,3 +134,26 @@ seed 20260927 은 JEV 비교용 예약이라 쓰지 않는다(41 §2).
 4. 판독기 확장: leading diagonal · double zigzag/combination — 지금 판독기가 이것들을 다른 모양(대조)으로 읽고 있을 수 있다.
 
 출처: [IC Markets — Elliott wave theory](https://www.icmarkets.com/blog/elliot-wave-theory/) · [LuxAlgo — Fib wave relationships](https://www.luxalgo.com/library/concept/fib-wave-relationships.md) · [LuxAlgo — Diagonals](https://www.luxalgo.com/library/concept/diagonals/) · [Batchelor & Ramyar, Magic numbers in the Dow](https://openaccess.city.ac.uk/16276/) · [Analysis of Elliott wave theory on time-series data from forex (Nazarbayev Univ.)](https://nur.nu.edu.kz/handle/123456789/7226) · [Wave degree timing (TradingView)](https://www.tradingview.com/script/ZDYEwyLR-zSph-x-Larry-Waves-Wave-Degree-Timing/)
+
+## 7. 결과 A — 관문 근소 미달 → 수익률 미열람 (2026-10-02)
+
+코드 `dbda86d` (`audit_ew_edge_power.py power-spot`), 기록 `reports/research/elliott/93/power_a.json`(Git 제외).
+자료: 현물 BTCUSDT 1m 109 개월, SHA-256 전부 일치. **사건 뒤 수익률은 계산하지도 열지도 않았다.**
+
+| 항목 | 값 |
+|---|---:|
+| 4h 봉 (2017-08-17 ~ 2026-08-31) · 1m 공백으로 끊긴 구간 | 19,794 · 10 |
+| 품질 차단 4h (1m 240 개 미만) | 783 |
+| 발동 · 1순위 IMPULSE(사건) / ZIGZAG / 후보 없음 | 5,095 · 293 / 1,662 / 3,140 |
+| 사건 연도별 | 2018 54 · 2019 21 · 2020 15 · 2021 22 · 2022 35 · 2023 20 · 2024 68 · 2025 39 · 2026 19 |
+| 사건 방향 (상승 끝 / 하락 끝) | 168 / 125 |
+| 독립 사건 n1 (그중 2020 년 전) / 독립 대조 n2 | **145** (30) / **557** |
+| 30 봉 선행 로그수익 SD | 7.83% |
+| MDE | **2.07%p** |
+| 관문 MDE ≤ 2.0%p | **미달** |
+
+- 확인: 2020 년 이후 사건 수 218 개 — 34(USD-M 선물) 216 개와 거의 같다. 현물로 바꾼 영향은 작다.
+- 2017-08 ~ 12 는 사건 0 (60 일 시작 창·1m 공백 때문에 첫 구간이 짧다). 2018 의 큰 하락장에서 사건 54 개.
+- **판정 (§2·34 §7 그대로): 판정 불가.** 사전 추정(1.94~2.11%p) 안에서 위쪽으로 나왔다. 기준을 0.07%p 넘었지만 바꾸지 않는다.
+  2017~2019 의 높은 변동성(SD 9.94%)이 늘어난 표본만큼 SD 를 올렸다. **4h degree·5 일 되돌림 가설은 BTC 한 자산의 9 년 자료로도 가를 수 없다.**
+- 같은 자료로 이 가설을 다시 재시험하지 않는다.
