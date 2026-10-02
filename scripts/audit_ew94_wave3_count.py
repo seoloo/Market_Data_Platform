@@ -173,9 +173,10 @@ def count(degree: str, symbol: str = "BTCUSDT") -> dict[str, object]:
 
 
 def main(argv: Sequence[str]) -> int:
-    if len(argv) != 1 or argv[0] not in ("4h", "1h"):
-        raise SystemExit("usage: audit_ew94_wave3_count.py 4h|1h")
-    sys.stdout.write(json.dumps(count(argv[0]), ensure_ascii=True, sort_keys=True) + "\n")
+    if len(argv) not in (1, 2) or argv[0] not in ("4h", "1h"):
+        raise SystemExit("usage: audit_ew94_wave3_count.py 4h|1h [SYMBOL]")
+    symbol = argv[1] if len(argv) == 2 else "BTCUSDT"
+    sys.stdout.write(json.dumps(count(argv[0], symbol), ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
 
