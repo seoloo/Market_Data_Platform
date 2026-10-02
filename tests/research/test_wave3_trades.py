@@ -86,3 +86,14 @@ def test_skipped_setup_never_trades() -> None:
     skipped = Setup(0, 1, 110.0, 100.0, 142.36, 120.0, skipped=True)
     trades, counts = simulate([skipped], bars((115, 116, 109, 112)), NO_COST)
     assert trades == [] and counts.skipped == 1
+
+
+def test_cluster_merges_overlapping_trades_across_assets() -> None:
+    from auto_trading.research.elliott.wave3_trades import Trade, cluster_trades
+
+    def t(fill: int, exit_: int, r: float) -> Trade:
+        return Trade(LONG, fill, exit_, 0.0, "TIME", r, r)
+
+    # 1~5 · 4~8(겹침) · 8~9(끝과 같은 분 = 겹침, 이어짐) · 20~21(따로)
+    clusters = cluster_trades([t(20, 21, 3.0), t(4, 8, -1.0), t(1, 5, 1.0), t(8, 9, 0.5)])
+    assert [[x.r_net for x in c] for c in clusters] == [[1.0, -1.0, 0.5], [3.0]]

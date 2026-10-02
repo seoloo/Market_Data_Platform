@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
-__all__ = ["Bar", "Counts", "Rules", "Setup", "Trade", "simulate"]
+__all__ = ["Bar", "Counts", "Rules", "Setup", "Trade", "cluster_trades", "simulate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,3 +166,20 @@ def simulate(
         counts.expired += 1
     counts.setups += len(order) - k
     return trades, counts
+
+
+def cluster_trades(trades: Sequence[Trade]) -> list[list[Trade]]:
+    """보유 구간 [체결, 청산] 이 겹치는 거래를 자산과 상관없이 한 묶음으로 (문서 96 §4).
+
+    겹침이 이어지면 계속 합친다. 같은 시기 같은 시장의 거래를 독립 표본으로 세지 않기 위해서다.
+    """
+    clusters: list[list[Trade]] = []
+    end = -1
+    for t in sorted(trades, key=lambda x: (x.fill_ms, x.exit_ms)):
+        if clusters and t.fill_ms <= end:
+            clusters[-1].append(t)
+            end = max(end, t.exit_ms)
+        else:
+            clusters.append([t])
+            end = t.exit_ms
+    return clusters

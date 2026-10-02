@@ -204,8 +204,8 @@ def _stretch(bars: Iterator[Candle]) -> Iterator[Candle]:
         )
 
 
-def _stretched_minutes() -> Iterator[Candle]:
-    for m in _vision_minutes(SPOT_BTC_DIR, "BTCUSDT"):
+def _stretched_minutes(directory: Path = SPOT_BTC_DIR, symbol: str = "BTCUSDT") -> Iterator[Candle]:
+    for m in _vision_minutes(directory, symbol):
         base = m.open_ms * SCALE
         for j in range(SCALE):
             yield replace(m, open_ms=base + j * M1, close_ms=base + (j + 1) * M1 - 1)

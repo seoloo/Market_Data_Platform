@@ -60,28 +60,35 @@ REWARD_RISK = 3.236
 """목표 1.618|B−A| ÷ 위험 0.5|B−A| (진입 B − 0.5(B−A), 손절 A)."""
 
 
-def _bars(degree: str) -> tuple[tuple[Candle, ...], tuple[Candle, ...], Iterator[Candle], Decimal]:
+def _dir(symbol: str) -> Path:
+    return SPOT_BTC_DIR.parent.parent / symbol / "1m"
+
+
+def _bars(
+    degree: str, symbol: str = "BTCUSDT"
+) -> tuple[tuple[Candle, ...], tuple[Candle, ...], Iterator[Candle], Decimal]:
+    directory = _dir(symbol)
     if degree == "4h":
 
         def minutes() -> Iterator[Candle]:
-            return _vision_minutes(SPOT_BTC_DIR, "BTCUSDT")
+            return _vision_minutes(directory, symbol)
 
         four = tuple(_aggregate(minutes(), H4))
         hours = tuple(_aggregate(minutes(), Timeframe.H1.ms))
         return four, hours, minutes(), EW0_THRESHOLD_PCT
-    real_hours = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.H1.ms)
-    real_quarters = _aggregate(_vision_minutes(SPOT_BTC_DIR, "BTCUSDT"), Timeframe.M15.ms)
+    real_hours = _aggregate(_vision_minutes(directory, symbol), Timeframe.H1.ms)
+    real_quarters = _aggregate(_vision_minutes(directory, symbol), Timeframe.M15.ms)
     four = tuple(_stretch(h for h in real_hours if h.volume > 0))
     hours = tuple(_stretch(iter(real_quarters)))
-    return four, hours, _stretched_minutes(), THRESHOLD_B
+    return four, hours, _stretched_minutes(directory, symbol), THRESHOLD_B
 
 
 def _real_ms(degree: str, ms: int) -> int:
     return ms if degree == "4h" else (ms + 1) // SCALE - 1
 
 
-def count(degree: str) -> dict[str, object]:
-    four, hours, minutes, threshold = _bars(degree)
+def count(degree: str, symbol: str = "BTCUSDT") -> dict[str, object]:
+    four, hours, minutes, threshold = _bars(degree, symbol)
     close_at = {bar.close_ms: bar.close for bar in four}
     index_of = {bar.close_ms: k for k, bar in enumerate(four)}
     rows: list[dict[str, object]] = []
@@ -96,7 +103,7 @@ def count(degree: str) -> dict[str, object]:
         triggers_total += len(triggers)
         for trig, scen in zip(triggers, lists, strict=True):
             data_set, ranks = export_scenario_set(
-                trig, scen, venue="binance_spot", instrument="BTCUSDT", rule_profile="EW-3e"
+                trig, scen, venue="binance_spot", instrument=symbol, rule_profile="EW-3e"
             )
             setup = setup_from_set(to_json_dict(data_set), ranks)
             if setup is None:
@@ -119,7 +126,8 @@ def count(degree: str) -> dict[str, object]:
                 }
             )
     OUT.mkdir(parents=True, exist_ok=True)
-    with (OUT / f"setups_{degree}.jsonl").open("w", encoding="utf-8", newline="\n") as f:
+    name = f"setups_{degree}.jsonl" if symbol == "BTCUSDT" else f"setups_{degree}_{symbol}.jsonl"
+    with (OUT / name).open("w", encoding="utf-8", newline="\n") as f:
         for r in rows:
             f.write(json.dumps(r, sort_keys=True) + "\n")
     live = [r for r in rows if not r["skipped_already_past_entry"]]
@@ -141,6 +149,7 @@ def count(degree: str) -> dict[str, object]:
     n = len(thinned)
     return {
         "degree": degree,
+        "symbol": symbol,
         "triggers": triggers_total,
         "setups": len(rows),
         "skipped_already_past_entry": len(rows) - len(live),
