@@ -1,7 +1,8 @@
 """T/v2 실거래 1단계 실행기 (57) — 가짜 거래소 장애 시험.
 
 정상 체결 · 같은 날 재실행 · 대기 중 강제 종료 뒤 이어받기 · 제한 시간 지난 재시작 · 긴급 정지 ·
-전송 결과 모름(거래소에 있음/없음) · 조회 장애로 다음 날 신규 금지 · post-only 거절 뒤 추격.
+전송 결과 모름(거래소에 있음/없음) · 조회 장애로 다음 날 신규 금지 · post-only 거절 뒤 추격 ·
+계좌 낙폭 30% 정지(새 매수 금지·추세 매도는 그대로·자동 해제 없음) · 계획만(읽기만).
 """
 
 from __future__ import annotations
@@ -16,10 +17,11 @@ from auto_trading.core.errors import ExchangeError, OrderRejectedError, OrderSta
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot_demo import SpotFill
 from auto_trading.exchange.spot import OrderStatus, SpotFilters, SpotOrderResult
-from auto_trading.execution.live_t2 import LiveOptions, LiveT2Runner
+from auto_trading.execution.live_t2 import DD_STOP, LiveOptions, LiveT2Runner
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
 from auto_trading.storage.repositories.paper_days import PaperDayRepository
+from auto_trading.storage.repositories.risk_events import RiskEventRepository
 from auto_trading.storage.repositories.spot_orders import SpotOrderRepository
 
 D = 86_400_000
@@ -194,6 +196,7 @@ def make(conn, halt: Path, venue: Venue, clock: Clock, notes: list[str], sleep=N
         sleep=sleep or clock.sleep,
         halt_path=halt,
         notify=notes.append,
+        risk_events=RiskEventRepository(conn),
     )
 
 
@@ -358,3 +361,76 @@ def test_quiet_day_says_why_nothing_was_ordered(env) -> None:
     quiet = [n for n in notes if "오늘 주문 없음" in n]
     assert quiet and "BTCUSDT: 20·60·120일 추세 3/3 상승" in quiet[0]
     assert "목표 비중" in quiet[0] and "← 현재" in quiet[0]
+
+
+def test_drawdown_30_blocks_new_buys_latches_and_needs_release(env) -> None:
+    conn, halt = env
+    venue = Venue()
+    notes: list[str] = []
+    two_days(conn, halt, venue, notes)  # 고점 5,000 기록
+    venue.cash, venue.base = (
+        Decimal(3400),
+        {},
+    )  # 낙폭 32%, 현금만 → 다시 사야 할 날
+    placed = list(venue.placed)
+    clock = Clock(after(202))
+    day = make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    assert day.status == "DD_STOP" and venue.placed == placed  # 새 매수 없음
+    assert any("🚨" in n and "낙폭 32.0%" in n and "release-dd" in n for n in notes)
+    events = RiskEventRepository(conn).of_kinds("demo", (DD_STOP,))
+    assert len(events) == 1 and events[0].severity == "critical"
+
+    # 값이 회복돼도 자동 해제는 없다
+    venue.cash = Decimal(5000)
+    notes.clear()
+    clock.ms = after(203)
+    day = make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    assert day.status == "DD_STOP" and venue.placed == placed
+    assert not any("🚨" in n for n in notes)  # 경보는 처음 한 번, 그 뒤는 매일 상태 줄
+    assert any("DD_STOP" in n for n in notes)
+
+    runner = make(conn, halt, venue, clock, notes)
+    with pytest.raises(ValueError):
+        runner.release_drawdown("  ")
+    runner.release_drawdown("시험: 원인 확인")
+    clock.ms = after(204)
+    day = make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    assert day.status == "OK" and len(venue.placed) > len(placed)  # 다시 산다
+    with pytest.raises(ValueError, match="정지 중이 아니다"):
+        make(conn, halt, venue, clock, notes).release_drawdown("또")
+
+
+def test_drawdown_stop_still_sells_on_trend(env) -> None:
+    conn, halt = env
+    venue = Venue()
+    notes: list[str] = []
+    two_days(conn, halt, venue, notes)  # 고점 5,000
+    venue.cash, venue.base = Decimal(0), {"BTC": Decimal(30)}  # BTC 만 3,000 = 비중 100%, 낙폭 40%
+    clock = Clock(after(202))
+    day = make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    assert day.status == "DD_STOP"
+    assert [(e["symbol"], e["side"]) for e in day.executed] == [
+        ("BTCUSDT", "SELL")
+    ]  # ETH 매수는 뺐다
+
+
+def test_plan_reads_only(env) -> None:
+    conn, halt = env
+    venue = Venue()
+    notes: list[str] = []
+    clock = Clock(after(200))
+    make(conn, halt, venue, clock, notes).run_once(clock.ms)
+    clock.ms = after(201)
+    runner = make(conn, halt, venue, clock, notes)
+    before = list(notes)
+    plan = runner.plan(clock.ms)
+    assert plan is not None and venue.placed == [] and notes == before  # 알림 없음
+    assert PaperDayRepository(conn).get(OPT.strategy_id, START + 202 * D - 1) is None  # 기록 없음
+    assert not SpotOrderRepository(conn).all()
+    text = plan.text("demo")
+    assert "계획만 — 주문 0건" in text and "BTCUSDT 롱 진입(매수)" in text and "이유:" in text
+    assert "낙폭 0.0%" in text
+    # 계획과 실제 실행이 같은 주문을 낸다
+    runner.run_once(clock.ms)
+    assert sorted(c.split("-")[2] for c in venue.placed) == sorted(s for _, s, _, _ in plan.planned)
+    assert runner.plan(clock.ms) is None  # 이미 실행한 날

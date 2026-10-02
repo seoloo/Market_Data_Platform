@@ -296,7 +296,7 @@ def demo_t2_review(
         Criterion(
             "K1",
             "PASS" if not k1_bad else "CHECK",
-            f"해소 안 된 주문 {unresolved} · DEGRADED/HALTED {len(degraded_days)}일"
+            f"해소 안 된 주문 {unresolved} · DEGRADED/HALTED/DD_STOP {len(degraded_days)}일"
             f" {list(degraded_days)}",
         )
     ]

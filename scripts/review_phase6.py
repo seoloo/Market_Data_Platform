@@ -143,7 +143,9 @@ def _demo(conn: Any, until: str) -> dict[str, Any]:
     unresolved = sum(
         1 for r in SpotOrderRepository(conn).all() if r.mode == "demo" and r.state in OPEN_STATES
     )
-    degraded = [k for k, v in reports.items() if v.get("status") in ("DEGRADED", "HALTED")]
+    degraded = [
+        k for k, v in reports.items() if v.get("status") in ("DEGRADED", "HALTED", "DD_STOP")
+    ]
     crit, stats = demo_t2_review(orders, unresolved=unresolved, degraded_days=degraded)
     events: list[dict[str, Any]] = []
     ew = REPORTS / "demo_ew" / "events.jsonl"

@@ -45,6 +45,19 @@ class RiskEventRepository:
         )
         self._conn.commit()
 
+    def of_kinds(self, mode: str, kinds: tuple[str, ...], limit: int = 500) -> list[RiskEvent]:
+        """``mode`` 의 ``kinds`` 이벤트, 새것 먼저."""
+        marks = ",".join("?" * len(kinds))
+        rows = self._conn.execute(
+            "SELECT ts_ms, mode, severity, kind, detail_json, action_taken FROM risk_events"
+            f" WHERE mode = ? AND kind IN ({marks}) ORDER BY ts_ms DESC, id DESC LIMIT ?",
+            (mode, *kinds, limit),
+        ).fetchall()
+        return [
+            RiskEvent(int(r[0]), str(r[1]), str(r[2]), str(r[3]), json.loads(r[4]), r[5])
+            for r in rows
+        ]
+
     def recent(self, limit: int = 50) -> list[RiskEvent]:
         rows = self._conn.execute(
             "SELECT ts_ms, mode, severity, kind, detail_json, action_taken FROM risk_events"

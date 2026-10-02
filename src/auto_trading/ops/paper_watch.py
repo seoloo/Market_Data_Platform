@@ -374,7 +374,7 @@ def check_demo_t2(
     if behind >= 1:
         findings.append(Finding("WARN", ledger, f"{behind}일 밀림 — 마지막 {_date(at)}"))
     status = str(report.get("status"))
-    if status in ("DEGRADED", "HALTED"):
+    if status in ("DEGRADED", "HALTED", "DD_STOP"):
         findings.append(Finding("WARN", ledger, f"{status}: {report.get('note')}"))
     if unresolved:
         findings.append(Finding("WARN", ledger, f"해소되지 않은 데모 주문 {unresolved}건"))

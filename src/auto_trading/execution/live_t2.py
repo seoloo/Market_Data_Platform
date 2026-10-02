@@ -15,8 +15,16 @@ Phase 8 승인 뒤 그것 하나만 더한다.
    위험 축소도 하지 않는다 — 사람이 판단한다.
 3. d−1 기록이 없으면 체결하지 않는다(NO_PRIOR_DECISION — 오래된 목표 금지, Paper 와 같다).
 4. d−1 목표를 실제 잔고로 계획한다(밴드 5%p, 매도 먼저, 매수는 가진 현금 안에서).
+   **계좌 낙폭 정지(문서 85 §11 A2, 2026-10-02 사용자 결정):** 고점 대비 30% 에 닿으면 그때부터
+   **새 매수를 내지 않는다**(DD_STOP). T/v2 자체의 추세 매도는 그대로 낸다 — 위험을 줄이는 쪽이라서.
+   강제 청산은 없고 **자동 해제도 없다** — 사람이 원인을 적고 해제해야 다시 산다
+   (:meth:`LiveT2Runner.release_drawdown`). 해제하면 고점을 그때부터 다시 잰다.
+   백테스트 최악 15.9% 라 과거 경로에서는 닿지 않는다.
 5. d 기록을 **먼저** 남기고(선기록), 주문마다 PENDING 을 커밋한 뒤 post-only 를 건다.
 6. 대기(``poll_s``) → 체결 / 제한 시간 뒤 취소·시장가 추격. 체결 내역에서 평균가·수수료를 읽는다.
+
+:meth:`LiveT2Runner.plan` 은 같은 판단을 **읽기만** 해서 보여 준다(실거래 첫날 "계획만", 85 §4) —
+주문·기록·알림·복구 조회 모두 없다.
 
 주문 ID: 지정가 ``<tag>-<d−1>-<종목>-<B|S>``, 추격 ``…m``. 같은 의도는 몇 번을 실행해도 주문 1 건.
 결과를 모르는 전송(UNKNOWN)은 조회로만 해소한다.
@@ -28,6 +36,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
@@ -42,6 +51,7 @@ from auto_trading.execution.demo_limit import DemoSpotVenue
 from auto_trading.execution.spot_orders import client_order_id
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.storage.repositories.paper_days import PaperDay, PaperDayRepository
+from auto_trading.storage.repositories.risk_events import RiskEvent, RiskEventRepository
 from auto_trading.storage.repositories.spot_orders import SpotOrderRecord, SpotOrderRepository
 from auto_trading.strategy.spot_trend import (
     SpotSide,
@@ -51,6 +61,10 @@ from auto_trading.strategy.spot_trend import (
 )
 
 __all__ = [
+    "DD_RELEASE",
+    "DD_STOP",
+    "DayPlan",
+    "Drawdown",
     "LiveOptions",
     "LiveSpotVenue",
     "LiveT2Runner",
@@ -58,6 +72,11 @@ __all__ = [
     "SignalSource",
     "TradeReason",
 ]
+
+DD_STOP = "t2_dd_stop"
+"""``risk_events.kind`` — 계좌 낙폭 정지가 걸린 순간 (detail.strategy_id 로 구분)."""
+DD_RELEASE = "t2_dd_release"
+"""``risk_events.kind`` — 사람이 원인을 적고 해제한 순간."""
 
 _DAY_MS = Timeframe.D1.ms
 _QUOTE = "USDT"
@@ -97,6 +116,38 @@ class LiveOptions:
     post_retries: int = 3
     fee_rate: Decimal = Decimal("0.001")
     """매수 수량을 현금 안에 맞출 때만 쓴다. 실제 수수료는 체결 내역에서 읽는다."""
+    dd_stop: Decimal | None = Decimal("0.30")
+    """계좌 낙폭 정지선 (TRADING_CORE 누적 DD 30%). None 이면 쓰지 않는다."""
+
+
+@dataclass(frozen=True, slots=True)
+class Drawdown:
+    """계좌 낙폭. 고점 = 마지막 해제 뒤 이 실행기 기록의 평가액과 지금 평가액 중 최대."""
+
+    peak: Decimal
+    equity: Decimal
+    limit: Decimal | None
+    latched: bool
+    """이미 정지 중 (해제 뒤 정지 기록이 있다)."""
+
+    @property
+    def dd(self) -> Decimal:
+        return 1 - self.equity / self.peak if self.peak > 0 else Decimal(0)
+
+    @property
+    def stopped(self) -> bool:
+        return self.limit is not None and (self.latched or self.dd >= self.limit)
+
+    @property
+    def new(self) -> bool:
+        """이번에 처음 닿았다."""
+        return self.stopped and not self.latched
+
+    def text(self) -> str:
+        line = f"고점 {self.peak:,.2f} → 지금 {self.equity:,.2f} USDT (낙폭 {self.dd:.1%}"
+        if self.limit is not None:
+            line += f" · 정지선 {self.limit:.0%}"
+        return line + ")"
 
 
 @dataclass(slots=True)
@@ -197,6 +248,66 @@ class TradeReason:
         )
 
 
+Planned = tuple[SpotSide, str, Decimal, Decimal]
+"""(방향, 종목, 수량, 목표 비중)."""
+
+
+@dataclass(frozen=True, slots=True)
+class DayPlan:
+    """그날의 판단. :meth:`LiveT2Runner.run_once` 는 기록·주문하고 ``plan`` 은 보여만 준다."""
+
+    day: PaperDay
+    """d 기록 (아직 저장하지 않은 것)."""
+    prev: PaperDay | None
+    planned: list[Planned]
+    reasons: dict[str, TradeReason]
+    drawdown: Drawdown
+    prices: dict[str, Decimal]
+
+    def text(self, mode: str) -> str:
+        d = self.day
+        when = _utc_date(d.decision_ms)
+        lines = [
+            f"[{mode}·현물 T/v2 · 계획만 — 주문 0건] 결정일 {when} · 상태 {d.status}",
+            "보유: " + " · ".join(f"{a} {q}" for a, q in d.holdings.items())
+            if d.holdings
+            else "보유: 없음",
+            f"평가액 {d.equity:,.2f} USDT · {self.drawdown.text()}",
+        ]
+        if d.note:
+            lines.append(f"메모: {d.note}")
+        if self.prev is not None:
+            lines.append(
+                f"체결할 목표 ({_utc_date(self.prev.decision_ms)} 결정): "
+                + " · ".join(f"{s} {_pct(w)}" for s, w in sorted(self.prev.targets.items()))
+            )
+        if self.planned:
+            lines.append("주문 예정 (매도 먼저 · 지정가 = 보낼 때 1호가 · 4시간 뒤 시장가 추격):")
+            for side, symbol, qty, w in self.planned:
+                why = self.reasons.get(symbol)
+                value = qty * self.prices[symbol]
+                lines.append(
+                    f"  {symbol} {why.action(side) if why else side.value} {qty}"
+                    f" (≈ {value:,.2f} USDT) → 목표 {w:.1%}"
+                )
+                if why:
+                    lines.append(f"    이유: {why.why}")
+        elif d.status in ("OK", "DD_STOP"):
+            lines.append("주문 예정 없음 — 목표와 현재 비중 차이가 밴드 안 (또는 정지로 매수 제외)")
+        lines.append(
+            "다음 결정 목표: " + " · ".join(f"{s} {_pct(w)}" for s, w in sorted(d.targets.items()))
+        )
+        return "\n".join(lines)
+
+
+def _utc_date(ms: int) -> str:
+    return datetime.fromtimestamp(ms / 1000, UTC).strftime("%Y-%m-%d")
+
+
+def _pct(w: str | None) -> str:
+    return "—" if w is None else f"{Decimal(w):.1%}"
+
+
 @dataclass(slots=True)
 class _Working:
     record: SpotOrderRecord
@@ -217,12 +328,14 @@ class LiveT2Runner:
         sleep: Callable[[float], None],
         halt_path: Path,
         notify: Callable[[str], None],
+        risk_events: RiskEventRepository,
         cfg: SpotTrendConfig | None = None,
     ) -> None:
         self._venue = venue
         self._signals = signals
         self._orders = orders
         self._days = days
+        self._risk = risk_events
         self._opt = options
         self._clock = clock
         self._sleep = sleep
@@ -238,6 +351,48 @@ class LiveT2Runner:
 
     def _unresolved(self) -> list[SpotOrderRecord]:
         return [r for r in self._orders.unresolved() if self._mine(r)]
+
+    def _dd_events(self) -> tuple[RiskEvent | None, RiskEvent | None]:
+        """(마지막 해제, 그 뒤의 첫 정지) — 이 실행기(strategy_id) 것만."""
+        events = [
+            e
+            for e in self._risk.of_kinds(self._opt.mode, (DD_STOP, DD_RELEASE))
+            if e.detail.get("strategy_id") == self._opt.strategy_id
+        ]
+        release = next((e for e in events if e.kind == DD_RELEASE), None)
+        since = release.ts_ms if release else -1
+        stop = next((e for e in events if e.kind == DD_STOP and e.ts_ms > since), None)
+        return release, stop
+
+    def drawdown(self, equity: Decimal) -> Drawdown:
+        release, stop = self._dd_events()
+        since = release.ts_ms if release else -1
+        history = [
+            d.equity
+            for d in self._days.recent(self._opt.strategy_id, 100_000)
+            if d.created_ms > since
+        ]
+        peak = max([equity, *history])
+        return Drawdown(peak, equity, self._opt.dd_stop, latched=stop is not None)
+
+    def release_drawdown(self, reason: str) -> None:
+        """사람이 원인을 적고 낙폭 정지를 푼다. 고점은 지금부터 다시 잰다."""
+        if not reason.strip():
+            raise ValueError("해제 사유를 적어야 한다")
+        _, stop = self._dd_events()
+        if stop is None:
+            raise ValueError("정지 중이 아니다 — 해제할 것이 없다")
+        self._risk.insert(
+            RiskEvent(
+                self._clock(),
+                self._opt.mode,
+                "warn",
+                DD_RELEASE,
+                {"strategy_id": self._opt.strategy_id, "reason": reason, "stop": stop.detail},
+                "새 매수 다시 허용 · 고점 재설정",
+            )
+        )
+        self._notify(f"[{self._opt.mode}·현물 T/v2] 낙폭 정지 해제 — 사유: {reason}")
 
     def _mid(self, symbol: str) -> tuple[Decimal, Decimal, Decimal]:
         bids, asks = self._venue.order_book(symbol, limit=5)
@@ -474,14 +629,9 @@ class LiveT2Runner:
 
     # ------------------------------------------------------------ 하루
 
-    def run_once(self, now_ms: int) -> PaperDay:
-        decision = now_ms - now_ms % _DAY_MS - 1
+    def _decide(self, decision: int, filters: Mapping[str, SpotFilters], resolved: bool) -> DayPlan:
+        """d 의 판단 — 읽기만 한다 (기록·주문·알림 없음)."""
         symbols = self._cfg.symbols
-        filters = {s: self._venue.filters(s) for s in symbols}
-        resolved = self.recover(filters)
-        done = self._days.get(self._opt.strategy_id, decision)
-        if done is not None:
-            return done
         daily = {s: self._signals.closed_daily(s, decision) for s in symbols}
         new_targets = spot_trend_targets(daily, as_of_ms=decision, cfg=self._cfg)
         balances = self._venue.balances()
@@ -491,6 +641,7 @@ class LiveT2Runner:
         equity = cash + sum(holdings[s] * prices[s] for s in symbols)
         prev = self._days.get(self._opt.strategy_id, decision - _DAY_MS)
         halt = halted_reason(self._halt)
+        dd = self.drawdown(equity)
         status, note = "OK", None
         intents = []
         if halt is not None:
@@ -512,7 +663,11 @@ class LiveT2Runner:
                 step_size={s: f.step_size for s, f in filters.items()},
                 min_notional={s: f.min_notional for s, f in filters.items()},
             )
-        planned: list[tuple[SpotSide, str, Decimal, Decimal]] = []
+            if dd.stopped:
+                intents = [i for i in intents if i.side is SpotSide.SELL]
+                status = "DD_STOP"
+                note = f"계좌 낙폭 정지 — 새 매수 금지, 추세 매도만. {dd.text()}"
+        planned: list[Planned] = []
         for intent in intents:  # 매도 먼저
             qty = intent.quantity
             f = filters[intent.symbol]
@@ -546,12 +701,61 @@ class LiveT2Runner:
             note=note,
             created_ms=self._clock(),
         )
+        reasons = (
+            {}
+            if prev is None
+            else self._reasons(daily, decision - _DAY_MS, holdings, prices, equity)
+        )
+        return DayPlan(day, prev, planned, reasons, dd, prices)
+
+    def plan(self, now_ms: int) -> DayPlan | None:
+        """오늘 실행하면 무엇을 할지 — **읽기만**. 이미 실행한 날이면 None.
+
+        복구 조회도 하지 않는다: 해소 안 된 주문이 DB 에 있으면 DEGRADED 로 보여 준다.
+        """
+        decision = now_ms - now_ms % _DAY_MS - 1
+        if self._days.get(self._opt.strategy_id, decision) is not None:
+            return None
+        filters = {s: self._venue.filters(s) for s in self._cfg.symbols}
+        return self._decide(decision, filters, resolved=not self._unresolved())
+
+    def run_once(self, now_ms: int) -> PaperDay:
+        decision = now_ms - now_ms % _DAY_MS - 1
+        filters = {s: self._venue.filters(s) for s in self._cfg.symbols}
+        resolved = self.recover(filters)
+        done = self._days.get(self._opt.strategy_id, decision)
+        if done is not None:
+            return done
+        plan = self._decide(decision, filters, resolved)
+        day, prev, planned, reasons = plan.day, plan.prev, plan.planned, plan.reasons
+        status, note = day.status, day.note
+        if plan.drawdown.new:
+            self._risk.insert(
+                RiskEvent(
+                    self._clock(),
+                    self._opt.mode,
+                    "critical",
+                    DD_STOP,
+                    {
+                        "strategy_id": self._opt.strategy_id,
+                        "decision_ms": decision,
+                        "peak": str(plan.drawdown.peak),
+                        "equity": str(plan.drawdown.equity),
+                        "dd": str(plan.drawdown.dd),
+                    },
+                    "새 매수 금지 (추세 매도는 그대로, 자동 해제 없음)",
+                )
+            )
+            self._notify(
+                f"🚨 [{self._opt.mode}·현물 T/v2] 계좌 낙폭 정지 — {plan.drawdown.text()}\n"
+                "지금부터 새 매수를 내지 않는다. T/v2 추세 매도는 그대로, 강제 청산은 없다.\n"
+                '자동 해제 없음 — 원인을 확인한 뒤 해제 명령(release-dd "사유")으로만 다시 산다.'
+            )
         self._days.insert(day)  # 선기록 — 주문보다 먼저
         if note is not None and status != "NO_PRIOR_DECISION":
             self._notify(f"[{self._opt.mode}·현물 T/v2] {status}: {note}")
         if prev is None:
             return day
-        reasons = self._reasons(daily, decision - _DAY_MS, holdings, prices, equity)
         if not planned:
             if status == "OK":
                 self._notify(

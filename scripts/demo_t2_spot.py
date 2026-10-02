@@ -6,7 +6,12 @@
 ``reports/demo_t2/<결정일>.json``. 알림은 텔레그램 + ``reports/demo_t2/outbox.log``.
 긴급 정지 ``data/HALT`` 는 실거래와 똑같이 이 실행기도 멈춘다.
 
-사용: ``python scripts/demo_t2_spot.py`` · ``python scripts/demo_t2_spot.py status``
+사용::
+
+    python scripts/demo_t2_spot.py                    # 하루 실행 (예약 작업)
+    python scripts/demo_t2_spot.py status             # 최근 기록
+    python scripts/demo_t2_spot.py plan               # 계획만 — 주문·기록·알림 없음 (첫날 절차)
+    python scripts/demo_t2_spot.py release-dd "사유"  # 계좌 낙폭 30% 정지 해제 (자동 해제 없음)
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.storage.db import connect  # noqa: E402
 from auto_trading.storage.migrations import apply_migrations  # noqa: E402
 from auto_trading.storage.repositories.paper_days import PaperDay, PaperDayRepository  # noqa: E402
+from auto_trading.storage.repositories.risk_events import RiskEventRepository  # noqa: E402
 from auto_trading.storage.repositories.spot_orders import SpotOrderRepository  # noqa: E402
 
 for _stream in (sys.stdout, sys.stderr):
@@ -94,26 +100,30 @@ def _import_legacy(days: PaperDayRepository) -> None:
         )
 
 
-def run() -> int:
+def _runner(conn: Any, notify: Any) -> LiveT2Runner:
     env = read_env_file(REPO_ROOT / ".env")
     key, secret = env.get("BINANCE_TESTNET_API_KEY", ""), env.get("BINANCE_TESTNET_API_SECRET", "")
     if not key or not secret:
         raise SystemExit(".env 에 BINANCE_TESTNET_API_KEY / SECRET(데모 키)가 없다")
-    conn = connect(DB)
-    apply_migrations(conn)
-    days = PaperDayRepository(conn)
-    _import_legacy(days)
-    runner = LiveT2Runner(
+    return LiveT2Runner(
         BinanceSpotDemo(BinanceCredentials(key, secret)),
         BinanceSpotReadOnly(None),
         SpotOrderRepository(conn),
-        days,
+        PaperDayRepository(conn),
         options=OPTIONS,
         clock=lambda: int(time.time() * 1000),
         sleep=time.sleep,
         halt_path=HALT,
-        notify=Notify(),
+        notify=notify,
+        risk_events=RiskEventRepository(conn),
     )
+
+
+def run() -> int:
+    conn = connect(DB)
+    apply_migrations(conn)
+    _import_legacy(PaperDayRepository(conn))
+    runner = _runner(conn, Notify())
     now = int(time.time() * 1000)
     day = runner.run_once(now)
     report: dict[str, Any] = {
@@ -143,5 +153,63 @@ def status() -> int:
     return 0
 
 
+PAPER = "t2_long"
+"""같은 규칙의 Paper 원장 — 계획의 목표가 이것과 같아야 한다 (85 §4 3)."""
+
+
+def plan() -> int:
+    """계획만 — 주문·기록·알림·복구 조회 없음. 거래소에서는 잔고·가격만 읽는다."""
+    conn = connect(DB)
+    apply_migrations(conn)
+    runner = _runner(conn, print)
+    now = int(time.time() * 1000)
+    day_plan = runner.plan(now)
+    if day_plan is None:
+        print("오늘 결정은 이미 실행·기록됐다 — status 로 본다")
+        conn.close()
+        return 0
+    print(day_plan.text(OPTIONS.mode))
+    if day_plan.prev is not None:
+        paper = PaperDayRepository(conn).get(PAPER, day_plan.prev.decision_ms)
+        if paper is None:
+            print(f"Paper {PAPER} 같은 결정일 기록 없음 — 대조 못 함")
+        else:
+            same = paper.targets == day_plan.prev.targets
+            print(
+                f"Paper {PAPER} 같은 결정일 목표: {paper.targets} → "
+                + ("같다 ✓" if same else "⚠ 다르다 — 보내기 전에 원인 확인")
+            )
+    conn.close()
+    return 0
+
+
+def release_dd(reason: str) -> int:
+    conn = connect(DB)
+    apply_migrations(conn)
+    try:
+        _runner(conn, Notify()).release_drawdown(reason)
+    except ValueError as exc:
+        print(f"해제 안 함: {exc}")
+        return 1
+    finally:
+        conn.close()
+    print("해제했다 — 다음 실행부터 새 매수 허용, 고점은 지금부터 다시 잰다")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if argv == ["status"]:
+        return status()
+    if argv == ["plan"]:
+        return plan()
+    if argv[:1] == ["release-dd"]:
+        if len(argv) != 2:
+            raise SystemExit('사용: release-dd "사유"')
+        return release_dd(argv[1])
+    if argv:
+        raise SystemExit(f"모르는 명령: {argv}")
+    return run()
+
+
 if __name__ == "__main__":
-    raise SystemExit(status() if sys.argv[1:] == ["status"] else run())
+    raise SystemExit(main(sys.argv[1:]))
