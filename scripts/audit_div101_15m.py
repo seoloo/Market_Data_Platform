@@ -478,7 +478,7 @@ def main(argv: list[str]) -> int:
     if not argv or argv[0] not in modes:
         raise SystemExit("usage: audit_div101_15m.py build | power | verdict")
     result = modes[argv[0]]()
-    sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=1) + "\n")
+    sys.stdout.write(json.dumps(result, indent=1) + "\n")  # ASCII (cp949 콘솔)
     return 0
 
 
