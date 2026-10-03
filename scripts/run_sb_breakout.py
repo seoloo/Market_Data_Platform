@@ -44,8 +44,8 @@ ALPHA, REL_MIN = 0.05, 0.005
 SPLIT_JUMP = 3.0
 """하루 종가 비율이 3 배 넘게 뛰거나 1/3 아래면 분할 미반영으로 보고 그 종목을 뺀다."""
 MIN_BARS = 260
-UNIVERSE_SHA256 = ""
-EXPECTED: tuple[int, int, int] | None = None
+UNIVERSE_SHA256 = "df6c54e323f7fadafd99184ced13b15ba0fb86a860b4478249a1966029419837"
+EXPECTED: tuple[int, int, int] | None = (1219, 12033, 180)
 """(돌파 매매, 대조 매매, 둘 다 있는 달) — count 뒤(수익 보기 전) 고정."""
 
 
