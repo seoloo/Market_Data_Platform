@@ -3,6 +3,14 @@
 최종 갱신: 2026-10-03 · 작성: Opus (Elliott 재시험 93).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-03 — Elliott 조정파·삼각형 연구 (문서 97·98, 참고 자료 2 개)
+
+- 사용자: "왜 5파에만 집중하나 · 모든 파동 포함 · 삼각수렴 반드시 고려 · 꼬리 무는 검색으로 많이". 참고 자료 [ELLIOTT_WAVE_PATTERNS](docs/research/ELLIOTT_WAVE_PATTERNS.md)(전체 패턴·규칙·지침·성격·단계·비판) · [ELLIOTT_TRIANGLES](docs/research/ELLIOTT_TRIANGLES.md)(EWI·NEoWave·Bulkowski 통계·꼭지점·학계).
+- [97](docs/research/97-elliott-correction-end-trend-resume-sol-preregistration.md) 조정 끝 → 추세 재개(SOL 1h, 10 중 6 합의): 합성 점검 **미달** — 조정 끝 합의 94% 이지만 충격파 끝 오판 36.0%/30.7% > 30%. SOL 자료 받기 전 중단.
+- [98](docs/research/98-elliott-triangle-thrust-and-correction-end-sol-preregistration.md) 사전 등록: H-T 삼각형 돌파(1 등 삼각형) · H-C1 조정 끝 정의 1(합의 + 1 등 조정 + 일봉 추세), 각 α 0.025, 새 seed 20261003·20261004 합성 점검.
+- "10 중 6 이 빡빡한가": BTC 1h 충격파 합의 셋업 월 6 번, 진짜 조정 끝 94% 가 합의 — 문턱을 낮추면 오판이 먼저 는다.
+- 인수인계: 엘리엇 연구 상태는 93~98 의 맨 위 '상태' 줄과 PROGRESS 가 기준. 다음 단계는 98 §4.
+
 ## 2026-10-03 — Elliott 2파→3파 진입 BTC+ETH 판정 (문서 96 §10): 증거 없음
 
 - 묶음 151, 평균 **−0.086R**(비용 뒤) · 비용 전 −0.017R · p 0.74. 손절 67% · 목표 17%(손익분기 23.6%) · 시간 16%. 최악: −1.17R, 최장 연패 13. BTC 만 +0.002R · ETH 만 −0.091R.
