@@ -1,6 +1,6 @@
 # 115 — LT Paper: 주도주 추세 보유를 앞으로의 자료로 기록 (가상 1,000 USD) — 등록
 
-작성: 2026-10-03 (Opus) · 트랙: Paper (주문 없음) · 상태: **관찰 시작 (2026-10-02 종가) · 뉴스 수집 1 단계 가동 · 예약 작업 등록은 사용자.**
+작성: 2026-10-03 (Opus) · 트랙: Paper (주문 없음) · 상태: **관찰 중 (2026-10-02 종가 시작) · 뉴스 수집·AI(Gemini) 판단 기록 가동 · 예약 작업 등록됨.**
 사용자 (2026-10-03): "둘 다 진행해줘" — (1) S&P 400 재현([114](114-leader-trend-sp400-replication.md)) (2) 앞으로의 자료로 Paper 관찰.
 방향 기준점: [DIRECTION_LEADER_TREND](DIRECTION_LEADER_TREND.md). 규칙: [113](113-leader-trend-hold-preregistration.md) 그대로.
 
@@ -53,3 +53,14 @@ Register-ScheduledTask -TaskName "AutoTrading_LT_Paper" -Action $a -Trigger $t
 ```
 
 PC 가 꺼져 있던 날은 다음 실행이 밀린 거래일을 모두 처리한다(`run` 은 마지막 처리일 뒤 모든 거래일을 처리). 대시보드 "놓친 작업 다시 실행" 도 `AutoTrading_*` 작업이라 함께 돈다.
+
+## 8. 2 단계 — AI 판단 기록 가동 (2026-10-03)
+
+- 공급자: **Gemini 무료 등급**(`GEMINI_API_KEY`, 사용자 발급). 없으면 ChatGPT(`OPENAI_API_KEY`·`CHATGPT_KEY`). ChatGPT 키는 크레딧이 없어 429 로 거절됐다 — 사용자 선택으로 Gemini.
+- 키는 요청 머리말로만 보낸다(주소에 넣지 않음). 값은 로그·보고에 남기지 않는다.
+- 모델: 몰림(503)·한도(429)·없음(404)이면 5 초 쉬고 다음 후보로 — `gemini-flash-latest` → `gemini-flash-lite-latest` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` (2026-10-03 모델 목록 조회로 확인). `GEMINI_MODEL` 로 바꿀 수 있다.
+- **질문에는 그날 모은 뉴스 제목·요약(최대 150 건)과 S&P 500 종목 목록만 준다.** 첫 호출에서 기계 규칙의 주도주를 함께 줬더니 AI 가 그 10 개를 그대로 베꼈다 → 기계 규칙 결과·가격 지표는 빼서 **독립 판단**이 되게 했다.
+- 답(JSON): 주도 섹터 3 · 주도주 10 (이유) · 증시 여지(up·neutral·down) · 확신 · 위험 · 요약. 유니버스 밖 종목은 빼고 따로 적는다.
+- 기록 `data/lt_paper/ai/<날짜>.json` (질문 해시·사용량 포함), 보고서 `news_shadow.ai_judgement`, 대시보드 "AI 판단" 칸.
+- 첫 기록(10-02 종가, Gemini flash-lite, 약 9,600 토큰): 증시 여지 **중립**(확신 65%) · 주도 섹터 정보기술·커뮤니케이션·경기소비재 · 주도주 NVDA · TSLA · META · GOOGL · AMAT · FTNT · EQIX · PLTR · LRCX · LEN — **기계 규칙과 겹침 0**.
+- 채점(몇 달 뒤, 기술 통계): 같은 날 고른 기계 규칙 10 개 vs AI 10 개의 이후 1·3 개월 수익, AI 의 증시 여지 판단 vs 이후 S&P 500.

@@ -29,7 +29,7 @@ SYSTEM = (
 def build_messages(
     report: Mapping[str, Any], items: Sequence[Mapping[str, Any]], universe: Sequence[str]
 ) -> list[dict[str, str]]:
-    """보고서(기계 규칙 결과)·그날 뉴스·유니버스로 대화 메시지를 만든다."""
+    """그날 뉴스·유니버스로 대화 메시지를 만든다 (보고서에서는 날짜만 쓴다)."""
     fetched = max((str(i.get("fetched_at", "")) for i in items), default="")
     lines = []
     for it in items[:MAX_HEADLINES]:
@@ -37,15 +37,11 @@ def build_messages(
         lines.append(
             f"- [{it.get('source')}] {it.get('title')}" + (f" — {summary}" if summary else "")
         )
-    mech = ", ".join(str(x.get("symbol")) for x in report.get("leaders") or [])
-    sectors = ", ".join(str(s) for s in report.get("leading_sectors") or [])
+    # 기계 규칙의 주도주·섹터·가격 지표는 일부러 주지 않는다 — AI 가 그 목록을 베끼면
+    # "뉴스 판단이 기계 규칙보다 나은가" 를 비교할 수 없다 (2026-10-03 첫 호출에서 그대로 베꼈다).
     user = (
         f"Headlines collected at: {fetched}\n"
-        f"Last close date: {report.get('date')}\n"
-        f"Mechanical rule (momentum ranking) leaders: {mech}\n"
-        f"Mechanical rule leading sectors: {sectors}\n"
-        f"S&P 500 above 200-day average: {report.get('spy_above_200')}; "
-        f"share of S&P 500 stocks above 50-day average: {report.get('breadth_above_50ma')}\n"
+        f"Last US market close date: {report.get('date')}\n"
         f"S&P 500 universe: {' '.join(universe)}\n\n"
         "Headlines:\n" + "\n".join(lines)
     )

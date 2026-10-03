@@ -20,6 +20,7 @@ import csv
 import json
 import shutil
 import sys
+import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -304,23 +305,108 @@ def news() -> dict[str, object]:
 
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_MODEL = "gpt-4o-mini"
+GEMINI_MODELS = (
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+)
+"""``GEMINI_MODEL`` 이 없으면 이 순서로 시도한다 (2026-10-03 모델 목록 조회로 확인한 이름)."""
 AI = ROOT / "ai"
 
 
-def ai() -> dict[str, object]:
-    """그날 모은 뉴스로 ChatGPT 판단 기록 (문서 115 2 단계). 키 없으면 건너뜀. 매매에 안 씀."""
-    import hashlib
+def _env(name: str, default: str = "") -> str:
     import os
 
+    from auto_trading.config.secrets import read_env_file
+
+    return os.environ.get(name) or read_env_file(REPO / ".env").get(name, default)
+
+
+def _ask_gemini(key: str, messages: list[dict[str, str]]) -> dict[str, object]:
+    """Gemini 무료 등급. 키는 머리말(x-goog-api-key)로만 보낸다 — 주소에 넣지 않는다."""
     import httpx
 
-    from auto_trading.config.secrets import load_openai_key, read_env_file
+    body = {
+        "systemInstruction": {"parts": [{"text": messages[0]["content"]}]},
+        "contents": [{"role": "user", "parts": [{"text": messages[1]["content"]}]}],
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+    }
+    models = [_env("GEMINI_MODEL")] if _env("GEMINI_MODEL") else list(GEMINI_MODELS)
+    last: dict[str, object] = {"error": "모델 없음"}
+    for model in models:
+        try:
+            resp = httpx.post(
+                GEMINI_URL.format(model=model),
+                headers={"x-goog-api-key": key},
+                json=body,
+                timeout=120,
+            )
+        except httpx.HTTPError as exc:
+            return {"error": f"연결 실패: {type(exc).__name__}"}
+        if resp.status_code in (404, 429, 503):
+            # 없는 모델·한도·몰림 — 잠깐 쉬고 다음 무료 모델로 (몰림은 보통 잠깐이다)
+            last = {"error": f"HTTP {resp.status_code}", "message": f"모델 {model} 거절"}
+            time.sleep(5)
+            continue
+        if resp.status_code != 200:
+            try:
+                message = str(resp.json().get("error", {}).get("message", ""))[:300]
+            except ValueError:
+                message = ""
+            return {"error": f"HTTP {resp.status_code}", "message": message}
+        payload = resp.json()
+        try:
+            text = payload["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError, TypeError):
+            return {"error": "답이 비어 있다 (안전 필터 또는 형식)"}
+        return {"text": text, "model": f"gemini:{model}", "usage": payload.get("usageMetadata")}
+    return last
+
+
+def _ask_openai(key: str, messages: list[dict[str, str]]) -> dict[str, object]:
+    import httpx
+
+    model = _env("CHATGPT_MODEL", DEFAULT_MODEL)
+    body = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        resp = httpx.post(
+            OPENAI_URL, headers={"Authorization": f"Bearer {key}"}, json=body, timeout=90
+        )
+    except httpx.HTTPError as exc:
+        return {"error": f"연결 실패: {type(exc).__name__}"}
+    if resp.status_code != 200:
+        try:
+            message = str(resp.json().get("error", {}).get("message", ""))[:300]
+        except ValueError:
+            message = ""
+        return {"error": f"HTTP {resp.status_code}", "message": message}
+    payload = resp.json()
+    return {
+        "text": payload["choices"][0]["message"]["content"],
+        "model": f"openai:{payload.get('model', model)}",
+        "usage": payload.get("usage"),
+    }
+
+
+def ai() -> dict[str, object]:
+    """그날 모은 뉴스로 AI 판단 기록 (문서 115 2 단계). Gemini 우선, 없으면 ChatGPT. 매매 안 씀."""
+    import hashlib
+
+    from auto_trading.config.secrets import load_gemini_key, load_openai_key
     from auto_trading.ops.news_ai import build_messages, compare, parse_reply
 
-    key = load_openai_key(REPO / ".env")
-    if key is None:
-        return {"skipped": "OPENAI_API_KEY 또는 CHATGPT_KEY 가 .env 에 없다"}
+    gemini = load_gemini_key(REPO / ".env")
+    openai = load_openai_key(REPO / ".env")
+    if gemini is None and openai is None:
+        return {"skipped": "GEMINI_API_KEY · OPENAI_API_KEY · CHATGPT_KEY 가 .env 에 없다"}
     latest = REPORTS / "latest.json"
     report = json.loads(latest.read_text(encoding="utf-8"))
     news_file = (report.get("news_shadow") or {}).get("file")
@@ -333,33 +419,17 @@ def ai() -> dict[str, object]:
     ]
     meta = json.loads(META.read_text(encoding="utf-8"))
     universe = sorted(s for s in meta["exchanges"] if s != "SPY")
-    model = os.environ.get("CHATGPT_MODEL") or read_env_file(REPO / ".env").get(
-        "CHATGPT_MODEL", DEFAULT_MODEL
-    )
     messages = build_messages(report, items, universe)
-    body = {
-        "model": model,
-        "messages": messages,
-        "temperature": 0,
-        "response_format": {"type": "json_object"},
-    }
-    try:
-        resp = httpx.post(
-            OPENAI_URL,
-            headers={"Authorization": f"Bearer {key.value}"},
-            json=body,
-            timeout=90,
-        )
-    except httpx.HTTPError as exc:
-        return {"error": f"연결 실패: {type(exc).__name__}"}
-    if resp.status_code != 200:
-        try:
-            message = str(resp.json().get("error", {}).get("message", ""))[:300]
-        except ValueError:
-            message = ""
-        return {"error": f"HTTP {resp.status_code}", "message": message}
-    payload = resp.json()
-    text = payload["choices"][0]["message"]["content"]
+    answer = (
+        _ask_gemini(gemini.value, messages)
+        if gemini is not None
+        else _ask_openai(openai.value, messages)  # type: ignore[union-attr]
+    )
+    if "error" in answer:
+        return answer
+    text = str(answer["text"])
+    model = str(answer["model"])
+    payload = {"model": model, "usage": answer.get("usage")}
     try:
         judgement = parse_reply(text, universe)
     except ValueError as exc:

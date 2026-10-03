@@ -18,6 +18,7 @@ __all__ = [
     "OpenAIKey",
     "TelegramCredentials",
     "load_binance_credentials",
+    "load_gemini_key",
     "load_kis_credentials",
     "load_openai_key",
     "load_telegram_credentials",
@@ -138,7 +139,7 @@ def load_kis_credentials(
 
 @dataclass(frozen=True, slots=True)
 class OpenAIKey:
-    """ChatGPT(OpenAI) API 키 — 문서 115 뉴스·AI 판단 기록용. 값은 보여 주지 않는다."""
+    """AI API 키(ChatGPT·Gemini) — 문서 115 뉴스·AI 판단 기록용. 값은 보여 주지 않는다."""
 
     value: str
 
@@ -158,3 +159,12 @@ def load_openai_key(
         if value:
             return OpenAIKey(value)
     return None
+
+
+def load_gemini_key(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> OpenAIKey | None:
+    """``GEMINI_API_KEY`` (Google AI Studio 무료 등급). 없으면 ``None``. 값은 보여 주지 않는다."""
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    value = merged.get("GEMINI_API_KEY", "").strip()
+    return OpenAIKey(value) if value else None

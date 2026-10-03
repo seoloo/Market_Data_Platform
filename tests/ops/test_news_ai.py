@@ -12,7 +12,7 @@ from auto_trading.ops.news_ai import build_messages, compare, parse_reply
 UNIVERSE = ["NVDA", "AMD", "HPE", "XOM"]
 
 
-def test_messages_contain_only_given_headlines_and_mechanical_leaders() -> None:
+def test_messages_contain_only_headlines_not_mechanical_leaders() -> None:
     report = {
         "date": "2026-10-02",
         "leaders": [{"symbol": "HPE"}, {"symbol": "AMD"}],
@@ -38,11 +38,10 @@ def test_messages_contain_only_given_headlines_and_mechanical_leaders() -> None:
     user = msgs[1]["content"]
     assert "ONLY the headlines" in msgs[0]["content"]
     assert "2026-10-03T00:01:00+00:00" in user  # 가장 늦게 모은 시각
+    assert "- [cnbc] Chips rally — AI demand" in user and "- [fed] Fed holds" in user
     assert (
-        "HPE, AMD" in user
-        and "- [cnbc] Chips rally — AI demand" in user
-        and "- [fed] Fed holds" in user
-    )
+        "HPE, AMD" not in user and "Information Technology" not in user
+    )  # 기계 규칙 결과는 안 준다
     assert "NVDA AMD HPE XOM" in user
 
 

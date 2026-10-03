@@ -164,4 +164,28 @@ def lt_paper_page(data: Any) -> str:
         f"<div class='sub'>{news_line}</div>"
         "<div class='foot'>제목·요약만 모은다. AI 판단은 그날 모은 뉴스만 쓴다.</div></div>"
     )
-    return intro + head + chart + positions + tables + news_panel
+    judge = news.get("ai_judgement") if isinstance(news, dict) else None
+    ai_panel = ""
+    if isinstance(judge, dict):
+        room = {"up": "더 오를 여지 있음", "neutral": "중립", "down": "내릴 위험"}.get(
+            str(judge.get("market_room")), str(judge.get("market_room"))
+        )
+        vs = judge.get("vs_mechanical") or {}
+
+        def names(key: str) -> str:
+            return " · ".join(escape(str(s)) for s in vs.get(key) or []) or "—"
+
+        ai_panel = (
+            f'<div class="panel"><h2>AI 판단 ({escape(str(judge.get("model")))})</h2>'
+            f"<div class='sub'>증시 여지: <b>{escape(room)}</b> · 확신 "
+            f"{float(judge.get('confidence') or 0):.0%} · 주도 섹터: "
+            + " · ".join(escape(str(s)) for s in judge.get("leading_sectors") or [])
+            + "</div>"
+            f"<table><tr><th>기계 규칙과 AI 둘 다</th><td>{names('both')}</td></tr>"
+            f"<tr><th>기계 규칙만</th><td>{names('only_mechanical')}</td></tr>"
+            f"<tr><th>AI 만</th><td>{names('only_ai')}</td></tr></table>"
+            f"<p class='mute'>{escape(str(judge.get('summary', '')))}</p>"
+            "<div class='foot'>AI 는 그날 모은 뉴스 제목만 보고 판단한다 (기계 규칙 결과는 안 줌). "
+            "기록·채점용이며 매매에 쓰지 않는다.</div></div>"
+        )
+    return intro + head + chart + positions + tables + news_panel + ai_panel
