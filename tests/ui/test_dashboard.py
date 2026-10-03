@@ -171,6 +171,8 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "overseas":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
+        elif page == "lt_paper":
+            assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
             assert "실거래 비활성" in html
         assert EVIL not in html  # 모든 동적 문자열은 이스케이프
@@ -184,6 +186,53 @@ class TestRender:
         assert nav.count('href="/overseas"') == 1
         assert 'href="/accumulate"' not in nav
         assert "QNDX" in html and "BTQ" in html
+
+    def test_lt_paper_page_reads_saved_report(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "lt_paper"
+        rep.mkdir(parents=True)
+        (rep / "latest.json").write_text(
+            json.dumps(
+                {
+                    "date": "2026-10-02",
+                    "equity_usd": 997.5,
+                    "start_usd": 1000.0,
+                    "return_since_start": -0.0025,
+                    "cash_usd": 0.0,
+                    "positions": [
+                        {
+                            "symbol": EVIL,
+                            "entry": "2026-10-02",
+                            "cost_usd": 100,
+                            "value_usd": 99.75,
+                            "return": -0.0025,
+                            "weight": 0.1,
+                            "from_peak": 0.0,
+                        }
+                    ],
+                    "pending_sell_next_session": {"AMD": "trend_off"},
+                    "leaders_as_of": "2026-10-01",
+                    "leaders": [{"symbol": "HPE", "score": 0.99, "trend_up": True}],
+                    "leading_sectors": ["Information Technology"],
+                    "spy_above_200": True,
+                    "breadth_above_50ma": 0.247,
+                    "news_shadow": {
+                        "items": 529,
+                        "sources_ok": 16,
+                        "sources_failed": [],
+                        "fetched_at": "t",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "lt_paper")
+        assert "주도주 추세 보유" in html and "HPE" in html and "$997.50" in html
+        assert "추세 꺾임" in html and "뉴스 529 건" in html
+        assert EVIL not in html
+        nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+        assert nav.count('href="/lt-paper"') == 1
 
     def test_overview_has_draft_sections(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview")
