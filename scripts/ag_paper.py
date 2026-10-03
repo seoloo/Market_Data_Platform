@@ -4,7 +4,7 @@
 
 사용 예::
 
-    python -m scripts.ag_paper daily    # AG-CR 원장 하루 진행 + 보고서 (예약 작업용)
+    python -m scripts.ag_paper daily    # AG-CR(3 배)·AG-CR4(4 배) 원장 하루 진행 + 보고서
     python -m scripts.ag_paper report   # 보고서만 다시 (원장은 그대로)
     python -m scripts.ag_paper status
 
@@ -39,20 +39,21 @@ def _date(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=UTC).strftime("%Y-%m-%d")
 
 
-def _paths() -> tuple[Path_, Path_, dict[str, Any], dict[str, Any]]:
-    qs = json.loads(QS_STATE.read_text(encoding="utf-8")) if QS_STATE.exists() else {}
-    ag_book = (qs.get("books") or {}).get("AG") or {}
-    us = {str(d): float(v) for d, v in ag_book.get("equity") or []}
+CRYPTO = (("AG-CR", "ag", 3), ("AG-CR4", "ag4", 4))
+"""(보고 이름, 원장, 배율). AG-CR4 는 2026-10-04 사용자 요청으로 추가 (문서 117 §6)."""
+
+
+def _crypto(ledger: str, multiple: int) -> tuple[Path_, dict[str, Any]]:
     conn = connect_read_only(DB)
     try:
-        rows = OverlayPaperDayRepository(conn).all(LEDGERS["ag"].strategy_id)
+        rows = OverlayPaperDayRepository(conn).all(LEDGERS[ledger].strategy_id)
     finally:
         conn.close()
-    cr = scale({_date(r.decision_ms): r.equity for r in rows})
-    latest = rows[-1] if rows else None
-    cr_info: dict[str, Any] = {}
-    if latest is not None:
-        cr_info = {
+    path = scale({_date(r.decision_ms): r.equity for r in rows})
+    info: dict[str, Any] = {"multiple": multiple}
+    if rows:
+        latest = rows[-1]
+        info |= {
             "status": latest.status,
             "exposure": latest.tally.get("exposure"),
             "next_target_weights": latest.state.get("target"),
@@ -60,30 +61,36 @@ def _paths() -> tuple[Path_, Path_, dict[str, Any], dict[str, Any]]:
             "stop_hits": latest.tally.get("stop_hits"),
             "note": latest.note,
         }
+    return path, info
+
+
+def _us() -> tuple[Path_, dict[str, Any]]:
+    qs = json.loads(QS_STATE.read_text(encoding="utf-8")) if QS_STATE.exists() else {}
+    ag_book = (qs.get("books") or {}).get("AG") or {}
+    us = {str(d): float(v) for d, v in ag_book.get("equity") or []}
     us_info = {
         "tqqq_shares": ag_book.get("tqqq"),
         "cash_usd": ag_book.get("cash"),
         "trades": (ag_book.get("trades") or [])[-10:],
         "tax_paid_usd": ag_book.get("tax_paid"),
     }
-    return us, cr, us_info, cr_info
+    return us, us_info
 
 
 def report() -> dict[str, object]:
-    us, cr, us_info, cr_info = _paths()
-    mixed = mix(us, cr)
+    us, us_info = _us()
+    paths: dict[str, Path_] = {"AG-US": us}
+    books: dict[str, Any] = {"AG-US": {**summary(us), **us_info}}
+    for name, ledger, multiple in CRYPTO:
+        cr, info = _crypto(ledger, multiple)
+        mix_name = name.replace("CR", "MIX")
+        paths[name], paths[mix_name] = cr, mix(us, cr)
+        books[name] = {**summary(cr), **info}
+        books[mix_name] = {**summary(paths[mix_name]), "multiple": multiple}
     out: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "books": {
-            "AG-US": {**summary(us), **us_info},
-            "AG-CR": {**summary(cr), **cr_info},
-            "AG-MIX": summary(mixed),
-        },
-        "paths": {
-            "AG-US": {d: round(v, 2) for d, v in sorted(us.items())},
-            "AG-CR": {d: round(v, 2) for d, v in sorted(cr.items())},
-            "AG-MIX": {d: round(v, 2) for d, v in sorted(mixed.items())},
-        },
+        "books": books,
+        "paths": {k: {d: round(v, 2) for d, v in sorted(p.items())} for k, p in paths.items()},
     }
     day = max((str(b.get("date")) for b in out["books"].values() if b.get("date")), default=None)
     out["date"] = day
@@ -105,8 +112,9 @@ def status() -> dict[str, object]:
 
 def main(argv: list[str]) -> int:
     if argv == ["daily"]:
-        code = run_overlay(LEDGERS["ag"])
-        result: dict[str, object] = {"ag_cr_ledger_exit": code, "report": report()}
+        codes = {name: run_overlay(LEDGERS[ledger]) for name, ledger, _ in CRYPTO}
+        code = max(codes.values())
+        result: dict[str, object] = {"ledger_exit": codes, "report": report()}
     elif argv == ["report"]:
         result, code = report(), 0
     elif argv == ["status"]:

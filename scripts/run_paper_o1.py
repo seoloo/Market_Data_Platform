@@ -56,6 +56,10 @@ DB = REPO / "data" / "trading.db"
 
 AG_CR3 = OverlayConfig(exposure=3.0, catastrophe_stop=0.20, halt_drawdown=1.0)
 """112 ``CR3`` 와 같다 (scripts/run_ag_small.py)."""
+AG_CR4 = OverlayConfig(
+    exposure=4.0, catastrophe_stop=0.20, halt_drawdown=1.0, max_futures_leverage=4.0
+)
+"""112 §7 의 4 배와 같다 (scripts/run_ag_leverage.py — 선물 레버리지 상한을 배율까지 연다)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +78,7 @@ LEDGERS = {
     # 문서 117 AG Paper: 112 AG-CR 그대로 — 노출 3 배, 비상 스톱 −20%, 계좌 정지 끔(−70% 정리선은
     # scripts/ag_paper.py 가 1,000 USD 환산 뒤 적용)
     "ag": Ledger("AG-CR", "ag_cr3", AG_CR3, REPO / "reports" / "paper" / "ag_cr"),
+    "ag4": Ledger("AG-CR4", "ag_cr4", AG_CR4, REPO / "reports" / "paper" / "ag_cr4"),
 }
 _DAY = 86_400_000
 

@@ -40,3 +40,19 @@ $t = New-ScheduledTaskTrigger -Daily -At 21:17
 $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun
 Register-ScheduledTask -TaskName "AutoTrading_AG_Paper" -Action $a -Trigger $t -Settings $s
 ```
+
+## 6. 4 배 장부 추가 (2026-10-04)
+
+사용자 (2026-10-04): AG-CR 4 배와 4 배짜리 AG-MIX 를 3 배 장부들과 나란히 기록.
+
+- **AG-CR4**: 원장 `ag_cr4`, `OverlayConfig(exposure=4.0, catastrophe_stop=0.20, halt_drawdown=1.0, max_futures_leverage=4.0)` — 112 §7 의 4 배와 같다. **AG-MIX4**: AG-US 반 + AG-CR4 반. 정리선 같음.
+- 같은 예약 작업(`ag_paper daily`)이 두 원장을 함께 진행한다. 첫 행 2026-10-02 UTC (`NO_PRIOR_DECISION`).
+- 참고 계산(결과를 본 뒤, 판정 아님 — 112 연구 시뮬레이터, 자료 끝 2026-08-31, 1,000 USD):
+
+| 시작 | 1 배 (T/v2) | 3 배 | 4 배 | 고점 대비 최악 (1·3·4 배) |
+|---|---:|---:|---:|---|
+| 2025-09 (최근 1 년) | 958 | 848 | 788 | 10% · 30% · 38% |
+| 2024-09 (2 년) | 1,174 | 1,367 | 1,550 | 16% · 41% · 51% |
+| 2023-09 (3 년) | 1,638 | 2,844 | 3,767 | 16% · 42% · 52% |
+
+  최근 1 년은 코인이 옆으로·아래로 가서 배율이 손실을 키웠다(4 배 최저 669). 2~3 년으로 보면 배율이 이겼다.

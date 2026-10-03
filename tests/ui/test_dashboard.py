@@ -300,7 +300,9 @@ class TestRender:
                             "exposure": 1.87,
                             "status": EVIL,
                             "next_target_weights": {"BTCUSDT": 0.36},
+                            "multiple": 3,
                         },
+                        "AG-CR4": {"multiple": 4, "next_target_weights": {"ETHUSDT": 0.25}},
                         "AG-MIX": {"value_usd": 280.0, "stopped": "2026-10-03"},
                     },
                     "paths": {"AG-CR": {"2026-10-02": 1000.0, "2026-10-03": 1012.3}},
@@ -311,6 +313,7 @@ class TestRender:
         html = render_page(load_dashboard(root, P0 + 11 * D), "ag_paper")
         assert "소액 공격형" in html and "$1,012.30" in html and "BTC 108%" in html
         assert "정리됨 2026-10-03" in html
+        assert "ETH 100%" in html and "AG-MIX4" in html
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/ag-paper"') == 1

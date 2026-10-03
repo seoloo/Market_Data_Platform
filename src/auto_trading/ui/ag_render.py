@@ -24,7 +24,27 @@ _BOOKS = (
     ("AG-US", "AG-US · 미국 (TQQQ / 현금)", "var(--t2)"),
     ("AG-CR", "AG-CR · 코인 3 배 (BTC·ETH)", "var(--o2)"),
     ("AG-MIX", "AG-MIX · 반반, 해마다 재조정", "var(--hold)"),
+    ("AG-CR4", "AG-CR4 · 코인 4 배", "var(--o3)"),
+    ("AG-MIX4", "AG-MIX4 · 반반 (코인 4 배)", "var(--o1)"),
 )
+
+
+def _crypto_row(name: str, cr: dict[str, Any]) -> str:
+    k = float(cr.get("multiple") or 3)
+    weights = cr.get("next_target_weights") or {}
+    target = (
+        " · ".join(
+            f"{escape(str(s).replace('USDT', ''))} {float(w) * k:.0%}" for s, w in weights.items()
+        )
+        or "현금"
+    )
+    status = escape(_STATUS.get(str(cr.get("status")), str(cr.get("status"))))
+    return (
+        f"<tr><th>{escape(name)}</th><td>노출 {float(cr.get('exposure') or 0):.2f} 배 · "
+        f"다음 목표({k:.0f} 배 반영) {target} · {status}"
+        f"{' · 선물 청산' if cr.get('liquidations') else ''}"
+        f"{' · 비상 스톱' if cr.get('stop_hits') else ''}</td></tr>"
+    )
 
 
 def ag_paper_page(data: Any) -> str:
@@ -32,9 +52,10 @@ def ag_paper_page(data: Any) -> str:
     latest = _read(root / "reports" / "ag_paper" / "latest.json")
     intro = (
         '<div class="panel"><h2>소액 공격형 · AG Paper (가상 1,000 USD 씩)</h2>'
-        '<p class="mute">문서 112 세 계좌를 앞으로의 자료로 매일 기록한다. AG-US 는 QQQ 추세가 '
+        '<p class="mute">문서 112 계좌들을 앞으로의 자료로 매일 기록한다. AG-US 는 QQQ 추세가 '
         "켜지면 TQQQ 전액·꺼지면 현금(QS Paper 의 AG 장부), AG-CR 은 코인 T/v2 신호에 노출 3 배"
         "(선물 비상 스톱 −20%), AG-MIX 는 500·500 으로 시작해 해마다 반반으로 다시 맞춘다. "
+        "AG-CR4·AG-MIX4 는 코인 쪽 배율만 4 배로 올린 비교 장부다. "
         "<b>처음 돈의 30%(300 USD) 이하가 되면 정리하고 멈춘다.</b> 실제 주문은 없다.</p></div>"
     )
     if latest is None:
@@ -67,14 +88,6 @@ def ag_paper_page(data: Any) -> str:
         series.append(Series(label, color, tuple(points)))
     chart = '<div class="panel"><h2>평가액 (USD)</h2>' + line_chart(series) + "</div>"
     us = books.get("AG-US") or {}
-    cr = books.get("AG-CR") or {}
-    weights = cr.get("next_target_weights") or {}
-    target = (
-        " · ".join(
-            f"{escape(str(s).replace('USDT', ''))} {float(w) * 3:.0%}" for s, w in weights.items()
-        )
-        or "현금"
-    )
     trades = (
         " · ".join(
             f"{escape(str(t.get('date')))} "
@@ -88,11 +101,8 @@ def ag_paper_page(data: Any) -> str:
         '<div class="panel"><h2>지금 들고 있는 것</h2><table>'
         f"<tr><th>AG-US</th><td>TQQQ {float(us.get('tqqq_shares') or 0):.4f} 주 · 현금 "
         f"{_usd(us.get('cash_usd'))} · 매매 {trades}</td></tr>"
-        f"<tr><th>AG-CR</th><td>노출 {float(cr.get('exposure') or 0):.2f} 배 · "
-        "다음 목표(3 배 반영) "
-        f"{target} · {escape(_STATUS.get(str(cr.get('status')), str(cr.get('status'))))}"
-        f"{' · 선물 청산' if cr.get('liquidations') else ''}"
-        f"{' · 비상 스톱' if cr.get('stop_hits') else ''}</td></tr></table>"
+        + "".join(_crypto_row(name, books.get(name) or {}) for name in ("AG-CR", "AG-CR4"))
+        + "</table>"
         "<div class='foot'>AG-MIX 는 두 계좌 값으로 계산한다(따로 매매하지 않음). "
         "AG-US 는 QS Paper(21:15) 뒤에 읽는다.</div></div>"
     )
