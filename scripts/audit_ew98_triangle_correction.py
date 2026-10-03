@@ -13,8 +13,9 @@ import math
 import random
 import sys
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from statistics import pstdev
 
@@ -26,15 +27,14 @@ if str(REPO_ROOT / "src") not in sys.path:
 
 from scripts.audit_ew3c_hourly import CELLS, DEGREES, hour_bars  # noqa: E402
 from scripts.audit_ew93_hourly_degree import SCALE, THRESHOLD_B, coarsen  # noqa: E402
-from scripts.audit_ew97_correction_resume import (  # noqa: E402
-    _daily,
-    _four,
-    _real,
-    _thin,
-    _trend,
-    _welch,
+from scripts.audit_ew94_wave3_count import _bars, _dir  # noqa: E402
+from scripts.audit_ew97_correction_resume import _real, _thin, _trend, _welch  # noqa: E402
+from scripts.audit_ew_edge_power import (  # noqa: E402
+    _aggregate,
+    _chunks,
+    _groups,
+    _vision_minutes,
 )
-from scripts.audit_ew_edge_power import _chunks, _groups  # noqa: E402
 
 from auto_trading.core.enums import Timeframe  # noqa: E402
 from auto_trading.research.elliott import synthetic as synthetic_module  # noqa: E402
@@ -59,11 +59,12 @@ GATE_SD_UNITS = 0.254
 ALPHA = 0.025
 COST = 0.0019
 OUT = REPO_ROOT / "reports" / "research" / "elliott" / "98"
-TRIGGERS = OUT / "triggers_1h_SOLUSDT.jsonl"
-TRIGGERS_SHA256 = ""
-"""``power`` 뒤(수익률 보기 전) 문서 98 과 함께 고정한다."""
-EXPECTED_N: dict[str, tuple[int, int]] = {}
-"""가설 → 관문의 (독립 사건, 독립 대조). 관문을 넘은 가설만 채운다."""
+SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
+"""문서 98 §8 — H-T 를 세 자산 합산으로."""
+ASSET_SHA256: dict[str, str] = {}
+"""자산 → 발동 파일 SHA-256. ``power-asset`` 뒤(수익률 보기 전) 문서 98 과 함께 고정한다."""
+EXPECTED_POOLED: tuple[int, int] | None = None
+"""합친 관문의 (독립 사건, 독립 대조) — 판정 때 그대로 나와야 한다."""
 
 
 def _shape(scen: ScenarioList, trigger: Trigger) -> dict[str, object]:
@@ -185,27 +186,28 @@ def synthetic() -> dict[str, object]:
     }
 
 
-# ---------------------------------------------------------------- 시장
+# ---------------------------------------------------------------- 시장 (문서 98 §8: H-T, 세 자산)
 
 
-def _usable(
-    rows: Sequence[dict[str, object]], close_at: dict[int, float], hypothesis: str
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    def ok(r: dict[str, object]) -> bool:
-        if int(str(r["close_ms"])) + HORIZON * H4 not in close_at:
-            return False
-        if hypothesis == "H-C1":
-            return r["trend"] is not None and -int(str(r["d"])) * float(str(r["trend"])) > 0
-        return True
-
-    pick: Callable[[dict[str, object]], bool] = is_ht if hypothesis == "H-T" else is_hc1
-    usable = [r for r in rows if ok(r)]
-    return _thin([r for r in usable if pick(r)]), _thin([r for r in usable if not pick(r)])
+def _triggers_path(symbol: str) -> Path:
+    return OUT / f"triggers_1h_{symbol}.jsonl"
 
 
-def power() -> dict[str, object]:
-    four, hours, minutes, threshold = _four()
-    lookup = _daily()
+def _asset_daily(symbol: str) -> tuple[list[int], list[Decimal]]:
+    days = _aggregate(_vision_minutes(_dir(symbol), symbol), Timeframe.D1.ms)
+    return [d.close_ms for d in days], [d.close for d in days]
+
+
+def _closes(symbol: str) -> dict[int, float]:
+    """판독기가 본 "4h"(= 실제 1h, 시간 ×4, 거래량 0 뺌) 마감 → 종가."""
+    real_hours = _aggregate(_vision_minutes(_dir(symbol), symbol), Timeframe.H1.ms)
+    return {(h.open_ms * SCALE) + H4 - 1: float(h.close) for h in real_hours if h.volume > 0}
+
+
+def power_asset(symbol: str) -> dict[str, object]:
+    """자산 하나의 발동마다 모양 정보를 파일로 남긴다. 수익률은 계산하지 않는다."""
+    four, hours, minutes, threshold = _bars("1h", symbol)
+    lookup = _asset_daily(symbol)
     rows: list[dict[str, object]] = []
     for chunk in _chunks(four):
         (replay,) = replay_minute_groups_ladder(
@@ -220,6 +222,7 @@ def power() -> dict[str, object]:
             trend = _trend(lookup, _real(trig.close_ms))
             rows.append(
                 {
+                    "symbol": symbol,
                     "close_ms": trig.close_ms,
                     "real_close_ms": _real(trig.close_ms),
                     "d": trig.direction,
@@ -228,66 +231,87 @@ def power() -> dict[str, object]:
                 }
             )
     OUT.mkdir(parents=True, exist_ok=True)
-    with TRIGGERS.open("w", encoding="utf-8", newline="\n") as f:
+    path = _triggers_path(symbol)
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         for r in rows:
             f.write(json.dumps(r, sort_keys=True) + "\n")
-    close_at = {bar.close_ms: float(bar.close) for bar in four}
+    mix = Counter("|".join(str(x) for x in r["rank1"]) or "NONE" for r in rows)  # type: ignore[attr-defined]
+    return {
+        "symbol": symbol,
+        "real_hour_bars": len(four),
+        "triggers": len(rows),
+        "ht_all": sum(1 for r in rows if is_ht(r)),
+        "rank1_mix": dict(sorted(mix.items())),
+        "triggers_file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "note": "문서 98 §8 자산별 발동. 수익률은 계산하지 않았다.",
+    }
+
+
+def _load(symbol: str) -> list[dict[str, object]]:
+    raw = _triggers_path(symbol).read_bytes()
+    want = ASSET_SHA256.get(symbol, "")
+    if not want or hashlib.sha256(raw).hexdigest() != want:
+        raise SystemExit(f"{symbol} 발동 파일 해시가 고정값과 다르다 (또는 고정 전)")
+    return [json.loads(line) for line in raw.decode("utf-8").splitlines()]
+
+
+def _pooled(
+    rows: Sequence[dict[str, object]], closes: dict[str, dict[int, float]]
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """세 자산을 한 시간축에서 겹침 제거 (34 §9). 사건·대조 각각."""
+    usable = [r for r in rows if int(str(r["close_ms"])) + HORIZON * H4 in closes[str(r["symbol"])]]
+    return _thin([r for r in usable if is_ht(r)]), _thin([r for r in usable if not is_ht(r)])
+
+
+def gate() -> dict[str, object]:
+    rows = [r for s in SYMBOLS for r in _load(s)]
+    closes = {s: _closes(s) for s in SYMBOLS}
+    ev, co = _pooled(rows, closes)
     fwd = [
-        math.log(close_at[c + HORIZON * H4] / v)
-        for c, v in close_at.items()
-        if c + HORIZON * H4 in close_at
+        math.log(c[t + HORIZON * H4] / v)
+        for c in closes.values()
+        for t, v in c.items()
+        if t + HORIZON * H4 in c
     ]
     sd = pstdev(fwd)
+    mde = 2.84 * sd * math.sqrt(1 / len(ev) + 1 / len(co)) if ev and co else math.inf
 
     def year(r: dict[str, object]) -> str:
         return datetime.fromtimestamp(int(str(r["real_close_ms"])) / 1000, UTC).strftime("%Y")
 
-    per: dict[str, object] = {}
-    for hyp in ("H-T", "H-C1"):
-        ev, co = _usable(rows, close_at, hyp)
-        mde = 2.84 * sd * math.sqrt(1 / len(ev) + 1 / len(co)) if ev and co else math.inf
-        per[hyp] = {
-            "n1_events_independent": len(ev),
-            "n2_controls_independent": len(co),
-            "events_by_year": dict(sorted(Counter(year(r) for r in ev).items())),
-            "events_by_direction": dict(sorted(Counter(str(r["d"]) for r in ev).items())),
-            "mde": round(mde, 5),
-            "gate_threshold": round(GATE_SD_UNITS * sd, 5),
-            "gate_pass": mde <= GATE_SD_UNITS * sd,
-        }
     return {
-        "real_hour_bars": len(four),
-        "triggers": len(rows),
-        "ht_all": sum(1 for r in rows if is_ht(r)),
-        "hc1_all": sum(1 for r in rows if is_hc1(r)),
-        "rank1_mix": dict(sorted(Counter("|".join(r["rank1"]) or "NONE" for r in rows).items())),  # type: ignore[arg-type]
-        "sd_forward_30h_log_return": round(sd, 5),
-        "per_hypothesis": per,
-        "triggers_file_sha256": hashlib.sha256(TRIGGERS.read_bytes()).hexdigest(),
-        "note": "문서 98 관문. 사건 뒤 수익률은 계산하지 않았다.",
+        "triggers_per_asset": {s: sum(1 for r in rows if r["symbol"] == s) for s in SYMBOLS},
+        "ht_per_asset": {s: sum(1 for r in rows if r["symbol"] == s and is_ht(r)) for s in SYMBOLS},
+        "n1_events_independent": len(ev),
+        "n2_controls_independent": len(co),
+        "events_by_asset": dict(sorted(Counter(str(r["symbol"]) for r in ev).items())),
+        "events_by_year": dict(sorted(Counter(year(r) for r in ev).items())),
+        "events_by_direction": dict(sorted(Counter(str(r["d"]) for r in ev).items())),
+        "sd_pooled_30h": round(sd, 5),
+        "mde": round(mde, 5),
+        "gate_threshold": round(GATE_SD_UNITS * sd, 5),
+        "gate_pass": mde <= GATE_SD_UNITS * sd,
+        "note": "문서 98 §8 합친 관문. 사건 뒤 수익률은 계산하지 않았다.",
     }
 
 
-def verdict(hypothesis: str) -> dict[str, object]:
-    path = OUT / f"verdict_{hypothesis}.json"
+def verdict_pooled() -> dict[str, object]:
+    path = OUT / "verdict_H-T.json"
     if path.exists():
         raise SystemExit(f"이미 판정했다: {path}")
-    if not TRIGGERS_SHA256 or hypothesis not in EXPECTED_N:
-        raise SystemExit("발동 파일 해시·관문 수가 고정되지 않았거나 이 가설은 관문을 넘지 못했다")
-    raw = TRIGGERS.read_bytes()
-    if hashlib.sha256(raw).hexdigest() != TRIGGERS_SHA256:
-        raise SystemExit("발동 파일이 관문 때와 다르다")
-    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
-    four, _, _, _ = _four()
-    close_at = {bar.close_ms: float(bar.close) for bar in four}
-    ev, co = _usable(rows, close_at, hypothesis)
-    if (len(ev), len(co)) != EXPECTED_N[hypothesis]:
+    if EXPECTED_POOLED is None:
+        raise SystemExit("합친 관문 수가 고정되지 않았다")
+    rows = [r for s in SYMBOLS for r in _load(s)]
+    closes = {s: _closes(s) for s in SYMBOLS}
+    ev, co = _pooled(rows, closes)
+    if (len(ev), len(co)) != EXPECTED_POOLED:
         raise SystemExit(f"사건·대조 수가 관문과 다르다: {(len(ev), len(co))}")
 
     def r(row: dict[str, object], bars: int) -> float | None:
-        c = int(str(row["close_ms"]))
-        later = close_at.get(c + bars * H4)
-        return None if later is None else -int(str(row["d"])) * math.log(later / close_at[c])
+        c = closes[str(row["symbol"])]
+        t = int(str(row["close_ms"]))
+        later = c.get(t + bars * H4)
+        return None if later is None else -int(str(row["d"])) * math.log(later / c[t])
 
     def values(rows_: Sequence[dict[str, object]], bars: int) -> list[float]:
         return [v for v in (r(x, bars) for x in rows_) if v is not None]
@@ -295,26 +319,32 @@ def verdict(hypothesis: str) -> dict[str, object]:
     main = _welch(values(ev, HORIZON), values(co, HORIZON))
     diff = float(str(main["diff"]))
     p = float(str(main["p_one_sided_normal_approx"]))
+    per_asset: dict[str, object] = {}
+    for s in SYMBOLS:
+        e = [x for x in ev if x["symbol"] == s]
+        c = [x for x in co if x["symbol"] == s]
+        if len(e) > 1 and len(c) > 1:
+            per_asset[s] = _welch(values(e, HORIZON), values(c, HORIZON))
+    reached = [
+        v >= float(str(x["tri_a_pct"]))
+        for x in ev
+        if x["tri_a_pct"] is not None and (v := r(x, HORIZON)) is not None
+    ]
     record: dict[str, object] = {
-        "hypothesis": hypothesis,
+        "hypothesis": "H-T pooled BTC+ETH+SOL",
         "main_30h": main,
         "significant_0_025": p < ALPHA,
         "diff_exceeds_cost_0_19pct": diff > COST,
         "secondary_descriptive": {
+            "per_asset_30h": per_asset,
             "horizon_6h": _welch(values(ev, 6), values(co, 6)),
             "horizon_60h": _welch(values(ev, 60), values(co, 60)),
+            "thrust_reached_widest_leg_30h": round(sum(reached) / len(reached), 4)
+            if reached
+            else None,
         },
-        "note": "문서 98 1회 판정. p 는 정규 근사. 보조는 기술 통계(판정 아님).",
+        "note": "문서 98 §8 1회 판정. p 는 정규 근사. 보조는 기술 통계(판정 아님).",
     }
-    if hypothesis == "H-T":
-        reached = [
-            v >= float(str(x["tri_a_pct"]))
-            for x in ev
-            if x["tri_a_pct"] is not None and (v := r(x, HORIZON)) is not None
-        ]
-        record["secondary_descriptive"]["thrust_reached_widest_leg_30h"] = (  # type: ignore[index]
-            round(sum(reached) / len(reached), 4) if reached else None
-        )
     path.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return record
 
@@ -322,14 +352,14 @@ def verdict(hypothesis: str) -> dict[str, object]:
 def main(argv: list[str]) -> int:
     if argv == ["synthetic"]:
         result = synthetic()
-    elif argv == ["power"]:
-        result = power()
-    elif len(argv) == 2 and argv[0] == "verdict" and argv[1] in ("H-T", "H-C1"):
-        result = verdict(argv[1])
+    elif len(argv) == 2 and argv[0] == "power-asset" and argv[1] in SYMBOLS:
+        result = power_asset(argv[1])
+    elif argv == ["gate"]:
+        result = gate()
+    elif argv == ["verdict-pooled"]:
+        result = verdict_pooled()
     else:
-        raise SystemExit(
-            "usage: audit_ew98_triangle_correction.py synthetic|power|verdict H-T|H-C1"
-        )
+        raise SystemExit("usage: audit_ew98 synthetic|power-asset SYMBOL|gate|verdict-pooled")
     sys.stdout.write(json.dumps(result, ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
