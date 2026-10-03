@@ -29,7 +29,15 @@ from scripts import audit_ew98_triangle_correction as ew98  # noqa: E402
 SYMBOLS = ("XRPUSDT", "BNBUSDT", "ADAUSDT", "DOGEUSDT", "LTCUSDT", "LINKUSDT", "TRXUSDT")
 """문서 99 §2 — 2019-07 이전부터 Binance 현물 1m 이 있는 주요 코인 (BTC·ETH·SOL 제외)."""
 OUT = REPO_ROOT / "reports" / "research" / "elliott" / "99"
-ASSET_SHA256: dict[str, str] = {}
+ASSET_SHA256: dict[str, str] = {
+    "XRPUSDT": "1b17bb36a807ffd63c6e943701a2c9eeca3b4e6e85d1188f96207532365813ca",
+    "BNBUSDT": "02406dc1d8f090940ad04e169b0494e3f43a3e0ec9bd5fa815171c2e77740675",
+    "ADAUSDT": "de474afdc47917da7a153f949a7cac586e3f91c834231f4617b02c62aea5b3c3",
+    "DOGEUSDT": "4af5b196f9b7c08491c409ce942353a3ed6e86442a023ab9ff03fd9e10d22daf",
+    "LTCUSDT": "3261866e975a66330591361b9d2e5eb79bdd3bc40798e09ad2371202d875cbaa",
+    "LINKUSDT": "e016187ddf327b4c00982349ae15222de608ff793ec3e0bf9b9fafe40b80b4af",
+    "TRXUSDT": "a56a712c2f87ae87ce65d55b2a50cf8978c0b43b97ef1fee89edaa86b566b9f0",
+}
 """코인 → 발동 파일 SHA-256 (수익률 보기 전 고정)."""
 EXPECTED: tuple[int, int] | None = None
 """합친 관문의 (독립 사건, 독립 대조)."""
