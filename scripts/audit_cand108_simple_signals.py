@@ -21,7 +21,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
-from statistics import median, pstdev
+from statistics import NormalDist, median, pstdev
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 for _p in (REPO_ROOT, REPO_ROOT / "src"):
@@ -40,6 +40,26 @@ HORIZON_V = 24
 _MICROS = 10**14
 
 Bar = tuple[int, float, float, float, float, float]  # open_ms, o, h, l, c, quote volume
+
+CACHE_SHA256: dict[str, str] = {
+    "BTCUSDT": "541bb8aedd83b125e4cc9bca409bdfb06ff89f05edb79678ef798af1287d5d1c",
+    "ETHUSDT": "c61bfe42c126e9416595ea8fc46bfa30a4e044401bb69942a803400bbbd61430",
+    "SOLUSDT": "91d1ba2996d4af3192c1812cdeb1f0396bf0fc64c18ec449dc4471245c2c3620",
+    "XRPUSDT": "33f0ec9b48a6369f043deb039e2041866d757124bb6d3eb61c5b14e306360f4d",
+    "BNBUSDT": "fc63026cf6dc2d3334eb2a982582e9a0c09e4ce9d23f0a6c1b538a5ccf38a530",
+    "ADAUSDT": "db27845cdc1605d1ef3aaa20a8c3e15d03d2742cb6a8461e6c4e15ccf8c7d892",
+    "DOGEUSDT": "00fe3ee20a94d121bd50e529191fbcbba7068d5ccb3f93a79df6b1829518e513",
+    "LTCUSDT": "32762e2725cadb71c856dd9baf8e5495c9cd6f43572654769e45af4296da227a",
+    "LINKUSDT": "566b260dba0416b437e8eac60de4b3ebe3f3257d20411702a8201dc280b0c663",
+    "TRXUSDT": "d1a8665a2477b8a1d2379e62de38a5b3adaf17047e2ed535b0fcd594fdbb8338",
+}
+"""문서 108 §3: 측정 때의 1h 캐시 SHA-256 (판정 때 대조)."""
+EXPECTED_V: tuple[int, int] = (1251, 1866)
+"""문서 108 §4: H-V 독립 (사건, 대조) — 판정 때 그대로 나와야 한다."""
+ALPHA_V = 0.05
+COST = 0.0019
+REAL_PERP = 0.00023
+VERDICT_V = OUT / "verdict_V.json"
 
 
 def build() -> dict[str, object]:
@@ -183,11 +203,134 @@ def measure() -> dict[str, object]:
     return out
 
 
+def _tie(close_ms: int, symbol: str) -> str:
+    return hashlib.sha256(f"{close_ms}-{symbol}".encode()).hexdigest()
+
+
+Row = tuple[int, str, int]  # open_ms, symbol, 그 봉 방향 부호
+
+
+def _thin_rows(rows: list[Row], horizon: int) -> list[Row]:
+    kept: list[Row] = []
+    last = -(10**18)
+    for r in sorted(rows, key=lambda x: (x[0], _tie(x[0], x[1]))):
+        if r[0] - last >= horizon * HOUR:
+            kept.append(r)
+            last = r[0]
+    return kept
+
+
+def _welch(a: list[float], b: list[float]) -> dict[str, float]:
+    ma, mb = sum(a) / len(a), sum(b) / len(b)
+    va = sum((x - ma) ** 2 for x in a) / (len(a) - 1)
+    vb = sum((x - mb) ** 2 for x in b) / (len(b) - 1)
+    se = math.sqrt(va / len(a) + vb / len(b))
+    z = (ma - mb) / se
+    return {
+        "n1": len(a),
+        "n2": len(b),
+        "mean_event": round(ma, 6),
+        "mean_control": round(mb, 6),
+        "diff": round(ma - mb, 6),
+        "t": round(z, 3),
+        "p_two_sided": round(2 * (1 - NormalDist().cdf(abs(z))), 5),
+    }
+
+
+def verdict_v() -> dict[str, object]:
+    """H-V 한 번 판정 (문서 108 §4): 그 봉 방향 부호의 24 시간 수익, 사건 − 대조, 양쪽 검정."""
+    if VERDICT_V.exists():
+        raise SystemExit(f"이미 판정했다: {VERDICT_V}")
+    for sym in SYMBOLS:
+        if hashlib.sha256((CACHE / f"{sym}.csv").read_bytes()).hexdigest() != CACHE_SHA256[sym]:
+            raise SystemExit(f"{sym} 1h 캐시가 측정 때와 다르다")
+    events: list[Row] = []
+    controls: list[Row] = []
+    closes: dict[str, dict[int, float]] = {}
+    for symbol in SYMBOLS:
+        lookup: dict[int, float] = {}
+        for seg in load(symbol):
+            c = [b[4] for b in seg]
+            for b in seg:
+                lookup[b[0]] = b[4]
+            rets = [0.0] + [math.log(c[t] / c[t - 1]) for t in range(1, len(seg))]
+            s1 = sum(rets[1:WINDOW])
+            s2 = sum(x * x for x in rets[1:WINDOW])
+            window_vol = sorted(b[5] for b in seg[0:WINDOW])
+            for t in range(WINDOW, len(seg) - HORIZON_V):
+                if t > WINDOW:
+                    old, new = rets[t - WINDOW], rets[t - 1]
+                    s1 += new - old
+                    s2 += new * new - old * old
+                    window_vol.pop(bisect.bisect_left(window_vol, seg[t - WINDOW - 1][5]))
+                    bisect.insort(window_vol, seg[t - 1][5])
+                n = WINDOW - 1
+                sd = math.sqrt(max(0.0, (s2 - s1 * s1 / n) / n))
+                if sd <= 0 or abs(rets[t]) < MOVE_SD * sd:
+                    continue
+                row: Row = (seg[t][0], symbol, 1 if rets[t] > 0 else -1)
+                if seg[t][5] >= VOL_MULT * median(window_vol):
+                    events.append(row)
+                else:
+                    controls.append(row)
+        closes[symbol] = lookup
+    ev, co = _thin_rows(events, HORIZON_V), _thin_rows(controls, HORIZON_V)
+    if (len(ev), len(co)) != EXPECTED_V:
+        raise SystemExit(f"수가 측정과 다르다: {(len(ev), len(co))}")
+
+    def r(row: Row, h: int) -> float | None:
+        c = closes[row[1]]
+        later = c.get(row[0] + h * HOUR)
+        return None if later is None else row[2] * math.log(later / c[row[0]])
+
+    def vals(rows: list[Row], h: int) -> list[float]:
+        return [v for v in (r(x, h) for x in rows) if v is not None]
+
+    main = _welch(vals(ev, HORIZON_V), vals(co, HORIZON_V))
+    diff, p = main["diff"], main["p_two_sided"]
+    groups: dict[str, list[float]] = {}
+    for x in ev:
+        v = r(x, HORIZON_V)
+        if v is None:
+            continue
+        year = datetime.fromtimestamp(x[0] / 1000, UTC).strftime("%Y")
+        for key in (f"symbol={x[1]}", f"year={year}", f"dir={x[2]}"):
+            groups.setdefault(key, []).append(v)
+    if p < ALPHA_V and diff > COST:
+        call = "continuation hypothesis (재현 필요)"
+    elif p < ALPHA_V and diff < -COST:
+        call = "reversal hypothesis (재현 필요)"
+    elif p < ALPHA_V:
+        call = "significant but below cost"
+    else:
+        call = "no evidence"
+    record = {
+        "H-V": {
+            "main_24h": main,
+            "call": call,
+            "reference_realistic_cost_abs_net": round(abs(diff) - REAL_PERP, 6),
+            "descriptive": {
+                "h4": _welch(vals(ev, 4), vals(co, 4)),
+                "h72": _welch(vals(ev, 72), vals(co, 72)),
+                "groups_mean_R": {
+                    k: {"n": len(v), "mean": round(sum(v) / len(v), 6)}
+                    for k, v in sorted(groups.items())
+                },
+            },
+        },
+        "note": "문서 108 §4 1 회 판정. p 는 정규 근사, 양쪽. 보조는 기술 통계.",
+    }
+    VERDICT_V.write_text(json.dumps(record, ensure_ascii=False, indent=1), encoding="utf-8")
+    return record
+
+
 def main(argv: list[str]) -> int:
     if argv == ["build"]:
         result = build()
     elif argv == ["measure"]:
         result = measure()
+    elif argv == ["verdict-v"]:
+        result = verdict_v()
     else:
         raise SystemExit("usage: audit_cand108_simple_signals.py build | measure")
     sys.stdout.write(json.dumps(result, indent=1) + "\n")
