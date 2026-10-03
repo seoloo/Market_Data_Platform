@@ -6,7 +6,8 @@
     python -m scripts.lt_paper update   # 한국투자증권에서 최근 일봉을 받아 붙인다 (읽기 전용)
     python -m scripts.lt_paper run      # 처리 안 한 거래일을 엔진으로 처리, 보고서
     python -m scripts.lt_paper news     # 무료 RSS 뉴스 제목 모으기 (주도주·보유 종목 포함)
-    python -m scripts.lt_paper daily    # update + run + news (예약 작업용)
+    python -m scripts.lt_paper ai       # 그날 뉴스로 ChatGPT 판단 기록 (키 없으면 건너뜀)
+    python -m scripts.lt_paper daily    # update + run + news + ai (예약 작업용)
     python -m scripts.lt_paper status
 
 자료 ``data/lt_paper/bars/<SYM>.csv`` (111 연구 자료는 그대로), 상태 ``data/lt_paper/state.json``,
@@ -302,6 +303,102 @@ def news() -> dict[str, object]:
     return summary
 
 
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+DEFAULT_MODEL = "gpt-4o-mini"
+AI = ROOT / "ai"
+
+
+def ai() -> dict[str, object]:
+    """그날 모은 뉴스로 ChatGPT 판단 기록 (문서 115 2 단계). 키 없으면 건너뜀. 매매에 안 씀."""
+    import hashlib
+    import os
+
+    import httpx
+
+    from auto_trading.config.secrets import load_openai_key, read_env_file
+    from auto_trading.ops.news_ai import build_messages, compare, parse_reply
+
+    key = load_openai_key(REPO / ".env")
+    if key is None:
+        return {"skipped": "OPENAI_API_KEY 또는 CHATGPT_KEY 가 .env 에 없다"}
+    latest = REPORTS / "latest.json"
+    report = json.loads(latest.read_text(encoding="utf-8"))
+    news_file = (report.get("news_shadow") or {}).get("file")
+    if not news_file:
+        return {"skipped": "그날 뉴스 기록이 없다 — news 먼저"}
+    items = [
+        json.loads(line)
+        for line in (REPO / news_file).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    meta = json.loads(META.read_text(encoding="utf-8"))
+    universe = sorted(s for s in meta["exchanges"] if s != "SPY")
+    model = os.environ.get("CHATGPT_MODEL") or read_env_file(REPO / ".env").get(
+        "CHATGPT_MODEL", DEFAULT_MODEL
+    )
+    messages = build_messages(report, items, universe)
+    body = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        resp = httpx.post(
+            OPENAI_URL,
+            headers={"Authorization": f"Bearer {key.value}"},
+            json=body,
+            timeout=90,
+        )
+    except httpx.HTTPError as exc:
+        return {"error": f"연결 실패: {type(exc).__name__}"}
+    if resp.status_code != 200:
+        try:
+            message = str(resp.json().get("error", {}).get("message", ""))[:300]
+        except ValueError:
+            message = ""
+        return {"error": f"HTTP {resp.status_code}", "message": message}
+    payload = resp.json()
+    text = payload["choices"][0]["message"]["content"]
+    try:
+        judgement = parse_reply(text, universe)
+    except ValueError as exc:
+        return {"error": f"답 형식 오류: {exc}"}
+    mech = [str(x["symbol"]) for x in report.get("leaders") or []]
+    record = {
+        "date": report.get("date"),
+        "model": payload.get("model", model),
+        "asked_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "news_items_given": min(len(items), 150),
+        "news_latest_fetched_at": max((str(i.get("fetched_at", "")) for i in items), default=""),
+        "prompt_sha256": hashlib.sha256(
+            json.dumps(messages, ensure_ascii=False).encode()
+        ).hexdigest(),
+        "usage": payload.get("usage"),
+        "judgement": judgement,
+        "vs_mechanical": compare(mech, [x["symbol"] for x in judgement["leaders"]]),
+    }
+    AI.mkdir(parents=True, exist_ok=True)
+    (AI / f"{report.get('date')}.json").write_text(
+        json.dumps(record, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    summary = {
+        "model": record["model"],
+        "market_room": judgement["market_room"],
+        "confidence": judgement["confidence"],
+        "leading_sectors": judgement["leading_sectors"],
+        "leaders": [x["symbol"] for x in judgement["leaders"]],
+        "vs_mechanical": record["vs_mechanical"],
+        "summary": judgement["summary"],
+    }
+    report.setdefault("news_shadow", {})["ai_judgement"] = summary
+    latest.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    dated = REPORTS / f"{report['date']}.json"
+    if dated.exists():
+        dated.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"ok": True, "market_room": judgement["market_room"], "leaders": summary["leaders"]}
+
+
 def status() -> dict[str, object]:
     latest = REPORTS / "latest.json"
     return (
@@ -312,14 +409,21 @@ def status() -> dict[str, object]:
 
 
 def main(argv: list[str]) -> int:
-    commands = {"init": init, "update": update, "run": run, "news": news, "status": status}
+    commands = {
+        "init": init,
+        "update": update,
+        "run": run,
+        "news": news,
+        "ai": ai,
+        "status": status,
+    }
     if argv == ["daily"]:
-        result: dict[str, object] = {"update": update(), "run": run(), "news": news()}
+        result: dict[str, object] = {"update": update(), "run": run(), "news": news(), "ai": ai()}
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:
         raise SystemExit(
-            "usage: python -m scripts.lt_paper init | update | run | news | daily | status"
+            "usage: python -m scripts.lt_paper init | update | run | news | ai | daily | status"
         )
     sys.stdout.write(json.dumps(result, ensure_ascii=True, indent=1) + "\n")
     return 0

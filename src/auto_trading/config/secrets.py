@@ -15,9 +15,11 @@ from auto_trading.core.errors import ConfigError
 __all__ = [
     "BinanceCredentials",
     "KisCredentials",
+    "OpenAIKey",
     "TelegramCredentials",
     "load_binance_credentials",
     "load_kis_credentials",
+    "load_openai_key",
     "load_telegram_credentials",
     "read_env_file",
 ]
@@ -132,3 +134,27 @@ def load_kis_credentials(
         product_code=account[8:],
         trading_enabled=merged.get("KIS_TRADING_ENABLED", "").strip().lower() == "true",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class OpenAIKey:
+    """ChatGPT(OpenAI) API 키 — 문서 115 뉴스·AI 판단 기록용. 값은 보여 주지 않는다."""
+
+    value: str
+
+    def __repr__(self) -> str:
+        return "OpenAIKey(***)"
+
+    __str__ = __repr__
+
+
+def load_openai_key(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> OpenAIKey | None:
+    """``OPENAI_API_KEY`` 또는 ``CHATGPT_KEY`` (앞의 것 우선). 없으면 ``None`` (AI 판단 건너뜀)."""
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    for name in ("OPENAI_API_KEY", "CHATGPT_KEY"):
+        value = merged.get(name, "").strip()
+        if value:
+            return OpenAIKey(value)
+    return None
