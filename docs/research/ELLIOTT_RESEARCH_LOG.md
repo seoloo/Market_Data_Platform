@@ -92,6 +92,14 @@
 
 **정리:** 사람들이 많이 쓰는 도구일수록, 기계적으로 고정해 긴 기간을 보면 **앞 구간에서 좋다가 뒤 구간에서 사라지는** 모습이 반복된다(일목·차트 패턴 실패율 상승). 거래량 "확인"은 직관과 반대로 실패를 늘렸다.
 
+## 8d. 카운트 운용과 특수 모양 (6 회차)
+
+- **1-2-1-2 겹침(nest)**: ((1))-((2))-(1)-(2)-1-2 처럼 여러 단계의 1·2 파가 겹친 뒤 **"3 파의 3 파" 가속**이 온다는 실전 해설. 판독기는 지금 진행 중인 1·2 파를 못 읽는다(완성된 모양만). 🟡
+- **절단된 5 파**: 5 파가 3 파 끝을 못 넘음 — 대개 3 파가 크게 연장된 뒤, 약세 신호, 차트상 이중 천장처럼 보임. "백 번에 한 번" 수준이라 미리 맞힐 수 없다는 해설. 🟡
+- **주 카운트·대안 카운트**: 전문가들은 카운트를 하나로 정하지 않고 **무효화 가격**과 함께 두세 개를 들고 가다 가격이 확인해 주면 정리한다 — 이 프로젝트의 "시나리오 묶음 + 합의" 방식과 같은 생각. 🟡
+- **자동 단계(degree) 식별**: 공개 도구들은 민감도가 다른 지그재그 여러 개(미시·표준·거시)나 대칭 피벗 창(예: 좌우 8 봉)으로 단계를 나눈다. 판독기는 2%·4%·8%·16% 단계 사다리와 1h·4h 증거를 쓴다. 🟡
+- "Full Fractal System" 같은 공개 스크립트는 **다단계 파동 탐지 + 4 파 되돌림 진입**을 자동화한다 — 후보 C1(4 파 → 5 파)과 같은 발상. 성과는 검증 안 됨. 🟡
+
 ## 9. 여기서 나온 시험 후보 (사전 등록 전)
 
 | 후보 | 내용 | 판독기 필요 | 비고 |
@@ -100,6 +108,10 @@
 | C2 EWO 다이버전스로 5 파 끝 | 가격 새 고점 + EWO 낮은 고점 → T/v2 비중 줄이기(숏 아님) | 아니오 | 코인 숏 손실 이력 → 노출 조절로만 |
 | C3 종결 대각선 반전 | 2-4 선 이탈 → 시작점까지 | 예 (파서에 대각선 추가) | 94 §2 |
 | C4 판독기 보강 | EWO·거래량으로 3 파/5 파·5 파 연장 구분 | 예 | 93·96 의 오판 원인 후보 |
+
+## 출처 (6 회차)
+
+[Elliottwave-forecast — nest](https://elliottwave-forecast.com/elliottwave/dow-jones-and-copper-why-the-overlap-reveals-a-nest-and-signals-a-major-risk-on-acceleration/) · [LuxAlgo — Truncation](https://www.luxalgo.com/library/concept/truncation/) · [FXStreet — preferred/alternate count 예](https://www.fxstreet.com/analysis/elliott-wave-analysis-for-gbpusd/2014/03/31) · [MQL5 — 다단계 ABC](https://www.mql5.com/en/blogs/post/775112) · [TradingView — Full Fractal System](https://www.tradingview.com/script/aqioom9L-Elliott-Wave-Full-Fractal-System-Clean/)
 
 ## 출처 (5 회차)
 
