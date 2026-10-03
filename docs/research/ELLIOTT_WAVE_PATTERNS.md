@@ -87,7 +87,7 @@
 | 삼각형 E 끝 → 돌파 (BTC+ETH+SOL 1h) | **증거 없음, 부호는 +** — 차이 +0.15%p, p 0.27 (98 §11) |
 | 진행 중 1-2 파 → 3 파 · 4 파 → 5 파 · 종결 대각선 반전 · 복합 조정 | 미시험 (판독기 확장 필요한 것 포함) |
 
-삼각형만 따로 깊게 모은 자료: [ELLIOTT_TRIANGLES](ELLIOTT_TRIANGLES.md) (정통·NEoWave·Bulkowski 통계·꼭지점 시간·학계).
+조정파(불규칙·플랫 세분류·지그재그 세 종류·복합 조정·NEoWave·강세장 패턴)만 따로: [ELLIOTT_CORRECTIONS](ELLIOTT_CORRECTIONS.md). 삼각형만 따로 깊게 모은 자료: [ELLIOTT_TRIANGLES](ELLIOTT_TRIANGLES.md) (정통·NEoWave·Bulkowski 통계·꼭지점 시간·학계).
 
 ## 출처
 
