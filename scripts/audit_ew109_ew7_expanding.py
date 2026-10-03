@@ -41,8 +41,8 @@ OUT = REPO_ROOT / "reports" / "research" / "elliott" / "109"
 TRIGGERS = OUT / "triggers.jsonl"
 NAME = "H-ET7"
 M_HIGH = 3.0
-TRIGGERS_SHA256 = ""
-EXPECTED: tuple[int, int] | None = None
+TRIGGERS_SHA256 = "8d50175c7224f7ebfc71c4fdc49d462357f16f736840f37dcbba141713ee7a9f"
+EXPECTED: tuple[int, int] | None = (1596, 2544)
 """(독립 사건, 독립 대조). ``power`` 뒤(수익률 보기 전) 고정."""
 
 
