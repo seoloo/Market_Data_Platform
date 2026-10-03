@@ -37,8 +37,8 @@ ALPHA = 0.025
 COST = 0.0019
 REAL_PERP = 0.00023
 GATE_SD_UNITS = 0.254
-TRIGGERS_SHA256 = ""
-EXPECTED: dict[str, tuple[int, int]] | None = None
+TRIGGERS_SHA256 = "da952c8d0c0d49f52a67aca4cb0f4f3aac24b3229e4d1e0f4ea82fe7edb2a46f"
+EXPECTED: dict[str, tuple[int, int]] | None = {"H-RT6": (2366, 2498), "H-ET6": (2011, 2537)}
 """가설 → (독립 사건, 독립 대조). ``power`` 뒤(수익률 보기 전) 고정."""
 
 HYPOTHESES: dict[str, Callable[[dict[str, object]], bool]] = {
