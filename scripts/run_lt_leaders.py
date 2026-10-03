@@ -14,7 +14,7 @@ import math
 import statistics
 import sys
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
@@ -151,7 +151,7 @@ def simulate(panel: Panel, spy_ok: Sequence[bool], *, tax: bool = False) -> Run:
         run.trades.append(
             {
                 "symbol": sym,
-                "entry": days[i0],
+                "entry": days[int(i0)],
                 "exit": days[t],
                 "ret": round(proceeds / cost - 1, 4),
                 "reason": reason,
@@ -215,26 +215,30 @@ def equal_weight(panel: Panel) -> list[float]:
     hold: dict[str, float] = {}
     cash, out = 1.0, []
     pending = True
+
+    def value_of(book: Mapping[str, float], t: int) -> dict[str, float]:
+        vals: dict[str, float] = {}
+        for sym, q in book.items():
+            c = panel.close[sym][t]
+            if c is not None:
+                vals[sym] = q * c
+        return vals
+
     for t in range(start, len(days)):
-        values = {
-            s: q * panel.close[s][t] for s, q in hold.items() if panel.close[s][t] is not None
-        }  # type: ignore[operator]
+        values = value_of(hold, t)
         total = cash + sum(values.values())
         if pending:
-            live = [s for s, xs in panel.close.items() if xs[t] is not None]
-            each = total / len(live)
-            moved = sum(abs(each - values.get(s, 0.0)) for s in live) + sum(
-                v for s, v in values.items() if s not in live
+            prices = {sym: c for sym, xs in panel.close.items() if (c := xs[t]) is not None}
+            each = total / len(prices)
+            moved = sum(abs(each - values.get(sym, 0.0)) for sym in prices) + sum(
+                v for sym, v in values.items() if sym not in prices
             )
             total -= moved * FEE
-            each = total / len(live)
-            hold = {s: each / panel.close[s][t] for s in live}  # type: ignore[operator]
+            each = total / len(prices)
+            hold = {sym: each / c for sym, c in prices.items()}
             cash = 0.0
             pending = False
-        out.append(
-            cash
-            + sum(q * panel.close[s][t] for s, q in hold.items() if panel.close[s][t] is not None)
-        )  # type: ignore[operator]
+        out.append(cash + sum(value_of(hold, t).values()))
         if t + 1 < len(days) and days[t + 1][:7] != days[t][:7]:
             pending = True
     return out

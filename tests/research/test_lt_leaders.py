@@ -8,7 +8,8 @@ from scripts.run_lt_leaders import Panel, leaders, simulate, trend_up
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2008, 1, 1)
+    out: list[str] = []
+    d = date(2008, 1, 1)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())
