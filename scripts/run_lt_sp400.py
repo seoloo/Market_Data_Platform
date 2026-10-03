@@ -18,7 +18,7 @@ from scripts import run_sb_breakout as sb
 REPO = Path(__file__).resolve().parent.parent
 STOCKS = REPO / "data" / "research" / "stocks_sp400"
 OUT = REPO / "reports" / "lt_sp400"
-UNIVERSE_SHA256 = ""
+UNIVERSE_SHA256 = "ef82b7c25fd368cdc7e627388b603db7a458a595942036f3f3a17e8fa4acd232"
 """audit 뒤(수익 보기 전) 문서 114 와 함께 고정한다."""
 
 
