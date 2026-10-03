@@ -61,7 +61,11 @@ COST = 0.0019
 OUT = REPO_ROOT / "reports" / "research" / "elliott" / "98"
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 """문서 98 §8 — H-T 를 세 자산 합산으로."""
-ASSET_SHA256: dict[str, str] = {}
+ASSET_SHA256: dict[str, str] = {
+    "BTCUSDT": "2d101ab7622341400a7968c7a729356f19e454bbf86b1055ab50318074809a96",
+    "ETHUSDT": "bf85386454f96e7f0b18e594a211ddf454853da82f8540f7162901bb2efad709",
+    "SOLUSDT": "7f8619945248b40621e61aabbfd54c97a69adc8f0673c2302a0b26d476e13917",
+}
 """자산 → 발동 파일 SHA-256. ``power-asset`` 뒤(수익률 보기 전) 문서 98 과 함께 고정한다."""
 EXPECTED_POOLED: tuple[int, int] | None = None
 """합친 관문의 (독립 사건, 독립 대조) — 판정 때 그대로 나와야 한다."""
