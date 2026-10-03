@@ -171,7 +171,7 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "overseas":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
-        elif page == "lt_paper":
+        elif page in ("lt_paper", "qs_paper"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
             assert "실거래 비활성" in html
@@ -233,6 +233,56 @@ class TestRender:
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/lt-paper"') == 1
+
+    def test_qs_paper_page_reads_saved_report(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "qs_paper"
+        rep.mkdir(parents=True)
+        book = {
+            "value_usd": 997.5,
+            "invested_usd": 1000.0,
+            "return_on_invested": -0.0025,
+            "qqq_usd": 997.5,
+            "tqqq_usd": 0.0,
+            "cash_usd": 0.0,
+            "tax_paid_usd": 0.0,
+            "today": [EVIL],
+            "next_session_if_trend_holds": "없음",
+        }
+        (rep / "latest.json").write_text(
+            json.dumps(
+                {
+                    "date": "2026-10-02",
+                    "qqq_close": 749.58,
+                    "tqqq_close": 81.01,
+                    "trend_for_next_session": {"as_of": "2026-10-02", "on": True, "r20": 0.04},
+                    "books": {"QS": book, "A": book, "AG": {**book, "value_usd": 1234.5}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        state = root / "data" / "qs_paper"
+        state.mkdir(parents=True)
+        (state / "state.json").write_text(
+            json.dumps(
+                {
+                    "books": {
+                        "AG": {
+                            "equity": [["2026-10-02", 997.5]],
+                            "trades": [{"date": "2026-10-02", "side": "BUY_TQQQ", "usd": 1000}],
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "qs_paper")
+        assert "TQQQ 전환" in html and "켜짐" in html and "$1,234.50" in html
+        assert "TQQQ 매수" in html
+        assert EVIL not in html
+        nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+        assert nav.count('href="/qs-paper"') == 1
 
     def test_overview_has_draft_sections(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview")
