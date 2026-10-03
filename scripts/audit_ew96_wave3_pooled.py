@@ -39,7 +39,10 @@ ASSETS = {
         "setups_1h.jsonl",
         "b34943e78a16f5eaa8336aa2cddbe0419ff763458826fae42d583a097a9f8628",
     ),
-    "ETHUSDT": ("setups_1h_ETHUSDT.jsonl", ""),
+    "ETHUSDT": (
+        "setups_1h_ETHUSDT.jsonl",
+        "6d45c7535fe687502b875fe26fb0745e67f45babdac7d854bc3fb3ef393f03e1",
+    ),
 }
 """자산 → (셋업 파일, SHA-256). ETH 해시는 셋업을 센 뒤(손익 보기 전) 문서 96 과 함께 고정한다."""
 OUT = REPO_ROOT / "reports" / "research" / "elliott" / "96"
