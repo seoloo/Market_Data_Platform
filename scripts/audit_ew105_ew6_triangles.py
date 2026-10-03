@@ -42,7 +42,7 @@ EXPECTED: dict[str, tuple[int, int]] | None = {"H-RT6": (2366, 2498), "H-ET6": (
 """가설 → (독립 사건, 독립 대조). ``power`` 뒤(수익률 보기 전) 고정."""
 
 OPEN = frozenset({"H-ET6"})
-"""문서 106 §5: 헛검출 관문을 통과한 갈래의 가설만 연다 (러닝 삼각형은 헛검출 13.9%·13.7% 로 미달)."""
+"""문서 106 §5: 헛검출 관문 통과 갈래의 가설만 연다 (러닝 삼각형 헛검출 13.9%·13.7% 미달)."""
 HYPOTHESES: dict[str, Callable[[dict[str, object]], bool]] = {
     "H-RT6": lambda r: "RUNNING_TRIANGLE" in r["five"],  # type: ignore[operator]
     "H-ET6": lambda r: "EXPANDING_TRIANGLE" in r["five"],  # type: ignore[operator]
