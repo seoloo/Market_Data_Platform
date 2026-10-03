@@ -177,7 +177,7 @@ def primary_label(events: Sequence[Ew6Event]) -> str:
     return "NONE"
 
 
-# ---------------------------------------------------------------- EW-6b: 극단 다리 조합 (문서 104 §6)
+# ------------------------------------------------ EW-6b: 극단 다리 조합 (문서 104 §6)
 
 LOOKBACK_PIVOTS = 40
 
@@ -214,22 +214,56 @@ def extremal_vertex_sets(
     return out
 
 
-def ew6b_labels(pivots: Sequence[Pivot6], k: int) -> tuple[frozenset[str], frozenset[str]]:
+def ew6b_labels(
+    pivots: Sequence[Pivot6], k: int, lookback: int = LOOKBACK_PIVOTS
+) -> tuple[frozenset[str], frozenset[str]]:
     """k 에서 끝나는 극단 다리 조합 중 어느 하나라도 맞는 (5 다리 갈래, 3 다리 갈래)."""
     five: set[str] = set()
     three: set[str] = set()
-    for vs in extremal_vertex_sets(pivots, k, 5):
+    for vs in extremal_vertex_sets(pivots, k, 5, lookback):
         five |= classify_five([pivots[i].price for i in vs])
-    for vs in extremal_vertex_sets(pivots, k, 3):
+    for vs in extremal_vertex_sets(pivots, k, 3, lookback):
         three |= classify_three([pivots[i].price for i in vs])
     return frozenset(five), frozenset(three)
 
 
-def ew6b_events(bars: Sequence[Candle], m: float = 2.0) -> list[Ew6Event]:
+def ew6b_events(
+    bars: Sequence[Candle], m: float = 2.0, lookback: int = LOOKBACK_PIVOTS
+) -> list[Ew6Event]:
     """가장 촘촘한 단계 m 의 꼭짓점 위에서 극단 다리 조합으로 판독 (확정 봉 순)."""
     piv = adaptive_pivots(bars, m)
     events = []
     for k in range(len(piv)):
-        five, three = ew6b_labels(piv, k)
+        five, three = ew6b_labels(piv, k, lookback)
+        events.append(Ew6Event(m, piv[k], five, three))
+    return events
+
+
+# ------------------------------------------------ EW-6c: 가장 뚜렷한 조합 하나 (문서 106)
+
+
+def _min_leg(pivots: Sequence[Pivot6], vs: Sequence[int]) -> float:
+    return min(abs(math.log(pivots[b].price / pivots[a].price)) for a, b in pairwise(vs))
+
+
+def dominant_vertex_set(
+    pivots: Sequence[Pivot6], k: int, legs: int, lookback: int = LOOKBACK_PIVOTS
+) -> tuple[int, ...] | None:
+    """극단 다리 조합 중 **가장 작은 다리가 가장 큰** 조합 하나 (동점은 시작이 늦은 쪽)."""
+    sets = extremal_vertex_sets(pivots, k, legs, lookback)
+    if not sets:
+        return None
+    return max(sets, key=lambda vs: (_min_leg(pivots, vs), vs[0]))
+
+
+def ew6c_events(bars: Sequence[Candle], m: float = 2.0) -> list[Ew6Event]:
+    """EW-6b 와 같은 꼭짓점·극단 다리지만, 3·5 다리마다 가장 뚜렷한 조합 하나만 판독."""
+    piv = adaptive_pivots(bars, m)
+    events = []
+    for k in range(len(piv)):
+        v5 = dominant_vertex_set(piv, k, 5)
+        v3 = dominant_vertex_set(piv, k, 3)
+        five = classify_five([piv[i].price for i in v5]) if v5 else frozenset()
+        three = classify_three([piv[i].price for i in v3]) if v3 else frozenset()
         events.append(Ew6Event(m, piv[k], five, three))
     return events
