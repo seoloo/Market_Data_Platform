@@ -51,7 +51,7 @@
 - **같음(equality):** 3 파가 연장되면 5 파 ≈ 1 파(또는 0.618 배).
 - **채널:** 2·4 파 끝을 잇는 선과 3 파 끝을 지나는 평행선이 5 파 끝을 가리킴.
 - **조정의 깊이:** 조정은 흔히 **한 단계 작은 4 파 자리**까지 되돌린다.
-- **거래량·모멘텀:** 3 파에서 거래량 최대, 5 파는 모멘텀 다이버전스가 흔하다.
+- **거래량·모멘텀:** 3 파에서 거래량 최대, 5 파는 거래량이 줄고 모멘텀 다이버전스가 흔하다. **5 파 거래량이 3 파만큼 크면 5 파 연장을 예상**한다는 지침 — 이 판독기는 거래량을 쓰지 않는다(5 파 연장을 5 파 끝으로 오판할 수 있는 빈칸, 96 의 "B 넘어 취소 298" 과 관련 가능, 미검증).
 
 ## 5. 파동의 성격 (Prechter "wave personality")
 
@@ -71,6 +71,7 @@
 - 다우지수 비율이 피보나치 근처에 우연 이상으로 몰리지 않았다(Batchelor & Ramyar 2006).
 - Mandelbrot: "파동 예측은 객관적 숫자보다 차트 해석자의 주관이 더 중요한 기술(art)". Aronson: 규칙이 느슨하고 중첩 파동을 얼마든지 가정할 수 있어 **어떤 과거든 맞출 수 있다**.
 - Neely: 당시엔 대단한 발견이지만 시장은 변했는데 정통 엘리엇은 그대로다.
+- **전문가 예측 성적:** CXO Advisory 의 예측 평가에서 Prechter 적중률 약 21%(전체 평균 47%), 2002~2012 그 신호를 따른 포트폴리오는 연 −18.1%. Hulbert Financial Digest: Elliott Wave Theorist 의 트레이더용 타이밍 조언이 **20 년 동안 추적한 타이밍 전략 중 꼴찌**(2009). 장기 예측이라 표본이 작다는 단서는 있다.
 → 그래서 이 프로젝트는 판독기를 고정하고, 한 해석으로 정하지 않고(시나리오 묶음), 사전 등록 뒤 한 번 판정한다.
 
 ## 7. 이 프로젝트가 시험한 쓰임 (2026-10-03)
@@ -88,6 +89,8 @@
 삼각형만 따로 깊게 모은 자료: [ELLIOTT_TRIANGLES](ELLIOTT_TRIANGLES.md) (정통·NEoWave·Bulkowski 통계·꼭지점 시간·학계).
 
 ## 출처
+
+[CXO Advisory — Robert Prechter 평가](https://www.cxoadvisory.com/individual-gurus/robert-prechter/) · [Investsmart — Elliott backwash(Hulbert 인용)](https://www.investsmart.com.au/investment-news/elliott-backwash/62366) · [StockCharts — 거래량 지침](https://chartschool.stockcharts.com/table-of-contents/market-analysis/elliott-wave-analysis-articles/guidelines-for-applying-elliott-wave-theory) ·
 
 [Wikipedia — Elliott wave principle](https://en.wikipedia.org/wiki/Elliott_wave_principle) ·
 [LuxAlgo — Elliott guidelines](https://www.luxalgo.com/library/concept/elliott-guidelines/) ·
