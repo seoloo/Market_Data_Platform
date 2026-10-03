@@ -41,6 +41,8 @@ TRIGGERS_SHA256 = "da952c8d0c0d49f52a67aca4cb0f4f3aac24b3229e4d1e0f4ea82fe7edb2a
 EXPECTED: dict[str, tuple[int, int]] | None = {"H-RT6": (2366, 2498), "H-ET6": (2011, 2537)}
 """가설 → (독립 사건, 독립 대조). ``power`` 뒤(수익률 보기 전) 고정."""
 
+OPEN = frozenset({"H-ET6"})
+"""문서 106 §5: 헛검출 관문을 통과한 갈래의 가설만 연다 (러닝 삼각형은 헛검출 13.9%·13.7% 로 미달)."""
 HYPOTHESES: dict[str, Callable[[dict[str, object]], bool]] = {
     "H-RT6": lambda r: "RUNNING_TRIANGLE" in r["five"],  # type: ignore[operator]
     "H-ET6": lambda r: "EXPANDING_TRIANGLE" in r["five"],  # type: ignore[operator]
@@ -188,6 +190,9 @@ def verdict() -> dict[str, object]:
             raise SystemExit(f"{name} 수가 관문과 다르다: {(len(ev), len(co))}")
         if not gate_info[name]["gate_pass"]:
             record[name] = {"opened": False, "note": "관문 미달 — 수익률 미열람"}
+            continue
+        if name not in OPEN:
+            record[name] = {"opened": False, "note": "문서 106 헛검출 관문 미달 — 수익률 미열람"}
             continue
         main = _welch(values(ev, HORIZON), values(co, HORIZON))
         diff = float(str(main["diff"]))
