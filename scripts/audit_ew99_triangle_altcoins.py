@@ -39,7 +39,7 @@ ASSET_SHA256: dict[str, str] = {
     "TRXUSDT": "a56a712c2f87ae87ce65d55b2a50cf8978c0b43b97ef1fee89edaa86b566b9f0",
 }
 """코인 → 발동 파일 SHA-256 (수익률 보기 전 고정)."""
-EXPECTED: tuple[int, int] | None = None
+EXPECTED: tuple[int, int] | None = (401, 2510)
 """합친 관문의 (독립 사건, 독립 대조)."""
 HORIZON, H4 = ew98.HORIZON, ew98.H4
 ALPHA = 0.05
