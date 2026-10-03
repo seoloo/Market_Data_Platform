@@ -5,7 +5,8 @@
     python -m scripts.lt_paper init     # 처음 한 번: 111 자료를 Paper 폴더로 복사, 가상 1,000 USD
     python -m scripts.lt_paper update   # 한국투자증권에서 최근 일봉을 받아 붙인다 (읽기 전용)
     python -m scripts.lt_paper run      # 처리 안 한 거래일을 엔진으로 처리, 보고서
-    python -m scripts.lt_paper daily    # update + run (예약 작업용)
+    python -m scripts.lt_paper news     # 무료 RSS 뉴스 제목 모으기 (주도주·보유 종목 포함)
+    python -m scripts.lt_paper daily    # update + run + news (예약 작업용)
     python -m scripts.lt_paper status
 
 자료 ``data/lt_paper/bars/<SYM>.csv`` (111 연구 자료는 그대로), 상태 ``data/lt_paper/state.json``,
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from auto_trading.ops.lt_paper import PaperState, step, trend_up
+from auto_trading.ops.news_rss import FEEDS, YAHOO_TICKER, NewsItem, dedupe, parse_feed
 
 REPO = Path(__file__).resolve().parent.parent
 RESEARCH = REPO / "data" / "research" / "stocks"
@@ -32,6 +34,8 @@ BARS = ROOT / "bars"
 STATE = ROOT / "state.json"
 META = ROOT / "meta.json"
 REPORTS = REPO / "reports" / "lt_paper"
+NEWS = ROOT / "news"
+UA = "AutoTradingResearch/1.0 (https://github.com/seoloo; personal research) httpx"
 START_CASH = 1_000.0
 FULL_SINCE = "2007-08-01"
 OVERLAP_DAYS = 30
@@ -247,6 +251,57 @@ def _report(
     }
 
 
+def news() -> dict[str, object]:
+    """고정 출처 + 주도주·보유 종목 Yahoo 뉴스. 같은 기사는 하나만, 실패 출처는 건너뜀."""
+    import httpx
+
+    latest = REPORTS / "latest.json"
+    report = json.loads(latest.read_text(encoding="utf-8")) if latest.exists() else {}
+    symbols = sorted(
+        {x["symbol"] for x in report.get("leaders", [])}
+        | {x["symbol"] for x in report.get("positions", [])}
+    )
+    urls = dict(FEEDS)
+    urls.update({f"yahoo_{s}": YAHOO_TICKER.format(symbol=s) for s in symbols})
+    fetched_at = datetime.now(UTC).isoformat(timespec="seconds")
+    items: list[NewsItem] = []
+    failed: list[str] = []
+    with httpx.Client(headers={"User-Agent": UA}, timeout=20, follow_redirects=True) as client:
+        for name, url in urls.items():
+            try:
+                resp = client.get(url)
+                resp.raise_for_status()
+            except Exception:
+                failed.append(name)
+                continue
+            got = parse_feed(resp.text, name, fetched_at)
+            if not got:
+                failed.append(name)
+            items.extend(got)
+    items = dedupe(items)
+    NEWS.mkdir(parents=True, exist_ok=True)
+    day = report.get("date") or fetched_at[:10]
+    path = NEWS / f"{day}.jsonl"
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
+        for it in items:
+            fh.write(json.dumps(it.to_json(), ensure_ascii=False) + "\n")
+    summary = {
+        "file": str(path.relative_to(REPO)),
+        "items": len(items),
+        "sources_ok": len(urls) - len(failed),
+        "sources_failed": failed,
+        "fetched_at": fetched_at,
+        "ai_judgement": None,
+    }
+    if report:
+        report["news_shadow"] = summary
+        latest.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+        dated = REPORTS / f"{report['date']}.json"
+        if dated.exists():
+            dated.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    return summary
+
+
 def status() -> dict[str, object]:
     latest = REPORTS / "latest.json"
     return (
@@ -257,13 +312,15 @@ def status() -> dict[str, object]:
 
 
 def main(argv: list[str]) -> int:
-    commands = {"init": init, "update": update, "run": run, "status": status}
+    commands = {"init": init, "update": update, "run": run, "news": news, "status": status}
     if argv == ["daily"]:
-        result: dict[str, object] = {"update": update(), "run": run()}
+        result: dict[str, object] = {"update": update(), "run": run(), "news": news()}
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:
-        raise SystemExit("usage: python -m scripts.lt_paper init | update | run | daily | status")
+        raise SystemExit(
+            "usage: python -m scripts.lt_paper init | update | run | news | daily | status"
+        )
     sys.stdout.write(json.dumps(result, ensure_ascii=True, indent=1) + "\n")
     return 0
 
