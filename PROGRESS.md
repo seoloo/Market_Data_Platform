@@ -3,6 +3,12 @@
 최종 갱신: 2026-10-03 · 작성: Opus (Elliott 재시험 93).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-03 — Elliott 삼각형 돌파 H-T (문서 98): BTC+ETH+SOL 관문 통과, 판정 대기
+
+- 새 seed 합성 점검: H-T 통과(삼각형 1 등 70.7%/64.7%, 오판 0.2%) · H-C1 근소 미달(충격파 끝 오판 30.7%) → H-C1 진행 안 함.
+- SOL 1m 73 개(SHA 일치) + 사용자 요청으로 BTC·ETH 포함(§8, 사건 세기 전 정정; BTC 는 93 에서 전체 발동 평균만 노출).
+- 1 등 삼각형 617 → 한 시간축 겹침 제거 독립 사건 361 · 대조 2,498, 합친 SD 5.13%, **MDE 0.82%p ≤ 1.30%p 통과**. `EXPECTED_POOLED=(361,2498)` 고정, **사용자 승인 대기**.
+
 ## 2026-10-03 — Elliott 조정파·삼각형 연구 (문서 97·98, 참고 자료 2 개)
 
 - 사용자: "왜 5파에만 집중하나 · 모든 파동 포함 · 삼각수렴 반드시 고려 · 꼬리 무는 검색으로 많이". 참고 자료 [ELLIOTT_WAVE_PATTERNS](docs/research/ELLIOTT_WAVE_PATTERNS.md)(전체 패턴·규칙·지침·성격·단계·비판) · [ELLIOTT_TRIANGLES](docs/research/ELLIOTT_TRIANGLES.md)(EWI·NEoWave·Bulkowski 통계·꼭지점·학계).
