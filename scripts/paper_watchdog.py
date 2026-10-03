@@ -83,6 +83,9 @@ O/v3 는 2026-09-26 사용자 결정(docs/research/82 §4 B)으로
 PHASE7_START_MS = int(datetime(2026, 9, 25, tzinfo=UTC).timestamp() * 1000)
 OVERLAY_START_MS = int(datetime(2026, 9, 26, tzinfo=UTC).timestamp() * 1000)
 """O/v2 선물 실행기 테스트넷 운영 시작 (docs/research/54). 이전 기록은 개발 중 실행이다."""
+OVERLAY_END_MS = int(datetime(2026, 10, 2, 23, 59, 59, tzinfo=UTC).timestamp() * 1000)
+"""선물 실행기 훈련 끝 (9/26~10/02 7 일, 사용자가 작업을 끔 — docs/research/54). 그 뒤로는 그날에
+멈춘 시계로 요약해 '밀림' 경고를 내지 않는다."""
 """Phase 7 매일 훈련 운영 시작 (docs/research/26). 이전 기록은 개발 중 실행이다."""
 
 
@@ -153,7 +156,7 @@ def overlay_drill_status(now_ms: int) -> tuple[list[str], list[Finding]]:
             broken.append(path.name)
     lines, findings = check_testnet_drill(
         reports,
-        now_ms,
+        min(now_ms, OVERLAY_END_MS),
         since_ms=OVERLAY_START_MS,
         window_days=7,
         ledger="선물 실행기",

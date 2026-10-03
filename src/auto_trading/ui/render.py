@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from html import escape
 from pathlib import Path
 
+from auto_trading.ui.ag_render import ag_paper_page
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
@@ -33,10 +34,11 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("overseas", "/overseas", "해외 주식"),
     ("lt_paper", "/lt-paper", "주도주 Paper"),
     ("qs_paper", "/qs-paper", "QS Paper"),
+    ("ag_paper", "/ag-paper", "AG Paper"),
     ("research", "/research", "연구 기록"),
 )
-_STOCK_PAGES = frozenset({"overseas", "lt_paper", "qs_paper"})
-_PAPER_PAGES = frozenset({"lt_paper", "qs_paper"})
+_STOCK_PAGES = frozenset({"overseas", "lt_paper", "qs_paper", "ag_paper"})
+_PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper"})
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
 _COLORS = {
@@ -105,7 +107,9 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         f'<a href="/lt-paper" class="{"on" if page == "lt_paper" else ""}">'
         "주도주 Paper</a>"
         f'<a href="/qs-paper" class="{"on" if page == "qs_paper" else ""}">'
-        "QS Paper</a></div>"
+        "QS Paper</a>"
+        f'<a href="/ag-paper" class="{"on" if page == "ag_paper" else ""}">'
+        "AG Paper</a></div>"
     )
     title = next(label for key, _, label in PAGES if key == page)
     errors = (
@@ -559,6 +563,7 @@ _RENDER = {
     "overseas": accumulate_page,
     "lt_paper": lt_paper_page,
     "qs_paper": qs_paper_page,
+    "ag_paper": ag_paper_page,
     "research": _research,
 }
 

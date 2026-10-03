@@ -3,6 +3,12 @@
 최종 갱신: 2026-10-03 · 작성: Opus (EW-5 · 문서 100~102).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-04 — AG Paper 시작 (문서 117) · 선물 실행기 훈련 끝 뒤 오탐 경고 제거
+
+- 112 AG-US(QS Paper 의 AG 장부) · AG-CR(오버레이 원장 `ag_cr3`, 노출 3 배·비상 스톱 −20%·계좌 정지 없음, 1,000 USD 환산) · AG-MIX(반반, 해마다 재조정)를 매일 기록, 300 USD 정리선. 대시보드 `/ag-paper`. 예약 작업 `AutoTrading_AG_Paper` 매일 21:17 은 사용자 등록.
+- 점검: 선물 실행기 테스트넷 훈련은 10/02 에 끝나 작업이 꺼져 있는데 매일 "훈련 N일 밀림" WARN 이 났다 → 10/02 23:59 UTC 에 멈춘 시계로 요약(`OVERLAY_END_MS`).
+- LT·QS Paper 예약 작업에 StartWhenAvailable·WakeToRun 이 빠져 있었다(등록 명령에 설정 없음) → 사용자에게 고치는 명령 안내.
+
 ## 2026-10-03 — QS Paper 시작 (문서 116)
 
 - 110 QS · 비교 A(매달 QQQ) · 112 AG-US(1,000 USD 한 번, TQQQ/현금) 세 장부를 실제 QQQ·TQQQ 종가로 매일 기록. 엔진은 110·112 백테스트를 하루씩 재현(시험). 10-02 종가 시작: 추세 켜짐 → QS·A QQQ, AG-US TQQQ, 셋 다 997.5 USD. 대시보드 `/qs-paper`. 예약 작업 `AutoTrading_QS_Paper` 21:15 화~토는 사용자 등록.

@@ -11,6 +11,7 @@ T/v2 Paper(`run_paper_t2.py`)와 원장이 분리돼 있다. 이 스크립트는
     python scripts/run_paper_o1.py verify   # 저장된 원장을 첫날부터 다시 계산해 어긋남 확인
     python scripts/run_paper_o1.py run --ledger o2   # O/v2(비상 스톱 −20%) 별도 원장 (28)
     python scripts/run_paper_o1.py run --ledger o3   # O/v3(2배 + 비상 스톱) 한 달 관찰 (31)
+    python scripts/run_paper_o1.py run --ledger ag   # AG-CR(3배, 정지 없음) — ag_paper.py 가 부름
 
 ``--ledger`` 를 주지 않으면 O/v1 이다 — O/v1 스케줄은 인자 없이 돌린다.
 O/v1 과 O/v2 는 원장(strategy_id)·보고서 폴더가 다르고 서로의 기록을 읽지 않는다.
@@ -53,6 +54,10 @@ REPO = Path(__file__).resolve().parent.parent
 DB = REPO / "data" / "trading.db"
 
 
+AG_CR3 = OverlayConfig(exposure=3.0, catastrophe_stop=0.20, halt_drawdown=1.0)
+"""112 ``CR3`` 와 같다 (scripts/run_ag_small.py)."""
+
+
 @dataclass(frozen=True, slots=True)
 class Ledger:
     name: str
@@ -66,6 +71,9 @@ LEDGERS = {
     "o2": Ledger("O/v2", "o2_stop", O2_STOP, REPO / "reports" / "paper" / "o2"),
     # 2026-09-26 부터 계좌 정지 40% (docs/research/82 §4 B). 정지가 난 적 없어 과거 행과 결과가 같다
     "o3": Ledger("O/v3", "o3_2x", O3_2X_LIMIT40, REPO / "reports" / "paper" / "o3"),
+    # 문서 117 AG Paper: 112 AG-CR 그대로 — 노출 3 배, 비상 스톱 −20%, 계좌 정지 끔(−70% 정리선은
+    # scripts/ag_paper.py 가 1,000 USD 환산 뒤 적용)
+    "ag": Ledger("AG-CR", "ag_cr3", AG_CR3, REPO / "reports" / "paper" / "ag_cr"),
 }
 _DAY = 86_400_000
 

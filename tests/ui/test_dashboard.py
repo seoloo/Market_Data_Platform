@@ -171,7 +171,7 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "overseas":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
-        elif page in ("lt_paper", "qs_paper"):
+        elif page in ("lt_paper", "qs_paper", "ag_paper"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
             assert "실거래 비활성" in html
@@ -283,6 +283,37 @@ class TestRender:
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/qs-paper"') == 1
+
+    def test_ag_paper_page_reads_saved_report(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "ag_paper"
+        rep.mkdir(parents=True)
+        (rep / "latest.json").write_text(
+            json.dumps(
+                {
+                    "date": "2026-10-03",
+                    "books": {
+                        "AG-US": {"value_usd": 997.5, "return": -0.0025, "trades": []},
+                        "AG-CR": {
+                            "value_usd": 1012.3,
+                            "exposure": 1.87,
+                            "status": EVIL,
+                            "next_target_weights": {"BTCUSDT": 0.36},
+                        },
+                        "AG-MIX": {"value_usd": 280.0, "stopped": "2026-10-03"},
+                    },
+                    "paths": {"AG-CR": {"2026-10-02": 1000.0, "2026-10-03": 1012.3}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "ag_paper")
+        assert "소액 공격형" in html and "$1,012.30" in html and "BTC 108%" in html
+        assert "정리됨 2026-10-03" in html
+        assert EVIL not in html
+        nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+        assert nav.count('href="/ag-paper"') == 1
 
     def test_overview_has_draft_sections(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview")

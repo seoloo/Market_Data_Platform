@@ -47,4 +47,12 @@ $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Fri
 Register-ScheduledTask -TaskName "AutoTrading_QS_Paper" -Action $a -Trigger $t
 ```
 
+2026-10-04: 위 명령에 설정이 빠져 StartWhenAvailable(놓치면 켤 때 실행)·WakeToRun(절전에서 깨워 실행)이 꺼진 채 등록됐다. 고치는 명령(LT 도 같다):
+
+```powershell
+$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun
+Set-ScheduledTask -TaskName "AutoTrading_QS_Paper" -Settings $s
+Set-ScheduledTask -TaskName "AutoTrading_LT_Paper" -Settings $s
+```
+
 PC 가 꺼져 있던 날은 다음 실행이 밀린 거래일을 모두 처리한다.
