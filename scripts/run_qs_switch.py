@@ -248,7 +248,9 @@ def fetch_tqqq() -> int:
         load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
     )
     try:
-        bars = broker.daily_history("TQQQ", since="2010-02-01", until=TO, adjusted=True)
+        bars = broker.daily_history(
+            "TQQQ", since="2010-02-01", until=TO, exchange="NAS", adjusted=True
+        )
     finally:
         broker.close()
     path = DATA / "TQQQ_adj.csv"
