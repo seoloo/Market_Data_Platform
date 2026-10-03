@@ -55,6 +55,9 @@
 | Lo·Mamaysky·Wang 2000 (미국 주식 1962~1996) | 커널 회귀 패턴 인식 | 일부 차트 패턴은 추가 정보 | 🟢 |
 | Kotyrba·Volná 외 2012·2013 | 신경망 인식 | 모양 인식 정확도 높음 — 수익 검증 아님 | 🟡 |
 
+| Vantuch·Zelinka·Vasant 2018 (*Intelligent Decision Technologies* 12(1)) | 엘리엇 패턴 탐지 알고리즘 + 미완성 패턴에 랜덤 포레스트·SVM | 주식 **추세 방향 정확도 70% 이상** — 수익·비용·미래 정보 차단 여부 불명 | 🟡 |
+| ElliottAgents 2024 (*Applied Sciences* 14, 11897) | 대형 언어모델 다중 에이전트 + RAG + 강화학습 백테스트, 주식·코인 | "정확도 개선" — 수치·비용 미확인 | 🟡 |
+
 **정리:** 사람이 카운트한 연구는 긍정적인 경우가 있지만 방법이 불분명하고, **기계적으로 고정해 통계 검정한 연구는 부정적**이다 — 이 프로젝트의 93·96·98 과 같은 방향.
 
 ## 7. 전문가 예측 성적
@@ -68,6 +71,12 @@
 - 한국: 블록미디어 — BTC 2022 저점 16,625 → 2025 고점 124,753 을 5 파로 카운트(3 파 106,141 · 4 파 76,272 · 5 파 124,753). 🟡 (사후 카운트)
 - 코인은 5 파 연장이 흔하다(원자재처럼)는 실전 관찰 다수 🟡.
 
+## 8b. 가까운 도구들 (4 회차)
+
+- **Bill Williams (*Trading Chaos*)**: **AO(Awesome Oscillator) = 중간가 5 봉 − 34 봉 단순이평** — EWO(5/35)와 거의 같은 도구로 엘리엇 파동을 센다. 5 봉 프랙탈(가운데 봉이 양옆보다 높거나 낮음)로 전환점, Alligator(이평 3 개)로 추세. 🟡
+- **일목균형표 파동론(호소다)**: I 파(한 다리)·V 파(두 다리)·**N 파(세 다리, 기본 추세 단위)**, 수렴형 **P 파**(= 수렴 삼각형과 같은 모양)·확장형 Y 파. 시간론 기본수 **9·17·26**(합성 33·42·65·76), "진행 중인 구간은 끝난 구간 길이를 닮는다". 가격 목표: A-B-C 에서 **N**(첫 다리를 되돌림 저점에서) · **E**(첫 다리를 첫 고점 위에) · **V**(되돌림 깊이를 고점 위에) · **NT**(A~C 를 C 에서). 🟡
+- **교대 지침**: 통계 수치는 찾지 못함 — "2 파는 단순 ABC(지그재그)가 4 파보다 흔하다" 수준의 해설만. 🟡
+
 ## 9. 여기서 나온 시험 후보 (사전 등록 전)
 
 | 후보 | 내용 | 판독기 필요 | 비고 |
@@ -77,7 +86,12 @@
 | C3 종결 대각선 반전 | 2-4 선 이탈 → 시작점까지 | 예 (파서에 대각선 추가) | 94 §2 |
 | C4 판독기 보강 | EWO·거래량으로 3 파/5 파·5 파 연장 구분 | 예 | 93·96 의 오판 원인 후보 |
 
-## 출처 (이번 회차)
+## 출처 (4 회차)
+
+[Bill Williams 지표 (AvaTrade)](https://www.avatrade.com.au/education/technical-analysis-indicators-strategies/bill-williams-indicators) · [LuxAlgo — Ichimoku theories](https://www.luxalgo.com/library/concept/ichimoku-theories/) ·
+[Vantuch 외 2018](https://khub.utp.edu.my/scholars/10880) · [ElliottAgents 2024](https://www.citedrive.com/en/discovery/large-language-models-and-the-elliott-wave-principle-a-multi-agent-deep-learning-approach-to-big-data-analysis-in-financial-markets) · [LuxAlgo — Elliott guidelines(교대)](https://www.luxalgo.com/library/concept/elliott-guidelines/)
+
+## 출처 (3 회차)
 
 [LuxAlgo — 5/35 oscillator](https://www.luxalgo.com/library/concept/5-35-oscillator/) · [thinkorswim — Elliot Oscillator](https://toslc.thinkorswim.com/center/reference/Tech-Indicators/studies-library/E-F/ElliotOscillator) ·
 [eSignal — Type I Buy](https://scanner.esignal.com/help/type_i_buy.html) · [eSignal — Oscillator pullback](https://scanner.esignal.com/help/oscillator_pullback.html) · [eSignal — PTI](https://scanner.esignal.com/help/pti.html) · [eSignal KB — PTI](https://kb.esignal.com/hc/en-us/articles/6362167496603-Advanced-GET-PTI-Profit-Taking-Index) · [eSignal 포럼 — 140% 규칙](https://forum.esignal.com/forum/product-data-category/advanced-get/advanced-get-studies-scanner/7395-elliot-oscillator-140-exceeded) ·
