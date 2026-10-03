@@ -50,3 +50,8 @@ AVAX·DOT 는 2020 년 상장이라 기준 밖. 내려받기는 사용자 허락
 ## 6. 코드
 
 `scripts/audit_ew99_triangle_altcoins.py power-asset SYMBOL | gate | verdict` (98 의 판독·모양 함수를 그대로 가져다 쓴다).
+
+## 7. 자료 (2026-10-03)
+
+사용자 허락("받아서 진행해줘") 뒤 7 코인 1m **689 개 전부 공식 SHA-256 일치** (XRP 100 · BNB 106 · ADA 101 · DOGE 86 · LTC 105 · LINK 92 · TRX 99, 합 1,149.4 MB).
+`data/external/binance_vision/spot/<코인>/1m/` — Git 제외. 다음: 코인별 `power-asset`(수익률 없음).
