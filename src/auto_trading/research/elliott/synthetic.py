@@ -312,6 +312,7 @@ def build_path(
     parent_threshold: float,
     noise_sd: float,
     market: MarketNoise | None = None,
+    lead_w1: float | None = None,
 ) -> SyntheticPath:
     """상승 impulse(5-3-5-3-5)·zigzag(5-3-5)·flat(3-3-5)·수렴 triangle(3-3-3-3-3) 하나와
     앞뒤 진입·이탈 직선. ``market`` 이 있으면 문서 103 시장형 흔들림을 더한다(없으면 기존)."""
@@ -338,7 +339,8 @@ def build_path(
         top_waves = [(s, a * unit) for s, a in top_waves]
     else:
         raise ValueError(pattern)
-    lead = math.log(1 + 2 * parent_threshold)
+    # 문서 107: lead_w1 이 있으면 진입·이탈 다리 = 첫 다리 × lead_w1 (큰 추세 다리 뒤 패턴)
+    lead = math.log(1 + 2 * parent_threshold) if lead_w1 is None else lead_w1 * w1
     pieces: list[tuple[float, int]] = [(-lead, max(1, round(lead / SPEED_PER_MINUTE)))]
     nominal = [pieces[0][1]]
     nested = pattern in NESTED_PATTERNS

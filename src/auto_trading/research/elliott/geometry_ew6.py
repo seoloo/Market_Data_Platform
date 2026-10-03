@@ -267,3 +267,54 @@ def ew6c_events(bars: Sequence[Candle], m: float = 2.0) -> list[Ew6Event]:
         three = classify_three([piv[i].price for i in v3]) if v3 else frozenset()
         events.append(Ew6Event(m, piv[k], five, three))
     return events
+
+
+# ------------------------------------------------ EW-7: 큰 단위 맥락 (문서 107)
+
+TRIANGLES = frozenset({TRIANGLE, RUNNING_TRIANGLE, EXPANDING_TRIANGLE})
+CONTEXT_TOLERANCE_BARS = 2
+
+
+def five_leg_matches(
+    pivots: Sequence[Pivot6], k: int, lookback: int = LOOKBACK_PIVOTS
+) -> list[tuple[str, tuple[int, ...]]]:
+    """k 에서 끝나는 극단 다리 5 다리 조합 중 규칙에 맞는 (갈래, 꼭짓점 조합) 전부."""
+    out: list[tuple[str, tuple[int, ...]]] = []
+    for vs in extremal_vertex_sets(pivots, k, 5, lookback):
+        for label in classify_five([pivots[i].price for i in vs]):
+            out.append((label, vs))
+    return out
+
+
+def _context_ok(
+    low: Sequence[Pivot6], vs: Sequence[int], high: Sequence[Pivot6], as_of: int
+) -> bool:
+    """삼각형 시작점이 큰 단위 꼭짓점(같은 종류, ± 2 봉, ``as_of`` 봉까지 확정)이고,
+    그 꼭짓점으로 들어온 큰 다리가 삼각형 첫 다리보다 길다 (= 돌파 방향의 추세 다리)."""
+    start = low[vs[0]]
+    first_leg = abs(math.log(low[vs[1]].price / start.price))
+    for j in range(1, len(high)):
+        h = high[j]
+        if h.confirmed > as_of:
+            break
+        if h.kind == start.kind and abs(h.index - start.index) <= CONTEXT_TOLERANCE_BARS:
+            prior = abs(math.log(h.price / high[j - 1].price))
+            if prior >= first_leg:
+                return True
+    return False
+
+
+def ew7_events(bars: Sequence[Candle], m: float = 2.0, m_high: float = 4.0) -> list[Ew6Event]:
+    """EW-6b 의 삼각형 검출 중 큰 단위(m_high) 맥락을 만족하는 것만 남긴다. 다른 갈래는 비운다."""
+    low = adaptive_pivots(bars, m)
+    high = adaptive_pivots(bars, m_high)
+    events = []
+    for k in range(len(low)):
+        as_of = low[k].confirmed
+        five = {
+            label
+            for label, vs in five_leg_matches(low, k)
+            if label in TRIANGLES and _context_ok(low, vs, high, as_of)
+        }
+        events.append(Ew6Event(m, low[k], frozenset(five), frozenset()))
+    return events
