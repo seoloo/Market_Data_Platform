@@ -337,6 +337,24 @@ def run() -> dict[str, object]:
             "exit_reasons": dict(reasons),
             "top_symbols_sum_ret": dict(sorted(by_sym.items(), key=lambda x: -x[1])[:10]),
             "watch": watch,
+            "best_trades": sorted(lt.trades, key=lambda tr: -float(str(tr["ret"])))[:15],
+            "longest_holds": [
+                {**tr, "hold_days": h}
+                for tr, h in sorted(zip(lt.trades, holds, strict=True), key=lambda x: -x[1])[:15]
+            ],
+            "most_months_as_leader": {
+                sym: {
+                    "months": n,
+                    "trades": [tr for tr in lt.trades if tr["symbol"] == sym],
+                }
+                for sym, n in sorted(
+                    {
+                        s2: sum(1 for v in lt.leader_log.values() if s2 in v)
+                        for s2 in {x for v in lt.leader_log.values() for x in v}
+                    }.items(),
+                    key=lambda x: -x[1],
+                )[:15]
+            },
             "tax_paid_fraction_of_start": round(lt_tax.tax_paid, 3),
         },
         "note": "문서 113 1 회 판정. 생존 편향으로 절대 수익은 부풀려진다 — EW 비교가 주.",
