@@ -4,6 +4,7 @@
 
     python -m scripts.fetch_sb_universe tickers   # 위키백과 종목 목록 → stocks/universe.json
     python -m scripts.fetch_sb_universe bars      # 종목마다 일봉 (받은 종목은 건너뜀, 이어 받기)
+    python -m scripts.fetch_sb_universe tickers --index sp400   # 문서 114: S&P 400 → stocks_sp400/
 
 주문하지 않는다. 거래소 코드는 NAS → NYS → AMS 순서로 찾는다.
 """
@@ -23,9 +24,23 @@ REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "data" / "research" / "stocks"
 UNIVERSE = OUT / "universe.json"
 SINCE, UNTIL = "2007-08-01", "2026-08-31"
-PAGES = {
-    "sp500": "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+INDEXES = {
+    "sp500": ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "stocks"),
+    "sp400": ("https://en.wikipedia.org/wiki/List_of_S%26P_400_companies", "stocks_sp400"),
 }
+"""지수 → (위키백과 문서, 저장 폴더). 문서 111 은 sp500, 문서 114 는 sp400."""
+_index = "sp500"
+PAGES = {"sp500": INDEXES["sp500"][0]}
+
+
+def _use(index: str) -> None:
+    global OUT, UNIVERSE, PAGES, _index
+    _index = index
+    OUT = REPO / "data" / "research" / INDEXES[index][1]
+    UNIVERSE = OUT / "universe.json"
+    PAGES = {index: INDEXES[index][0]}
+
+
 EXCHANGES = ("NAS", "NYS", "AMS")
 _TICKER = re.compile(r"^[A-Z][A-Z.\-]{0,6}$")
 
@@ -89,12 +104,21 @@ def tickers() -> dict[str, object]:
         "User-Agent": "AutoTradingResearch/1.0 (https://github.com/seoloo; personal research) httpx"
     }
     lists: dict[str, list[str]] = {}
+    sectors: dict[str, str] = {}
     with httpx.Client(headers=headers, timeout=30, follow_redirects=True) as client:
         for name, url in PAGES.items():
             resp = client.get(url)
             resp.raise_for_status()
             lists[name] = _symbols_from(resp.text)
-    union = sorted(set(lists["sp500"]))
+            parser = _Tables()
+            parser.feed(resp.text)
+            head = parser.tables[0][0]
+            if "Symbol" in head and "GICS Sector" in head:
+                si, gi = head.index("Symbol"), head.index("GICS Sector")
+                for row in parser.tables[0][1:]:
+                    if len(row) > gi:
+                        sectors[row[si].strip()] = row[gi].strip()
+    union = sorted(set(lists[_index]))
     OUT.mkdir(parents=True, exist_ok=True)
     record = {
         "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -104,7 +128,11 @@ def tickers() -> dict[str, object]:
         "lists": lists,
     }
     UNIVERSE.write_text(json.dumps(record, indent=1), encoding="utf-8")
-    return {"counts": record["counts"], "union": len(union)}
+    if _index != "sp500" and sectors:  # sp500 섹터는 문서 113 에서 따로 받았다 (그대로 둔다)
+        (OUT / "sectors.json").write_text(
+            json.dumps({"source": PAGES[_index], "sectors": sectors}, indent=1), encoding="utf-8"
+        )
+    return {"counts": record["counts"], "union": len(union), "sectors": len(sectors)}
 
 
 def bars() -> dict[str, object]:
@@ -160,6 +188,10 @@ def bars() -> dict[str, object]:
 
 
 def main(argv: list[str]) -> int:
+    if "--index" in argv:
+        i = argv.index("--index")
+        _use(argv[i + 1])
+        argv = argv[:i] + argv[i + 2 :]
     if argv == ["tickers"]:
         result = tickers()
     elif argv == ["bars"]:
