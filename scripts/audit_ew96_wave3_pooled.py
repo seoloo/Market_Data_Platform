@@ -49,7 +49,7 @@ OUT = REPO_ROOT / "reports" / "research" / "elliott" / "96"
 VERDICT = OUT / "verdict.json"
 SD_R = 1.799
 MDE_GATE_R = 0.5
-EXPECTED: tuple[int, int, int] | None = None
+EXPECTED: tuple[int, int, int] | None = (76, 95, 151)
 """(BTC 체결, ETH 체결, 묶음) — ``fills`` 결과를 문서 96 에 적은 뒤 고정한다."""
 REALISTIC_COST_SIDE = 0.00023
 
