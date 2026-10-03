@@ -57,10 +57,25 @@ REAL_PERP, REAL_SPOT = 0.00023, 0.0011
 DESCRIPTIVE_HORIZONS = (4, 8, 32)
 _MICROS = 10**14
 
-CACHE_SHA256: dict[str, str] = {}
+CACHE_SHA256: dict[str, str] = {
+    "BTCUSDT": "0b5eebe0a13232a5bba0e1257eafa370b53567e81210bc884880b2cdaca2995c",
+    "ETHUSDT": "e1c250d5e141d3702c70ce0eb946290441d370ec68f220da51bc671782aad3dd",
+    "SOLUSDT": "22fc12a7bd29dd761bd8e09dbfde9793696f73d3d9c5d1f75d93b4a5170b21cc",
+    "XRPUSDT": "4835acf1b7d5ac02aba9b501281eb9a43bbabbfb45660ff0906beba63cb7b607",
+    "BNBUSDT": "c59b6310be088664496680780a5c0b6e1dc75f286ea280586c595b5ae8429802",
+    "ADAUSDT": "7ba90e032d801bc28d2f4865df244adca7da3021699bf170fee48d7652e3f970",
+    "DOGEUSDT": "48e327658e3720a3f64ece89d1c754e5d2a399c9f26bec096da47a3cd47ff14b",
+    "LTCUSDT": "47a118fdfe7ffac7005f2a44cf48be12b295585f0cab7133b75dd5ca7dd3ae25",
+    "LINKUSDT": "7bce09647ccccf7f869a82932cbfc643c7aa3dbdd4ba060e91a6d645e687b8f3",
+    "TRXUSDT": "bcbcec42ddad2ec65916bdd4eddf9ce677f946832acc6f67e059e5b76c0eb97b",
+}
 """코인 → 15 분 캐시 SHA-256. ``power`` 뒤(수익률 보기 전) 문서 101 과 함께 고정한다."""
-EVENTS_SHA256 = ""
-EXPECTED: dict[str, tuple[int, int]] | None = None
+EVENTS_SHA256 = "0dc08be1ead57b73a7a31c757c9d8ea15b4e3f72631812c413c7d167b681c0c9"
+EXPECTED: dict[str, tuple[int, int]] | None = {
+    "H-D": (11079, 19555),
+    "S1": (6777, 19555),
+    "S2": (6237, 19555),
+}
 """가설 → (독립 사건, 독립 대조). 판정 때 그대로 나와야 한다."""
 
 Bar = tuple[int, float, float, float, float]  # open_ms, open, high, low, close
