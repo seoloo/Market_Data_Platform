@@ -22,9 +22,11 @@ from auto_trading.research.elliott.parser import (
     as_grid_anchor,
     counted_at_four_hour,
 )
+from auto_trading.research.elliott.parser_ew5 import WaveParserV5
 from auto_trading.research.elliott.ranking import RankKey, rank_key
 from auto_trading.research.elliott.ranking_v2 import rank_key_v2
 from auto_trading.research.elliott.ranking_v3 import rank_key_v3
+from auto_trading.research.elliott.ranking_v5 import rank_key_v5
 
 __all__ = [
     "EW3E_LOOKBACK_BARS",
@@ -147,6 +149,7 @@ def trigger_candidates(
     lookback_bars: int | None = None,
     ew4: bool = False,
     nested: bool = False,
+    ew5: bool = False,
 ) -> tuple[list[Parse], int]:
     """E 로 끝나는 모든 시작 후보의 EW-3d′ 후보 전부와 시작 후보 수 (문서 34 §3 3~4).
 
@@ -158,7 +161,10 @@ def trigger_candidates(
     end = fine[j]
     if parser is None:
         closed = [bar for bar in hour_bars if bar.close_ms <= trigger.close_ms]
-        parser = WaveParser([as_grid_anchor(p) for p in fine], closed, nested=nested)
+        anchors = [as_grid_anchor(p) for p in fine]
+        parser = (
+            WaveParserV5(anchors, closed) if ew5 else WaveParser(anchors, closed, nested=nested)
+        )
     starts = [
         i
         for i in range(j - 3, -1, -2)
@@ -186,6 +192,16 @@ def trigger_candidates(
             for c in parser.pattern_candidates(i, j)
             if counted_at_four_hour(c, fine)
         ]
+        if ew5:
+            # 문서 100: 대각선·이중 지그재그·이중 3·확장/러닝 삼각형 (EW-5 파서일 때만)
+            if not isinstance(parser, WaveParserV5):
+                raise TypeError("ew5 에는 WaveParserV5 가 필요하다")
+            candidates += [
+                c
+                for i in ew4_starts
+                for c in parser.pattern_candidates_v5(i, j)
+                if counted_at_four_hour(c, fine)
+            ]
     return candidates, len(starts)
 
 
@@ -221,6 +237,7 @@ def scenario_list(
     lookback_bars: int | None = None,
     ew4: bool = False,
     nested: bool = False,
+    ew5: bool = False,
 ) -> ScenarioList:
     """모든 시작 후보의 후보를 ``rank_key`` 로 정렬한 시나리오 묶음. 확률이 아니다.
 
@@ -228,10 +245,16 @@ def scenario_list(
     (충격파·지그재그 값은 v1 과 같다).
     """
     candidates, _ = trigger_candidates(
-        trigger, hour_bars, parser=parser, lookback_bars=lookback_bars, ew4=ew4, nested=nested
+        trigger,
+        hour_bars,
+        parser=parser,
+        lookback_bars=lookback_bars,
+        ew4=ew4,
+        nested=nested,
+        ew5=ew5,
     )
     # 문서 61: ``nested`` 는 파서도 nested=True 로 만들어야 한다(넘긴 parser 는 호출자 책임)
-    ranker = rank_key_v3 if nested else rank_key_v2 if ew4 else rank_key
+    ranker = rank_key_v5 if ew5 else rank_key_v3 if nested else rank_key_v2 if ew4 else rank_key
     ranked = sorted(
         ((c, ranker(c, trigger.segment)) for c in candidates),
         key=lambda item: (item[1], item[0].pattern.value, item[0].bounds),
@@ -301,6 +324,7 @@ def scenario_lists(
     lookback_bars: int | None = None,
     ew4: bool = False,
     nested: bool = False,
+    ew5: bool = False,
 ) -> list[ScenarioList]:
     """:func:`evaluate_triggers` 와 같이 구간별 파서를 재사용해 발동마다 시나리오 묶음을 만든다."""
     groups: dict[tuple[int, int], list[int]] = {}
@@ -310,8 +334,11 @@ def scenario_lists(
     out: dict[int, ScenarioList] = {}
     for members in groups.values():
         longest = max((triggers[n] for n in members), key=lambda trig: len(trig.segment))
-        parser = WaveParser(
-            [as_grid_anchor(p) for p in longest.segment], list(hour_bars), nested=nested
+        anchors = [as_grid_anchor(p) for p in longest.segment]
+        parser = (
+            WaveParserV5(anchors, list(hour_bars))
+            if ew5
+            else WaveParser(anchors, list(hour_bars), nested=nested)
         )
         for n in members:
             out[n] = scenario_list(
@@ -322,5 +349,6 @@ def scenario_lists(
                 lookback_bars=lookback_bars,
                 ew4=ew4,
                 nested=nested,
+                ew5=ew5,
             )
     return [out[n] for n in range(len(triggers))]

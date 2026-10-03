@@ -52,6 +52,18 @@ class Label(StrEnum):
     """EW-4 (문서 60): 플랫 A-B-C (3-3-5) — 최상위 후보로만."""
     TRIANGLE = "TRIANGLE"
     """EW-4 (문서 60): 수렴 삼각형 A-B-C-D-E (3-3-3-3-3) — 최상위 후보로만."""
+    ENDING_DIAGONAL = "ENDING_DIAGONAL"
+    """EW-5 (문서 100): 종결 대각선 (3-3-3-3-3), 4 파가 1 파와 겹치고 수렴 — 최상위 후보로만."""
+    LEADING_DIAGONAL = "LEADING_DIAGONAL"
+    """EW-5: 선행 대각선 (5-3-5-3-5 읽기), 모양 규칙은 종결 대각선과 같다."""
+    DOUBLE_ZIGZAG = "DOUBLE_ZIGZAG"
+    """EW-5: 이중 지그재그 W-X-Y (가격을 늘림)."""
+    DOUBLE_THREE = "DOUBLE_THREE"
+    """EW-5: 이중 3 복합 조정 W-X-Y (옆걸음)."""
+    EXPANDING_TRIANGLE = "EXPANDING_TRIANGLE"
+    """EW-5: 확장 삼각형 A-B-C-D-E, 다리가 매번 100~150% 로 커짐."""
+    RUNNING_TRIANGLE = "RUNNING_TRIANGLE"
+    """EW-5: 러닝 삼각형 — B 가 A 시작을 넘고 그 뒤 수렴."""
 
 
 LEG_NEEDS: dict[Label, tuple[Label, ...]] = {}
@@ -78,6 +90,19 @@ LEG_NEEDS.update(
         Label.ZIGZAG: (Label.IMPULSE, Label.ZIGZAG, Label.IMPULSE),
         Label.FLAT: (Label.ZIGZAG, Label.ZIGZAG, Label.IMPULSE),
         Label.TRIANGLE: (Label.ZIGZAG,) * 5,
+        # EW-5 (문서 100) — 기존 네 모양의 값은 바꾸지 않는다
+        Label.ENDING_DIAGONAL: (Label.ZIGZAG,) * 5,
+        Label.LEADING_DIAGONAL: (
+            Label.IMPULSE,
+            Label.ZIGZAG,
+            Label.IMPULSE,
+            Label.ZIGZAG,
+            Label.IMPULSE,
+        ),
+        Label.DOUBLE_ZIGZAG: (Label.ZIGZAG,) * 3,
+        Label.DOUBLE_THREE: (Label.ZIGZAG,) * 3,
+        Label.EXPANDING_TRIANGLE: (Label.ZIGZAG,) * 5,
+        Label.RUNNING_TRIANGLE: (Label.ZIGZAG,) * 5,
     }
 )
 
@@ -93,8 +118,20 @@ NESTED_ALLOWED: dict[Label, tuple[frozenset[Label], ...]] = {
     Label.ZIGZAG: (frozenset({Label.IMPULSE}), _CORRECTIVE_FORMS, frozenset({Label.IMPULSE})),
     Label.FLAT: tuple(frozenset({need}) for need in LEG_NEEDS[Label.FLAT]),
     Label.TRIANGLE: tuple(frozenset({need}) for need in LEG_NEEDS[Label.TRIANGLE]),
+    # EW-5 (문서 100)
+    Label.ENDING_DIAGONAL: (frozenset({Label.ZIGZAG}),) * 5,
+    Label.LEADING_DIAGONAL: tuple(frozenset({need}) for need in LEG_NEEDS[Label.LEADING_DIAGONAL]),
+    Label.DOUBLE_ZIGZAG: (frozenset({Label.ZIGZAG}), _CORRECTIVE_FORMS, frozenset({Label.ZIGZAG})),
+    Label.DOUBLE_THREE: (
+        frozenset({Label.ZIGZAG, Label.FLAT}),
+        _CORRECTIVE_FORMS,
+        _CORRECTIVE_FORMS,
+    ),
+    Label.EXPANDING_TRIANGLE: (frozenset({Label.ZIGZAG}),) * 5,
+    Label.RUNNING_TRIANGLE: (frozenset({Label.ZIGZAG}),) * 5,
 }
-"""문서 61 (EW-4n): 다리 자리별로 검증으로 치는 모양 — 4파·B파에 플랫·수렴 삼각형 허용."""
+"""문서 61 (EW-4n): 다리 자리별로 검증으로 치는 모양 — 4파·B파에 플랫·수렴 삼각형 허용.
+EW-5 새 라벨은 문서 100 §4."""
 
 FLAT_B_MIN, FLAT_B_MAX = 0.618, 1.618
 """문서 60 §3.1 F1·F2: B/A 범위."""

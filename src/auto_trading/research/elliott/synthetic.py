@@ -19,6 +19,7 @@ from auto_trading.features.structure import SwingKind
 __all__ = [
     "BASE_W1",
     "CORRECTIVE",
+    "EW5_PATTERNS",
     "MOTIVE",
     "NESTED_PATTERNS",
     "SEED",
@@ -34,6 +35,10 @@ SPEED_PER_MINUTE = 0.00004
 """부모 파동의 1분당 로그 속도 — 1파 ≈ 31 개 4h 봉."""
 MOTIVE = "MOTIVE"
 CORRECTIVE = "CORRECTIVE"
+FLATLEG = "FLATLEG"
+"""EW-5 (문서 100): 이 다리를 플랫(3-3-5)으로 나눈다 — 이중 3 의 W·Y."""
+TRILEG = "TRILEG"
+"""EW-5: 이 다리를 수렴 삼각형으로 나눈다 — 이중 3 의 Y."""
 _BASE_PRICE = 30_000.0
 _ORIGIN_MS = 1_000 * Timeframe.H4.ms
 _CENT = Decimal("0.01")
@@ -151,6 +156,12 @@ def _nested(rng: random.Random, name: str) -> tuple[list[_Wave], dict[int, list[
 
 
 def _split(rng: random.Random, shape: str, amp: float, strict: bool = False) -> list[_Wave]:
+    if shape == FLATLEG:
+        return _flat_leg(rng, amp)
+    if shape == TRILEG:
+        legs = _triangle(rng, 1.0)
+        net = sum(a for _, a in legs)
+        return [(s, a * amp / net) for s, a in legs]
     if strict:
         return _motive_strict(rng, amp) if shape == MOTIVE else _zigzag_strict(rng, amp)
     return _motive(rng, amp) if shape == MOTIVE else _zigzag(rng, amp)
@@ -174,6 +185,72 @@ def _zigzag_strict(rng: random.Random, amp: float) -> list[_Wave]:
         unit = waves[0][1]
         if (waves[2][1] + waves[1][1]) / unit > _NO_TRUNCATION:  # C 끝 − A 끝
             return waves
+
+
+# ---------------------------------------------------------------- EW-5 (문서 100 §5)
+
+
+def _diagonal(rng: random.Random, leading: bool) -> list[_Wave]:
+    """대각선 1-2-3-4-5: 4 파가 1 파와 겹치고 2 파 끝 위, L1 > L3 > L5 · L2 > L4 · L5 > L4."""
+    side = MOTIVE if leading else CORRECTIVE
+    while True:
+        r2 = rng.uniform(0.5, 0.85)
+        k3 = rng.uniform(0.6, 0.95)
+        lo, hi = k3 - r2, min(k3, r2)  # q4 < q1 · q4 > q2 · L4 < L2
+        if k3 <= r2 or hi - lo < 0.05:
+            continue
+        l4 = rng.uniform(lo + 0.02, hi - 0.02)
+        top = 0.95 * k3  # L5 < L3
+        if top <= 1.05 * l4:
+            continue
+        l5 = rng.uniform(1.05 * l4, top)  # q5 > q3
+        return [(side, 1.0), (CORRECTIVE, -r2), (side, k3), (CORRECTIVE, -l4), (side, l5)]
+
+
+def _double_zigzag(rng: random.Random) -> list[_Wave]:
+    rx = rng.uniform(0.382, 0.786)
+    ky = rng.uniform(max(1.05 * rx, 0.618), 1.618)
+    return [(CORRECTIVE, 1.0), (CORRECTIVE, -rx), (CORRECTIVE, ky)]
+
+
+def _flat_leg(rng: random.Random, amp: float) -> list[_Wave]:
+    """이중 3 의 W·Y 플랫: 정규(B/A 0.786~1.0) · C 가 A 끝을 넘음 — 다리 끝이 극값."""
+    rb = rng.uniform(0.786, 1.0)
+    kc = rng.uniform(rb + 0.05, 1.5)
+    unit = amp / (1 - rb + kc)
+    return [(CORRECTIVE, unit), (CORRECTIVE, -rb * unit), (MOTIVE, kc * unit)]
+
+
+def _double_three(rng: random.Random) -> list[_Wave]:
+    """W(지그재그·플랫) − X(지그재그, W 의 60~95%) − Y(W 가 지그재그면 플랫·삼각형), 옆걸음."""
+    w = rng.choice([CORRECTIVE, FLATLEG])
+    y = rng.choice([FLATLEG, TRILEG] if w == CORRECTIVE else [CORRECTIVE, FLATLEG, TRILEG])
+    return [(w, 1.0), (CORRECTIVE, -rng.uniform(0.6, 0.95)), (y, rng.uniform(0.7, 1.3))]
+
+
+def _expanding_triangle(rng: random.Random) -> list[_Wave]:
+    sizes = [1.0]
+    for _ in range(4):
+        sizes.append(sizes[-1] * rng.uniform(1.05, 1.45))
+    return [(CORRECTIVE, s * (1 if k % 2 == 0 else -1)) for k, s in enumerate(sizes)]
+
+
+def _running_triangle(rng: random.Random) -> list[_Wave]:
+    sizes = [1.0, rng.uniform(1.05, 1.3)]
+    for _ in range(3):
+        sizes.append(sizes[-1] * rng.uniform(0.55, 0.85))
+    return [(CORRECTIVE, s * (1 if k % 2 == 0 else -1)) for k, s in enumerate(sizes)]
+
+
+EW5_PATTERNS: dict[str, object] = {
+    "ENDING_DIAGONAL": lambda rng: _diagonal(rng, leading=False),
+    "LEADING_DIAGONAL": lambda rng: _diagonal(rng, leading=True),
+    "DOUBLE_ZIGZAG": _double_zigzag,
+    "DOUBLE_THREE": _double_three,
+    "EXPANDING_TRIANGLE": _expanding_triangle,
+    "RUNNING_TRIANGLE": _running_triangle,
+}
+"""문서 100 §5: 새 합성 모양 이름 → 최상위 다리 만들기 (첫 다리 상승, 크기 1 기준)."""
 
 
 def _durations(rng: random.Random, amps: list[float], total: int) -> list[int]:
@@ -226,12 +303,18 @@ def build_path(
         top_waves = maker(rng, 1.0)
         unit = w1 / top_waves[0][1]
         top_waves = [(s, a * unit) for s, a in top_waves]
+    elif pattern in EW5_PATTERNS:
+        make = EW5_PATTERNS[pattern]
+        top_waves = make(rng)  # type: ignore[operator]
+        unit = w1 / top_waves[0][1]
+        top_waves = [(s, a * unit) for s, a in top_waves]
     else:
         raise ValueError(pattern)
     lead = math.log(1 + 2 * parent_threshold)
     pieces: list[tuple[float, int]] = [(-lead, max(1, round(lead / SPEED_PER_MINUTE)))]
     nominal = [pieces[0][1]]
     nested = pattern in NESTED_PATTERNS
+    ew5 = pattern in EW5_PATTERNS
     inner_edges: dict[
         int, tuple[int, int]
     ] = {}  # 안 모양 파동 → (첫 안쪽 다리, 마지막 안쪽 다리) 길이
@@ -251,10 +334,10 @@ def build_path(
             inner_edges[index] = (kid_minutes[0], kid_minutes[-1])
         else:
             minutes = max(1, round(abs(amp) / SPEED_PER_MINUTE * rng.uniform(0.7, 1.3)))
-            pieces.extend(_expand(rng, shape, amp, minutes, 2, strict=nested))
+            pieces.extend(_expand(rng, shape, amp, minutes, 2, strict=nested or ew5))
         # 새 패턴은 실제 조각 길이 합 (정답 꼭짓점을 조각 경계에서 찾는다), 기존 패턴은 그대로
         added = sum(m for _, m in pieces[before:])
-        nominal.append(nominal[-1] + (added if nested else minutes))
+        nominal.append(nominal[-1] + (added if nested or ew5 else minutes))
     exit_minutes = max(1, round(lead / SPEED_PER_MINUTE))
     pieces.append((-lead, exit_minutes))
     total = sum(m for _, m in pieces)
@@ -310,6 +393,17 @@ def build_path(
         start, end = windows[index], windows[index + 1]
         windows[index] = range(start.start, min(start.stop, nominal[index] + max(1, first // 2)))
         windows[index + 1] = range(max(end.start, nominal[index + 1] - last // 2), end.stop)
+    if ew5:
+        # 문서 100 §5: 끝 다리가 삼각형·플랫이면 반쪽 창의 극값이 진짜 끝이 아니다 —
+        # 꼭짓점은 조각 경계 ± (이웃 다리 중 짧은 쪽의 1/4) 안에서 찾는다
+        edges = [nominal[0], *(b - a for a, b in pairwise(nominal)), exit_minutes]
+        windows = [
+            range(
+                max(0, at - max(1, min(edges[k], edges[k + 1]) // 4)),
+                min(len(minutes_out), at + max(1, min(edges[k], edges[k + 1]) // 4) + 1),
+            )
+            for k, at in enumerate(nominal)
+        ]
     vertex_minutes: list[int] = []
     for kind, window in zip(kinds, windows, strict=True):
         if kind is SwingKind.HIGH:
