@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from itertools import pairwise
@@ -24,6 +25,7 @@ __all__ = [
     "NESTED_PATTERNS",
     "SEED",
     "SPEED_PER_MINUTE",
+    "MarketNoise",
     "SyntheticPath",
     "build_path",
 ]
@@ -278,15 +280,41 @@ def _expand(
     return out
 
 
+@dataclass(frozen=True, slots=True)
+class MarketNoise:
+    """문서 103 시장형 합성: 다리마다 실제 1m 로그수익 묶음을 끝점 고정(양 끝 0)으로 더한다.
+
+    ``returns`` 실제 1m 로그수익 열 · ``k`` 크기 배율 · ``step`` 실제 1 분이 합성 몇 분인가
+    (1h 설정은 4) · ``depth`` 교과서 하위 분할 깊이 (기존 2).
+    """
+
+    returns: Sequence[float]
+    k: float
+    step: int = 1
+    depth: int = 2
+
+
+def _bridge(rng: random.Random, noise: MarketNoise, length: int) -> list[float]:
+    """길이 ``length`` 분의 끝점 고정 누적 흔들림 (0 .. length, 양 끝 0)."""
+    need = -(-length // noise.step)
+    start = rng.randrange(0, len(noise.returns) - need)
+    path = [0.0]
+    for t in range(1, length + 1):
+        path.append(path[-1] + noise.returns[start + (t - 1) // noise.step] / noise.step)
+    end = path[-1]
+    return [noise.k * (v - end * t / length) for t, v in enumerate(path)]
+
+
 def build_path(
     rng: random.Random,
     pattern: str,
     scale: float,
     parent_threshold: float,
     noise_sd: float,
+    market: MarketNoise | None = None,
 ) -> SyntheticPath:
     """상승 impulse(5-3-5-3-5)·zigzag(5-3-5)·flat(3-3-5)·수렴 triangle(3-3-3-3-3) 하나와
-    앞뒤 진입·이탈 직선."""
+    앞뒤 진입·이탈 직선. ``market`` 이 있으면 문서 103 시장형 흔들림을 더한다(없으면 기존)."""
     w1 = BASE_W1 * scale
     children: dict[int, list[_Wave]] = {}
     if pattern in NESTED_PATTERNS:
@@ -315,6 +343,8 @@ def build_path(
     nominal = [pieces[0][1]]
     nested = pattern in NESTED_PATTERNS
     ew5 = pattern in EW5_PATTERNS
+    depth = 2 if market is None else market.depth
+    exact = nested or ew5 or market is not None
     inner_edges: dict[
         int, tuple[int, int]
     ] = {}  # 안 모양 파동 → (첫 안쪽 다리, 마지막 안쪽 다리) 길이
@@ -334,10 +364,10 @@ def build_path(
             inner_edges[index] = (kid_minutes[0], kid_minutes[-1])
         else:
             minutes = max(1, round(abs(amp) / SPEED_PER_MINUTE * rng.uniform(0.7, 1.3)))
-            pieces.extend(_expand(rng, shape, amp, minutes, 2, strict=nested or ew5))
+            pieces.extend(_expand(rng, shape, amp, minutes, depth, strict=nested or ew5))
         # 새 패턴은 실제 조각 길이 합 (정답 꼭짓점을 조각 경계에서 찾는다), 기존 패턴은 그대로
         added = sum(m for _, m in pieces[before:])
-        nominal.append(nominal[-1] + (added if nested or ew5 else minutes))
+        nominal.append(nominal[-1] + (added if exact else minutes))
     exit_minutes = max(1, round(lead / SPEED_PER_MINUTE))
     pieces.append((-lead, exit_minutes))
     total = sum(m for _, m in pieces)
@@ -352,6 +382,12 @@ def build_path(
         for step in range(1, minutes + 1):
             points.append(level + delta * step / minutes)
         level += delta
+    if market is not None:
+        spans = [(0, nominal[0]), *pairwise(nominal), (nominal[-1], len(points) - 1)]
+        for a, b in spans:
+            if b > a:
+                for t, v in enumerate(_bridge(rng, market, b - a)):
+                    points[a + t] += v
     noisy = [p + (rng.gauss(0.0, noise_sd) if noise_sd > 0 else 0.0) for p in points]
     prices = [Decimal(str(_BASE_PRICE * math.exp(v))).quantize(_CENT) for v in noisy]
     minutes_out = tuple(
@@ -393,7 +429,7 @@ def build_path(
         start, end = windows[index], windows[index + 1]
         windows[index] = range(start.start, min(start.stop, nominal[index] + max(1, first // 2)))
         windows[index + 1] = range(max(end.start, nominal[index + 1] - last // 2), end.stop)
-    if ew5:
+    if ew5 or market is not None:
         # 문서 100 §5: 끝 다리가 삼각형·플랫이면 반쪽 창의 극값이 진짜 끝이 아니다 —
         # 꼭짓점은 조각 경계 ± (이웃 다리 중 짧은 쪽의 1/4) 안에서 찾는다
         edges = [nominal[0], *(b - a for a, b in pairwise(nominal)), exit_minutes]
