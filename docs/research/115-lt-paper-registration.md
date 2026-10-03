@@ -1,6 +1,6 @@
 # 115 — LT Paper: 주도주 추세 보유를 앞으로의 자료로 기록 (가상 1,000 USD) — 등록
 
-작성: 2026-10-03 (Opus) · 트랙: Paper (주문 없음) · 상태: **등록 · 첫 실행 전.**
+작성: 2026-10-03 (Opus) · 트랙: Paper (주문 없음) · 상태: **관찰 시작 (2026-10-02 종가) · 뉴스 수집 1 단계 가동 · 예약 작업 등록은 사용자.**
 사용자 (2026-10-03): "둘 다 진행해줘" — (1) S&P 400 재현([114](114-leader-trend-sp400-replication.md)) (2) 앞으로의 자료로 Paper 관찰.
 방향 기준점: [DIRECTION_LEADER_TREND](DIRECTION_LEADER_TREND.md). 규칙: [113](113-leader-trend-hold-preregistration.md) 그대로.
 
@@ -36,3 +36,20 @@
 
 - 매달 첫 거래일 뒤: 산 종목·나간 종목·주도 섹터 변화를 짧게 보고.
 - 6 개월마다: 같은 기간 SPY·QQQ·고르게 들기와 비교 (기술 통계 — 판정은 아님).
+
+## 6. 시작 기록 (2026-10-03 실행, 2026-10-02 종가 기준)
+
+- `init` → `update`(504 종목 이어 받기, 실패 0) → `run` → `news`.
+- 주도 섹터(10-01 종가): 정보기술 · 헬스케어 · 에너지. SPY 200 일선 위. **50 일선 위 종목 비율 24.7%** (넓게 오르는 장은 아니다).
+- 가상 매수 10 종목(각 100 USD, 10-02 종가): HPE · MRNA · DELL · ILMN · CRWD · AMD · SMCI · NTAP · VLO · SWKS. 평가 997.5 USD (수수료 0.25%).
+- 뉴스: 16 개 출처(고정 6 + 주도주 Yahoo 10)에서 529 건, 실패 0 — `data/lt_paper/news/2026-10-02.jsonl`.
+
+## 7. 예약 작업 (사용자가 PowerShell 에서 등록)
+
+```powershell
+$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\lt_paper.py daily" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:30
+Register-ScheduledTask -TaskName "AutoTrading_LT_Paper" -Action $a -Trigger $t
+```
+
+PC 가 꺼져 있던 날은 다음 실행이 밀린 거래일을 모두 처리한다(`run` 은 마지막 처리일 뒤 모든 거래일을 처리). 대시보드 "놓친 작업 다시 실행" 도 `AutoTrading_*` 작업이라 함께 돈다.
