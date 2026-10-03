@@ -1,6 +1,6 @@
 """주도주 추세 Paper 화면 (docs/research/115) — 저장된 보고서·상태 파일만 읽는다. 주문 없음.
 
-출처: ``reports/lt_paper/latest.json`` (매일 07:30 KST 화~토) · ``data/lt_paper/state.json``.
+출처: ``reports/lt_paper/latest.json`` (매일 21:10 KST 화~토) · ``data/lt_paper/state.json``.
 모든 동적 문자열은 이스케이프한다.
 """
 

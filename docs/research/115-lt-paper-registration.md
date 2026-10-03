@@ -21,7 +21,7 @@
 
 ## 3. 운영
 
-- `python -m scripts.lt_paper daily` = 한국투자증권 최근 일봉 받기(읽기 전용) + 엔진. 매일 **07:30 KST (화~토)** — 미국 장 마감 뒤. 예약 작업 등록은 사용자가 한다(아래 명령).
+- `python -m scripts.lt_paper daily` = 한국투자증권 최근 일봉 받기(읽기 전용) + 엔진. 매일 **21:10 KST (화~토)** — 전날 미국 종가로 판단하므로 아침 7 시 무렵부터 그날 밤 미국 장이 열리기 전(서머타임 22:30 · 겨울 23:30)까지 언제 돌려도 결과가 같다. PC 가 켜져 있는 저녁으로 정했다(2026-10-03 사용자가 07:30 → 21:10 으로 바꿈). 예약 작업 등록은 사용자가 한다(아래 명령).
 - 자료 `data/lt_paper/bars/` (111 연구 자료는 건드리지 않는다), 상태 `data/lt_paper/state.json`, 보고 `reports/lt_paper/<날짜>.json` · `latest.json`.
 - 보고: 평가액·종목별 수익·고점 대비·다음 날 팔 종목·주도주 목록·주도 섹터·SPY 200 일선·50 일선 위 종목 비율.
 - 실제 주문은 없다. 이 Paper 는 실거래 승인 단계와 무관하다.
@@ -48,7 +48,7 @@
 
 ```powershell
 $a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\lt_paper.py daily" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"
-$t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:30
+$t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 21:10
 Register-ScheduledTask -TaskName "AutoTrading_LT_Paper" -Action $a -Trigger $t
 ```
 
