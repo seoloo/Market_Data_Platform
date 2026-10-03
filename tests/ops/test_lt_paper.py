@@ -28,13 +28,14 @@ def _panel(n: int) -> tuple[Panel, list[float | None]]:
     for k in range(60):
         sym = f"S{k:02d}"
         sector[sym] = ("Tech", "Energy", "Utilities", "Health")[k % 4]
-        v, xs = 100.0, []
+        v = 100.0
+        xs: list[float | None] = []
         for t in range(n):
             # 섹터·종목마다 다른 주기의 추세 → 주도주가 바뀌고 추세가 꺾인다
             v *= 1 + 0.002 * ((t // (40 + k)) % 3 - 1) + 0.0001 * (k % 4)
             xs.append(v)
         close[sym] = xs
-    spy = [100.0 * (1.0003**t) for t in range(n)]
+    spy: list[float | None] = [100.0 * (1.0003**t) for t in range(n)]
     return Panel(days, close, sector), spy
 
 
