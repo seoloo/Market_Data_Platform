@@ -55,6 +55,11 @@ GATE_READERS: dict[str, Callable[[Sequence[Candle]], list[Ew6Event]]] = {
     "ew6b": DEV_READERS["ew6b"],
     "ew7": DEV_READERS["ew7_h4"],
 }
+RETRY_SEEDS = (20261016, 20261017, 20261018)
+"""문서 107 §8: 재도전(마지막) — m_high 3, 새 seed 세 개 모두 통과해야 한다."""
+RETRY_READERS: dict[str, Callable[[Sequence[Candle]], list[Ew6Event]]] = {
+    "ew7_h3": DEV_READERS["ew7_h3"],
+}
 OUT = REPO_ROOT / "reports" / "research" / "elliott" / "107"
 
 
@@ -142,10 +147,31 @@ def evaluate(
 
 
 def main(argv: list[str]) -> int:
-    if not argv or argv[0] not in ("dev", "gate"):
-        raise SystemExit("usage: audit_ew107_multidegree.py dev [--count N] | gate --confirm-gate")
+    if not argv or argv[0] not in ("dev", "gate", "retry"):
+        raise SystemExit(
+            "usage: audit_ew107_multidegree.py dev [--count N] | gate --confirm-gate"
+            " | retry --confirm-final"
+        )
     returns = load_returns()
     OUT.mkdir(parents=True, exist_ok=True)
+    if argv[0] == "retry":
+        if "--confirm-final" not in argv:
+            raise SystemExit("재도전은 --confirm-final 로 한 번만 (문서 107 §8)")
+        target = OUT / "retry.json"
+        if target.exists():
+            raise SystemExit(f"{target} 가 이미 있다 — 재도전은 한 번만")
+        seeds = {
+            str(s): evaluate(s, COUNT_GATE, NOISE_PATHS_GATE, returns, RETRY_READERS)
+            for s in RETRY_SEEDS
+        }
+        passes = {
+            c: all(bool(seeds[str(s)]["ew7_h3"][c]["pass"]) for s in RETRY_SEEDS)  # type: ignore[index]
+            for c in TRIANGLE_CLASSES
+        }
+        result = {"seeds": seeds, "pass_all_three_seeds": passes}
+        target.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+        sys.stdout.write(json.dumps(result, indent=1) + "\n")
+        return 0
     if argv[0] == "dev":
         count = int(argv[argv.index("--count") + 1]) if "--count" in argv else 10
         result: dict[str, object] = evaluate(DEV_SEED, count, NOISE_PATHS_DEV, returns, DEV_READERS)
