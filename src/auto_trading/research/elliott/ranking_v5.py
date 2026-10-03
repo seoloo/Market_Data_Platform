@@ -2,18 +2,22 @@
 
 v1·v2·v3 는 그대로 둔다(기존 결과 재현). 순위는 확률이 아니다:
 (1) 다리 자리마다 허용 모양으로 검증된 비율, (2) 교과서 대표 비율과의 로그 거리.
+
+단순한 해석 우선 (문서 100 §4.1, 가중치 없음): 경계가 똑같은 기존 모양(충격파·지그재그·
+플랫·수렴 삼각형) 후보가 있고 그 검증 비율이 새 모양 후보 이상이면 새 모양 후보를 뺀다.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 from auto_trading.research.elliott.parser import NESTED_ALLOWED, FinePivot, Label, Parse
+from auto_trading.research.elliott.parser_ew5 import EW5_LABELS
 from auto_trading.research.elliott.ranking import RankKey
 from auto_trading.research.elliott.ranking_v2 import GUIDELINE_TARGETS_V2
 
-__all__ = ["GUIDELINE_TARGETS_V5", "guideline_distance_v5", "rank_key_v5"]
+__all__ = ["GUIDELINE_TARGETS_V5", "guideline_distance_v5", "prefer_simple", "rank_key_v5"]
 
 GUIDELINE_TARGETS_V5: dict[Label, tuple[tuple[int, int, float], ...]] = {
     **GUIDELINE_TARGETS_V2,
@@ -47,3 +51,15 @@ def guideline_distance_v5(parse: Parse, pivots: Sequence[FinePivot]) -> float:
 
 def rank_key_v5(parse: Parse, pivots: Sequence[FinePivot]) -> RankKey:
     return RankKey(-_verified(parse), guideline_distance_v5(parse, pivots))
+
+
+def prefer_simple(candidates: Iterable[Parse]) -> list[Parse]:
+    """경계가 같은 기존 모양의 검증 비율 이상인 새 모양 후보를 뺀다 (순서 유지)."""
+    pool = list(candidates)
+    best: dict[tuple[int, ...], float] = {}
+    for c in pool:
+        if c.pattern not in EW5_LABELS:
+            best[c.bounds] = max(best.get(c.bounds, -1.0), _verified(c))
+    return [
+        c for c in pool if c.pattern not in EW5_LABELS or _verified(c) > best.get(c.bounds, -1.0)
+    ]

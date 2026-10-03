@@ -26,7 +26,7 @@ from auto_trading.research.elliott.parser_ew5 import WaveParserV5
 from auto_trading.research.elliott.ranking import RankKey, rank_key
 from auto_trading.research.elliott.ranking_v2 import rank_key_v2
 from auto_trading.research.elliott.ranking_v3 import rank_key_v3
-from auto_trading.research.elliott.ranking_v5 import rank_key_v5
+from auto_trading.research.elliott.ranking_v5 import prefer_simple, rank_key_v5
 
 __all__ = [
     "EW3E_LOOKBACK_BARS",
@@ -202,6 +202,7 @@ def trigger_candidates(
                 for c in parser.pattern_candidates_v5(i, j)
                 if counted_at_four_hour(c, fine)
             ]
+            candidates = prefer_simple(candidates)  # 문서 100 §4.1 경계가 같으면 단순한 해석
     return candidates, len(starts)
 
 

@@ -51,7 +51,14 @@ def test_new_shape_is_a_candidate_only_with_ew5(name: str) -> None:
         hit, hours, lookback_bars=EW3E_LOOKBACK_BARS, ew4=True, nested=True, ew5=True
     )
     parse = next((c for c, _ in new.ranked if c.pattern is label and c.bounds == bounds), None)
-    assert parse is not None
+    if parse is None:
+        # 문서 100 §4.1: 경계가 같은 기존 모양이 검증 비율 이상이면 새 모양은 빠진다
+        simpler = [
+            key
+            for c, key in new.ranked
+            if c.bounds == bounds and c.pattern in (Label.ZIGZAG, Label.FLAT, Label.IMPULSE)
+        ]
+        assert simpler
     old = scenario_list(hit, hours, lookback_bars=EW3E_LOOKBACK_BARS, ew4=True, nested=True)
     assert all(c.pattern not in EW5_LABELS for c, _ in old.ranked)
 
