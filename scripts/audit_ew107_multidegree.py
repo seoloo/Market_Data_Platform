@@ -2,8 +2,8 @@
 
 사용::
 
-    python scripts/audit_ew107_multidegree.py dev [--count 10]      # 개발 seed 20261009
     python scripts/audit_ew107_multidegree.py dev [--count 10]   # 개발 seed 20261009
+    python scripts/audit_ew107_multidegree.py gate --confirm-gate   # 관문 seed 20261014·15, 1 회
 
 시장형 합성(103, k = 2.0) + 진입 다리 = 첫 다리 × 2 (교과서 맥락: 큰 추세 다리 뒤 패턴).
 패턴 없는 경로는 106 과 같은 뒤섞은 실제 1m 무작위 걸음. 수익 시험이 아니다.
