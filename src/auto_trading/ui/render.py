@@ -1,6 +1,6 @@
 """대시보드 화면 HTML (순수 함수). 모든 동적 문자열은 이스케이프한다.
 
-구성은 사용자가 고른 초안을 따른다: 왼쪽 메뉴, 실행 현황, 상단 카드, 전략별 자산 변화(100 기준),
+구성은 사용자가 고른 초안을 따른다: 상단 탭, 실행 현황, 상단 카드, 전략별 자산 변화(100 기준),
 시스템 상태, 테스트넷 검증 체크리스트, 포지션·보호 상태, 최근 이벤트.
 **보여 주기만 한다** — 버튼·폼·쓰기 요청이 없다.
 """
@@ -17,6 +17,7 @@ from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.lt_render import lt_paper_page
+from auto_trading.ui.overview import overview_attention, overview_stocks, overview_summary
 from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
@@ -93,7 +94,7 @@ def _dot(level: str) -> str:
     return f'<span class="dot {cls}"></span>'
 
 
-def _layout(data: DashboardData, page: str, body: str) -> str:
+def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
     main_nav = "".join(
         f'<a href="{href}" class="{"on" if key == page else ""}">{escape(label)}</a>'
         for key, href, label in PAGES
@@ -112,6 +113,35 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
         "AG Paper</a></div>"
     )
     title = next(label for key, _, label in PAGES if key == page)
+    subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
+    group = (
+        "stocks"
+        if page in _STOCK_PAGES
+        else "research"
+        if page == "research"
+        else "system"
+        if page in {"running", "testnet", "risk", "demo"}
+        else "overview"
+        if page == "overview"
+        else "coin"
+    )
+    tabs = "".join(
+        f'<a href="{href}" class="{"on" if key == group else ""}"'
+        f"{' aria-current=page' if key == group else ''}>{label}</a>"
+        for key, href, label in (
+            ("overview", "/", "요약"),
+            ("coin", "/compare", "코인"),
+            ("stocks", "/toss", "해외 주식"),
+            ("research", "/research", "연구"),
+            ("system", "/running", "시스템"),
+        )
+    )
+    href = next(href for key, href, _ in PAGES if key == page)
+    themes = "".join(
+        f'<a href="{href}?theme={key}" class="{"on" if theme == key else ""}" '
+        f'aria-label="{label} 모드" {"aria-current=true" if theme == key else ""}>{label}</a>'
+        for key, label in (("light", "라이트"), ("dark", "다크"))
+    )
     errors = (
         '<div class="errors">읽기 실패: ' + " · ".join(escape(e) for e in data.errors) + "</div>"
         if data.errors
@@ -140,13 +170,20 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
             "데모(가짜 돈)·일일 점검 보고. PAPER·TESTNET·DEMO 자산은 합산하지 않는다."
         )
     return (
-        '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
+        f'<!doctype html><html lang="ko" data-theme="{theme}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="refresh" content="60">'
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
-        f'<div class="layout"><nav><div class="logo">AUTO <b>TRADING</b></div>{nav}</nav><main>'
-        f'<header><h1>{escape(title)}</h1><span class="date">{_kst(data.now_ms)} KST</span>'
-        f'<span class="badge">읽기 전용</span>{trading_badge}</header>'
+        f'<div class="topbar"><a class="logo" href="/">AUTO <b>TRADING</b></a>'
+        f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
+        f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
+        f'<div class="layout"><nav><details><summary>상세 메뉴 · {escape(title)}</summary>'
+        f"{nav}</details></nav><main>"
+        f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
+        f"<h1>{'오늘의 운영' if page == 'overview' else escape(title)}</h1>"
+        f'<div class="mute">{subtitle}</div></div>'
+        f'<div class="header-meta"><span class="date">{_kst(data.now_ms)} KST</span>'
+        f'<div><span class="badge">읽기 전용</span>{trading_badge}</div></div></header>'
         f"{errors}{body}"
         f'<div class="foot">{foot}</div></main></div></body></html>'
     )
@@ -381,9 +418,13 @@ def _overview(data: DashboardData) -> str:
         + note
     )
     return (
-        f'{banner}<div class="cards">{cards}</div>'
-        f'<div class="grid2"><div>{_chart_panel(data)}{_positions_table(data)}{_events(data)}</div>'
-        f"<div>{_system_panel(data)}{_stream_checklist(data)}</div></div>"
+        f"{banner}{overview_summary(data)}"
+        f'<div class="grid2"><div>{_chart_panel(data)}{overview_stocks(data)}</div>'
+        f"<div>{overview_attention(data)}</div></div>"
+        f'{_events(data)}<details class="detail-panel">'
+        "<summary>원장 · 보호 · 테스트넷 상세</summary>"
+        f'<div class="cards">{cards}</div><div class="grid2"><div>{_positions_table(data)}</div>'
+        f"<div>{_system_panel(data)}{_stream_checklist(data)}</div></div></details>"
     )
 
 
@@ -568,7 +609,9 @@ _RENDER = {
 }
 
 
-def render_page(data: DashboardData, page: str) -> str:
+def render_page(data: DashboardData, page: str, *, theme: str = "light") -> str:
     if page not in _RENDER:
         raise KeyError(page)
-    return _layout(data, page, _RENDER[page](data))
+    return _layout(
+        data, page, _RENDER[page](data), theme if theme in {"light", "dark"} else "light"
+    )

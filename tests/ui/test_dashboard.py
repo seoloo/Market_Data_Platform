@@ -377,6 +377,21 @@ class TestRender:
         for section in ("전략별 자산 변화", "시스템 상태", "테스트넷 검증", "포지션 · 보호 상태"):
             assert section in html
         assert "합산하지 않는다" in html
+        for section in ("오늘의 운영", "확인할 일", "다가오는 일정", "해외 주식 적립"):
+            assert section in html
+
+    @pytest.mark.parametrize("page", [key for key, _, _ in PAGES])
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_both_themes_on_every_page(self, root: Path, page: str, theme: str) -> None:
+        html = render_page(load_dashboard(root, P0 + 11 * D), page, theme=theme)
+        assert f'data-theme="{theme}"' in html
+        assert "라이트 모드" in html and "다크 모드" in html
+        assert '<div class="topbar">' in html
+        assert "<script" not in html and EVIL not in html
+
+    def test_invalid_theme_is_not_injected(self, root: Path) -> None:
+        html = render_page(load_dashboard(root, P0 + 11 * D), "overview", theme=EVIL)
+        assert 'data-theme="light"' in html and EVIL not in html
 
     def test_unknown_page(self, root: Path) -> None:
         with pytest.raises(KeyError):
@@ -455,6 +470,37 @@ class TestServer:
                 assert response.status == 200
                 assert "form-action 'self'" in response.headers["Content-Security-Policy"]
                 assert response.headers["Cache-Control"] == "no-store"
+
+    def test_theme_cookie_persists_across_navigation_and_refresh(self, base: str) -> None:
+        from http.cookiejar import CookieJar
+
+        jar = CookieJar()
+        browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+        with browser.open(base + "/?theme=dark") as response:
+            assert 'data-theme="dark"' in response.read().decode()
+            cookie = response.headers["Set-Cookie"]
+            assert "HttpOnly" in cookie and "SameSite=Strict" in cookie and "Path=/" in cookie
+        for path in ("/", "/toss", "/running", "/research", "/compare", "/"):
+            with browser.open(base + path) as response:
+                assert 'data-theme="dark"' in response.read().decode()
+        with browser.open(base + "/toss?theme=light") as response:
+            assert 'data-theme="light"' in response.read().decode()
+        with browser.open(base + "/") as response:
+            assert 'data-theme="light"' in response.read().decode()
+
+    @pytest.mark.parametrize("cookie", ["dashboard_theme=garbage", 'dashboard_theme="bad"'])
+    def test_invalid_theme_cookie_and_query_fall_back_safely(self, base: str, cookie: str) -> None:
+        request = urllib.request.Request(base + "/?theme=" + urllib.parse.quote(EVIL))
+        request.add_header("Cookie", cookie)
+        with urllib.request.urlopen(request) as response:
+            html = response.read().decode()
+            assert 'data-theme="light"' in html and EVIL not in html
+            assert response.headers.get("Set-Cookie") is None
+
+    def test_theme_change_does_not_start_tasks(self, base: str, runner: CatchupRunner) -> None:
+        with urllib.request.urlopen(base + "/running?theme=dark") as response:
+            assert response.status == 200
+        assert runner.started == []  # type: ignore[attr-defined]
 
     def test_unknown_path_is_404(self, base: str) -> None:
         with pytest.raises(urllib.error.HTTPError) as err:

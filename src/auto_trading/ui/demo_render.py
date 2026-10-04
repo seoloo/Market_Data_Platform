@@ -332,7 +332,7 @@ def _ew_panel(d: DemoView) -> str:
 def demo_page(d: DemoView, now_ms: int) -> str:
     cards = _t2_card(d) + _o2_card(d) + _ew_card(d, now_ms) + _shadow_card(d)
     return (
-        '<div class="banner" style="border-color:#1e3a5f;background:#0d1b30;color:#93c5fd">'
+        '<div class="banner info">'
         "데모는 <b>가짜 돈</b>이다(Binance 데모 모드). Paper 원장·테스트넷 자산과 합산하지 않는다. "
         "목적은 실거래와 같은 코드로 주문 흐름·체결 비용을 매일 확인하는 것이다.</div>"
         f'<div class="cards">{cards}</div>'

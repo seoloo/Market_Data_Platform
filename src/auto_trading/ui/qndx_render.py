@@ -185,7 +185,7 @@ def _toss_qs(base: Path) -> str:
     r = _read(paths[-1]) if paths else None
     if not r:
         return (
-            '<div class="panel"><h2>QS — QQQ 추세</h2><p class="mute">첫 밤 실행 전이다 '
+            '<div class="panel" id="qs"><h2>QS — QQQ 추세</h2><p class="mute">첫 밤 실행 전이다 '
             "(월~금 21:00 KST).</p></div>"
         )
     p = r.get("parts") or {}
@@ -212,7 +212,8 @@ def _toss_qs(base: Path) -> str:
     )
     line = escape(str(r.get("order_line") or ""))
     return (
-        f'<div class="panel"><h2>QS — QQQ 추세 · TQQQ 전환</h2><div class="cards">{cards}</div>'
+        '<div class="panel" id="qs"><h2>QS — QQQ 추세 · TQQQ 전환</h2>'
+        f'<div class="cards">{cards}</div>'
         f"<div class='foot'>마지막 실행 {escape(_observed(r.get('at_ms'), r.get('date')))}"
         f"{' · ' + line if line else ''}</div></div>"
     )
@@ -222,7 +223,10 @@ def _toss_fx(base: Path) -> str:
     paths = sorted(base.glob("fx-*.json"))
     r = _read(paths[-1]) if paths else None
     if not r:
-        return ""
+        return (
+            '<div class="panel" id="fx"><h2>환전 안내</h2>'
+            '<p class="mute">아직 환전 점검 기록이 없습니다.</p></div>'
+        )
     short = float(r.get("short_usd") or 0)
     needs = " · ".join(
         f"{escape(str(n.get('symbol')))} {int(n.get('qty') or 0)}주" for n in r.get("needs") or []
@@ -233,7 +237,8 @@ def _toss_fx(base: Path) -> str:
         else "환전 필요 없음"
     )
     return (
-        f'<div class="panel"><h2>환전 안내</h2><div class="sub">{escape(str(r.get("at")))} 확인 · '
+        '<div class="panel" id="fx"><h2>환전 안내</h2>'
+        f'<div class="sub">{escape(str(r.get("at")))} 확인 · '
         f"오늘 밤 매수 {needs or '없음'} · 달러 ${float(r.get('usd') or 0):,.2f} → "
         f"<b>{escape(msg)}</b></div><div class='foot'>평일 09·12·15시에 확인해 모자라면 "
         "텔레그램으로 알린다. 15:30 까지 환전하면 95% 우대.</div></div>"

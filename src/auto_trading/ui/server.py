@@ -17,6 +17,7 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import replace
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
@@ -77,13 +78,22 @@ class _Handler(BaseHTTPRequestHandler):
             data = self.server.loader()
             if page == "running" and self.server.catchup is not None:
                 data = replace(data, catchup=self.server.catchup.view())
-            html = render_page(data, page)
+            query = parse_qs(self.path.partition("?")[2])
+            selected = (query.get("theme") or [""])[0]
+            cookie = SimpleCookie()
+            try:
+                cookie.load(self.headers.get("Cookie", ""))
+            except CookieError:
+                cookie = SimpleCookie()
+            saved = cookie.get("dashboard_theme")
+            theme = selected if selected in {"light", "dark"} else saved.value if saved else "light"
+            html = render_page(data, page, theme=theme)
         except Exception as exc:  # 화면 오류가 서버를 멈추지 않게 — 원인만 보인다
             self._send(
                 500, f"<!doctype html><meta charset='utf-8'><p>화면 오류: {type(exc).__name__}</p>"
             )
             return
-        self._send(200, html)
+        self._send(200, html, theme=selected if selected in {"light", "dark"} else None)
 
     def do_POST(self) -> None:
         """놓친 작업 다시 실행 버튼 하나만 받는다."""
@@ -110,11 +120,16 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
 
-    def _send(self, status: int, html: str) -> None:
+    def _send(self, status: int, html: str, *, theme: str | None = None) -> None:
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        if theme in {"light", "dark"}:
+            self.send_header(
+                "Set-Cookie",
+                f"dashboard_theme={theme}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict",
+            )
         for name, value in _HEADERS.items():
             self.send_header(name, value)
         self.end_headers()

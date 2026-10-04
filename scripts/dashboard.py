@@ -37,14 +37,23 @@ REPO = Path(__file__).resolve().parent.parent
 def export(folder: Path) -> int:
     data = load_dashboard(REPO, int(time.time() * 1000))
     folder.mkdir(parents=True, exist_ok=True)
-    for key, href, _ in PAGES:
-        name = "index.html" if href == "/" else f"{href.strip('/')}.html"
-        html = render_page(data, key)
-        for _, other_href, _ in PAGES:  # 파일끼리 이동되게 링크를 바꾼다
-            target = "index.html" if other_href == "/" else f"{other_href.strip('/')}.html"
-            html = html.replace(f'href="{other_href}"', f'href="{target}"')
-        (folder / name).write_text(html, encoding="utf-8", newline="\n")
-    print(f"화면 {len(PAGES)}개 저장: {folder}")
+    for theme in ("light", "dark"):
+        suffix = "" if theme == "light" else "-dark"
+        for key, href, _ in PAGES:
+            stem = "index" if href == "/" else href.strip("/")
+            html = render_page(data, key, theme=theme)
+            for _, other_href, _ in PAGES:  # 파일끼리 이동되게 링크를 바꾼다
+                target = "index" if other_href == "/" else other_href.strip("/")
+                for selected in ("light", "dark"):
+                    target_suffix = "" if selected == "light" else "-dark"
+                    html = html.replace(
+                        f'href="{other_href}?theme={selected}"',
+                        f'href="{target}{target_suffix}.html"',
+                    )
+                html = html.replace(f'href="{other_href}"', f'href="{target}{suffix}.html"')
+                html = html.replace(f'href="{other_href}#', f'href="{target}{suffix}.html#')
+            (folder / f"{stem}{suffix}.html").write_text(html, encoding="utf-8", newline="\n")
+    print(f"화면 {len(PAGES)}개 × 2개 테마 저장: {folder}")
     if data.errors:
         print("읽기 실패:", *data.errors, sep="\n  ")
     return 0
