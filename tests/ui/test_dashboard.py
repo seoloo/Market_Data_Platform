@@ -323,7 +323,7 @@ class TestRender:
 
         rep = root / "reports" / "toss"
         (rep / "QNDX").mkdir(parents=True)
-        (rep / "QS").mkdir(parents=True)
+        (rep / "QS_SWITCH").mkdir(parents=True)
         (rep / "QNDX" / "2026-10-06.json").write_text(
             json.dumps(
                 {
@@ -337,7 +337,7 @@ class TestRender:
             ),
             encoding="utf-8",
         )
-        (rep / "QS" / "2026-10-06.json").write_text(
+        (rep / "QS_SWITCH" / "2026-10-06.json").write_text(
             json.dumps(
                 {
                     "date": "2026-10-06",
@@ -390,8 +390,8 @@ class TestRender:
             )
         before = digest(root / "data" / "trading.db")
         html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
-        assert html.count('class="savings-card ') == 3
-        assert html.count("첫 실행 대기") == 3
+        assert html.count('class="savings-card ') == 4
+        assert html.count("첫 실행 대기") == 4
         assert 'role="progressbar"' not in html
         assert "매일 1만 원" in html and "매일 $1" in html and "매일 $4" in html
         assert 'id="qs"' in html and 'id="fx"' in html
@@ -423,7 +423,7 @@ class TestRender:
         rep.mkdir(parents=True)
         (rep / "2026-10-04.json").write_text("broken", encoding="utf-8")
         html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
-        assert "기록 읽기 실패" in html and html.count("첫 실행 대기") == 2
+        assert "기록 읽기 실패" in html and html.count("첫 실행 대기") == 3
 
     def test_brand_and_favicon_present_on_all_pages(self, root: Path) -> None:
         for page, _, _ in PAGES:

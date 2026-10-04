@@ -23,7 +23,8 @@ from auto_trading.ops.paper_watch import Finding
 
 __all__ = ["check_stock_papers", "check_toss", "expected_toss_day"]
 
-TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM")
+TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM", "QS")
+"""적립 종목. QS 는 퀀텀스케이프다 — QS 전략 보고는 ``reports/toss/QS_SWITCH/``."""
 _RUN_DONE = (21, 15)
 
 
@@ -82,7 +83,7 @@ def check_toss(root: Path, now_kst: datetime) -> tuple[list[str], list[Finding]]
                 )
             elif status == "UNKNOWN":
                 findings.append(Finding("WARN", "토스", f"{last} {sym} 주문 전송 결과 모름"))
-    qs_paths = sorted((base / "QS").glob("20*.json"))
+    qs_paths = sorted((base / "QS_SWITCH").glob("20*.json"))
     qs = [_read(p) or {} for p in qs_paths[-2:]]
     qs_line = ""
     if qs:

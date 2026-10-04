@@ -54,7 +54,10 @@ def test_rejected_orders_and_stuck_qs(tmp_path: Path) -> None:
     base = tmp_path / "reports" / "toss"
     for d in ("2026-10-05", "2026-10-06"):
         _w(base / f"{d}.json", {"message": "x"})
-        _w(base / "QS" / f"{d}.json", {"trend_on": True, "want": "BUY", "strategy_tqqq_qty": 0})
+        _w(
+            base / "QS_SWITCH" / f"{d}.json",
+            {"trend_on": True, "want": "BUY", "strategy_tqqq_qty": 0},
+        )
     _w(
         base / "QNDX" / "2026-10-06.json",
         {"order": {"status": "REJECTED", "code": "insufficient-buying-power"}},
@@ -73,7 +76,7 @@ def test_healthy_run_has_no_findings(tmp_path: Path) -> None:
     _start(tmp_path)
     base = tmp_path / "reports" / "toss"
     _w(base / "2026-10-05.json", {"message": "x"})
-    _w(base / "QS" / "2026-10-05.json", {"trend_on": True, "want": "NONE"})
+    _w(base / "QS_SWITCH" / "2026-10-05.json", {"trend_on": True, "want": "NONE"})
     _, found = check_toss(tmp_path, datetime(2026, 10, 5, 21, 20, tzinfo=KST))
     assert found == []
 

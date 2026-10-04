@@ -178,11 +178,12 @@ def _section(root: Path, folder: Path, state_dir: Path | None = None) -> str:
     )
 
 
-_TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM")
+_TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM", "QS")
 _TOSS_LABELS = {
     "QNDX": ("원화로 꾸준히", "매일 1만 원", "월 30만 원 한도"),
     "BTQ": ("달러로 차곡차곡", "매일 $1", "월 $31 한도"),
     "WQTM": ("달러로 차곡차곡", "매일 $4", "월 $124 한도"),
+    "QS": ("퀀텀스케이프 · 달러로 차곡차곡", "매일 $1", "월 $31 한도"),
 }
 
 
@@ -246,7 +247,7 @@ def _toss_tile(root: Path, symbol: str) -> str:
 
 
 def _toss_qs(base: Path) -> str:
-    paths = sorted((base / "QS").glob("20*.json"))
+    paths = sorted((base / "QS_SWITCH").glob("20*.json"))
     r = _read(paths[-1]) if paths else None
     if not r:
         return (
@@ -343,7 +344,8 @@ def toss_page(data: Any) -> str:
     )
     guide = (
         '<details class="savings-guide"><summary>적립 방식 알아보기</summary>'
-        "<p>QNDX 매일 1만 원 · BTQ 매일 1달러 · WQTM 매일 4달러를 적립해 1주 값이 모이면 "
+        "<p>QNDX 매일 1만 원 · BTQ 매일 1달러 · WQTM 매일 4달러 · QS(퀀텀스케이프) 매일 1달러를 "
+        "적립해 1주 값이 모이면 "
         "장 마감 지정가로 1주 산다. QQQ 추세가 꺼지면 QNDX 를 멈추고, 다시 켜지면 쌓인 "
         "적립금으로 TQQQ 를 산다(QS). 매수·매도 버튼은 없다.</p></details>"
     )

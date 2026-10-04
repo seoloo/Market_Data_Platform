@@ -17,7 +17,7 @@ _NOW = int(datetime(2026, 10, 4, 12, tzinfo=_KST).timestamp() * 1000)
 
 def test_missing_reports_are_pending_not_fake_progress(tmp_path: Path) -> None:
     html = overview_stocks(load_dashboard(tmp_path, _NOW))
-    assert html.count("첫 실행 대기") == 3
+    assert html.count("첫 실행 대기") == 4
     assert 'role="progressbar"' not in html
     assert "평가 손익은 표시하지 않습니다" in html
     assert not (tmp_path / "data").exists()

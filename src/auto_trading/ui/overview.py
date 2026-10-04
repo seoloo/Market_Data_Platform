@@ -11,7 +11,7 @@ from auto_trading.ui.qndx_render import _read
 from auto_trading.ui.running import TRACKS, load_running
 
 _KST = timezone(timedelta(hours=9))
-_SYMBOLS = ("QNDX", "BTQ", "WQTM")
+_SYMBOLS = ("QNDX", "BTQ", "WQTM", "QS")
 _STATUS = {
     "BUY": "1주 살 차례",
     "WAIT": "적립 중",

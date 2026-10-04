@@ -27,7 +27,7 @@ class Holding:
     avg_usd: float
     last_usd: float
     strategy: bool
-    """자동 적립 종목(QNDX·BTQ·WQTM)이면 참. 아니면 사용자가 직접 정한다."""
+    """자동 적립 종목(QNDX·BTQ·WQTM·QS)이면 참. 아니면 사용자가 직접 정한다."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -31,7 +31,7 @@ class FakeToss:
         return self.holding
 
     def prices(self, symbols: list[str]) -> dict[str, Decimal]:
-        table = {"QNDX": "25.4", "BTQ": "3.17", "WQTM": "32.5", "TQQQ": "81.07"}
+        table = {"QNDX": "25.4", "BTQ": "3.17", "WQTM": "32.5", "QS": "4.57", "TQQQ": "81.07"}
         return {s: Decimal(table[s]) for s in symbols}
 
     def usd_krw(self) -> Decimal:
@@ -136,7 +136,7 @@ def test_trend_off_pauses_qndx_and_sells_qs_tqqq(
     assert mod.run(telegram=False) == 0
     assert [(s, side, q) for s, side, q, _, _ in fake.sent] == [("TQQQ", "SELL", 3)]
     assert fake.sent[0][3] == Decimal("78.63")  # 81.07 × 0.97 내림
-    qs = json.loads((tmp_path / "data" / "QS.json").read_text(encoding="utf-8"))
+    qs = json.loads((tmp_path / "data" / "QS_SWITCH.json").read_text(encoding="utf-8"))
     assert qs["prev_on"] is False and qs["want"] == "SELL"
 
 
@@ -148,7 +148,7 @@ def test_qs_buy_short_of_dollars_is_retried_next_day(
     _seed(mod, qndx_start="2026-08-01", qs=QsLiveState("2026-10-05", 0.0, 0.0, 0.0, prev_on=False))
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     mod.run(telegram=False)
-    qs = json.loads((tmp_path / "data" / "QS.json").read_text(encoding="utf-8"))
+    qs = json.loads((tmp_path / "data" / "QS_SWITCH.json").read_text(encoding="utf-8"))
     assert [s for s, *_ in fake.sent] == ["TQQQ"]  # QNDX 는 멈춤, TQQQ 만
     assert qs["want"] == "BUY"  # 달러 부족은 다음 날 다시
 
@@ -161,7 +161,7 @@ def test_qs_buy_prerequisite_rejection_is_not_retried(
     _seed(mod, qndx_start="2026-08-01", qs=QsLiveState("2026-10-05", 0.0, 0.0, 0.0, prev_on=False))
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     mod.run(telegram=False)
-    qs = json.loads((tmp_path / "data" / "QS.json").read_text(encoding="utf-8"))
+    qs = json.loads((tmp_path / "data" / "QS_SWITCH.json").read_text(encoding="utf-8"))
     assert qs["want"] == "NONE"
 
 
@@ -176,7 +176,7 @@ def test_sell_fill_uses_exact_proceeds(monkeypatch: pytest.MonkeyPatch, tmp_path
     )
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     mod.run(telegram=False)
-    saved = json.loads((tmp_path / "data" / "QS.json").read_text(encoding="utf-8"))
+    saved = json.loads((tmp_path / "data" / "QS_SWITCH.json").read_text(encoding="utf-8"))
     sell = saved["trades"][-1]
     assert sell["side"] == "SELL" and sell["usd"] == pytest.approx(236.76)
     assert sell["estimated"] is False and saved["want"] == "NONE"
@@ -223,3 +223,41 @@ def test_commission_change_is_flagged(monkeypatch: pytest.MonkeyPatch, tmp_path:
     mod.run(telegram=False)
     report = json.loads((tmp_path / "reports" / "2026-10-06.json").read_text(encoding="utf-8"))
     assert "수수료가 0.250%" in report["message"]
+
+
+def test_quantumscape_accumulates_apart_from_qs_strategy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """종목 QS(퀀텀스케이프) 적립은 QS.json, QS 전략은 QS_SWITCH.json — 섞이지 않는다."""
+    fake = FakeToss()
+    mod = _mod(monkeypatch, tmp_path, fake)
+    _seed(mod)
+    mod._save_plan_state(State("QS", "2026-10-01", 0.0, 0.0, 0.0))  # 6 일 × 1 달러 ≥ 4.57
+    monkeypatch.setattr(mod, "datetime", _FixedDT)
+    assert mod.run(telegram=False) == 0
+    sent = [(s, side, q) for s, side, q, _, _ in fake.sent]
+    assert ("QS", "BUY", 1) in sent and all(s != "TQQQ" for s, _, _ in sent)
+    stock = json.loads((tmp_path / "data" / "QS.json").read_text(encoding="utf-8"))
+    strategy = json.loads((tmp_path / "data" / "QS_SWITCH.json").read_text(encoding="utf-8"))
+    assert stock["symbol"] == "QS" and stock["orders"][-1]["status"] == "SENT"
+    assert "prev_on" in strategy and "symbol" not in strategy
+    assert (tmp_path / "reports" / "QS" / "2026-10-06.json").exists()
+    assert (tmp_path / "reports" / "QS_SWITCH" / "2026-10-06.json").exists()
+
+
+def test_old_qs_strategy_file_is_moved_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    mod = _mod(monkeypatch, tmp_path, FakeToss())
+    old = tmp_path / "data" / "QS.json"
+    old.parent.mkdir(parents=True)
+    body = QsLiveState("2026-10-04", 0.0, 0.0, 0.0, prev_on=None).to_dict()
+    old.write_text(json.dumps(body), encoding="utf-8")
+    assert mod._load_qs() is not None
+    assert not old.exists() and (tmp_path / "data" / "QS_SWITCH.json").exists()
+    plan = next(p for p in mod.PLANS if p.symbol == "QS")
+    assert mod._load_plan_state(plan) is None  # 종목 QS 적립은 run 이 그날 새로 시작
+    # 종목 QS 적립 상태(QS.json)는 전략 형식이 아니므로 옮기지 않는다
+    mod._save_plan_state(State("QS", "2026-10-05", 0.0, 0.0, 0.0))
+    mod._migrate_qs_switch()
+    assert old.exists()

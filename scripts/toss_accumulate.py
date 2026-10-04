@@ -76,13 +76,17 @@ DATA = REPO / "data" / "toss"
 REPORTS = REPO / "reports" / "toss"
 HALT = REPO / "data" / "HALT"
 TOKEN = REPO / "data" / "toss_token.json"
-QS_FILE = "QS.json"
+QS_KEY = "QS_SWITCH"
+"""QS 전략(QQQ 추세 → TQQQ) 상태·보고 이름. 종목 QS(퀀텀스케이프) 적립과 겹치지 않게 따로 둔다."""
+QS_FILE = f"{QS_KEY}.json"
 PLANS: tuple[Plan, ...] = (
     *KIS_PLANS,
     Plan("WQTM", "AMS", "AMEX", "USD", 4.0, 124.0, 60.0),
+    Plan("QS", "NAS", "NASD", "USD", 1.0, 31.0, 10.0),
 )
 """토스 적립 종목: QNDX·BTQ(문서 89 그대로) + WQTM 매일 4 달러·월 124 달러(2026-10-04 사용자 추가,
-2026-10-02 종가 32.5 USD). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다."""
+2026-10-02 종가 32.5 USD) + QS(퀀텀스케이프, 나스닥) 매일 1 달러·월 31 달러(2026-10-04 사용자 추가,
+2026-10-02 종가 4.57 USD, BTQ 와 같은 방식). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다."""
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -102,6 +106,7 @@ def _path(name: str) -> Path:
 
 
 def _load_plan_state(plan: Plan) -> State | None:
+    _migrate_qs_switch()
     p = _path(f"{plan.symbol}.json")
     return State.from_dict(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
 
@@ -113,7 +118,24 @@ def _save_plan_state(state: State) -> None:
     )
 
 
+def _migrate_qs_switch() -> None:
+    """옛 QS 전략 상태 ``QS.json`` → ``QS_SWITCH.json`` (2026-10-04, 종목 QS 적립 추가 전 1회).
+
+    ``QS.json`` 이 QS 전략 형식(``prev_on``)일 때만 옮긴다. 종목 QS 적립 상태는 건드리지 않는다.
+    """
+    old, new = _path("QS.json"), _path(QS_FILE)
+    if not old.exists() or new.exists():
+        return
+    try:
+        body = json.loads(old.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if isinstance(body, dict) and "prev_on" in body:
+        old.replace(new)
+
+
 def _load_qs() -> QsLiveState | None:
+    _migrate_qs_switch()
     p = _path(QS_FILE)
     return QsLiveState.from_dict(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
 
@@ -518,7 +540,7 @@ def run(telegram: bool = True) -> int:
                 qline = f"⏸ QS TQQQ 주문 안 함 — {plan_q.reason}"
             _save_qs(qs)
             _write_report(
-                "QS",
+                QS_KEY,
                 today,
                 {
                     "trend_on": ctx["on"],
