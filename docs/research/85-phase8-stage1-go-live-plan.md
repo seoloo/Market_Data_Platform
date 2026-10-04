@@ -213,3 +213,33 @@ Set-Content -Path "C:\Users\seolh\Documents\GitHub\Auto_Trading\data\HALT" -Valu
 시험: 가짜 거래소 13건(기존 9 + 낙폭 정지·회복해도 유지·해제 뒤 재매수 · 정지 중 추세 매도 · 계획만 읽기 전용·계획과 실제 주문 일치). 실제 데모 계좌로 `plan` 문구 확인(10/02, 평가액 5,081 USDT · 낙폭 0.0%).
 
 **사용자 재확인 (2026-10-02):** "물타기를 해야 할 것 같은데 굳이 넣어야 하나" → 설명(T/v2 는 하락 추세에서 스스로 매수하지 않음, 30% 는 백테스트 최악의 두 배라 고장 감지가 목적, 해제 한 줄) 뒤 **그대로 두기** 선택. 물타기·적립은 T/v2 와 따로 운영할 일이고 BTC 에서는 검증하지 않았다.
+
+### 11.6 출발 전 점검 (2026-10-04, 사용자 "1번 진행해줘")
+
+L3(실계좌 주문 어댑터)는 규칙대로 **아직 만들지 않았다** — 사용자 "1단계 시작" 뒤에 만든다. 그 전에 확인할 수 있는 것을 모두 돌렸다(조회만, 주문 0).
+
+| # | 항목 | 결과 | 남은 일 |
+|---|---|---|---|
+| G1 | Phase 7 중간 점검 (`review_phase7 --until 2026-10-04`) | 09-25 ~ 10-03 기록 9 일 · 실패 1 일(10-01, 원인 external 기록) · P2·P3 PASS. P1 의 "10-04 기록 없음" 은 그날 21:08 훈련 전에 돌려서다 | 10/08 21:30 뒤 본 판정 |
+| G1-P4 | 10-01 마무리 전 중단의 흔적 | **CHECK 로 남는다**(사람 확인 항목). 근거: 다음 날 10-02 훈련 20/20 — 첫 단계 "정리 뒤 평탄"(시작 상태 RUNNING · 포지션·주문·스톱 0)과 마지막 단계 모두 통과 → 흔적 없음 | 10/08 판정 때 사용자가 이 근거로 확인 |
+| G2 | 데모 실행기 "계획만" (`demo_t2_spot.py plan`, 창 없는 실행기로) | 정상 — 평가액 5,027.93 USDT · 낙폭 0.9% (정지선 30%) · 주문 예정 없음(밴드 안) · **Paper t2_long 같은 결정일 목표와 같다 ✓** | — |
+| 실계좌 | 그림자 운영 (읽기 전용 키) | 최신 10-02 결정일 OK · 거래소 주문 0 · Paper 목표 차이 0 · 읽기 전용·IP 제한 확인 통과(CRITICAL 없음). 평가액 0.47 USDT | 출발 때 입금(§2), 그림자 `--allocation` 을 시작 금액으로 |
+| 시계 | 서버 시계 차이 1,108 ms (WARN) | 서명 요청은 거래소 시각으로 보정하므로 주문에는 문제없다 | 선택: Windows 설정 → 시간 → 지금 동기화 |
+| G4 | 예약 작업 | 18 개 모두 창 없는 실행기(`pythonw scripts\task_launcher.py …`, 기록 `reports/tasklog/`). PC 점검 오탐 3 종 수정(꺼진 작업·점검 경고 1·월~금 작업 주말) | 아래 S4U 전환 |
+| G4 | **로그인 필요 작업 5 개** (AG·LT·QS Paper · 토스 적립·환전 알림) | 이번 주말 일반 PowerShell 로 등록해 "로그인했을 때만 실행"이다. 예전 13 개는 로그인 없이(S4U) 돈다 | 관리자 PowerShell 로 S4U 전환(아래) |
+
+**S4U 전환 명령 (관리자 PowerShell, 사용자):**
+
+```powershell
+$p = New-ScheduledTaskPrincipal -UserId "seolh" -LogonType S4U -RunLevel Limited
+"AG_Paper","LT_Paper","QS_Paper","Toss_Accumulate","Toss_FX" | ForEach-Object { Set-ScheduledTask -TaskName "AutoTrading_$_" -Principal $p | Out-Null; "AutoTrading_$_" }
+```
+
+**출발 날 예약 작업 등록은 창 없는 실행기로** (§4 5, L5 — 스크립트 이름은 L3 때 확정):
+
+```powershell
+$repo = "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$a = New-ScheduledTaskAction -Execute "$repo\.venv\Scripts\pythonw.exe" -Argument "`"$repo\scripts\task_launcher.py`" scripts\<실거래 스크립트>.py" -WorkingDirectory $repo
+```
+
+**10/24 순서 (예상):** 21:30 뒤 `review_phase6 --until 2026-10-23` → 사용자 승인 "1단계 시작" + 금액 → (에이전트) L3 + 데모 시험 → (사용자) 거래 키(§3) · 현물 지갑에 5,000 USDT · BNB 수수료 끄기 → 계획만 → 보내기 → 주문 내역 대조 → 예약 작업.
