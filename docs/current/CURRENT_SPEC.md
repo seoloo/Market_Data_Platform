@@ -49,6 +49,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 | WA 연구 G6 | 선택 (b): 거래당 우위 측정에서는 G6 비적용. 전체 규칙 계좌 재생·실거래에는 적용. 연구 결과를 운용 가능 판정으로 취급하지 않음 | 2026-09-24 사용자 선택 | backtest/research |
 | D22 | INCOMPLETE / EXCLUDED: 현재 전략·점수·로드맵·연구 방향에서 제외 | 2026-09-23 정리 | [보관 초안](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
 | Elliott/JEV/News AI | Optional Shadow만 허용. 초기 실제 주문·차단·사이징에 영향 없음. **Elliott 파동 판정은 최소 마감 4h 봉 이상**(상위 시간대 맥락 허용). 1m은 완성 4h 내부 경로·품질 검증용일 뿐 1m 파동/진입 신호가 아니다. 실거래 연결은 별도 승인·검증 전 금지 | 2026-09-24 사용자 명시 | ai/research |
+| 실적 개선형 주도주 후보 | 사용자 선택 1번만 **Phase 0** 무료 데이터/PIT 사전 타당성 조사. [131](../research/131-fundamental-leaders-feasibility.md): 조사 완료 / `DATA_NOT_READY`. 현재 종목 가격 자료의 생존 편향, SEC 공개 API 실제 403, 재무 커버리지/검정력 미확인. 수익성 판정·사전등록·매매 구현 없음. 2번 우량·가격은 안내만, 129·130 사용자 보류 유지 | 2026-10-04 사용자 선택 | research |
 | 자본·새 전략 수치 | 미정: 결과를 본 뒤 임의 확정 금지 | Phase 0 대기 | config/research |
 
 기각된 H1 구현은 회귀·재현용으로 남아 있으나 현행 수익 전략으로 복귀하지 않는다.
@@ -108,6 +109,7 @@ Phase 4에서 승인된 전략은 없다. Phase 5 이후와 실거래는 미착�
 | C6 | 실거래 관련 API 명세와 안전장치 | **선물 부분 진행(2026-09-24)**: 공식 API 확인·구현·장애 테스트·실계좌 읽기 완료. **WS 사용자 스트림 구현·테스트넷 확인(2026-09-24)** — `/private` 새 주소, 이벤트는 신호·조회가 확정(`stream_sync`). 남은 것: 주문 전송 경로(Phase 8), 체결 수수료(userTrades), 운영 프로세스에 스트림 연결 |
 | C7 | D22 제외가 사용자 의도인지 미확인 (2026-09-22 `요구사항 확정` → 다음 날 `EXCLUDED`) | 사용자 확인. 원문은 [초안 보관](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
 | C8 | Phase 4 OOS `실제 거래 n≥100` 이 TRAIN 보다 약해, 23~35bps 효과는 TRAIN 통과 후 OOS 확인 불가 | 사전등록 전 사용자 결정. 선택지는 [후보 비교 §6](../research/01-candidate-comparison.md) |
+| C9 | 본 문서의 T/v2 Phase 5·6 예외 승인/구현 표와 위 “Phase 5 이후·실거래 미착수” 총괄 문구가 상충. PROGRESS에는 기존 Paper 관찰·주식 운영 후속 기록도 있음 | 전체 게이트 통과로 해석하지 않음. 운영 단계 문서 정합성은 별도 확인/정리 필요. 이번 131은 Phase 0 범위에 한정하며 기존 승인·운영을 변경하지 않음 |
 
 ## 문서 정리 이력
 
