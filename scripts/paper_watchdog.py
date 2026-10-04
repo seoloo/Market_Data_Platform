@@ -30,7 +30,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from auto_trading.backtest.overlay import O2_STOP, O3_2X_LIMIT40
@@ -52,6 +52,7 @@ from auto_trading.ops.paper_watch import (
     render_report,
 )
 from auto_trading.ops.pc_health import pc_findings
+from auto_trading.ops.stock_watch import check_stock_papers, check_toss
 from auto_trading.storage.db import connect_read_only
 from auto_trading.storage.repositories.paper_days import PaperDayRepository
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDayRepository
@@ -314,6 +315,14 @@ def main() -> int:
         demo_lines, demo_findings = status_fn(now_ms)
         drill_lines += demo_lines
         findings += demo_findings
+    # 미국 주식: 토스 실거래 적립 + QS (문서 118) · LT·QS·AG Paper — 저장 기록만 읽는다
+    now_kst = datetime.fromtimestamp(now_ms / 1000, tz=UTC).replace(tzinfo=None) + timedelta(
+        hours=9
+    )
+    for stock_fn in (check_toss, check_stock_papers):
+        stock_lines, stock_findings = stock_fn(REPO, now_kst)
+        drill_lines += stock_lines
+        findings += stock_findings
     code = exit_code(findings)
     text = render_report(summaries, findings, now_ms, extra=drill_lines)
 
