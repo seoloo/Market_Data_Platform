@@ -18,10 +18,12 @@ import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from scripts.run_index_mr import trend_returns
 from scripts.run_qs_switch import read_close
+
+_T = TypeVar("_T")
 
 REPO = Path(__file__).resolve().parent.parent
 GEM = REPO / "data" / "research" / "tradfi" / "gem"
@@ -149,14 +151,14 @@ def run() -> dict[str, Any]:
         va *= px["AGG"][d] / px["AGG"][days[i - 1]]
         sixty.append((vs + va) / before - 1)
 
-    def seg(xs: Sequence[float], lo: str, hi: str) -> list[float]:
+    def seg(xs: Sequence[_T], lo: str, hi: str) -> list[_T]:
         return [x for d, x in zip(days, xs, strict=True) if lo <= d <= hi]
 
     g, s = stats(seg(rets, *OOS)), stats(seg(spy, *OOS))
     p1 = g["cagr"] >= s["cagr"] - P1_GAP
     p2 = g["mdd"] <= s["mdd"] - P2_GAP
     p3 = g["sharpe"] >= s["sharpe"]
-    oos_held = seg(held, *OOS)  # type: ignore[arg-type]
+    oos_held = seg(held, *OOS)
     switches = sum(1 for a, b in itertools.pairwise(oos_held) if a != b)
     result = {
         "verdict": "PASS" if p1 and p2 and p3 else "REJECT",

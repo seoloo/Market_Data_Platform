@@ -20,7 +20,8 @@ from itertools import pairwise
 from pathlib import Path
 
 from scripts.run_a1_train import git_state
-from scripts.run_sb_breakout import QQQ, SPY, STOCKS, _sma, load
+from scripts.run_sb_breakout import QQQ, SPY, _sma, load
+from scripts.run_sb_breakout import STOCKS as STOCKS
 
 REPO = Path(__file__).resolve().parent.parent
 OUTPUT = REPO / "reports" / "lt_leaders"
@@ -34,7 +35,7 @@ MAX_POS, TARGET = 10, 0.10
 TREND_LB = (20, 60, 120)
 STOP_FROM_PEAK = 0.35
 SPY_SMA, STOCK_SMA = 200, 50
-WATCH = ("NVDA", "MU", "INTC", "SNDK", "APH")
+WATCH: tuple[str, ...] = ("NVDA", "MU", "INTC", "SNDK", "APH")
 
 
 @dataclass(slots=True)

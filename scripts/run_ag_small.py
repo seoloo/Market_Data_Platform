@@ -17,7 +17,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from scripts.run_a1_train import git_state
-from scripts.run_o_overlay import load as load_crypto
+from scripts.run_o_overlay import load as _load_crypto
 from scripts.run_qs_switch import (
     QLD_FEE_YEAR,
     TQQQ_FEE_YEAR,
@@ -27,6 +27,8 @@ from scripts.run_qs_switch import (
 )
 
 from auto_trading.backtest.overlay import OverlayConfig, simulate_overlay
+
+load_crypto = _load_crypto
 
 REPO = Path(__file__).resolve().parent.parent
 OUTPUT = REPO / "reports" / "ag_small"

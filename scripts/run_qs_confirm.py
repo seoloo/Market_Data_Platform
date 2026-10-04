@@ -45,8 +45,8 @@ def confirm(days: Sequence[str], sig: Mapping[str, bool | None], n: int) -> dict
 
 def _windows(days: Sequence[str], first: str, last: str) -> list[tuple[str, str]]:
     months = sorted({d[:7] for d in days})
-    first_day = {}
-    last_day = {}
+    first_day: dict[str, str] = {}
+    last_day: dict[str, str] = {}
     for d in days:
         first_day.setdefault(d[:7], d)
         last_day[d[:7]] = d
