@@ -27,7 +27,11 @@ REPO = Path(__file__).resolve().parent.parent
 GEM = REPO / "data" / "research" / "tradfi" / "gem"
 OUT = REPO / "reports" / "gem"
 SYMBOLS = {"EFA": "AMS", "AGG": "AMS", "BIL": "AMS"}
-SHA: dict[str, str] = {}
+SHA: dict[str, str] = {
+    "EFA": "255c610f07ca15385552e2c944cae3e28158234cdbe93388e5945101a1ffbfe7",
+    "AGG": "09ed3f9811a2f4ce281b2a9fb666251d21c05b797b451a1e6a87511beba10155",
+    "BIL": "6606e529078654a3b57aa116526e7b609f2dc966e985b372bf0e22b6eb131fbd",
+}
 """fetch 뒤(수익 보기 전) 고정한다."""
 COST = 0.0012
 LOOK = 252
