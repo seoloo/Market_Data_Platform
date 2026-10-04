@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import cast
 
@@ -163,13 +163,17 @@ def _acceptance(value: object) -> int | None:
     text = _string(value)
     # 시간대 없는 시각을 ET/UTC로 추정하지 않는다. UTC 명시만 지원한다.
     if (
-        re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|\+00:00)", text)
+        re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?(Z|\+00:00)",
+            text,
+        )
         is None
     ):
         raise DataIntegrityError("SEC_ACCEPTANCE_REQUIRES_EXPLICIT_UTC")
     try:
         accepted = datetime.fromisoformat(text.replace("Z", "+00:00"))
-        result = int(accepted.timestamp() * 1000)
+        delta = accepted - datetime(1970, 1, 1, tzinfo=UTC)
+        result = (delta.days * 86400 + delta.seconds) * 1000 + delta.microseconds // 1000
     except (ValueError, OverflowError, OSError) as exc:
         raise DataIntegrityError("SEC_INVALID_ACCEPTANCE") from exc
     if result < 0:

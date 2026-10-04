@@ -280,6 +280,27 @@ def test_explicit_zero_utc_offset_is_supported() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "fraction,expected_ms", [("000", 0), ("1", 100), ("12", 120), ("123", 123)]
+)
+def test_sec_explicit_utc_milliseconds_preserved_exactly(fraction: str, expected_ms: int) -> None:
+    document = source().raw.replace(b"20:00:00Z", f"20:00:00.{fraction}Z".encode())
+    assert (
+        read_filings([SubmissionSource(CIK, document)], cik=CIK)[0].accepted_at_ms
+        == ms("2024-05-01T20:00:00") + expected_ms
+    )
+
+
+@pytest.mark.parametrize(
+    "time",
+    ["2024-05-01T20:00:00.1234Z", "2024-05-01T20:00:00.123", "2024-05-01T20:00:00.123-04:00"],
+)
+def test_unsupported_fraction_or_timezone_is_not_truncated_or_guessed(time: str) -> None:
+    document = source().raw.replace(b"2024-05-01T20:00:00Z", time.encode())
+    with pytest.raises(DataIntegrityError, match="ACCEPTANCE_REQUIRES_EXPLICIT_UTC"):
+        read_filings([SubmissionSource(CIK, document)], cik=CIK)
+
+
 def test_column_lengths_and_duplicate_filing_conflict() -> None:
     document = json.loads(source(historical=True).raw)
     document["form"] = []

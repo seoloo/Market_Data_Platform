@@ -1,0 +1,43 @@
+{
+  "kind": "MANUALLY_EXTRACTED_REAL_FILING_ROWS_NOT_FULL_RAW_SNAPSHOT",
+  "reference": "docs/research/134-apple-fundamental-pilot.md",
+  "full_companyfacts_sha256": "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43",
+  "full_submissions_sha256": "3cf0928a15c79b842e4ecef56a0ce30c5edfeda0c98643a046233fafba40dae7",
+  "companyfacts": {
+    "cik": 320193,
+    "facts": {
+      "us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {
+          "units": {"USD": [
+            {"start": "2022-09-25", "end": "2023-09-30", "val": 383285000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"},
+            {"start": "2023-10-01", "end": "2024-06-29", "val": 296105000000, "accn": "0000320193-24-000081", "form": "10-Q", "filed": "2024-08-02"},
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 391035000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"}
+          ]}
+        },
+        "OperatingIncomeLoss": {
+          "units": {"USD": [
+            {"start": "2022-09-25", "end": "2023-09-30", "val": 114301000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"},
+            {"start": "2023-10-01", "end": "2024-06-29", "val": 93625000000, "accn": "0000320193-24-000081", "form": "10-Q", "filed": "2024-08-02"},
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 123216000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"}
+          ]}
+        },
+        "NetCashProvidedByUsedInOperatingActivities": {
+          "units": {"USD": [
+            {"start": "2022-09-25", "end": "2023-09-30", "val": 110543000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"},
+            {"start": "2023-10-01", "end": "2024-06-29", "val": 91443000000, "accn": "0000320193-24-000081", "form": "10-Q", "filed": "2024-08-02"},
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 118254000000, "accn": "0000320193-24-000123", "form": "10-K", "filed": "2024-11-01"}
+          ]}
+        }
+      }
+    }
+  },
+  "submissions": {
+    "cik": 320193,
+    "filings": {"recent": {
+      "accessionNumber": ["0000320193-24-000123", "0000320193-24-000081"],
+      "form": ["10-K", "10-Q"],
+      "filingDate": ["2024-11-01", "2024-08-02"],
+      "acceptanceDateTime": ["2024-11-01T10:01:36.000Z", "2024-08-01T22:03:34.000Z"]
+    }}
+  }
+}
