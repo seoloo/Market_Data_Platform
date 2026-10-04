@@ -8,13 +8,13 @@ QS 몫 TQQQ)·적립 진행·Paper 장부가 함께 사라진다. 매일 밤 다
     python -m scripts.backup_state run      # 오늘 백업
     python -m scripts.backup_state status   # 마지막 백업 보기
 
-* **상태 묶음** ``state-YYYY-MM-DD.zip`` (수 MB) → 대상마다(기본 F: 하드디스크 · OneDrive) 저장,
+* **상태 묶음** ``state-YYYY-MM-DD.zip`` (수 MB) → F: 하드디스크에 저장,
   최근 ``KEEP`` 개만 남긴다. 들어가는 것: ``data/`` 의 작은 상태 파일, SQLite 장부(안전 복사),
   ``trading.db`` 에서 다시 받을 수 있는 시세 표를 뺀 장부 표, ``reports/`` (연구·실행 기록 제외).
 * **큰 자료 거울** (첫 대상에만): 해시 고정 연구 자료·바이낸스 원자료·시세 캐시 — 바뀐 파일만 복사,
   지우지 않는다.
 * 넣지 않는 것: ``.env``·토큰(비밀 — 다시 발급), ``trading.db`` 의 시세 표(다시 받음).
-* 끝 코드: 0 성공 · 1 보조 대상(OneDrive) 실패 · 2 첫 대상 실패 — 21:20 점검이 실패를 알린다.
+* 끝 코드: 0 성공 · 1 보조 대상 실패(대상을 더 둘 때) · 2 첫 대상 실패 — 21:20 점검이 실패를 알린다.
 
 되살리기: 묶음을 저장소 루트에 풀면 경로가 그대로다. ``backup/trading_ledger.db`` 의 표는
 ``trading.db`` 에 옮겨 넣는다(문서 OPERATIONS §백업).
@@ -37,8 +37,9 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
-TARGETS = (Path("F:/AutoTrading_backup"), Path.home() / "OneDrive" / "AutoTrading_backup")
-"""첫 대상 = C: 와 다른 물리 디스크(F: 2TB 하드디스크). 둘째 = OneDrive(집 밖 사본)."""
+TARGETS: tuple[Path, ...] = (Path("F:/AutoTrading_backup"),)
+"""C: 와 다른 물리 디스크(F: 2TB 하드디스크). OneDrive 는 용량이 가득 차 올라가지 않아 뺐다
+(2026-10-04 사용자) — 올라가지 않는 OneDrive 폴더는 C: 에 남을 뿐이라 백업이 아니다."""
 KEEP = 30
 MIRROR_DIRS = ("external", "research", "macro_sources")
 """``data/`` 아래 큰 자료 — 묶음에 넣지 않고 첫 대상에 거울로만."""
