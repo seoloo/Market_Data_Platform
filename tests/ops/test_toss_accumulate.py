@@ -212,3 +212,14 @@ class _FixedDT(datetime):
     @classmethod
     def now(cls, tz: Any = None) -> datetime:  # type: ignore[override]
         return NOW_UTC
+
+
+def test_commission_change_is_flagged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = FakeToss()
+    monkeypatch.setattr(fake, "us_commission", lambda: Decimal("0.0025"))
+    mod = _mod(monkeypatch, tmp_path, fake)
+    _seed(mod)
+    monkeypatch.setattr(mod, "datetime", _FixedDT)
+    mod.run(telegram=False)
+    report = json.loads((tmp_path / "reports" / "2026-10-06.json").read_text(encoding="utf-8"))
+    assert "수수료가 0.250%" in report["message"]

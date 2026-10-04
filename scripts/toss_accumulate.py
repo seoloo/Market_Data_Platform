@@ -551,6 +551,8 @@ def run(telegram: bool = True) -> int:
         return 1
     finally:
         trader.close()
+    if abs(day.fee - TOSS_FEE) > 1e-9:  # 0.1% 의 '적용 종료일'이 하루씩 밀리는 값이라 바뀌면 알린다
+        day.notes.insert(0, f"⚠ 토스 미국 수수료가 {day.fee:.3%} 로 바뀌었다 (기존 {TOSS_FEE:.3%})")
     text = "\n".join(["[토스]", *day.notes, *lines])
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / f"{today}.json").write_text(
