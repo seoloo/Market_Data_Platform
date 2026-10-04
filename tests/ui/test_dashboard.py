@@ -169,7 +169,7 @@ class TestRender:
         html = render_page(load_dashboard(root, P0 + 11 * D), page)
         assert html.startswith("<!doctype html>")
         assert "읽기 전용" in html
-        if page == "overseas":
+        if page in ("overseas", "toss"):
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
         elif page in ("lt_paper", "qs_paper", "ag_paper"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
@@ -317,6 +317,60 @@ class TestRender:
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/ag-paper"') == 1
+
+    def test_toss_page_reads_saved_reports(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "toss"
+        (rep / "QNDX").mkdir(parents=True)
+        (rep / "QS").mkdir(parents=True)
+        (rep / "QNDX" / "2026-10-06.json").write_text(
+            json.dumps(
+                {
+                    "at_ms": 1_790_000_000_000,
+                    "date": "2026-10-06",
+                    "symbol": "QNDX",
+                    "status": "PAUSE",
+                    "advice": {"currency": "KRW", "accrued": 50000, "price": 34350},
+                    "holding_qty": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (rep / "QS" / "2026-10-06.json").write_text(
+            json.dumps(
+                {
+                    "date": "2026-10-06",
+                    "trend_on": False,
+                    "as_of": "2026-10-05",
+                    "parts": {"r20": -0.03, "r60": 0.01, "r120": 0.1},
+                    "want": "NONE",
+                    "qndx_paused": True,
+                    "strategy_tqqq_qty": 0,
+                    "net_krw": 0,
+                    "order_line": EVIL,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (rep / "fx-2026-10-06-0900.json").write_text(
+            json.dumps(
+                {
+                    "at": "2026-10-06T09:00",
+                    "needs": [{"symbol": "WQTM", "qty": 1}],
+                    "usd": 2.05,
+                    "short_usd": 31.2,
+                    "fx": 1350,
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
+        assert "토스증권 · 적립 현황" in html and "QS 멈춤" in html and "추세 꺼짐" in html
+        assert "$31 환전 필요" in html and "WQTM" in html
+        assert EVIL not in html
+        nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+        assert nav.count('href="/toss"') == 1 and "한투 적립(종료)" in nav
 
     def test_overview_has_draft_sections(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview")

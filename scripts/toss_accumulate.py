@@ -25,6 +25,7 @@ import math
 import re
 import sys
 import time
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -148,6 +149,15 @@ def _trader() -> TossTrader:
         max_qty={TQQQ: MAX_TQQQ_QTY},
         sell_symbols=frozenset({TQQQ}),
         max_limit_usd=Decimal(str(limit)),
+    )
+
+
+def _write_report(name: str, today: str, body: dict[str, Any]) -> None:
+    folder = REPORTS / name
+    folder.mkdir(parents=True, exist_ok=True)
+    payload = {"at_ms": int(time.time() * 1000), "date": today, **body}
+    (folder / f"{today}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=1) + "\n", "utf-8"
     )
 
 
@@ -457,7 +467,23 @@ def run(telegram: bool = True) -> int:
             elif a.status == "BUY":
                 line = f"⏸ 자동 매수 안 함 — {reason}"
             _save_plan_state(state)
-            lines.append(message(a, [], order_line=line))
+            text_one = message(a, [], order_line=line)
+            lines.append(text_one)
+            _write_report(
+                plan.symbol,
+                today,
+                {
+                    "symbol": plan.symbol,
+                    "status": a.status,
+                    "advice": a.to_dict(),
+                    "auto_buy": enabled,
+                    "order": next(
+                        (asdict(o) for o in reversed(state.orders) if o.date == today), None
+                    ),
+                    "holding_qty": day.qty_avg(plan.symbol)[0],
+                    "message": text_one,
+                },
+            )
         if qs is not None and ctx is not None:
             plan_q = plan_tqqq_order(
                 qs,
@@ -491,6 +517,23 @@ def run(telegram: bool = True) -> int:
             elif plan_q.reason != "할 일 없음":
                 qline = f"⏸ QS TQQQ 주문 안 함 — {plan_q.reason}"
             _save_qs(qs)
+            _write_report(
+                "QS",
+                today,
+                {
+                    "trend_on": ctx["on"],
+                    "as_of": ctx["as_of"],
+                    "parts": ctx["parts"],
+                    "strategy_tqqq_qty": qs.strategy_qty,
+                    "net_krw": qs.net_krw(),
+                    "want": qs.want,
+                    "qndx_paused": qndx_paused(qs),
+                    "order_line": qline,
+                    "order": next(
+                        (asdict(o) for o in reversed(qs.orders) if o.date == today), None
+                    ),
+                },
+            )
             p = ctx["parts"]
             head = [
                 f"📊 QS: QQQ 추세 {'켜짐' if ctx['on'] else '꺼짐'} ({ctx['as_of']} 종가 · 20일 "

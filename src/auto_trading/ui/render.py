@@ -17,7 +17,7 @@ from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.lt_render import lt_paper_page
-from auto_trading.ui.qndx_render import accumulate_page
+from auto_trading.ui.qndx_render import accumulate_page, toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
 
@@ -32,12 +32,13 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("risk", "/risk", "위험 · 알림"),
     ("demo", "/demo", "데모 · 실거래 준비"),
     ("overseas", "/overseas", "해외 주식"),
+    ("toss", "/toss", "토스 적립"),
     ("lt_paper", "/lt-paper", "주도주 Paper"),
     ("qs_paper", "/qs-paper", "QS Paper"),
     ("ag_paper", "/ag-paper", "AG Paper"),
     ("research", "/research", "연구 기록"),
 )
-_STOCK_PAGES = frozenset({"overseas", "lt_paper", "qs_paper", "ag_paper"})
+_STOCK_PAGES = frozenset({"overseas", "toss", "lt_paper", "qs_paper", "ag_paper"})
 _PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper"})
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
@@ -102,8 +103,10 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
     nav = (
         f'<div class="nav-group"><div class="nav-heading">자동매매</div>{main_nav}</div>'
         '<div class="nav-group nav-stock"><div class="nav-heading">해외 주식</div>'
+        f'<a href="/toss" class="{"on" if page == "toss" else ""}">'
+        "토스 적립</a>"
         f'<a href="/overseas" class="{"on" if page == "overseas" else ""}">'
-        "적립 현황</a>"
+        "한투 적립(종료)</a>"
         f'<a href="/lt-paper" class="{"on" if page == "lt_paper" else ""}">'
         "주도주 Paper</a>"
         f'<a href="/qs-paper" class="{"on" if page == "qs_paper" else ""}">'
@@ -119,7 +122,7 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
     )
     trading_badge = (
         '<span class="badge">저장된 적립 기록</span>'
-        if page == "overseas"
+        if page in ("overseas", "toss")
         else '<span class="badge">저장된 Paper 기록 · 주문 없음</span>'
         if page in _PAPER_PAGES
         else '<span class="badge red">실거래 비활성</span>'
@@ -129,7 +132,7 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
             "60초마다 저장된 Paper 보고서를 다시 읽는다 · "
             "이 화면은 KIS 계좌를 조회하거나 주문하지 않는다."
         )
-    elif page == "overseas":
+    elif page in ("overseas", "toss"):
         foot = (
             "60초마다 저장된 적립 보고서를 다시 읽는다 · "
             "이 화면은 KIS 계좌를 실시간 조회하거나 주문하지 않는다."
@@ -561,6 +564,7 @@ _RENDER = {
     "demo": lambda data: demo_page(data.demo, data.now_ms),
     "running": running_page,
     "overseas": accumulate_page,
+    "toss": toss_page,
     "lt_paper": lt_paper_page,
     "qs_paper": qs_paper_page,
     "ag_paper": ag_paper_page,
