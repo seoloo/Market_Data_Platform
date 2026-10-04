@@ -42,6 +42,7 @@ __all__ = [
 
 class FuturesOrderType(StrEnum):
     MARKET = "MARKET"
+    LIMIT = "LIMIT"
     STOP_MARKET = "STOP_MARKET"
 
 
@@ -72,6 +73,8 @@ class FuturesOrderResult:
     """STOP_MARKET 의 발동가. 시장가 주문은 0."""
     fee: Decimal
     fee_asset: str
+    limit_price: Decimal = Decimal(0)
+    """지정가(LIMIT) 주문의 가격. 다른 주문은 0."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +112,23 @@ class FuturesExchange(Protocol):
         *,
         reduce_only: bool,
     ) -> FuturesOrderResult: ...
+
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> FuturesOrderResult:
+        """가격 한도 지정가를 '즉시 체결 아니면 취소'(IOC)로 보낸다 (TRADING_CORE 시장가 금지).
+
+        ``price`` 보다 나쁜 값에는 체결되지 않는다. 그 자리에서 못 채운 수량은 거래소가 만료시킨다
+        (상태 EXPIRED, ``executed_qty`` 가 일부일 수 있다). 걸어 두는 주문이 남지 않는다.
+        """
+        ...
 
     def place_stop_market(
         self,

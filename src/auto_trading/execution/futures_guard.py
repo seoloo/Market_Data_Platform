@@ -173,8 +173,13 @@ class FuturesSupervisor:
         protect_attempts: int = 3,
         protect_window_ms: int = 3_000,
         shared_account: bool = False,
+        orphan_close: str = "limit",
     ) -> None:
         """``shared_account``: 계좌를 여러 트랙이 나눠 쓴다(데모·테스트넷, 문서 59 §3).
+
+        ``orphan_close``: 원인 불명 포지션 정리 주문. 기본 ``limit`` = 가격 한도 지정가 IOC
+        (TRADING_CORE 시장가 금지). ``market`` 은 Phase 7 판정 창(~10/08) 동안 ``testnet_drill`` 이
+        같은 경로를 유지하려고만 남긴다 — 판정 뒤 없앤다.
 
         기본(False)은 실거래처럼 **계좌 전체**를 본다
         — 기록에 없는 포지션은 어느 종목이든 원인 불명이다.
@@ -183,6 +188,8 @@ class FuturesSupervisor:
         """
         if orphan_policy not in {"flatten", "hold_with_stop"}:
             raise ValueError(f"orphan_policy: {orphan_policy}")
+        if orphan_close not in {"limit", "market"}:
+            raise ValueError(f"orphan_close: {orphan_close}")
         self._exchange = exchange
         self._manager = manager
         self._store = store
@@ -195,6 +202,7 @@ class FuturesSupervisor:
         self._attempts = protect_attempts
         self._window_ms = protect_window_ms
         self._shared = shared_account
+        self._orphan_capped = orphan_close == "limit"
 
     def recover(self, decision_ms: int, stop_price_for: StopPriceFor) -> RecoveryReport:
         report = RecoveryReport("RUNNING", [], [])
@@ -248,7 +256,12 @@ class FuturesSupervisor:
             if "ORPHAN_POSITION" in kinds and position is not None:
                 if self._orphan_policy == "flatten":
                     done = self._close(
-                        decision_ms, symbol, position, report, reason="원인 불명 정리"
+                        decision_ms,
+                        symbol,
+                        position,
+                        report,
+                        reason="원인 불명 정리",
+                        capped=self._orphan_capped,
                     )
                     if done:
                         self._store.add_adjustment(
@@ -326,20 +339,34 @@ class FuturesSupervisor:
         report: RecoveryReport,
         *,
         reason: str,
+        capped: bool = False,
     ) -> bool:
+        """포지션을 닫는다. ``capped`` 면 가격 한도 지정가 IOC(일반 정리), 아니면 시장가 —
+        시장가는 보호 실패 비상 청산(TRADING_CORE 시장가 금지의 예외 2)에만 쓴다."""
         side = _closing_side(position.quantity)
         attempt = self._next_attempt(decision_ms, symbol, "CLOSE", side)
-        record = self._manager.submit_market(
-            decision_ms=decision_ms,
-            symbol=symbol,
-            side=side,
-            quantity=abs(position.quantity),
-            purpose="CLOSE",
-            attempt=attempt,
-        )
-        done = record.state == "FILLED"
+        if capped:
+            result = self._manager.submit_capped(
+                decision_ms=decision_ms,
+                symbol=symbol,
+                side=side,
+                quantity=abs(position.quantity),
+                purpose="CLOSE",
+                first_attempt=attempt,
+            )
+            done, state = result.done, f"{result.last_state}, {result.stop_reason}"
+        else:
+            record = self._manager.submit_market(
+                decision_ms=decision_ms,
+                symbol=symbol,
+                side=side,
+                quantity=abs(position.quantity),
+                purpose="CLOSE",
+                attempt=attempt,
+            )
+            done, state = record.state == "FILLED", record.state
         # 청산이 끝나지 않았으면 "청산 완료"로 적지 않는다
-        verdict = "청산 완료" if done else f"청산 미완료 ({record.state}) — 계속 대조 필요"
+        verdict = "청산 완료" if done else f"청산 미완료 ({state}) — 계속 대조 필요"
         report.actions.append(f"{symbol}: {reason} {abs(position.quantity)} → {verdict}")
         return done
 

@@ -12,6 +12,11 @@
 * **신규 진입만 막는다:** 결과를 모르는 주문이 하나라도 있으면 ``OPEN`` 은 거부한다. 그러나
   ``REDUCE``·``CLOSE``·``PROTECT`` 는 막지 않는다 — 위험 축소와 보호는 어떤 상태에서도 허용된다.
 * **걸린 보호 스톱은 정상이다:** SUBMITTED 스톱은 막지 않고, 복구 때 조회해 발동·만료를 반영한다.
+* **일반 주문은 가격 한도 지정가다 (TRADING_CORE 시장가 금지, 2026-10-05):** OPEN·REDUCE·CLOSE 는
+  :meth:`FuturesOrderManager.submit_capped` 로 mark ± ``cap`` 안의 지정가를 IOC 로 보내고, 덜 차면
+  가격을 다시 읽어 정한 횟수만 새 ID 로 다시 건다. 그래도 남으면 남긴 채 보고한다
+  (다음 실행이 이어 감).
+  :meth:`submit_market` 은 예외(보호 실패 비상 청산, TRADING_CORE 예외 2)에만 쓴다.
 * **스톱은 다른 경로로 조회·취소한다:** Binance 조건부 주문은 Algo API 라서
   (:mod:`auto_trading.exchange.futures` 참조) 기록의 주문 종류를 보고 ``*_stop`` 을 부른다.
 """
@@ -20,9 +25,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from decimal import Decimal
 
 from auto_trading.core.errors import ExchangeError, OrderRejectedError, ReconciliationError
+from auto_trading.core.money import ceil_to_step, floor_to_step
 from auto_trading.exchange.futures import FuturesExchange, FuturesOrderResult, OrderStatus
 from auto_trading.storage.repositories.futures_orders import (
     TERMINAL_STATES,
@@ -30,7 +37,20 @@ from auto_trading.storage.repositories.futures_orders import (
     FuturesOrderRepository,
 )
 
-__all__ = ["FuturesOrderManager", "futures_client_order_id"]
+__all__ = [
+    "DEFAULT_CAP",
+    "DEFAULT_TRIES",
+    "CappedResult",
+    "FuturesOrderManager",
+    "capped_price",
+    "futures_client_order_id",
+]
+
+DEFAULT_CAP = Decimal("0.003")
+"""지정가 한도: mark 에서 0.3% (2026-10-05 사용자 선택 — 즉시 지정가 + 한도)."""
+DEFAULT_TRIES = 3
+"""덜 찼을 때 가격을 다시 읽어 거는 최대 횟수(첫 주문 포함)."""
+_OPEN_OR_UNCERTAIN = frozenset({"PENDING", "UNKNOWN", "SUBMITTED", "PARTIALLY_FILLED"})
 
 _MAX_ID_LEN = 36
 _ID_PATTERN = re.compile(r"^[.A-Z:/a-z0-9_-]{1,36}$")
@@ -46,6 +66,34 @@ _STATE_BY_STATUS = {
     OrderStatus.REJECTED: "REJECTED",
     OrderStatus.EXPIRED: "EXPIRED",
 }
+
+
+def capped_price(mark: Decimal, side: str, cap: Decimal, tick: Decimal) -> Decimal:
+    """mark ± cap 을 호가 단위로 — 매수는 내림, 매도는 올림(한도를 넘지 않는 쪽)."""
+    if side == "BUY":
+        return floor_to_step(mark * (1 + cap), tick)
+    return ceil_to_step(mark * (1 - cap), tick)
+
+
+@dataclass(frozen=True, slots=True)
+class CappedResult:
+    """가격 한도 지정가 실행 결과."""
+
+    requested: Decimal
+    filled: Decimal
+    records: tuple[FuturesOrderRecord, ...]
+    stop_reason: str
+    """``filled`` · ``remainder_below_min`` (남은 수량이 최소 수량 미만) · ``below_min`` (처음부터
+    미만) · ``tries_exhausted`` · ``rejected`` · ``unresolved`` (결과 모름·걸린 채 남음) ·
+    ``price_unavailable``."""
+
+    @property
+    def done(self) -> bool:
+        return self.stop_reason in {"filled", "remainder_below_min"}
+
+    @property
+    def last_state(self) -> str:
+        return self.records[-1].state if self.records else "NONE"
 
 
 def futures_client_order_id(
@@ -117,7 +165,10 @@ class FuturesOrderManager:
         purpose: str,
         attempt: int = 0,
     ) -> FuturesOrderRecord:
-        """시장가 의도 하나를 멱등하게 실행한다. OPEN 외에는 reduce-only 로 보낸다."""
+        """시장가 의도 하나를 멱등하게 실행한다. OPEN 외에는 reduce-only 로 보낸다.
+
+        **예외 전용** (TRADING_CORE 예외 2 — 보호 등록 실패·보호 공백 때 전량 정리).
+        일반 늘리기·줄이기·정리는 :meth:`submit_capped` 를 쓴다."""
         if purpose not in {"OPEN", "REDUCE", "CLOSE"}:
             raise ValueError(f"시장가 목적은 OPEN·REDUCE·CLOSE 중 하나다: {purpose}")
         cid = futures_client_order_id(self._tag, decision_ms, symbol, purpose, side, attempt)
@@ -144,6 +195,105 @@ class FuturesOrderManager:
                 symbol, side, quantity, cid, reduce_only=record.reduce_only
             ),
         )
+
+    def submit_limit(
+        self,
+        *,
+        decision_ms: int,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        purpose: str,
+        attempt: int = 0,
+    ) -> FuturesOrderRecord:
+        """가격 한도 지정가 IOC 하나를 멱등하게 보낸다. OPEN 외에는 reduce-only 로 보낸다."""
+        if purpose not in {"OPEN", "REDUCE", "CLOSE"}:
+            raise ValueError(f"지정가 목적은 OPEN·REDUCE·CLOSE 중 하나다: {purpose}")
+        cid = futures_client_order_id(self._tag, decision_ms, symbol, purpose, side, attempt)
+        existing = self._store.get(cid)
+        if existing is not None:
+            return existing if existing.state in TERMINAL_STATES else self._reconcile(existing)
+        if purpose == "OPEN" and self.blocked():
+            raise ReconciliationError("결과를 모르는 주문이 있어 신규 진입 금지 — 먼저 recover()")
+        record = self._new_record(
+            cid,
+            decision_ms,
+            symbol,
+            side,
+            order_type="LIMIT",
+            purpose=purpose,
+            reduce_only=purpose != "OPEN",
+            close_position=False,
+            qty=quantity,
+            stop_price=Decimal(0),
+            limit_price=price,
+        )
+        return self._send(
+            record,
+            lambda: self._exchange.place_limit_ioc(
+                symbol, side, quantity, price, cid, reduce_only=record.reduce_only
+            ),
+        )
+
+    def submit_capped(
+        self,
+        *,
+        decision_ms: int,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        purpose: str,
+        first_attempt: int = 0,
+        cap: Decimal = DEFAULT_CAP,
+        tries: int = DEFAULT_TRIES,
+    ) -> CappedResult:
+        """mark ± ``cap`` 지정가 IOC 를 최대 ``tries`` 번(매번 mark 를 다시 읽고 새 ID) 보낸다.
+
+        결과를 모르거나 걸린 채 남은 주문이 생기면 더 보내지 않는다 — 복구가 조회로 해소한다.
+        """
+        if tries < 1:
+            raise ValueError(f"tries 는 1 이상이어야 한다: {tries}")
+        f = self._exchange.filters(symbol)
+        remaining = floor_to_step(quantity, f.step_size)
+        filled = Decimal(0)
+        records: list[FuturesOrderRecord] = []
+        reason = "tries_exhausted"
+        for k in range(tries):
+            if remaining < f.min_qty or remaining <= 0:
+                reason = "remainder_below_min" if filled else "below_min"
+                break
+            try:
+                mark = self._exchange.mark_price(symbol)
+            except ExchangeError:
+                reason = "price_unavailable"
+                break
+            price = capped_price(mark, side, cap, f.tick_size)
+            r = self.submit_limit(
+                decision_ms=decision_ms,
+                symbol=symbol,
+                side=side,
+                quantity=remaining,
+                price=price,
+                purpose=purpose,
+                attempt=first_attempt + k,
+            )
+            records.append(r)
+            filled += r.filled_qty
+            remaining = floor_to_step(remaining - r.filled_qty, f.step_size)
+            if r.state == "FILLED":
+                reason = "filled"
+                break
+            if r.state in _OPEN_OR_UNCERTAIN:
+                reason = "unresolved"
+                break
+            if r.state in {"REJECTED", "NOT_PLACED"}:
+                reason = "rejected"
+                break
+        else:
+            if remaining < f.min_qty:
+                reason = "remainder_below_min"
+        return CappedResult(quantity, filled, tuple(records), reason)
 
     def place_protective_stop(
         self,
@@ -271,6 +421,7 @@ class FuturesOrderManager:
         close_position: bool,
         qty: Decimal,
         stop_price: Decimal,
+        limit_price: Decimal = Decimal(0),
     ) -> FuturesOrderRecord:
         now = self._clock()
         record = FuturesOrderRecord(
@@ -286,6 +437,7 @@ class FuturesOrderManager:
             close_position=close_position,
             qty=qty,
             stop_price=stop_price,
+            limit_price=limit_price,
             state="PENDING",
             created_ms=now,
             updated_ms=now,

@@ -1,4 +1,4 @@
-"""선물 주문 기록 저장소 (``futures_orders``, 마이그레이션 007).
+"""선물 주문 기록 저장소 (``futures_orders``, 마이그레이션 007·008·010).
 
 쓰기는 행 단위로 즉시 커밋한다. 선기록(PENDING)이 거래소 호출 전에 디스크에 있어야
 재시작 뒤 복구할 수 있다.
@@ -46,6 +46,8 @@ class FuturesOrderRecord:
     fee: Decimal = Decimal(0)
     fee_asset: str | None = None
     error: str | None = None
+    limit_price: Decimal = Decimal(0)
+    """지정가(LIMIT) 주문의 가격 한도. 다른 주문은 0."""
 
     def with_state(self, state: str, updated_ms: int, **changes: Any) -> FuturesOrderRecord:
         return replace(self, state=state, updated_ms=updated_ms, **changes)
@@ -57,16 +59,18 @@ class FuturesOrderRecord:
 
     @property
     def needs_reconcile(self) -> bool:
-        """결과를 모르거나 체결이 끝나지 않은 주문 — 해소 전 신규 주문 금지."""
+        """결과를 모르거나 체결이 끝나지 않은 주문 — 해소 전 신규 주문 금지.
+
+        즉시 체결 주문(MARKET, IOC LIMIT)은 곧바로 끝나야 하므로 열려 있으면 해소 대상이다."""
         if self.state in _UNCERTAIN:
             return True
-        return self.order_type == "MARKET" and self.state in OPEN_STATES
+        return self.order_type in {"MARKET", "LIMIT"} and self.state in OPEN_STATES
 
 
 _COLUMNS = (
     "client_order_id, mode, strategy_id, decision_ms, symbol, side, order_type, purpose,"
     " reduce_only, close_position, qty, stop_price, state, exchange_order_id, filled_qty,"
-    " avg_price, fee, fee_asset, error, created_ms, updated_ms"
+    " avg_price, fee, fee_asset, error, created_ms, updated_ms, limit_price"
 )
 
 
@@ -93,6 +97,7 @@ def _row(r: FuturesOrderRecord) -> tuple[object, ...]:
         r.error,
         r.created_ms,
         r.updated_ms,
+        str(r.limit_price),
     )
 
 
@@ -119,6 +124,7 @@ def _record(row: sqlite3.Row | tuple[Any, ...]) -> FuturesOrderRecord:
         error=None if row[18] is None else str(row[18]),
         created_ms=int(row[19]),
         updated_ms=int(row[20]),
+        limit_price=Decimal(str(row[21])),
     )
 
 
@@ -136,7 +142,7 @@ class FuturesOrderRepository:
 
     def insert(self, record: FuturesOrderRecord) -> None:
         """선기록. 같은 ID가 있으면 IntegrityError — 호출자는 먼저 get으로 확인한다."""
-        placeholders = ",".join("?" * 21)
+        placeholders = ",".join("?" * 22)
         self._conn.execute(
             f"INSERT INTO futures_orders ({_COLUMNS}) VALUES ({placeholders})", _row(record)
         )

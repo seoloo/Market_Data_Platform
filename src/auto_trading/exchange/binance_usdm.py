@@ -294,6 +294,18 @@ class BinanceUsdmReadOnly:
     ) -> FuturesOrderResult:
         return self._refuse()
 
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> FuturesOrderResult:
+        return self._refuse()
+
     def place_stop_market(
         self,
         symbol: str,
@@ -330,7 +342,9 @@ class BinanceUsdmReadOnly:
             exchange_order_id=str(d.get("orderId", "")),
             symbol=str(d["symbol"]),
             side=str(d["side"]),
-            order_type=FuturesOrderType.MARKET,
+            order_type=(
+                FuturesOrderType.LIMIT if d.get("type") == "LIMIT" else FuturesOrderType.MARKET
+            ),
             status=_STATUS.get(str(d.get("status")), OrderStatus.NEW),
             orig_qty=_dec(d.get("origQty")),
             executed_qty=executed,
@@ -340,6 +354,7 @@ class BinanceUsdmReadOnly:
             stop_price=_dec(d.get("stopPrice")),
             fee=_ZERO,  # 주문 조회에는 수수료가 없다 — 체결 내역(userTrades)에서 따로 얻는다
             fee_asset="USDT",
+            limit_price=_dec(d.get("price")) if d.get("type") == "LIMIT" else _ZERO,
         )
 
     def _stop(self, d: Mapping[str, Any]) -> FuturesOrderResult:

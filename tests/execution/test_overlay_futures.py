@@ -352,3 +352,23 @@ def test_eventually_consistent_exchange_does_not_cause_duplicate_replacement() -
     assert len(r.store.all()) == n, "같은 목표·같은 스톱인데 새 주문을 냈다"
     assert again.legs[0].stop == "40000 유지"
     assert r.stops() == [(True, Decimal(40_000), Decimal(0))] and r.ex.gaps == 0
+
+
+def test_rebalance_orders_are_capped_limits_and_only_emergency_close_is_market() -> None:
+    """시장가 금지 (TRADING_CORE): 늘리기·줄이기·정리는 지정가 IOC.
+
+    시장가는 보호 실패 비상 청산뿐이다."""
+    r = Rig()
+    r.run("0.1", "40000")
+    r.run("0.05", "40000")
+    r.run("0", "40000")
+    trades = [o for o in r.store.all() if o.purpose in {"OPEN", "REDUCE", "CLOSE"}]
+    assert {o.purpose for o in trades} == {"OPEN", "REDUCE", "CLOSE"}
+    assert all(o.order_type == "LIMIT" and o.limit_price > 0 for o in trades)
+    assert r.position() == 0
+
+    e = Rig()
+    e.ex.reject_stops = True
+    e.run("0.1", "40000")
+    kinds = {(o.purpose, o.order_type) for o in e.store.all() if o.purpose in {"OPEN", "CLOSE"}}
+    assert kinds == {("OPEN", "LIMIT"), ("CLOSE", "MARKET")}

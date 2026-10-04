@@ -205,20 +205,28 @@ class OverlayFuturesExecutor:
         else:
             side, purpose = "SELL", ("CLOSE" if desired == 0 else "REDUCE")
         try:
-            record = self._m.submit_market(
+            # 시장가 금지 (TRADING_CORE): mark ± 0.3% 지정가 IOC, 덜 차면 최대 3 번 다시 건다
+            result = self._m.submit_capped(
                 decision_ms=decision_ms,
                 symbol=symbol,
                 side=side,
                 quantity=abs(delta),
                 purpose=purpose,
-                attempt=self._attempt(decision_ms, symbol, purpose, side),
+                first_attempt=self._attempt(decision_ms, symbol, purpose, side),
             )
         except ReconciliationError as exc:
             leg.notes.append(f"{purpose} 거부 — {exc}")
             return
-        leg.orders.append(f"{purpose} {side} {abs(delta)} → {record.state}")
-        if record.state != "FILLED":
-            leg.notes.append(f"{purpose} 가 끝나지 않음 ({record.state}) — 다음 복구가 조회로 해소")
+        prices = ", ".join(str(r.limit_price) for r in result.records)
+        leg.orders.append(
+            f"{purpose} {side} {abs(delta)} 지정가 IOC [{prices}] → {result.filled} 체결"
+            f" ({len(result.records)} 번, {result.last_state})"
+        )
+        if not result.done:
+            leg.notes.append(
+                f"{purpose} 가 다 차지 않음 ({result.filled}/{abs(delta)}, {result.stop_reason})"
+                " — 남은 수량은 다음 실행이 이어 가고, 결과를 모르는 주문은 복구가 조회로 해소"
+            )
 
     # ------------------------------------------------------------ 보호 스톱
 
@@ -334,7 +342,9 @@ class OverlayFuturesExecutor:
     def _protect_or_close(
         self, decision_ms: int, symbol: str, pos: Decimal, price: Decimal, leg: LegReport
     ) -> None:
-        """걸린 스톱이 하나도 없다: 3회·3초 재시도 → 실패하면 전량 시장가 청산 (TRADING_CORE)."""
+        """걸린 스톱이 하나도 없다: 3회·3초 재시도 → 실패하면 전량 시장가 청산 (TRADING_CORE).
+
+        이 시장가 청산은 시장가 금지의 예외 2(보호 등록 실패)다."""
         start = self._clock()
         for _ in range(self._attempts):
             if self._clock() - start > self._window_ms:

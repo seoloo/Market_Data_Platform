@@ -18,7 +18,7 @@ import pytest
 from auto_trading.config.secrets import BinanceCredentials
 from auto_trading.core.errors import ConfigError, OrderRejectedError, OrderStateUnknownError
 from auto_trading.exchange.binance_usdm_testnet import TESTNET_URL, BinanceUsdmTestnet
-from auto_trading.exchange.futures import OrderStatus
+from auto_trading.exchange.futures import FuturesOrderType, OrderStatus
 from auto_trading.execution.futures_orders import FuturesOrderManager
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
@@ -333,3 +333,23 @@ class TestTestnetFindings:
         r = api.cancel_order("BTCUSDT", "x")
         assert r is not None and r.status is OrderStatus.CANCELED
         assert [q.method for q in seen if q.url.path == "/fapi/v1/order"] == ["DELETE"]
+
+
+def test_limit_ioc_sends_price_capped_immediate_or_cancel() -> None:
+    """선물 일반 주문의 시장가 대신 (TRADING_CORE 시장가 금지)."""
+    body = {
+        **FILLED,
+        "type": "LIMIT",
+        "status": "EXPIRED",
+        "executedQty": "0.001",
+        "price": "84250.0",
+    }
+    api, seen = adapter({("POST", "/fapi/v1/order"): httpx.Response(200, json=body)})
+    r = api.place_limit_ioc(
+        "BTCUSDT", "SELL", Decimal("0.002"), Decimal("84250.0"), "tn-1-BTCUSDT-RS", reduce_only=True
+    )
+    p = params(seen[-1])
+    assert (p["type"], p["timeInForce"], p["reduceOnly"]) == ("LIMIT", "IOC", "true")
+    assert p["quantity"] == "0.002" and p["price"] == "84250"
+    assert r.status is OrderStatus.EXPIRED and r.executed_qty == Decimal("0.001")
+    assert r.order_type is FuturesOrderType.LIMIT and r.limit_price == Decimal("84250.0")

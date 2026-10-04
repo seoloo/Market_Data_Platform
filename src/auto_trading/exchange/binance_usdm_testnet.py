@@ -115,6 +115,34 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
                 result = replace(result, avg_price=looked.avg_price)
         return result
 
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> FuturesOrderResult:
+        """가격 한도 지정가 IOC — 선물 일반 주문(OPEN·REDUCE·CLOSE)의 시장가 대신 (TRADING_CORE)."""
+        data = self._send(
+            "POST",
+            "/fapi/v1/order",
+            {
+                "symbol": symbol,
+                "side": side,
+                "type": "LIMIT",
+                "timeInForce": "IOC",
+                "quantity": _qty(quantity),
+                "price": _qty(price),
+                "newClientOrderId": client_order_id,
+                "reduceOnly": "true" if reduce_only else "false",
+                "newOrderRespType": "RESULT",
+            },
+        )
+        return self._order(data)
+
     def place_stop_market(
         self,
         symbol: str,

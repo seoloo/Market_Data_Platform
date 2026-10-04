@@ -1,7 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-10-05 · 작성: Claude (MJ-B·MJ-C 판정 — 둘 다 REJECT, 문서 140 §11).
+최종 갱신: 2026-10-05 · 작성: Claude (선물 일반 주문 시장가 → 가격 한도 지정가 IOC, TRADING_CORE 충돌 해소).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-10-05 — 선물 일반 주문: 시장가 → 가격 한도 지정가 IOC
+
+- 사용자 선택: "즉시 지정가 + 한도" (TRADING_CORE 시장가 금지의 남은 충돌, 2 단계 전 필수).
+- `FuturesOrderManager.submit_capped`: mark ± 0.3% 지정가를 IOC 로 보내고, 덜 차면 mark 를 다시 읽어 새 ID 로 최대 3 번. 결과를 모르는 주문이 생기면 멈추고 복구가 조회로 해소. 남은 수량은 남긴 채 보고 → 다음 실행이 이어 감.
+- 적용: O/v2 실행기(`overlay_futures`)의 늘리기·줄이기·정리, 복구 가드의 원인 불명 정리. `submit_market` 은 보호 실패 비상 청산(예외 2)에만 남김.
+- 거래소: `place_limit_ioc` (테스트넷 = LIMIT·IOC, 실계좌 어댑터는 계속 거부, 가짜 거래소 = 한도가 mark 를 넘을 때만 mark 에 체결).
+- 저장: 마이그레이션 010 (`order_type` 에 LIMIT, `limit_price` 열). 실제 DB 3 개 사본에 적용해 행 그대로 확인(demo_o2 21 · testnet 226 · trading 0).
+- 데모 호가 확인: ETH·BTC·SOL·BNB 최우선 호가가 mark 와 0.01% 안 → 0.3% 한도면 체결된다.
+- **`testnet_drill.py` 는 Phase 7 판정 창(~10/08) 동안 옛 경로 유지**(`orphan_close="market"`) — 판정 뒤 지정가로 바꾼다. 오늘 밤부터 데모 O/v2·선물 실행기 훈련은 지정가.
+- 시험 11 개 추가.
 
 ## 2026-10-05 — MJ 방식 시험: B(자금 관리)·C(매물대 겹침) (문서 140)
 

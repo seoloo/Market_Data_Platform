@@ -2,6 +2,8 @@
 
 one-way 포지션, 교차 지갑, 수수료, reduce-only, closePosition 보호 스톱, funding, 청산을 흉내 낸다.
 시장가는 현재 mark 가격에 즉시 체결한다(선택적으로 일부만 체결 후 EXPIRED).
+지정가 IOC 는 가격 한도가 mark 를 넘으면(매수 ≥ mark, 매도 ≤ mark) mark 에 체결하고 — 한도보다
+좋은 값 — 아니면 체결 없이 EXPIRED 다. 걸어 두는 일반 주문은 남지 않는다.
 
 :meth:`set_mark_price` 가 가격을 움직이면 걸려 있는 스톱을 판정한다. 발동한 스톱은 **새 가격**에
 체결된다 — 스톱가를 건너뛴 갭이면 스톱가보다 나쁜 가격이다
@@ -120,10 +122,17 @@ class FakeFuturesExchange:
         ]
 
     def get_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
-        return self._lookup(symbol, client_order_id, FuturesOrderType.MARKET)
+        order = self._lookup(symbol, client_order_id, FuturesOrderType.MARKET)
+        if order is None and client_order_id in self.orders:
+            order = self.orders[client_order_id]
+            if order.symbol != symbol or order.order_type is not FuturesOrderType.LIMIT:
+                return None
+        return order
 
     def open_orders(self, symbol: str) -> list[FuturesOrderResult]:
-        return self._working(symbol, FuturesOrderType.MARKET)
+        return self._working(symbol, FuturesOrderType.MARKET) + self._working(
+            symbol, FuturesOrderType.LIMIT
+        )
 
     def get_stop(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
         return self._lookup(symbol, client_order_id, FuturesOrderType.STOP_MARKET)
@@ -157,11 +166,37 @@ class FakeFuturesExchange:
         *,
         reduce_only: bool,
     ) -> FuturesOrderResult:
+        return self._execute(symbol, side, quantity, client_order_id, reduce_only, None)
+
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> FuturesOrderResult:
+        return self._execute(symbol, side, quantity, client_order_id, reduce_only, price)
+
+    def _execute(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        client_order_id: str,
+        reduce_only: bool,
+        limit: Decimal | None,
+    ) -> FuturesOrderResult:
+        """시장가(``limit`` 없음) 또는 지정가 IOC. 체결가는 mark."""
         self._accept_or_fail(client_order_id)
         f = self.symbol_filters[symbol]
         price = self.prices[symbol]
         if quantity != floor_to_step(quantity, f.step_size) or quantity < f.min_qty:
             raise OrderRejectedError("LOT_SIZE")
+        if limit is not None and (limit <= 0 or limit != floor_to_step(limit, f.tick_size)):
+            raise OrderRejectedError("PRICE_FILTER")
         if not reduce_only and quantity * price < f.min_notional:
             raise OrderRejectedError("MIN_NOTIONAL")
         delta = quantity if side == "BUY" else -quantity
@@ -175,7 +210,8 @@ class FakeFuturesExchange:
             need = increase * price / self._lev(symbol) + quantity * price * self.fee_rate
             if need > self.account().available_balance:
                 raise OrderRejectedError("Margin is insufficient")
-        executed = floor_to_step(quantity * self.fill_ratio, f.step_size)
+        crosses = limit is None or (limit >= price if side == "BUY" else limit <= price)
+        executed = floor_to_step(quantity * self.fill_ratio, f.step_size) if crosses else _ZERO
         fee = executed * price * self.fee_rate
         self._fill(symbol, executed if side == "BUY" else -executed, price)
         self.wallet -= fee
@@ -186,7 +222,7 @@ class FakeFuturesExchange:
                 exchange_order_id=str(self.placed_count + 1),
                 symbol=symbol,
                 side=side,
-                order_type=FuturesOrderType.MARKET,
+                order_type=FuturesOrderType.MARKET if limit is None else FuturesOrderType.LIMIT,
                 status=status,
                 orig_qty=quantity,
                 executed_qty=executed,
@@ -196,6 +232,7 @@ class FakeFuturesExchange:
                 stop_price=_ZERO,
                 fee=fee,
                 fee_asset=_QUOTE,
+                limit_price=_ZERO if limit is None else limit,
             )
         )
 

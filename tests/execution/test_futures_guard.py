@@ -373,3 +373,25 @@ class TestSharedAccount:
         report = guard.recover(T0, lambda s, p: Decimal(2_000))
         assert "ORPHAN_POSITION" in {i.kind for i in report.issues}
         assert "ETHUSDT" not in ex.account().positions  # 실거래(전략 하나) 규칙은 그대로
+
+
+def test_orphan_flatten_uses_capped_limit_unless_told_market() -> None:
+    """원인 불명 정리는 지정가 IOC (TRADING_CORE). market 은 Phase 7 훈련 경로 유지용."""
+    for close, kind in (("limit", "LIMIT"), ("market", "MARKET")):
+        rig = Rig()
+        rig.guard = FuturesSupervisor(
+            rig.ex,
+            rig.m,
+            rig.store,
+            rig.events,
+            mode="paper",
+            symbols=["BTCUSDT"],
+            require_stop=True,
+            orphan_policy="flatten",
+            orphan_close=close,
+            clock=lambda: 0,
+        )
+        rig.ex.place_market_order("BTCUSDT", "BUY", Decimal("0.2"), "manual-1", reduce_only=False)
+        rig.recover()
+        assert rig.position() == 0
+        assert [o.order_type for o in rig.store.all() if o.purpose == "CLOSE"] == [kind]

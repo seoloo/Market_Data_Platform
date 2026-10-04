@@ -97,6 +97,8 @@ class Drill:
             symbols=[SYMBOL],
             require_stop=True,
             orphan_policy="flatten",
+            # Phase 7 판정 창(~10/08) 동안 훈련 경로를 바꾸지 않는다 — 판정 뒤 지정가로 바꾼다
+            orphan_close="market",
             shared_account=True,  # 데모 계좌를 여러 트랙이 나눠 쓴다 (문서 59 §3)
             clock=lambda: int(time.time() * 1000),
         )
