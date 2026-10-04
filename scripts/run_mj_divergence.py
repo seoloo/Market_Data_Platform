@@ -20,7 +20,7 @@ import sys
 import zipfile
 from array import array
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -52,8 +52,25 @@ RISK = 0.05
 _MICROS = 10**14
 
 # 사건 수 관문(count) 결과 — 판정은 이 값과 같을 때만 돈다 (문서 140 §6).
-EXPECTED_COUNTS: dict[str, int] | None = None
-EXPECTED_SIGNALS: str | None = None
+EXPECTED_COUNTS: dict[str, int] | None = {
+    "C_busy": 1,
+    "C_missed": 0,
+    "C_skipped": 2,
+    "C_trades": 178,
+    "M0_busy": 14,
+    "M0_missed": 1,
+    "M0_skipped": 4,
+    "M0_trades": 745,
+    "M1_busy": 52,
+    "M1_missed": 1,
+    "M1_skipped": 4,
+    "M1_trades": 707,
+    "conf_signals_BTCUSDT": 99,
+    "conf_signals_ETHUSDT": 82,
+    "signals_BTCUSDT": 373,
+    "signals_ETHUSDT": 391,
+}
+EXPECTED_SIGNALS: str | None = "5ee9c5cdc5b78a5e95a9890d0f335f4cf81b3b7c4fee5228474a3fc2ba1d9dc3"
 
 
 def _ms(text: str) -> int:
@@ -67,6 +84,8 @@ def _date(ms: int) -> str:
 FROM, TO = _ms("2018-01-01"), _ms("2026-09-01") - HOUR
 SPLIT = _ms("2022-01-01")
 CFG = SignalConfig()
+# C v2 (문서 140 §10): 후보 {2.0, 2.5, 3.0} 중 C 거래 ≥ 150 인 가장 작은 값 — 수만 보고 골랐다.
+CFG_C = replace(CFG, box_atr=2.0)
 
 
 def load_hourly(symbol: str) -> Bars:
@@ -107,8 +126,8 @@ def build(bars: dict[str, Bars]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for s, b in bars.items():
         sigs = [x for x in signals(b, CFG) if FROM <= b.t[x.i] <= TO]
-        z = boxes(b, CFG)
-        out[s] = {"all": sigs, "conf": [x for x in sigs if confluent(x, z, CFG)]}
+        z = boxes(b, CFG_C)
+        out[s] = {"all": sigs, "conf": [x for x in sigs if confluent(x, z, CFG_C)]}
     return out
 
 
@@ -383,6 +402,7 @@ def verdict(output: Path) -> int:
         "bundle_sha256": digest,
         "signal_sha256": EXPECTED_SIGNALS,
         "config": asdict(CFG),
+        "config_c": asdict(CFG_C),
         "status": {"MJ-B": status_b, "MJ-C": status_c},
         "criteria": criteria,
         "full": full,
