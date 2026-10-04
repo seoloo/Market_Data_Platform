@@ -239,7 +239,9 @@ $tasks = @(Get-ScheduledTask | Where-Object { $_.TaskName -like 'AutoTrading*' }
   $i = $_ | Get-ScheduledTaskInfo
   [pscustomobject]@{ name=$_.TaskName; last_run=$i.LastRunTime.ToString('o');
     last_result=[int64]$i.LastTaskResult; start_when_available=$_.Settings.StartWhenAvailable;
-    wake=$_.Settings.WakeToRun; logon=[string]$_.Principal.LogonType } })
+    wake=$_.Settings.WakeToRun; logon=[string]$_.Principal.LogonType; state=[string]$_.State;
+    weekly=[bool]@($_.Triggers |
+      Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskWeeklyTrigger' }).Count } })
 $since = (Get-Date).AddHours(-24)
 $filter = @{LogName='System'; Id=41; StartTime=$since}
 $bad = @(Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue).Count

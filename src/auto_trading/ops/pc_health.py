@@ -25,6 +25,10 @@ __all__ = ["RESULT_OK", "pc_findings", "result_text"]
 
 _HOUR_MS = 3_600_000
 _DAILY_GRACE_MS = 26 * _HOUR_MS
+_WEEKLY_GRACE_MS = 74 * _HOUR_MS
+"""월~금(주간 트리거) 작업은 주말을 건너 74 시간까지 정상 (2026-10-04)."""
+_EXTRA_OK = {"AutoTrading_Paper_Watchdog": frozenset({1})}
+"""점검은 경고가 있으면 1 로 끝난다 — 실패가 아니다 (CRITICAL 은 2)."""
 
 
 def _ms(text: str | None) -> int | None:
@@ -45,23 +49,30 @@ def pc_findings(
 ) -> tuple[list[str], list[Finding]]:
     """예약 작업 상태·비정상 종료로 한 줄 요약과 판정.
 
-    ``tasks`` 항목: name · last_run(ISO) · last_result(int) · start_when_available · wake · logon.
+    ``tasks`` 항목: name · last_run(ISO) · last_result(int) · start_when_available · wake · logon
+    · state(Disabled 면 건너뜀) · weekly(주간 트리거면 74 시간 기준).
     """
     ledger = "PC"
     findings: list[Finding] = []
     if not tasks:
         return [], [Finding("WARN", ledger, "AutoTrading 예약 작업을 찾지 못함")]
     failed = behind = 0
+    tasks = [t for t in tasks if str(t.get("state")) != "Disabled"]  # 꺼 둔 작업은 보지 않는다
     for t in tasks:
         name = str(t.get("name"))
         code = int(t.get("last_result") or 0)
-        ok = code in RESULT_OK or (code == _ALREADY_RUNNING and name in _RESIDENT)
+        ok = (
+            code in RESULT_OK
+            or (code == _ALREADY_RUNNING and name in _RESIDENT)
+            or code in _EXTRA_OK.get(name, ())
+        )
         if not ok:
             failed += 1
             findings.append(Finding("WARN", ledger, f"{name} 마지막 결과 {result_text(code)}"))
         last = _ms(t.get("last_run"))
         daily = name not in _RESIDENT and code != 0x41303
-        if daily and last is not None and now_ms - last > _DAILY_GRACE_MS:
+        grace = _WEEKLY_GRACE_MS if t.get("weekly") else _DAILY_GRACE_MS
+        if daily and last is not None and now_ms - last > grace:
             behind += 1
             hours = (now_ms - last) // _HOUR_MS
             findings.append(Finding("WARN", ledger, f"{name} {hours}시간째 실행 안 됨"))

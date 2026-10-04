@@ -75,3 +75,47 @@ def test_no_tasks_and_result_text() -> None:
     _, found = pc_findings([], now_ms=NOW, unexpected_shutdowns_24h=0, last_boot=None)
     assert found[0].level == "WARN"
     assert result_text(0x41303) == "아직 실행 전"
+
+
+def test_disabled_weekly_and_watchdog_warning_are_not_flagged() -> None:
+    """2026-10-04: 꺼 둔 훈련 작업 · 월~금 작업의 주말 · 점검 경고(1) 가 오탐으로 떴다."""
+    from auto_trading.ops.pc_health import pc_findings
+
+    now = 1_791_100_000_000
+    hour = 3_600_000
+
+    def iso(ms: int) -> str:
+        from datetime import UTC, datetime
+
+        return datetime.fromtimestamp(ms / 1000, UTC).isoformat()
+
+    tasks = [
+        {
+            "name": "AutoTrading_Testnet_Overlay",
+            "last_run": iso(now - 44 * hour),
+            "last_result": 0,
+            "state": "Disabled",
+            "start_when_available": True,
+        },
+        {
+            "name": "AutoTrading_Toss_Accumulate",
+            "last_run": iso(now - 48 * hour),
+            "last_result": 0,
+            "state": "Ready",
+            "weekly": True,
+            "start_when_available": True,
+        },
+        {
+            "name": "AutoTrading_Paper_Watchdog",
+            "last_run": iso(now - 2 * hour),
+            "last_result": 1,
+            "state": "Ready",
+            "start_when_available": True,
+        },
+    ]
+    lines, found = pc_findings(tasks, now_ms=now, unexpected_shutdowns_24h=0, last_boot=None)
+    assert found == [] and "작업 2개" in lines[0]
+    tasks[1]["last_run"] = iso(now - 80 * hour)  # 주말을 넘겨도 안 돌았다
+    tasks[2]["last_result"] = 2  # CRITICAL
+    _, found = pc_findings(tasks, now_ms=now, unexpected_shutdowns_24h=0, last_boot=None)
+    assert len(found) == 2
