@@ -15,7 +15,7 @@ import hashlib
 import json
 import statistics
 import sys
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -84,7 +84,7 @@ def run() -> dict[str, Any]:
     months = sorted({d[:7] for d in days})
     starts = [m for m in months if FIRST_START <= m <= LAST_START]
     first_day = {m: min(d for d in days if d[:7] == m) for m in months}
-    windows = []
+    windows: list[dict[str, Any]] = []
     for m in starts:
         end_m = _add_months(m, MONTHS - 1)
         end_days = [d for d in days if d[:7] == end_m]
@@ -150,7 +150,7 @@ def run() -> dict[str, Any]:
         "worst_ratio_windows": sorted(windows, key=lambda w: w["ratio"])[:5],
         "all_windows": windows,
         "data_range": [days[0], days[-1]],
-        "computed": date.today().isoformat(),
+        "computed": datetime.now(UTC).date().isoformat(),
     }
     OUT.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
