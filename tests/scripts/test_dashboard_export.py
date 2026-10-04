@@ -35,6 +35,8 @@ def test_export_both_themes_without_broken_internal_links(
         html = path.read_text(encoding="utf-8")
         theme = "dark" if path.stem.endswith("-dark") else "light"
         assert f'data-theme="{theme}"' in html
+        assert 'src="assets/auto-trading.svg"' in html
+        assert 'href="assets/auto-trading.ico?v=2"' in html
         links = _Links()
         links.feed(html)
         for href in links.links:
@@ -43,3 +45,5 @@ def test_export_both_themes_without_broken_internal_links(
             assert not href.startswith("/") and "?theme=" not in href
             assert (folder / href.partition("#")[0]).exists(), (path.name, href)
     assert not (source / "data").exists()
+    assert (folder / "assets" / "auto-trading.svg").exists()
+    assert (folder / "assets" / "auto-trading.ico").read_bytes().startswith(b"\x00\x00\x01\x00")

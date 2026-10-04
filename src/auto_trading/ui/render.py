@@ -22,7 +22,9 @@ from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
 
-__all__ = ["PAGES", "render_page"]
+__all__ = ["ASSET_DIR", "PAGES", "render_page"]
+
+ASSET_DIR = Path(__file__).with_name("assets")
 
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("overview", "/", "운영 개요"),
@@ -173,8 +175,12 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         f'<!doctype html><html lang="ko" data-theme="{theme}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="refresh" content="60">'
+        '<link rel="icon" type="image/svg+xml" href="/assets/auto-trading.svg?v=2">'
+        '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" sizes="any">'
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
-        f'<div class="topbar"><a class="logo" href="/">AUTO <b>TRADING</b></a>'
+        '<div class="topbar"><a class="logo" href="/">'
+        '<img src="/assets/auto-trading.svg" width="32" height="32" alt="">'
+        "AUTO <b>TRADING</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout"><nav><details><summary>상세 메뉴 · {escape(title)}</summary>'

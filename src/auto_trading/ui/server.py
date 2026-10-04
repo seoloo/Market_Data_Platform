@@ -31,6 +31,12 @@ __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost"})
 _ROUTES = {href: key for key, href, _ in PAGES}
 _ROUTES.update({"/overseas": "toss", "/accumulate": "toss", "/qndx": "toss"})
+_ASSET_DIR = Path(__file__).with_name("assets")
+_ASSETS = {
+    "/favicon.ico": ("auto-trading.ico", "image/x-icon"),
+    "/assets/auto-trading.ico": ("auto-trading.ico", "image/x-icon"),
+    "/assets/auto-trading.svg": ("auto-trading.svg", "image/svg+xml"),
+}
 _HEADERS = {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
@@ -70,6 +76,15 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        asset = _ASSETS.get(path)
+        if asset is not None:
+            try:
+                body = (_ASSET_DIR / asset[0]).read_bytes()
+            except OSError:
+                self._send(404, "<!doctype html><p>아이콘 없음</p>")
+                return
+            self._send_bytes(200, body, asset[1])
+            return
         page = _ROUTES.get(path)
         if page is None:
             self._send(404, "<!doctype html><meta charset='utf-8'><p>없는 화면</p>")
@@ -121,9 +136,18 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _send(self, status: int, html: str, *, theme: str | None = None) -> None:
-        body = html.encode("utf-8")
+        self._send_bytes(status, html.encode("utf-8"), "text/html; charset=utf-8", theme=theme)
+
+    def _send_bytes(
+        self,
+        status: int,
+        body: bytes,
+        content_type: str,
+        *,
+        theme: str | None = None,
+    ) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         if theme in {"light", "dark"}:
             self.send_header(

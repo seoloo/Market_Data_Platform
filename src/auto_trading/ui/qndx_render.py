@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from html import escape
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -78,7 +79,7 @@ def _section(root: Path, folder: Path, state_dir: Path | None = None) -> str:
             else ""
         )
         return (
-            f'<section class="stock-section" id="{symbol.lower()}">'
+            f'<section class="stock-section" id="{symbol.lower()}-history">'
             f'<div class="panel"><h2>{escape(symbol)}</h2>'
             f'<p class="mute">아직 기록이 없다.{started}</p>'
             "</div></section>"
@@ -171,13 +172,77 @@ def _section(root: Path, folder: Path, state_dir: Path | None = None) -> str:
         f"<th>주문</th></tr>{''.join(hist)}</table></div></div>"
     )
     return (
-        f'<section class="stock-section" id="{symbol.lower()}"><h2>{escape(symbol)}</h2>'
+        f'<section class="stock-section" id="{symbol.lower()}-history"><h2>{escape(symbol)}</h2>'
         f'{lead}<div class="panel"><div class="cards">{cards}</div>{bar}</div>{tables}'
         "</section>"
     )
 
 
 _TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM")
+_TOSS_LABELS = {
+    "QNDX": ("원화로 꾸준히", "매일 1만 원", "월 30만 원 한도"),
+    "BTQ": ("달러로 차곡차곡", "매일 $1", "월 $31 한도"),
+    "WQTM": ("달러로 차곡차곡", "매일 $4", "월 $124 한도"),
+}
+
+
+def _number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if isfinite(number) else None
+
+
+def _toss_tile(root: Path, symbol: str) -> str:
+    """기록이 없는 기간도 가짜 금액/진행률 없이 보여 주는 종목별 카드."""
+    paths = sorted((root / "reports" / "toss" / symbol).glob("20*.json"))
+    report = _read(paths[-1]) if paths else None
+    state = _read(root / "data" / "toss" / f"{symbol}.json") or {}
+    caption, daily, cap = _TOSS_LABELS[symbol]
+    status, color = "첫 실행 대기", "var(--mute)"
+    progress = (
+        '<div class="savings-empty"><span class="empty-dot"></span>'
+        "<b>아직 기록이 없다</b><p>첫 보고서가 저장되면<br>적립금과 진행률이 표시됩니다.</p></div>"
+    )
+    observed = "적립 시작 " + str(state.get("start_date") or "미기록")
+    if paths and report is None:
+        status, color = "기록 읽기 실패", "var(--bad)"
+        progress = '<div class="savings-empty"><b>보고서를 확인해 주세요</b></div>'
+    elif report is not None:
+        status, color = _STATUS.get(str(report.get("status")), ("상태 미확인", "var(--mute)"))
+        advice = report.get("advice")
+        advice = advice if isinstance(advice, dict) else {}
+        accrued, price = _number(advice.get("accrued")), _number(advice.get("price"))
+        currency = str(advice.get("currency") or "KRW")
+        observed = "저장 기록 " + _observed(report.get("at_ms"), report.get("date", paths[-1].stem))
+        progress = '<div class="savings-empty"><b>적립 자료 미확인</b></div>'
+        if accrued is not None and price is not None and accrued >= 0 and price > 0:
+            pct = min(100.0, accrued / price * 100)
+            progress = (
+                '<div class="saving-amount"><span>쌓인 적립금</span>'
+                f"<strong>{_money(accrued, currency)}</strong></div>"
+                f'<div class="row"><span class="mute">다음 1주까지</span><b>{pct:.0f}%</b></div>'
+                f'<div class="progress" role="progressbar" aria-label="{symbol} 적립 진행률" '
+                f'aria-valuemin="0" aria-valuemax="100" aria-valuenow="{pct:.1f}">'
+                f'<span style="width:{pct:.1f}%;background:{color}"></span></div>'
+                f'<div class="foot">1주 가격 {_money(price, currency)} · 수수료 포함</div>'
+            )
+    history = (
+        f'<a class="text-link" href="#{symbol.lower()}-details">저장 내역 보기 →</a>'
+        if paths
+        else '<span class="mute">월~금 21:00 판단</span>'
+    )
+    return (
+        f'<article class="savings-card savings-{symbol.lower()}" id="{symbol.lower()}">'
+        '<div class="row"><div class="ticker-heading">'
+        f'<span class="ticker-icon" aria-hidden="true">{symbol[0]}</span>'
+        f"<div><h2>{symbol}</h2><span>{caption}</span></div></div>"
+        f'<span class="saving-status" style="color:{color}">{escape(status)}</span></div>'
+        f'<div class="saving-plan"><b>{daily}</b><span>{cap}</span></div>'
+        f'<div class="saving-body">{progress}</div>'
+        f'<div class="saving-footer"><span>{escape(observed)}</span>{history}</div></article>'
+    )
 
 
 def _toss_qs(base: Path) -> str:
@@ -250,18 +315,46 @@ def toss_page(data: Any) -> str:
     root = getattr(data, "root", None) or Path()
     base = root / "reports" / "toss"
     state_dir = root / "data" / "toss"
-    jump = "".join(f'<a href="#{s.lower()}">{s}</a>' for s in _TOSS_SYMBOLS)
     intro = (
-        '<div class="panel"><h2>토스증권 · 적립 현황</h2>'
-        f'<div class="stock-jump">{jump}</div>'
-        '<p class="mute">QNDX 매일 1만 원 · BTQ 매일 1달러 · WQTM 매일 4달러를 적립해 1주 값이 '
-        "모이면 장 마감 지정가로 1주 산다. QQQ 추세가 꺼지면 QNDX 를 멈추고, 다시 켜지면 쌓인 "
-        "적립금으로 TQQQ 를 산다(QS). 저장된 마지막 보고서이며 실시간 계좌 화면이 아니다. "
-        "매수·매도 버튼은 없다.</p></div>"
+        '<section class="savings-hero"><div><div class="eyebrow">OVERSEAS / SAVINGS</div>'
+        "<h2>작게 시작하고,<br>꾸준히 쌓아가는 투자.</h2>"
+        '<p>토스증권 · 적립 현황</p><div class="hero-chips"><span>3개 적립 종목</span>'
+        "<span>월~금 21:00 KST</span><span>평가 손익 비표시</span></div></div>"
+        '<div class="hero-note"><span class="hero-symbol" aria-hidden="true">↗</span>'
+        "<b>내역만 편안하게 확인하세요.</b><p>저장된 마지막 보고서입니다.<br>"
+        "실시간 계좌 조회나 주문은 하지 않습니다.</p></div></section>"
     )
-    sections = "".join(_section(root, base / s, state_dir) for s in _TOSS_SYMBOLS)
+    tiles = "".join(_toss_tile(root, s) for s in _TOSS_SYMBOLS)
+    sections: list[str] = []
+    for symbol in _TOSS_SYMBOLS:
+        if not list((base / symbol).glob("20*.json")):
+            continue
+        try:
+            detail = _section(root, base / symbol, state_dir)
+        except (TypeError, ValueError, OverflowError):
+            detail = '<div class="errors">저장된 보고서 형식을 확인해 주세요.</div>'
+        sections.append(
+            f'<details class="panel stock-detail" id="{symbol.lower()}-details">'
+            f"<summary>{symbol} · 적립·주문 상세 기록</summary>{detail}</details>"
+        )
     foot = (
         "<div class='foot'>월~금 밤 9시(KST) 한 번 판단한다. 체결은 다음 실행에서 토스 주문 "
         "조회·잔고로 확인한다.</div>"
     )
-    return intro + _toss_qs(base) + _toss_fx(base) + sections + foot
+    guide = (
+        '<details class="savings-guide"><summary>적립 방식 알아보기</summary>'
+        "<p>QNDX 매일 1만 원 · BTQ 매일 1달러 · WQTM 매일 4달러를 적립해 1주 값이 모이면 "
+        "장 마감 지정가로 1주 산다. QQQ 추세가 꺼지면 QNDX 를 멈추고, 다시 켜지면 쌓인 "
+        "적립금으로 TQQQ 를 산다(QS). 매수·매도 버튼은 없다.</p></details>"
+    )
+    return (
+        intro
+        + f'<div class="savings-grid">{tiles}</div>'
+        + '<div class="toss-support">'
+        + _toss_qs(base)
+        + _toss_fx(base)
+        + "</div>"
+        + "".join(sections)
+        + guide
+        + foot
+    )

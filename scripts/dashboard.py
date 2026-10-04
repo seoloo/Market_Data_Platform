@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import time
 import urllib.request
@@ -23,7 +24,7 @@ import webbrowser
 from pathlib import Path
 
 from auto_trading.ui.data import load_dashboard
-from auto_trading.ui.render import PAGES, render_page
+from auto_trading.ui.render import ASSET_DIR, PAGES, render_page
 from auto_trading.ui.server import make_server
 
 for _stream in (sys.stdout, sys.stderr):
@@ -37,11 +38,18 @@ REPO = Path(__file__).resolve().parent.parent
 def export(folder: Path) -> int:
     data = load_dashboard(REPO, int(time.time() * 1000))
     folder.mkdir(parents=True, exist_ok=True)
+    assets = folder / "assets"
+    assets.mkdir(exist_ok=True)
+    for name in ("auto-trading.svg", "auto-trading.ico"):
+        shutil.copyfile(ASSET_DIR / name, assets / name)
     for theme in ("light", "dark"):
         suffix = "" if theme == "light" else "-dark"
         for key, href, _ in PAGES:
             stem = "index" if href == "/" else href.strip("/")
             html = render_page(data, key, theme=theme)
+            html = html.replace('"/assets/', '"assets/').replace(
+                '"/favicon.ico?v=2"', '"assets/auto-trading.ico?v=2"'
+            )
             for _, other_href, _ in PAGES:  # 파일끼리 이동되게 링크를 바꾼다
                 target = "index" if other_href == "/" else other_href.strip("/")
                 for selected in ("light", "dark"):

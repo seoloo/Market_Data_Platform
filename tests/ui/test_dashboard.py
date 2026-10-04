@@ -380,6 +380,58 @@ class TestRender:
         for section in ("오늘의 운영", "확인할 일", "다가오는 일정", "해외 주식 적립"):
             assert section in html
 
+    def test_toss_initial_cards_do_not_fabricate_account_values(self, root: Path) -> None:
+        state = root / "data" / "toss"
+        state.mkdir()
+        for symbol in ("QNDX", "BTQ", "WQTM"):
+            (state / f"{symbol}.json").write_text(
+                json.dumps({"start_date": "2026-10-04"}),
+                encoding="utf-8",
+            )
+        before = digest(root / "data" / "trading.db")
+        html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
+        assert html.count('class="savings-card ') == 3
+        assert html.count("첫 실행 대기") == 3
+        assert 'role="progressbar"' not in html
+        assert "매일 1만 원" in html and "매일 $1" in html and "매일 $4" in html
+        assert 'id="qs"' in html and 'id="fx"' in html
+        assert digest(root / "data" / "trading.db") == before
+
+    def test_toss_saved_progress_and_detail_keep_the_same_source(self, root: Path) -> None:
+        rep = root / "reports" / "toss" / "QNDX"
+        rep.mkdir(parents=True)
+        path = rep / "2026-10-04.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "status": "WAIT",
+                    "date": "2026-10-04",
+                    "advice": {"accrued": 10000, "price": 40000, "currency": "KRW"},
+                    "pnl": 99887766,
+                }
+            ),
+            encoding="utf-8",
+        )
+        before = digest(path)
+        html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
+        assert 'aria-valuenow="25.0"' in html and "10,000원" in html
+        assert 'id="qndx-details"' in html and 'id="qndx-history"' in html
+        assert "99887766" not in html and digest(path) == before
+
+    def test_toss_corrupt_report_is_not_shown_as_initial_wait(self, root: Path) -> None:
+        rep = root / "reports" / "toss" / "QNDX"
+        rep.mkdir(parents=True)
+        (rep / "2026-10-04.json").write_text("broken", encoding="utf-8")
+        html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
+        assert "기록 읽기 실패" in html and html.count("첫 실행 대기") == 2
+
+    def test_brand_and_favicon_present_on_all_pages(self, root: Path) -> None:
+        for page, _, _ in PAGES:
+            html = render_page(load_dashboard(root, P0 + 11 * D), page)
+            assert 'src="/assets/auto-trading.svg"' in html
+            assert 'rel="icon" type="image/svg+xml"' in html
+            assert 'href="/favicon.ico?v=2"' in html
+
     @pytest.mark.parametrize("page", [key for key, _, _ in PAGES])
     @pytest.mark.parametrize("theme", ["light", "dark"])
     def test_both_themes_on_every_page(self, root: Path, page: str, theme: str) -> None:
@@ -470,6 +522,46 @@ class TestServer:
                 assert response.status == 200
                 assert "form-action 'self'" in response.headers["Content-Security-Policy"]
                 assert response.headers["Cache-Control"] == "no-store"
+
+    @pytest.mark.parametrize(
+        "path,mime",
+        [
+            ("/favicon.ico", "image/x-icon"),
+            ("/assets/auto-trading.ico", "image/x-icon"),
+            ("/assets/auto-trading.svg?v=2", "image/svg+xml"),
+        ],
+    )
+    def test_brand_assets_do_not_load_account_data(
+        self,
+        base: str,
+        monkeypatch: pytest.MonkeyPatch,
+        path: str,
+        mime: str,
+    ) -> None:
+        def blocked(*_: object) -> None:
+            raise AssertionError("아이콘 요청은 DB·계좌 자료를 읽으면 안 됨")
+
+        monkeypatch.setattr("auto_trading.ui.server.load_dashboard", blocked)
+        with urllib.request.urlopen(base + path) as response:
+            assert response.status == 200 and response.headers["Content-Type"] == mime
+            assert response.headers["X-Content-Type-Options"] == "nosniff"
+            assert "default-src 'none'" in response.headers["Content-Security-Policy"]
+            body = response.read()
+            assert body.startswith(b"<svg") if "svg" in mime else body[:4] == b"\x00\x00\x01\x00"
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/assets/../server.py",
+            "/assets/%2e%2e/server.py",
+            "/assets/.env",
+            "/assets/other.svg",
+        ],
+    )
+    def test_asset_requests_are_exactly_whitelisted(self, base: str, path: str) -> None:
+        with pytest.raises(urllib.error.HTTPError) as err:
+            urllib.request.urlopen(base + path)
+        assert err.value.code == 404
 
     def test_theme_cookie_persists_across_navigation_and_refresh(self, base: str) -> None:
         from http.cookiejar import CookieJar
