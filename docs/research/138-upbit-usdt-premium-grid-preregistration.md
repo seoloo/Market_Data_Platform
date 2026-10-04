@@ -100,7 +100,7 @@
 
 ## 8. 자료 고정과 코드
 
-- `KRW-USDT-1m.csv` SHA-256: **(자료 받은 뒤, 판정 전 커밋에서 채움)**
-- `DEXKOUS.csv` SHA-256: **(같음)**
+- `KRW-USDT-1m.csv` SHA-256: **`a7e510af5038e0e0b33a4bf220787236a693026e324187af4120f8120f43dad6`** (1,208,179 분, 2024-06-07 ~ 2026-09-30, 요청 6,041 번, 2026-10-05 받음)
+- `DEXKOUS.csv` SHA-256: **`d9de5fd0954777e88b01181b2ed26f54d16fb2172b06d42a9365f62861864918`** (602 영업일, 2024-05-01 ~ 2026-09-25 — FRED 공개 지연으로 마지막 값이 09-25, 그 뒤 날은 §3.1 대로 마지막 값을 쓴다)
 - 받기·판정: `scripts/run_usdt_grid.py fetch`(공개 API, 읽기만) · `hash` · `run`(깨끗한 트리 · 해시 일치 · 판정 파일 없음일 때만 1회).
 - 시뮬레이터 `backtest/premium_grid.py`(순수 함수), 시험 `tests/backtest/test_premium_grid.py`.
