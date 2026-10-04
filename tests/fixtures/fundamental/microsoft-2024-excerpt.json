@@ -1,0 +1,42 @@
+{
+  "kind": "MANUALLY_EXTRACTED_REAL_FILING_ROWS_NOT_FULL_RAW_SNAPSHOT",
+  "reference": "docs/research/135-microsoft-fundamental-pilot.md",
+  "full_companyfacts_sha256": "f8aae2965b20ad0df44bdf7ccbedf797d275b6b8dc030154a7a311361bb7246f",
+  "full_submissions_sha256": "2484a2a3b5677d892a1b25af573ce4eda7b6f449f5eda41bac6b3f106dc3139c",
+  "full_history_sha256": "de768837e66425317895fba9214f56fd17b72b676804d1d5ea48827c5e24afba",
+  "companyfacts": {
+    "cik": 789019,
+    "facts": {"us-gaap": {
+      "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [
+        {"start":"2022-07-01","end":"2023-06-30","val":211915000000,"accn":"0000950170-23-035122","form":"10-K","filed":"2023-07-27"},
+        {"start":"2022-07-01","end":"2023-06-30","val":211915000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"},
+        {"start":"2023-07-01","end":"2024-03-31","val":180395000000,"accn":"0000950170-24-048288","form":"10-Q","filed":"2024-04-25"},
+        {"start":"2023-07-01","end":"2024-06-30","val":245122000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"}
+      ]}},
+      "OperatingIncomeLoss": {"units": {"USD": [
+        {"start":"2022-07-01","end":"2023-06-30","val":88523000000,"accn":"0000950170-23-035122","form":"10-K","filed":"2023-07-27"},
+        {"start":"2022-07-01","end":"2023-06-30","val":88523000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"},
+        {"start":"2023-07-01","end":"2024-03-31","val":81508000000,"accn":"0000950170-24-048288","form":"10-Q","filed":"2024-04-25"},
+        {"start":"2023-07-01","end":"2024-06-30","val":109433000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"}
+      ]}},
+      "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": [
+        {"start":"2022-07-01","end":"2023-06-30","val":87582000000,"accn":"0000950170-23-035122","form":"10-K","filed":"2023-07-27"},
+        {"start":"2022-07-01","end":"2023-06-30","val":87582000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"},
+        {"start":"2023-07-01","end":"2024-03-31","val":81353000000,"accn":"0000950170-24-048288","form":"10-Q","filed":"2024-04-25"},
+        {"start":"2023-07-01","end":"2024-06-30","val":118548000000,"accn":"0000950170-24-087843","form":"10-K","filed":"2024-07-30"}
+      ]}}
+    }}
+  },
+  "submissions": {"cik":789019,"filings":{"recent":{
+    "accessionNumber":["0000950170-23-035122","0000950170-24-048288","0000950170-24-087843"],
+    "form":["10-K","10-Q","10-K"],
+    "filingDate":["2023-07-27","2024-04-25","2024-07-30"],
+    "acceptanceDateTime":["2023-07-27T20:01:56.000Z","2024-04-25T20:06:24.000Z","2024-07-30T20:06:22.000Z"]
+  }}},
+  "history": {
+    "accessionNumber":["0001564590-20-034944"],
+    "form":["10-K"],
+    "filingDate":["2020-07-30"],
+    "acceptanceDateTime":["2020-07-31T00:44:46.000Z"]
+  }
+}
