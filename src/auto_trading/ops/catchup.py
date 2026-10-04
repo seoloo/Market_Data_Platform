@@ -13,6 +13,9 @@ CRITICAL, 테스트넷 훈련이 같은 계좌의 오버레이 훈련 주문에 
   각 스크립트의 멱등 장치(Paper 는 UTC 하루 1 번, 적립은 하루 주문 1 건)가 그대로 지킨다.
 * 놓친 Paper UTC 날짜를 되살리지는 않는다 — 각 실행기는 지금 시점 기준으로 판단한다.
 * 상주 실행기(데모 Elliott)는 고르지 않는다.
+* (2026-10-04) 꺼진 작업은 고르지 않는다 · 등록하기 전 예정 시각은 놓친 것이 아니다 ·
+  점검(Watchdog)의 결과 1 은 "경고 있음"(정상 동작) · 시작에 실패한 작업은 적고 다음으로 ·
+  주간(월~금 등) 트리거도 본다.
 """
 
 from __future__ import annotations
@@ -43,16 +46,22 @@ __all__ = [
 PREFIX = "AutoTrading_"
 LAST = "AutoTrading_Paper_Watchdog"
 """다른 작업의 기록을 읽어 점검하므로 늘 마지막."""
+EXTRA_OK = {LAST: frozenset({1})}
+"""작업별로 실패가 아닌 결과 — 점검은 경고가 있으면 1, CRITICAL 이면 2 로 끝난다."""
 
 
 @dataclass(frozen=True, slots=True)
 class Task:
     name: str
     times: tuple[str, ...]
-    """매일 트리거 시각 "HH:MM" (현지 시각). 비어 있으면 매일 작업이 아니다."""
+    """트리거 시각 (현지 시각): 매일 "HH:MM", 주간 "HH:MM@0,1,2,3,4" (월 0 … 일 6).
+    비어 있으면 정해진 시각 작업이 아니다."""
     last_run: datetime | None
     last_result: int
     running: bool
+    disabled: bool = False
+    created: datetime | None = None
+    """트리거가 처음 돌 수 있는 시각(StartBoundary 중 가장 이른 것) — 그 전 예정 시각은 없었다."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,12 +75,23 @@ class Due:
 
 
 def due_time(times: Iterable[str], now: datetime) -> datetime | None:
-    """``now`` 이전(같거나)의 가장 최근 예정 시각 — 오늘 것이 아직이면 어제 것."""
+    """``now`` 이전(같거나)의 가장 최근 예정 시각.
+
+    오늘 것이 아직이면 그 전 날 — 주간 트리거면 그 전 해당 요일.
+    """
     best: datetime | None = None
-    for hhmm in times:
+    for spec in times:
+        hhmm, _, days = spec.partition("@")
+        allowed = {int(d) for d in days.split(",") if d} if days else set(range(7))
+        if not allowed:
+            continue
         h, m = (int(x) for x in hhmm.split(":"))
         at = now.replace(hour=h, minute=m, second=0, microsecond=0)
         if at > now:
+            at -= timedelta(days=1)
+        for _ in range(7):
+            if at.weekday() in allowed:
+                break
             at -= timedelta(days=1)
         if best is None or at > best:
             best = at
@@ -87,13 +107,17 @@ def plan(tasks: Sequence[Task], now: datetime) -> list[Due]:
     for t in tasks:
         if not t.name.startswith(PREFIX) or t.name in RESIDENT or not t.times or t.running:
             continue
+        if t.disabled:
+            continue
         due = due_time(t.times, now)
         if due is None:
             continue
+        if t.created is not None and due < t.created:
+            continue  # 트리거가 시작되기 전 시각 — 놓친 것이 아니다 (등록 전)
         if t.last_run is None or t.last_run < due:
             last = t.last_run.strftime("%m-%d %H:%M") if t.last_run else "기록 없음"
             out.append(Due(t.name, due, "MISSED", f"마지막 실행 {last}"))
-        elif t.last_result not in RESULT_OK:
+        elif t.last_result not in RESULT_OK and t.last_result not in EXTRA_OK.get(t.name, ()):
             out.append(Due(t.name, due, "FAILED", result_text(t.last_result)))
     out.sort(key=lambda d: (d.name == LAST, d.due, d.name))
     return out
@@ -112,19 +136,35 @@ def _local(text: str | None) -> datetime | None:
     return at.astimezone()
 
 
+_DAY_BITS = ((2, 0), (4, 1), (8, 2), (16, 3), (32, 4), (64, 5), (1, 6))
+"""작업 스케줄러 DaysOfWeek 비트 (일 1 · 월 2 · … · 토 64) → 파이썬 요일 (월 0 … 일 6)."""
+
+
+def _spec(text: str) -> str:
+    """'HH:MM' 그대로, 주간 'HH:MM#비트' → 'HH:MM@요일들'."""
+    hhmm, _, mask = text.partition("#")
+    if not mask:
+        return hhmm
+    bits = int(mask)
+    return hhmm + "@" + ",".join(str(d) for bit, d in _DAY_BITS if bits & bit)
+
+
 def parse_tasks(rows: Sequence[Mapping[str, Any]]) -> list[Task]:
     tasks = []
     for r in rows:
         times = r.get("times") or []
         if isinstance(times, str):  # 하나면 배열이 아니라 문자열로 온다
             times = [times]
+        state = str(r.get("state", ""))
         tasks.append(
             Task(
                 name=str(r.get("name", "")),
-                times=tuple(str(x) for x in times if x),
+                times=tuple(_spec(str(x)) for x in times if x),
                 last_run=_local(r.get("last_run")),
                 last_result=int(r.get("last_result") or 0),
-                running=str(r.get("state", "")) == "Running",
+                running=state == "Running",
+                disabled=state == "Disabled",
+                created=_local(r.get("created")),
             )
         )
     return tasks
@@ -135,10 +175,16 @@ def parse_tasks(rows: Sequence[Mapping[str, Any]]) -> list[Task]:
 _QUERY = r"""
 $rows = @(Get-ScheduledTask -TaskName 'AutoTrading_*' | ForEach-Object {
   $i = $_ | Get-ScheduledTaskInfo
-  $times = @($_.Triggers | Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskDailyTrigger' } |
-    ForEach-Object { ([datetime]$_.StartBoundary).ToString('HH:mm') })
+  $times = @($_.Triggers | ForEach-Object {
+    $k = $_.CimClass.CimClassName; $hm = ([datetime]$_.StartBoundary).ToString('HH:mm')
+    if ($k -eq 'MSFT_TaskDailyTrigger') { $hm }
+    elseif ($k -eq 'MSFT_TaskWeeklyTrigger') { $hm + '#' + [int]$_.DaysOfWeek } })
+  $made = @($_.Triggers | Where-Object { $_.StartBoundary } |
+    ForEach-Object { ([datetime]$_.StartBoundary).ToString('o') } |
+    Sort-Object | Select-Object -First 1)
+  $made = if ($made.Count -gt 0) { $made[0] } else { '' }
   [pscustomobject]@{ name=$_.TaskName; times=$times; last_run=$i.LastRunTime.ToString('o');
-    last_result=[int64]$i.LastTaskResult; state=[string]$_.State } })
+    last_result=[int64]$i.LastTaskResult; state=[string]$_.State; created=$made } })
 ConvertTo-Json -InputObject $rows -Depth 3 -Compress
 """
 
@@ -196,7 +242,12 @@ def run_in_order(
             results.append((name, None))
             continue
         log(f"{name}: 시작")
-        start(name)
+        try:
+            start(name)
+        except Exception as exc:  # 꺼진 작업 등 — 이 작업만 건너뛰고 다음으로
+            log(f"{name}: 시작 실패 ({type(exc).__name__}) — 건너뜀")
+            results.append((name, None))
+            continue
         code: int | None = None
         waited = 0.0
         while waited < task_timeout_s:

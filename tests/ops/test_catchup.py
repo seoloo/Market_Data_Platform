@@ -132,3 +132,75 @@ def test_run_in_order_gives_up_after_timeout() -> None:
     )
     assert results == [("AutoTrading_A", None)]
     assert lines[-1].endswith("시간 초과")
+
+
+def test_disabled_late_registered_and_watchdog_warning_are_not_due() -> None:
+    """2026-10-04: 꺼진 훈련 작업 · 등록 전 예정 시각 · 점검 경고(1) 를 다시 돌리려다 막혔다."""
+    night = datetime(2026, 10, 4, 12, 0, tzinfo=KST)
+    before = datetime(2026, 10, 2, 20, 45, tzinfo=KST)
+    tasks = [
+        Task("AutoTrading_Testnet_Overlay", ("20:45",), before, 0, False, disabled=True),
+        Task(
+            "AutoTrading_AG_Paper",
+            ("21:17",),
+            None,
+            0x41303,
+            False,
+            created=datetime(2026, 10, 4, 0, 31, tzinfo=KST),
+        ),
+        _t("Paper_Watchdog", ("21:20",), datetime(2026, 10, 3, 21, 20, tzinfo=KST), result=1),
+        _t("Paper_T2", ("21:00",), datetime(2026, 10, 3, 21, 0, tzinfo=KST), result=2),
+    ]
+    assert [d.name for d in plan(tasks, night)] == ["AutoTrading_Paper_T2"]
+    # 점검이라도 2 (CRITICAL) 는 실패
+    crit = _t("Paper_Watchdog", ("21:20",), datetime(2026, 10, 3, 21, 20, tzinfo=KST), result=2)
+    assert [d.reason for d in plan([crit], night)] == ["FAILED"]
+
+
+def test_weekly_triggers_skip_weekends() -> None:
+    sunday_noon = datetime(2026, 10, 4, 12, 0, tzinfo=KST)  # 일요일
+    fri = datetime(2026, 10, 2, 21, 0, tzinfo=KST)
+    assert due_time(["21:00@0,1,2,3,4"], sunday_noon) == fri
+    ran_fri = _t("Toss_Accumulate", ("21:00@0,1,2,3,4",), datetime(2026, 10, 2, 21, 1, tzinfo=KST))
+    assert plan([ran_fri], sunday_noon) == []
+    monday_late = datetime(2026, 10, 5, 22, 0, tzinfo=KST)
+    assert [d.name for d in plan([ran_fri], monday_late)] == ["AutoTrading_Toss_Accumulate"]
+    rows = [
+        {
+            "name": "AutoTrading_Toss_FX",
+            "times": ["09:00#62", "15:00#62"],
+            "state": "Ready",
+            "created": "2026-10-04T10:00:00+09:00",
+        }
+    ]
+    (t,) = parse_tasks(rows)
+    assert t.times == ("09:00@0,1,2,3,4", "15:00@0,1,2,3,4") and t.created is not None
+    assert parse_tasks([{"name": "x", "state": "Disabled"}])[0].disabled
+
+
+def test_start_failure_skips_only_that_task() -> None:
+    t0 = datetime(2026, 10, 1, 21, 0, tzinfo=KST)
+    t1 = datetime(2026, 10, 2, 9, 1, tzinfo=KST)
+    tasks = {
+        "AutoTrading_Off": Task("AutoTrading_Off", ("20:45",), t0, 0, False),
+        "AutoTrading_B": Task("AutoTrading_B", ("21:02",), t0, 0, False),
+    }
+    started: list[str] = []
+
+    def start(name: str) -> None:
+        if name.endswith("Off"):
+            raise RuntimeError("disabled")
+        started.append(name)
+        tasks[name] = Task(name, ("21:02",), t1, 0, False)
+
+    lines: list[str] = []
+    results = run_in_order(
+        ["AutoTrading_Off", "AutoTrading_B"],
+        log=lines.append,
+        query=lambda: list(tasks.values()),
+        start=start,
+        sleep=lambda s: None,
+    )
+    assert started == ["AutoTrading_B"]
+    assert results == [("AutoTrading_Off", None), ("AutoTrading_B", 0)]
+    assert any("시작 실패" in x for x in lines)
