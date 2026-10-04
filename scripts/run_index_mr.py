@@ -162,7 +162,7 @@ def _run_one(
     k = len(xs) - len(span)
     tr = [r for i, r in trades if i >= k]  # 판정 구간 안에서 끝난 매매만
     seg_daily = daily[k:]
-    out = stats(seg_daily) | {
+    out: dict[str, Any] = stats(seg_daily) | {
         "trades": len(tr),
         "avg_trade": round(statistics.fmean(tr), 5) if tr else 0.0,
         "win": round(sum(t > 0 for t in tr) / len(tr), 3) if tr else 0.0,
