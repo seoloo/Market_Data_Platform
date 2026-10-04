@@ -223,8 +223,9 @@ def account(trades: Sequence[tuple[str, Trade]], bars: dict[str, Bars]) -> dict[
     """계산기 방식: 진입 때 실현 자본의 5% 위험, 청산 때 R × 위험 금액을 더한다(초기 100)."""
     events: list[tuple[int, int, int]] = []
     for k, (s, tr) in enumerate(trades):
-        events.append((bars[s].t[tr.entry_i], 1, k))
-        events.append((bars[s].t[tr.exit_i], 0, k))
+        # 같은 봉이면 진입이 먼저(같은 봉에 들어가 나간 거래)
+        events.append((bars[s].t[tr.entry_i], 0, k))
+        events.append((bars[s].t[tr.exit_i], 1, k))
     events.sort()
     equity, peak, mdd = 100.0, 100.0, 0.0
     risk: dict[int, float] = {}
@@ -232,7 +233,7 @@ def account(trades: Sequence[tuple[str, Trade]], bars: dict[str, Bars]) -> dict[
     peak_at = ""
     year_end: dict[str, float] = {}
     for ms, kind, k in events:
-        if kind == 1:
+        if kind == 0:
             risk[k] = RISK * equity
             continue
         equity += trades[k][1].r * risk.pop(k)
