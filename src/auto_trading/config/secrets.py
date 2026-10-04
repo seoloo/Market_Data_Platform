@@ -168,3 +168,44 @@ def load_gemini_key(
     merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
     value = merged.get("GEMINI_API_KEY", "").strip()
     return OpenAIKey(value) if value else None
+
+
+@dataclass(frozen=True, slots=True)
+class TossCredentials:
+    """토스증권 Open API (문서 118 §6). 값은 보여 주지 않는다."""
+
+    client_id: str
+    client_secret: str
+    account_seq: int
+    trading_enabled: bool
+
+    def __repr__(self) -> str:
+        return (
+            f"TossCredentials(client_id=***, client_secret=***, account_seq={self.account_seq}, "
+            f"trading_enabled={self.trading_enabled})"
+        )
+
+    __str__ = __repr__
+
+
+def load_toss_credentials(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> TossCredentials:
+    """``TOSS_CLIENT_ID``·``TOSS_CLIENT_SECRET`` (+ 선택 ``TOSS_ACCOUNT_SEQ``, 기본 1).
+
+    ``TOSS_TRADING_ENABLED`` 가 정확히 ``true`` 일 때만 주문한다 — 사용자가 직접 켠다.
+    """
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    names = ("TOSS_CLIENT_ID", "TOSS_CLIENT_SECRET")
+    missing = [n for n in names if not merged.get(n, "").strip()]
+    if missing:
+        raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
+    seq = merged.get("TOSS_ACCOUNT_SEQ", "1").strip() or "1"
+    if not seq.isdigit():
+        raise ConfigError("TOSS_ACCOUNT_SEQ 는 숫자여야 한다")
+    return TossCredentials(
+        client_id=merged["TOSS_CLIENT_ID"].strip(),
+        client_secret=merged["TOSS_CLIENT_SECRET"].strip(),
+        account_seq=int(seq),
+        trading_enabled=merged.get("TOSS_TRADING_ENABLED", "").strip().lower() == "true",
+    )

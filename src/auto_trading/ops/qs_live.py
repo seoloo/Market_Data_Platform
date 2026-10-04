@@ -145,15 +145,26 @@ def qndx_paused(state: QsLiveState) -> bool:
 
 
 def reconcile_tqqq(
-    state: QsLiveState, today: str, qty: float, avg_usd: float, last_usd: float, fx_rate: float
+    state: QsLiveState,
+    today: str,
+    qty: float,
+    avg_usd: float,
+    last_usd: float,
+    fx_rate: float,
+    *,
+    fee: float = FEE,
+    sold_usd: float | None = None,
 ) -> list[str]:
-    """TQQQ 잔고 변화로 체결을 찾는다. 늘면 산 것, 줄면 판 것(금액은 직전 종가로 추정)."""
+    """TQQQ 잔고 변화로 체결을 찾는다. 늘면 산 것, 줄면 판 것.
+
+    판 금액은 ``sold_usd``(체결 조회, 수수료 뺀 값)가 있으면 그것, 없으면 직전 종가로 추정.
+    """
     notes: list[str] = []
     dq = qty - state.last_qty
     cost_total = qty * avg_usd
     if dq > 1e-9:
         usd = max(cost_total - state.last_cost_usd, 0.0)
-        krw = usd * fx_rate * (1 + FEE)
+        krw = usd * fx_rate * (1 + fee)
         state.trades.append(QsTrade(today, "BUY", dq, usd, fx_rate, krw))
         if state.want == "BUY":
             state.want = "NONE"
@@ -161,12 +172,14 @@ def reconcile_tqqq(
     elif dq < -1e-9:
         sold = min(-dq, state.strategy_qty)
         if sold > 1e-9:
-            usd = sold * last_usd * (1 - FEE)
+            exact = sold_usd is not None
+            usd = sold_usd if sold_usd is not None else sold * last_usd * (1 - fee)
             krw = usd * fx_rate
-            state.trades.append(QsTrade(today, "SELL", sold, usd, fx_rate, krw, estimated=True))
+            trade = QsTrade(today, "SELL", sold, usd, fx_rate, krw, estimated=not exact)
+            state.trades.append(trade)
             notes.append(
-                f"QS: TQQQ {sold:g}주 매도 확인 — 약 {usd:,.2f} USD ({krw:,.0f}원,"
-                " 직전 종가로 추정) 적립금으로 돌아옴"
+                f"QS: TQQQ {sold:g}주 매도 확인 — {'' if exact else '약 '}{usd:,.2f} USD"
+                f" ({krw:,.0f}원{'' if exact else ', 직전 종가로 추정'}) 적립금으로 돌아옴"
             )
         if -dq - sold > 1e-9:
             notes.append(
@@ -214,6 +227,8 @@ def plan_tqqq_order(
     kst_hhmm: str | None,
     trading_enabled: bool,
     halted: str | None,
+    fee: float = FEE,
+    window: tuple[str, str] = ORDER_WINDOW,
 ) -> TqqqOrder:
     """오늘 TQQQ 예약주문을 낼지. 하루 1 건, 열린 주문이 있으면 내지 않는다."""
 
@@ -225,7 +240,7 @@ def plan_tqqq_order(
     if state.want == "BUY":
         limit = math.floor(last_usd * (1 + LIMIT_BUFFER) * 100) / 100
         budget = min(max(accrued_krw, 0.0) / fx_rate, MAX_ORDER_USD)
-        qty = min(int(budget // (limit * (1 + FEE))), MAX_TQQQ_QTY)
+        qty = min(int(budget // (limit * (1 + fee))), MAX_TQQQ_QTY)
         if qty < 1:
             state.want = "NONE"
             return none(
@@ -246,7 +261,7 @@ def plan_tqqq_order(
         return none(f"긴급 정지 켜짐 (data/HALT: {halted})")
     if weekday >= 5:
         return none("주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에")
-    start, end = ORDER_WINDOW
+    start, end = window
     if kst_hhmm is not None and not start <= kst_hhmm < end:
         return none(f"예약주문 접수 시간({start}~{end}) 밖 — 다음 실행에서")
     if any(o.date == today for o in state.orders):

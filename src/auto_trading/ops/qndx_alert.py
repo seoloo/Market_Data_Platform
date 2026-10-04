@@ -164,7 +164,14 @@ def _in_plan(usd: float, fx_rate: float, plan: Plan) -> float:
 
 
 def reconcile(
-    state: State, plan: Plan, today: str, qty: float, avg_usd: float, fx_rate: float
+    state: State,
+    plan: Plan,
+    today: str,
+    qty: float,
+    avg_usd: float,
+    fx_rate: float,
+    *,
+    fee: float = FEE,
 ) -> list[str]:
     """잔고(수량·평균 매입가)로 새 매수를 찾는다. 늘면 적립금에서 빼고, 줄면 알리기만 한다."""
     notes: list[str] = []
@@ -172,7 +179,7 @@ def reconcile(
     dq = qty - state.last_qty
     if dq > 1e-9:
         cost_usd = max(cost_total - state.last_cost_usd, 0.0)
-        cost = _in_plan(cost_usd, fx_rate, plan) * (1 + FEE)
+        cost = _in_plan(cost_usd, fx_rate, plan) * (1 + fee)
         state.buys.append(Buy(today, dq, cost_usd, fx_rate, cost))
         notes.append(
             f"{state.symbol} {dq:g}주 매수 확인 — {cost_usd:,.2f} USD"
@@ -252,6 +259,7 @@ def advise(
     weekday: int,
     extra_spent: float = 0.0,
     paused: bool = False,
+    fee: float = FEE,
 ) -> Advice:
     """``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6).
 
@@ -261,7 +269,7 @@ def advise(
     accrued = (
         plan.daily * _days(state.start_date, today) - sum(b.cost for b in state.buys) - extra_spent
     )
-    price = _in_plan(last_usd, fx_rate, plan) * (1 + FEE)
+    price = _in_plan(last_usd, fx_rate, plan) * (1 + fee)
     month_spent = sum(b.cost for b in state.buys if b.date[:7] == today[:7])
     if paused:
         status = "PAUSE"
