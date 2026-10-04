@@ -46,7 +46,6 @@ from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.ops.qndx_alert import (
     LIMIT_BUFFER,
     OPEN_ORDER,
-    PLANS,
     Advice,
     Order,
     Plan,
@@ -57,6 +56,7 @@ from auto_trading.ops.qndx_alert import (
     reconcile,
     should_order,
 )
+from auto_trading.ops.qndx_alert import PLANS as KIS_PLANS
 from auto_trading.ops.qs_live import (
     MAX_TQQQ_LIMIT_USD,
     MAX_TQQQ_QTY,
@@ -76,6 +76,12 @@ REPORTS = REPO / "reports" / "toss"
 HALT = REPO / "data" / "HALT"
 TOKEN = REPO / "data" / "toss_token.json"
 QS_FILE = "QS.json"
+PLANS: tuple[Plan, ...] = (
+    *KIS_PLANS,
+    Plan("WQTM", "AMS", "AMEX", "USD", 4.0, 124.0, 60.0),
+)
+"""토스 적립 종목: QNDX·BTQ(문서 89 그대로) + WQTM 매일 4 달러·월 124 달러(2026-10-04 사용자 추가,
+2026-10-02 종가 32.5 USD). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다."""
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -423,8 +429,12 @@ def run(telegram: bool = True) -> int:
         accrued_qndx = 0.0
         for plan in PLANS:
             state = states.get(plan.symbol)
-            if state is None:
-                continue
+            if state is None:  # 새로 추가된 종목 — 오늘 시작, 지금 보유는 적립 밖
+                q, avg = day.qty_avg(plan.symbol)
+                state = states[plan.symbol] = State(plan.symbol, today, q, q, q * avg)
+                day.notes.append(
+                    f"{plan.symbol} 적립 시작 (매일 {money(plan.daily, plan.currency)})"
+                )
             day.resolve(state.orders)
             a = day.plan_advice(plan, state, qs)
             if plan.symbol == "QNDX":

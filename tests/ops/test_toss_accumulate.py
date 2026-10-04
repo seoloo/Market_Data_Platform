@@ -31,7 +31,7 @@ class FakeToss:
         return self.holding
 
     def prices(self, symbols: list[str]) -> dict[str, Decimal]:
-        table = {"QNDX": "25.4", "BTQ": "3.17", "TQQQ": "81.07"}
+        table = {"QNDX": "25.4", "BTQ": "3.17", "WQTM": "32.5", "TQQQ": "81.07"}
         return {s: Decimal(table[s]) for s in symbols}
 
     def usd_krw(self) -> Decimal:
