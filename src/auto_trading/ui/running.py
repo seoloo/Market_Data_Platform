@@ -27,6 +27,7 @@ _KST = timedelta(hours=9)
 _HOUR_MS = 3_600_000
 _DAY_MS = 86_400_000
 _DAILY_GRACE_MS = 26 * _HOUR_MS
+_WEEKDAY_GRACE_MS = 74 * _HOUR_MS
 _RESIDENT_GRACE_MS = 5 * _HOUR_MS
 
 
@@ -46,6 +47,8 @@ class Track:
     """``ledger:<key>`` · ``glob:<reports 아래 패턴>`` · ``ew`` · ``watchdog``."""
     watch_prefix: str | None = None
     """21:20 점검 보고에서 이 작업의 한 줄 요약이 시작하는 글자."""
+    weekdays_only: bool = False
+    """월~금만 도는 작업 — 주말을 건너 74 시간까지는 밀림이 아니다."""
 
 
 TRACKS: tuple[Track, ...] = (
@@ -160,14 +163,15 @@ TRACKS: tuple[Track, ...] = (
         "데모 Elliott",
     ),
     Track(
-        "accumulate",
-        "적립 매수 (QNDX·BTQ)",
-        "실계좌 (한국투자증권)",
-        "매일 가상 적립 · 살 차례면 예약 매수 1주 (켜졌을 때) 또는 텔레그램, 매도 없음 (문서 89)",
-        "21:00",
-        "2026-09-26",
+        "toss",
+        "토스 적립 + QS (QNDX·BTQ·WQTM)",
+        "실계좌 (토스증권)",
+        "매일 가상 적립 · 1주 값이 모이면 장 마감 지정가 1주 · QQQ 추세로 QS (문서 118)",
+        "21:00 월~금 · 환전 알림 09·12·15시",
+        "2026-10-04",
         None,
-        "glob:accumulate/20*.json",
+        "glob:toss/20*.json",
+        weekdays_only=True,
     ),
     Track(
         "watchdog",
@@ -250,7 +254,8 @@ def _file_row(track: Track, root: Path, now_ms: int, watch: dict[str, str]) -> R
         }
     )
     level, status = _content(track, _read(paths[-1]))
-    return _timed(track, now_ms, last_ms, level, status, detail, days, _DAILY_GRACE_MS)
+    grace = _WEEKDAY_GRACE_MS if track.weekdays_only else _DAILY_GRACE_MS
+    return _timed(track, now_ms, last_ms, level, status, detail, days, grace)
 
 
 def _timed(

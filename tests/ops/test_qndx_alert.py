@@ -25,7 +25,7 @@ from auto_trading.ops.qndx_alert import (
     resolve_orders,
     should_order,
 )
-from auto_trading.ui.qndx_render import accumulate_page
+from auto_trading.ui.qndx_render import toss_page
 
 QNDX, BTQ = PLANS
 PRICE, FX = 25.0, 1_400.0  # 1주 35,000원 (+수수료 87.5원)
@@ -263,7 +263,7 @@ def test_page_renders_each_plan(tmp_path: Path) -> None:
     for plan, price in ((QNDX, PRICE), (BTQ, 2.74)):
         s = _state(plan.symbol)
         a = advise(s, plan, "2026-09-29", price, FX, weekday=0)
-        folder = tmp_path / "reports" / "accumulate" / plan.symbol
+        folder = tmp_path / "reports" / "toss" / plan.symbol
         folder.mkdir(parents=True)
         (folder / "2026-09-29.json").write_text(
             json.dumps(
@@ -277,27 +277,27 @@ def test_page_renders_each_plan(tmp_path: Path) -> None:
             ),
             encoding="utf-8",
         )
-        (tmp_path / "data" / "accumulate").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "data" / "accumulate" / f"{plan.symbol}.json").write_text(
+        (tmp_path / "data" / "toss").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "data" / "toss" / f"{plan.symbol}.json").write_text(
             json.dumps(s.to_dict()), encoding="utf-8"
         )
-    html = accumulate_page(SimpleNamespace(root=tmp_path))
+    html = toss_page(SimpleNamespace(root=tmp_path))
     assert "QNDX · 1주 살 차례" in html and "40,000원" in html
     assert "BTQ" in html and "$4.00" in html
     assert "QNDX" in html and "2주" in html
     assert "2026-09-29 21:00 KST" in html
     assert 'id="qndx"' in html and 'id="btq"' in html
-    assert "아직 기록이 없다" in accumulate_page(SimpleNamespace(root=tmp_path / "none"))
+    assert "아직 기록이 없다" in toss_page(SimpleNamespace(root=tmp_path / "none"))
 
 
 def test_overseas_report_date_is_escaped_when_timestamp_invalid(tmp_path: Path) -> None:
-    folder = tmp_path / "reports" / "accumulate" / "QNDX"
+    folder = tmp_path / "reports" / "toss" / "QNDX"
     folder.mkdir(parents=True)
     (folder / "2026-09-29.json").write_text(
         json.dumps({"date": "<script>bad</script>", "at_ms": "invalid", "status": "WAIT"}),
         encoding="utf-8",
     )
-    html = accumulate_page(SimpleNamespace(root=tmp_path))
+    html = toss_page(SimpleNamespace(root=tmp_path))
     assert "<script>" not in html
     assert "&lt;script&gt;bad&lt;/script&gt;" in html
 

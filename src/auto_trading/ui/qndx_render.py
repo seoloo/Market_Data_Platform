@@ -1,7 +1,7 @@
-"""해외 주식 적립 화면 (docs/research/89) — 보고서·상태 파일만 읽는다.
+"""토스 적립 화면 (docs/research/89 · 118 §7) — 보고서·상태 파일만 읽는다.
 
-출처: ``reports/accumulate/<종목>/<KST 날짜>.json`` (매일 밤 9 시)
-· ``data/accumulate/<종목>.json``.
+출처: ``reports/toss/<종목>/<KST 날짜>.json`` (월~금 밤 9 시) · ``data/toss/<종목>.json``.
+한국투자 적립 화면은 2026-10-04 사용자 요청으로 뺐다(토스로 옮김).
 평가 손익·수익률은 **일부러 보여 주지 않는다** — 사용자 요청("계좌를 보면 팔고 싶어서").
 모든 동적 문자열은 이스케이프한다.
 """
@@ -14,9 +14,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-__all__ = ["accumulate_page", "toss_page"]
+__all__ = ["toss_page"]
 
-_SYMBOLS = ("QNDX", "BTQ")
 _KST = timedelta(hours=9)
 
 _STATUS = {
@@ -169,33 +168,6 @@ def _section(root: Path, folder: Path, state_dir: Path | None = None) -> str:
         f'{lead}<div class="panel"><div class="cards">{cards}</div>{bar}</div>{tables}'
         "</section>"
     )
-
-
-def accumulate_page(data: Any) -> str:
-    root = getattr(data, "root", None) or Path()
-    base = root / "reports" / "accumulate"
-    sections = "".join(_section(root, base / symbol) for symbol in _SYMBOLS)
-    intro = (
-        '<div class="panel"><h2>해외 주식 · 적립 현황</h2>'
-        '<div class="stock-jump"><a href="#qndx">QNDX</a><a href="#btq">BTQ</a></div>'
-        '<p class="mute">QNDX는 원화, BTQ는 달러로 적립한다. 아래 값은 저장된 마지막 '
-        "보고서이며 실시간 계좌 화면이 아니다. 계좌를 바꿨다면 다음 적립 실행 전 기록은 "
-        "이전 계좌의 값일 수 있다. 매수·매도 버튼은 없다.</p></div>"
-    )
-    day = sorted(base.glob("20*.json"))
-    tele = _read(day[-1]) if day else None
-    note = (
-        f"마지막 텔레그램: {escape(str(tele.get('date')))} "
-        + ("보냄" if tele.get("notified") else "안 보냄(시험 실행)")
-        if tele
-        else ""
-    )
-    foot = (
-        "<div class='foot'>매일 밤 9시(KST) 한 번 확인한다. 자동 매수가 켜져 있으면 살 차례인 날 "
-        "예약 매수 1주(현재가 +3% 지정가, 당일 유효)를 낸다 — 매도는 하지 않는다. "
-        f"체결은 다음 날 잔고로 확인한다. {note}</div>"
-    )
-    return intro + sections + foot
 
 
 _TOSS_SYMBOLS = ("QNDX", "BTQ", "WQTM")
