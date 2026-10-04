@@ -1,0 +1,35 @@
+{
+  "kind": "MANUALLY_EXTRACTED_REAL_FILING_ROWS_NOT_FULL_RAW_SNAPSHOT",
+  "reference": "docs/research/136-fundamental-universe-accounting-gates.md",
+  "full_companyfacts_sha256": "f8aae2965b20ad0df44bdf7ccbedf797d275b6b8dc030154a7a311361bb7246f",
+  "full_history_sha256": "de768837e66425317895fba9214f56fd17b72b676804d1d5ea48827c5e24afba",
+  "availability_kind": "CONTROLLED_AUDIT_CUTOFF_NOT_TRADING_POLICY_OR_FIRST_SEEN",
+  "source_note": {
+    "original_accession": "0001564590-17-014900",
+    "label": "Expected Impacts to Reported Results / As Adjusted",
+    "adjusted_revenue_usd": "96571000000",
+    "status": "DISCLOSED_IN_2017_NOTE_NOT_ORIGINAL_REPORTED_REVENUE_FACT",
+    "included_as_standard_fact": false
+  },
+  "companyfacts": {"cik":789019,"facts":{"us-gaap":{
+    "SalesRevenueNet":{"units":{"USD":[
+      {"start":"2016-07-01","end":"2017-06-30","val":89950000000,"accn":"0001564590-17-014900","form":"10-K","filed":"2017-08-02"}
+    ]}},
+    "RevenueFromContractWithCustomerExcludingAssessedTax":{"units":{"USD":[
+      {"start":"2016-07-01","end":"2017-06-30","val":96571000000,"accn":"0001564590-18-019062","form":"10-K","filed":"2018-08-03"}
+    ]}},
+    "OperatingIncomeLoss":{"units":{"USD":[
+      {"start":"2016-07-01","end":"2017-06-30","val":22326000000,"accn":"0001564590-17-014900","form":"10-K","filed":"2017-08-02"},
+      {"start":"2016-07-01","end":"2017-06-30","val":29025000000,"accn":"0001564590-18-019062","form":"10-K","filed":"2018-08-03"}
+    ]}},
+    "NetCashProvidedByUsedInOperatingActivities":{"units":{"USD":[
+      {"start":"2016-07-01","end":"2017-06-30","val":39507000000,"accn":"0001564590-18-019062","form":"10-K","filed":"2018-08-03"}
+    ]}}
+  }}},
+  "history": {
+    "accessionNumber":["0001564590-17-014900","0001564590-18-019062"],
+    "form":["10-K","10-K"],
+    "filingDate":["2017-08-02","2018-08-03"],
+    "acceptanceDateTime":["2017-08-02T20:15:01.000Z","2018-08-03T15:03:33.000Z"]
+  }
+}

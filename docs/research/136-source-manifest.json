@@ -1,0 +1,18 @@
+{
+  "kind": "BOUNDED_PUBLIC_SOURCE_AUDIT_NOT_MARKET_COVERAGE",
+  "strategy_result": "NOT_TESTED",
+  "sources": [
+    {"path":"data/research/fundamental_pilot/msft-fy2017-10k.html","url":"https://www.sec.gov/Archives/edgar/data/789019/000156459017014900/msft-10k_20170630.htm","sha256":"9527e694f5bbf94c442e8e710f3dc0520752fd3a7dab4dcb98408eb501d96a71","bytes":5670317,"acquired_at_ms":1791122752693},
+    {"path":"data/research/fundamental_pilot/msft-fy2018-10k.html","url":"https://www.sec.gov/Archives/edgar/data/789019/000156459018019062/msft-10k_20180630.htm","sha256":"544b3e7ea0d853e2276631e876d7d397dd7bde281136e45c4ba6a5a81a523cdc","bytes":6343676,"acquired_at_ms":1791122753020},
+    {"path":"data/research/fundamental_pilot/twtr-20221028-8k.html","url":"https://www.sec.gov/Archives/edgar/data/1418091/000119312522272772/d411753d8k.htm","sha256":"f2e414a136ca55dfc778e921d8489bedf69327a7ee634bce8f8b86051694d88f","bytes":57474,"acquired_at_ms":1791122753140},
+    {"path":"data/research/fundamental_pilot/spdj-20221027-changes.html","url":"https://press.spglobal.com/2022-10-27-Arch-Capital-Group-Set-to-Join-S-P-500-RXO-to-Join-S-P-MidCap-400-Bread-Financial-Holdings-to-Join-S-P-SmallCap-600","sha256":"ffba81e2e37dee60ca2b013eca337d9758dbcea459c1e3fc37671ab13416d639","bytes":55631,"acquired_at_ms":1791122757848},
+    {"path":"data/research/fundamental_pilot/spdj-20240906-changes.html","url":"https://press.spglobal.com/2024-09-06-Palantir-Technologies,-Dell-Technologies,-and-Erie-Indemnity-Set-to-Join-S-P-500-Others-to-Join-S-P-MidCap-400-and-S-P-SmallCap-600","sha256":"a96b720bd1db374d4139611943c4ed295c8d702452d1eff72a25dba1c2f38f52","bytes":89214,"acquired_at_ms":1791122757963}
+  ],
+  "reused_sources": [
+    {"path":"data/research/fundamental_pilot/msft-companyfacts.json","sha256":"f8aae2965b20ad0df44bdf7ccbedf797d275b6b8dc030154a7a311361bb7246f","reference":"docs/research/135-microsoft-fundamental-pilot.md"},
+    {"path":"data/research/fundamental_pilot/msft-submissions-001.json","sha256":"de768837e66425317895fba9214f56fd17b72b676804d1d5ea48827c5e24afba","reference":"docs/research/135-microsoft-fundamental-pilot.md"},
+    {"path":"data/research/fundamental_pilot/apple-companyfacts.json","sha256":"73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43","reference":"docs/research/134-apple-fundamental-pilot.md"},
+    {"path":"data/research/stocks/universe.json","sha256":"209edea2294a2a8889314980cee57c05cbb244511bf2f74991440cfce05cea2f","reference":"docs/research/131-fundamental-leaders-feasibility.md"},
+    {"path":"data/research/stocks_sp400/universe.json","sha256":"6297b19479537811839fdea7731356be801b483152054b310f248a8038da6032","reference":"docs/research/131-fundamental-leaders-feasibility.md"}
+  ]
+}
