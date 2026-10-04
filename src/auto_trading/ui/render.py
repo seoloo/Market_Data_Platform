@@ -135,7 +135,8 @@ def _layout(data: DashboardData, page: str, body: str) -> str:
     elif page in ("overseas", "toss"):
         foot = (
             "60초마다 저장된 적립 보고서를 다시 읽는다 · "
-            "이 화면은 KIS 계좌를 실시간 조회하거나 주문하지 않는다."
+            f"이 화면은 {'토스' if page == 'toss' else 'KIS'} 계좌를 실시간 조회하거나"
+            " 주문하지 않는다."
         )
     else:
         foot = (
