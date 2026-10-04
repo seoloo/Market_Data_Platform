@@ -20,9 +20,12 @@ from scripts.run_qs_confirm import _windows
 from scripts.run_qs_dotcom import FRED, _series
 from scripts.run_qs_switch import TQQQ_FEE_YEAR, leveraged, simulate, trend_signals
 
+from scripts import run_qs_dotcom as dc
+
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "reports" / "qs_vix"
 VIX_SHA = "cc0b59b37b714477d604de46fba408fd888e82308561111a772f3aacf931387f"
+dc.SHA["VIXCLS.csv"] = VIX_SHA  # _series 가 같은 해시 확인을 하게
 XS = (25.0, 30.0, 40.0)
 RS = (0.7, 0.8)
 LOOKBACK = 60
