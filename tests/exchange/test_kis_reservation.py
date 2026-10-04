@@ -195,3 +195,65 @@ def test_read_retries_gateway_error_but_order_is_not_resent(tmp_path: Path) -> N
     with pytest.raises(OrderStateUnknownError):  # 접수 여부 모름 → 다음 날 잔고로 확인
         make(tmp_path / "o", order_500).reserve_buy("QNDX", "NASD", 1, Decimal("25"))
     assert order_calls == [PATH]
+
+
+def _qs_trader(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Response]) -> Any:
+    cache = KisTokenCache(tmp_path / "kis_token.json")
+    cache.save(KEY, TOKEN, NOW + 86_400_000)
+    return KisReservationBuyer(
+        KisCredentials(KEY, SECRET, "12345678", "01", True),
+        cache,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        clock=lambda: NOW,
+        sleep=lambda _s: None,
+        allowed_symbols=frozenset({"QNDX", "TQQQ"}),
+        max_limit_usd=Decimal("250"),
+        max_qty={"TQQQ": 60},
+        sell_symbols=frozenset({"TQQQ"}),
+    )
+
+
+def test_qs_tqqq_sell_shape_and_multi_qty_buy(tmp_path: Path) -> None:
+    """문서 118: TQQQ 만 여러 주 매수·예약 매도(TTTT3016U). 몸통은 매수와 같다."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return ok()
+
+    trader = _qs_trader(tmp_path, handler)
+    assert trader.reserve_sell("tqqq", "NASD", 3, Decimal("78.57")).accepted
+    assert trader.reserve_buy("TQQQ", "NASD", 60, Decimal("83.43")).accepted
+    sell, buy = seen
+    assert sell.headers["tr_id"] == "TTTT3016U" and buy.headers["tr_id"] == "TTTT3014U"
+    assert json.loads(sell.content)["FT_ORD_QTY"] == "3"
+    assert json.loads(sell.content)["PDNO"] == "TQQQ"
+
+
+@pytest.mark.parametrize(
+    ("side", "symbol", "qty"),
+    [
+        ("sell", "QNDX", 1),  # QNDX 는 팔지 않는다
+        ("buy", "QNDX", 2),  # QNDX 는 여전히 1 주만
+        ("buy", "TQQQ", 61),  # TQQQ 수량 상한
+        ("sell", "TQQQ", 0),
+    ],
+)
+def test_qs_guards_send_nothing(tmp_path: Path, side: str, symbol: str, qty: int) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return ok()
+
+    trader = _qs_trader(tmp_path, handler)
+    send = trader.reserve_sell if side == "sell" else trader.reserve_buy
+    with pytest.raises(TradingDisabledError):
+        send(symbol, "NASD", qty, Decimal("50"))
+    assert calls == []
+
+
+def test_default_buyer_cannot_sell(tmp_path: Path) -> None:
+    buyer = make(tmp_path, lambda r: ok())
+    with pytest.raises(TradingDisabledError):
+        buyer.reserve_sell("QNDX", "NASD", 1, Decimal("25"))

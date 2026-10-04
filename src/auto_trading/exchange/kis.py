@@ -420,6 +420,7 @@ class KisOverseasReadOnly:
 # ---------------------------------------------------------------- 예약 매수 전용 (문서 89)
 
 _TR_RESV_BUY_US = "TTTT3014U"
+_TR_RESV_SELL_US = "TTTT3016U"
 _TR_PSAMOUNT = "TTTS3007R"
 
 
@@ -442,12 +443,16 @@ class ReservationResult:
 
 @dataclass(slots=True)
 class KisReservationBuyer(KisOverseasReadOnly):
-    """미국 주식 **예약 매수 1 주만** 내는 어댑터 (문서 89 QNDX 적립). 매도·정정·취소 코드는 없다.
+    """미국 주식 예약주문 어댑터 (문서 89 QNDX 적립 · 문서 118 QS). 정정·취소 코드는 없다.
+
+    기본은 **예약 매수 1 주만**이다. 문서 118 QS 가 쓰는 종목만 따로 연다:
+    ``max_qty`` 에 적은 종목은 그 수량까지 살 수 있고, ``sell_symbols`` 종목만 예약 매도할 수 있다.
 
     지키지 않으면 요청을 보내지 않고 :class:`TradingDisabledError`:
 
     * ``KIS_TRADING_ENABLED=true`` — 사용자가 ``.env`` 에서 직접 켠다
-    * ``allowed_symbols`` 안의 종목 · 수량 정확히 1 · 0 < 지정가 ≤ ``max_limit_usd``
+    * ``allowed_symbols`` 안의 종목 · 0 < 지정가 ≤ ``max_limit_usd``
+    * 수량: 1 (``max_qty`` 에 있으면 1 ~ 그 수) · 매도는 ``sell_symbols`` 종목만
 
     예약주문(``TTTT3014U``)은 미국 **지정가만**, **당일 유효**다(접수 10:00~23:20 KST,
     서머타임 10:00~22:20, 16:30~16:45 제한). 정규장 시작 때 거래소로 간다.
@@ -457,6 +462,8 @@ class KisReservationBuyer(KisOverseasReadOnly):
 
     allowed_symbols: frozenset[str] = frozenset()
     max_limit_usd: Decimal = Decimal(0)
+    max_qty: Mapping[str, int] = field(default_factory=dict)
+    sell_symbols: frozenset[str] = frozenset()
 
     def buying_power(self, symbol: str, order_exchange: str, price: Decimal) -> BuyingPower:
         """매수가능금액조회 (``TTTS3007R``, 조회만)."""
@@ -489,14 +496,28 @@ class KisReservationBuyer(KisOverseasReadOnly):
     def reserve_buy(
         self, symbol: str, order_exchange: str, qty: int, limit: Decimal
     ) -> ReservationResult:
+        return self._reserve(_TR_RESV_BUY_US, symbol, order_exchange, qty, limit)
+
+    def reserve_sell(
+        self, symbol: str, order_exchange: str, qty: int, limit: Decimal
+    ) -> ReservationResult:
+        """예약 매도 (``TTTT3016U``) — ``sell_symbols`` 종목만 (문서 118 QS 의 TQQQ)."""
+        if symbol.upper() not in self.sell_symbols:
+            raise TradingDisabledError(f"매도가 허용되지 않은 종목: {symbol.upper()}")
+        return self._reserve(_TR_RESV_SELL_US, symbol, order_exchange, qty, limit)
+
+    def _reserve(
+        self, tr_id: str, symbol: str, order_exchange: str, qty: int, limit: Decimal
+    ) -> ReservationResult:
         creds = self.credentials
         symbol = symbol.upper()
         if not creds.trading_enabled:
             raise TradingDisabledError("KIS_TRADING_ENABLED 가 true 가 아니다 — 주문하지 않는다")
         if symbol not in self.allowed_symbols:
             raise TradingDisabledError(f"허용되지 않은 종목: {symbol}")
-        if qty != 1:
-            raise TradingDisabledError(f"수량은 1 주만 허용한다 (요청 {qty})")
+        top = self.max_qty.get(symbol, 1)
+        if not 1 <= qty <= top:
+            raise TradingDisabledError(f"수량은 1 ~ {top} 주만 허용한다 (요청 {qty})")
         if not Decimal(0) < limit <= self.max_limit_usd:
             raise TradingDisabledError(f"지정가 {limit} 가 허용 범위 (0, {self.max_limit_usd}] 밖")
         body = {
@@ -516,7 +537,7 @@ class KisReservationBuyer(KisOverseasReadOnly):
                 "authorization": f"Bearer {self._access_token()}",
                 "appkey": creds.app_key,
                 "appsecret": creds.app_secret,
-                "tr_id": _TR_RESV_BUY_US,
+                "tr_id": tr_id,
                 "custtype": "P",
             }
             try:

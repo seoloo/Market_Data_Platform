@@ -135,7 +135,7 @@ class Advice:
     symbol: str
     currency: str
     status: str
-    """BUY · WAIT · CAP."""
+    """BUY · WAIT · CAP · PAUSE (문서 118 QS — 추세 꺼짐 또는 TQQQ 살 차례)."""
     today: str
     accrued: float
     price: float
@@ -243,13 +243,29 @@ def should_order(
 
 
 def advise(
-    state: State, plan: Plan, today: str, last_usd: float, fx_rate: float, *, weekday: int
+    state: State,
+    plan: Plan,
+    today: str,
+    last_usd: float,
+    fx_rate: float,
+    *,
+    weekday: int,
+    extra_spent: float = 0.0,
+    paused: bool = False,
 ) -> Advice:
-    """``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6)."""
-    accrued = plan.daily * _days(state.start_date, today) - sum(b.cost for b in state.buys)
+    """``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6).
+
+    문서 118 QS: ``extra_spent`` = TQQQ 에 쓴 돈 − TQQQ 에서 돌아온 돈 (적립금에서 더 뺀다,
+    월 한도에는 넣지 않는다), ``paused`` 면 QNDX 를 사지 않는다(PAUSE).
+    """
+    accrued = (
+        plan.daily * _days(state.start_date, today) - sum(b.cost for b in state.buys) - extra_spent
+    )
     price = _in_plan(last_usd, fx_rate, plan) * (1 + FEE)
     month_spent = sum(b.cost for b in state.buys if b.date[:7] == today[:7])
-    if month_spent + price > plan.monthly_cap:
+    if paused:
+        status = "PAUSE"
+    elif month_spent + price > plan.monthly_cap:
         status = "CAP"
     elif accrued >= price:
         status = "BUY"
@@ -281,6 +297,7 @@ def message(advice: Advice, notes: list[str], *, order_line: str | None = None) 
         "BUY": f"🟢 {a.symbol} 오늘 1주 살 차례",
         "WAIT": f"⏳ {a.symbol} 적립 중 — 약 {a.days_to_go}일 뒤 1주",
         "CAP": f"⏸ {a.symbol} 이번 달 한도({money(a.monthly_cap, c)}) — 다음 달에",
+        "PAUSE": f"⏸ {a.symbol} 매수 멈춤 (QS) — 적립금은 현금으로 쌓는다",
     }[a.status]
     per_share = f"{a.last_usd:.2f} USD" + (f" × {a.fx_rate:,.2f}원" if c == "KRW" else "")
     lines = [
