@@ -259,6 +259,7 @@ def pc_status(now_ms: int) -> tuple[list[str], list[Finding]]:
             encoding="utf-8",
             timeout=60,
             check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),  # 창 없이 돌 때 번쩍임 방지
         )
         data = json.loads(done.stdout)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:

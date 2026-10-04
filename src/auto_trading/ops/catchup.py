@@ -189,14 +189,27 @@ ConvertTo-Json -InputObject $rows -Depth 3 -Compress
 """
 
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+"""창 없는 대시보드(pythonw)에서 부를 때 PowerShell 창이 번쩍이지 않게 (2026-10-04)."""
+
+
 def _powershell(command: str, timeout: float) -> str:
     done = subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            command,
+        ],
         capture_output=True,
         text=True,
         encoding="utf-8",
         timeout=timeout,
         check=True,
+        creationflags=_NO_WINDOW,
     )
     return done.stdout
 
