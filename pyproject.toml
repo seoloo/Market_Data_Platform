@@ -198,4 +198,5 @@ forbidden_modules = [
     "auto_trading.research.elliott",
     "auto_trading.research.option_protection",
     "auto_trading.research.staking_carry",
+    "auto_trading.research.fundamental_pit",
 ]

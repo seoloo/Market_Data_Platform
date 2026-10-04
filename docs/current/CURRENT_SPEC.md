@@ -49,7 +49,7 @@ AGENTS → PROGRESS → 이 문서 → 작업에 해당하는 아래 문서. Arc
 | WA 연구 G6 | 선택 (b): 거래당 우위 측정에서는 G6 비적용. 전체 규칙 계좌 재생·실거래에는 적용. 연구 결과를 운용 가능 판정으로 취급하지 않음 | 2026-09-24 사용자 선택 | backtest/research |
 | D22 | INCOMPLETE / EXCLUDED: 현재 전략·점수·로드맵·연구 방향에서 제외 | 2026-09-23 정리 | [보관 초안](../archive/drafts/D22-btc-multitimeframe-strategy.md) |
 | Elliott/JEV/News AI | Optional Shadow만 허용. 초기 실제 주문·차단·사이징에 영향 없음. **Elliott 파동 판정은 최소 마감 4h 봉 이상**(상위 시간대 맥락 허용). 1m은 완성 4h 내부 경로·품질 검증용일 뿐 1m 파동/진입 신호가 아니다. 실거래 연결은 별도 승인·검증 전 금지 | 2026-09-24 사용자 명시 | ai/research |
-| 실적 개선형 주도주 후보 | 사용자 선택 1번만 **Phase 0** 무료 데이터/PIT 사전 타당성 조사. [131](../research/131-fundamental-leaders-feasibility.md): 조사 완료 / `DATA_NOT_READY`. 현재 종목 가격 자료의 생존 편향, SEC 공개 API 실제 403, 재무 커버리지/검정력 미확인. 수익성 판정·사전등록·매매 구현 없음. 2번 우량·가격은 안내만, 129·130 사용자 보류 유지 | 2026-10-04 사용자 선택 | research |
+| 실적 개선형 주도주 후보 | 사용자 선택 1번만 **Phase 0**. [131](../research/131-fundamental-leaders-feasibility.md) 무료 데이터 타당성, [132](../research/132-fundamental-pit-audit.md) `OFFLINE_AUDIT_READY / REAL_DATA_PENDING`: 정규화 재무 계산·미래 정보 차단 합성 38건 검증. 실제 SEC 원자료 파서/회계 기준·거래일 대조 미완료, 과거 종목 이력·재무 커버리지/검정력 미확인. 수익성 판정·사전등록·매매 구현 없음. 2번 안내만, 129·130 보류 유지. 기존 타입 오류는 사용자 별도 승인으로 정리(규칙/결과 불변) | 2026-10-04 사용자 선택·계산 감사 | research |
 | 자본·새 전략 수치 | 미정: 결과를 본 뒤 임의 확정 금지 | Phase 0 대기 | config/research |
 
 기각된 H1 구현은 회귀·재현용으로 남아 있으나 현행 수익 전략으로 복귀하지 않는다.
