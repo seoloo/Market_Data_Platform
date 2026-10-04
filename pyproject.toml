@@ -199,4 +199,5 @@ forbidden_modules = [
     "auto_trading.research.option_protection",
     "auto_trading.research.staking_carry",
     "auto_trading.research.fundamental_pit",
+    "auto_trading.research.sec_fundamentals",
 ]
