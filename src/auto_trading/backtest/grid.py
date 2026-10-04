@@ -77,6 +77,8 @@ class GridResult:
     """손절마다 정리한 재고의 손익(비용 뺌)."""
     exit_pnl: list[float] = field(default_factory=list)
     """추세 꺼짐 정리마다 재고의 손익(비용 뺌)."""
+    realized_by_day: dict[int, float] = field(default_factory=dict)
+    """날마다 끝난 왕복 차익 — 영상식 '오늘 수익' 표시(보고용, 계산에 쓰지 않음)."""
 
 
 def daily_closes(bars: MinuteBars) -> dict[int, float]:
@@ -238,6 +240,9 @@ def simulate_grid(
                             res.fees += f
                             cash += gross - f
                             res.realized_grid += gross - f - basis[k]
+                            res.realized_by_day[day] = (
+                                res.realized_by_day.get(day, 0.0) + gross - f - basis[k]
+                            )
                             res.round_trips += 1
                             res.sells += 1
                             units[k] = 0.0
