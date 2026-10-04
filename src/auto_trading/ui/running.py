@@ -401,7 +401,7 @@ def running_page(data: DashboardData) -> str:
         for r in rows
     )
     table = (
-        '<div class="panel"><h2>지금 돌고 있는 것</h2><table><tr>'
+        '<div class="panel"><h2>지금 돌고 있는 것</h2><table class="runs"><tr>'
         '<th style="min-width:170px">작업</th><th>시각(KST)</th><th>기간</th>'
         '<th class="num nowrap">일수</th><th>마지막 기록</th><th>상태 · 최근 요약</th></tr>'
         f"{body}</table>"

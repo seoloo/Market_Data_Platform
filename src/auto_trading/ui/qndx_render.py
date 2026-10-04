@@ -70,10 +70,17 @@ def _section(root: Path, folder: Path, state_dir: Path | None = None) -> str:
     symbol = folder.name
     paths = sorted(folder.glob("20*.json"))
     if not paths:
+        state0 = _read((state_dir or root / "data" / "accumulate") / f"{symbol}.json") or {}
+        started = (
+            f" 적립 시작 {escape(str(state0.get('start_date')))} — 첫 밤 실행(월~금 21:00 KST)"
+            " 뒤 적립금·진행률이 표시된다."
+            if state0.get("start_date")
+            else ""
+        )
         return (
             f'<section class="stock-section" id="{symbol.lower()}">'
             f'<div class="panel"><h2>{escape(symbol)}</h2>'
-            '<p class="mute">아직 기록이 없다. 마지막 적립 실행 후 이곳에 표시된다.</p>'
+            f'<p class="mute">아직 기록이 없다.{started}</p>'
             "</div></section>"
         )
     latest = _read(paths[-1]) or {}
