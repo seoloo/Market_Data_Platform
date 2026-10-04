@@ -629,9 +629,64 @@ def status() -> int:
     return 0
 
 
+def harvest_plan(other_gains_krw: float) -> int:
+    """연말 양도세 공제(250 만 원) 수확 계획 — 조회만, 주문 없음 (문서 123)."""
+    from dataclasses import asdict as _asdict
+
+    from auto_trading.ops.tax_harvest import Holding, plan, qs_realized_krw
+
+    now = _kst_now()
+    reader = _trader()
+    try:
+        holdings = reader.holdings()
+        fx_rate = float(reader.usd_krw())
+        fee = reader.us_commission()
+    finally:
+        reader.close()
+    strategy = {p.symbol for p in PLANS}
+    hs = [
+        Holding(sym, float(pos.qty), float(pos.avg_price), float(pos.last), sym in strategy)
+        for sym, pos in holdings.items()
+        if pos.currency == "USD"
+    ]
+    qs = _load_qs()
+    qs_gain = qs_realized_krw([_asdict(t) for t in qs.trades], now.strftime("%Y")) if qs else 0.0
+    result = plan(
+        hs,
+        fx_rate,
+        other_gains_krw=other_gains_krw,
+        qs_gains_krw=qs_gain,
+        fee=float(fee) if fee is not None else TOSS_FEE,
+    )
+    print("[양도세 공제 수확 계획 — 조회만, 주문 없음]")
+    print(
+        f"공제 250만 원 − 다른 실현 이익 {other_gains_krw:,.0f}원 − QS 실현 {qs_gain:,.0f}원"
+        f" − 여유 30만 원 = 쓸 수 있는 공제 {max(result.budget_krw, 0):,.0f}원"
+        f" (환율 {fx_rate:,.1f})"
+    )
+    for h in hs:
+        gain = (h.last_usd - h.avg_usd) * h.qty * fx_rate
+        mark = "자동 적립" if h.strategy else "직접 보유"
+        print(f"  {h.symbol} {h.qty:g}주 · 평가 이익 약 {gain:,.0f}원 · {mark}")
+    if not result.lines:
+        print("팔 것 없음 — 이익 난 종목이 없거나 공제가 남지 않았다")
+        return 0
+    for x in result.lines:
+        who = "" if x.strategy else " (직접 보유 — 사용자 결정)"
+        print(f"→ {x.symbol} {x.qty}주 팔고 다음 날 다시 사기 · 실현 약 {x.gain_krw:,.0f}원{who}")
+    print(
+        f"수확 약 {result.harvested_krw:,.0f}원 → 미래 세금 약 {result.future_tax_saved_krw:,.0f}원"
+        f" 줄어듦 · 수수료 약 ${result.cost_usd:,.2f} · 하루는 시장 밖"
+    )
+    return 0
+
+
 def main(argv: list[str]) -> int:
     telegram = "--no-telegram" not in argv
     args = [a for a in argv if a != "--no-telegram"]
+    if args[:1] == ["harvest-plan"]:
+        other = float(args[2]) if len(args) == 3 and args[1] == "--other-gains" else 0.0
+        return harvest_plan(other)
     commands = {
         "start": start,
         "run": lambda: run(telegram),
@@ -642,6 +697,7 @@ def main(argv: list[str]) -> int:
     if len(args) != 1 or args[0] not in commands:
         raise SystemExit(
             "usage: python -m scripts.toss_accumulate start|run|fx|preview|status [--no-telegram]"
+            " | harvest-plan [--other-gains 원]"
         )
     return commands[args[0]]()
 
