@@ -13,19 +13,23 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-__all__ = ["TRIANGLE_RULE", "Triangle", "ascending_triangle", "new_entries"]
+__all__ = ["PULLBACK", "TRIANGLE_RULE", "Triangle", "ascending_triangle", "new_entries"]
 
 WINDOW = 60
 """삼각형을 볼 거래일 수 (약 3 달)."""
 TOUCH = 0.02
 """고점이 저항선(구간 최고가) 의 2% 안이면 '닿음'."""
 MIN_TOUCHES = 2
-MIN_GAP = 5
-"""닿음끼리 최소 5 거래일 떨어져야 따로 센다."""
+MIN_GAP = 10
+"""닿음끼리 최소 10 거래일 떨어져야 따로 센다."""
+PULLBACK = 0.05
+"""두 닿음 사이에 저가가 저항선보다 5% 이상 내려가야 한다 — 꾸준한 상승(매일 신고가)을
+삼각형으로 잘못 읽지 않게 (2026-10-05, 문서 146 확정 전 합성 시험에서 발견, 수익 보기 전)."""
 TRIANGLE_RULE = (
     f"최근 {WINDOW} 거래일(오늘 제외) 최고가 = 저항선 · 고점이 저항선 {TOUCH:.0%} 안에 "
-    f"{MIN_TOUCHES} 번 이상(서로 {MIN_GAP} 거래일 이상 떨어짐) · 구간을 셋으로 나눈 최저가가 "
-    "차례로 높아짐 → '형성 중', 오늘 종가가 저항선 위면 '돌파'. 검증 안 된 참고 규칙"
+    f"{MIN_TOUCHES} 번 이상(서로 {MIN_GAP} 거래일 이상 떨어지고, 그 사이 저가가 저항선보다 "
+    f"{PULLBACK:.0%} 이상 내려감) · 구간을 셋으로 나눈 최저가가 차례로 높아짐 → '형성 중', "
+    "오늘 종가가 저항선 위면 '돌파'. 검증 안 된 참고 규칙"
 )
 
 
@@ -60,9 +64,14 @@ def ascending_triangle(
     hs, ls = highs[-WINDOW - 1 : -1], lows[-WINDOW - 1 : -1]
     resistance = max(hs)
     touches = 0
-    last_touch = -MIN_GAP - 1
+    last_touch: int | None = None
+    floor = resistance * (1 - PULLBACK)
     for i, h in enumerate(hs):
-        if h >= resistance * (1 - TOUCH) and i - last_touch >= MIN_GAP:
+        if h < resistance * (1 - TOUCH):
+            continue
+        if last_touch is None:
+            touches, last_touch = 1, i
+        elif i - last_touch >= MIN_GAP and min(ls[last_touch + 1 : i]) <= floor:
             touches += 1
             last_touch = i
     third = WINDOW // 3
