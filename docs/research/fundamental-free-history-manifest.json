@@ -1,0 +1,73 @@
+{
+  "kind": "BOUNDED_FREE_HISTORY_FEASIBILITY_NOT_STRATEGY_TEST",
+  "base_commit": "fb39297",
+  "phase": 0,
+  "data_status": "DATA_NOT_READY",
+  "strategy_result": "NOT_TESTED",
+  "selected_route": "HISTORICAL_RECONSTRUCTION",
+  "sources": [
+    {"path":"data/research/fundamental_pilot/fja-sp500-readme-a2430f2-20261005.md","url":"https://raw.githubusercontent.com/fja05680/sp500/a2430f2af0c79ddf0748e91de11bdeb1616ab5a7/README.md","http_status":200,"bytes":4847,"sha256":"1b328209e11f1f02c27d1345cb078b0d147b47295fee36928cab59fef0b9df04","acquired_at_ms":1791192005290},
+    {"path":"data/research/fundamental_pilot/fja-sp500-license-a2430f2-20261005.txt","url":"https://raw.githubusercontent.com/fja05680/sp500/a2430f2af0c79ddf0748e91de11bdeb1616ab5a7/LICENSE","http_status":200,"bytes":1100,"sha256":"a0a71da320f7c856f189569ddb5c46a576cf02caae28ead6c40a27c0de006992","acquired_at_ms":1791192005575},
+    {"path":"data/research/fundamental_pilot/fja-sp500-changes-a2430f2-20261005.csv","url":"https://raw.githubusercontent.com/fja05680/sp500/a2430f2af0c79ddf0748e91de11bdeb1616ab5a7/sp500_changes_since_2019.csv","http_status":200,"bytes":3389,"sha256":"1fb4ec6641324ca71153189ee18e2b4b13753e8f9296569717eaca802de882f1","acquired_at_ms":1791192005827},
+    {"path":"data/research/fundamental_pilot/spdj-20221006-nlsn-changes-20261005.html","url":"https://press.spglobal.com/2022-10-06-Targa-Resources-Set-to-Join-S-P-500-Lantheus-Holdings-to-Join-S-P-MidCap-400-Payoneer-Global-to-Join-S-P-SmallCap-600","http_status":200,"bytes":55101,"sha256":"b3f68e62c002033dcedf2de6a436868602341b0cb3f28b1702abfb1697f85630","acquired_at_ms":1791192182890},
+    {"path":"data/research/fundamental_pilot/tiingo-supported-tickers-20261005.zip","url":"https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip","http_status":200,"bytes":797329,"sha256":"416d44fea438992b0ec49f2d3db43a490576e7d993bd47d07304f0b97fe4be8a","acquired_at_ms":1791192283018}
+  ],
+  "raw_sources_added_bytes": 861766,
+  "raw_sources_total_files": 34,
+  "market_price_series_files_acquired_this_step": 0,
+  "web_observations_not_full_response_archives": {
+    "observed_on": "2026-10-05",
+    "historical_first_seen_at_ms": null,
+    "stockanalysis_url": "https://stockanalysis.com/stocks/twtr/history/",
+    "terms_url": "https://stockanalysis.com/terms-of-use/",
+    "robots_url": "https://stockanalysis.com/robots.txt",
+    "displayed_rows": 50,
+    "displayed_page": "1 of 3; 6M",
+    "supplier_display": "Tiingo",
+    "last_trade_display": "2022-10-27",
+    "oct28_price_row": "repeated OHLC 53.70; volume missing; not tradability evidence",
+    "price_table_copied_or_ingested": false
+  },
+  "metadata_audit": {
+    "provider": "Tiingo",
+    "rows": 108936,
+    "selected_tickers_present": ["TWTR", "CTXS", "NLSN"],
+    "end_dates": {"TWTR":"2022-10-28","CTXS":"2022-11-02","NLSN":"2022-10-11"},
+    "actual_api_access_confirmed": false,
+    "end_date_is_last_trading_date": false,
+    "official_documentation": "https://www.tiingo.com/documentation/end-of-day",
+    "account_requirement_documentation": "https://www.tiingo.com/documentation/general",
+    "pricing_documentation": "https://www.tiingo.com/pricing",
+    "starter_limits_observed": {"monthly_price_usd":0,"unique_symbols_per_month":500,"requests_per_hour":50,"requests_per_day":1000,"bandwidth_gb_per_month":1},
+    "limits_observed_on": "2026-10-05",
+    "new_account_or_token_used": false,
+    "authenticated_price_requests": 0,
+    "price_or_metadata_rows_redistributed": false
+  },
+  "membership_candidate_audit": {
+    "repository": "https://github.com/fja05680/sp500",
+    "commit": "a2430f2af0c79ddf0748e91de11bdeb1616ab5a7",
+    "commit_timestamp": "2026-09-07T14:56:49Z",
+    "license_declared": "MIT; not official completeness or upstream rights certification",
+    "rows":125,
+    "min_date":"2019-01-18",
+    "max_date":"2026-08-18",
+    "empty_add_and_remove_rows":0,
+    "duplicate_dates":0,
+    "officially_crosschecked_rows": [
+      {"effective_session":"2022-10-03","additions":["EQT","PCG"],"removals":["DRE","CTXS"],"source_url":"https://press.spglobal.com/2022-09-23-PG-E-and-EQT-Set-to-Join-S-P-500-ExlService-to-Join-S-P-MidCap-400-Others-to-Join-S-P-SmallCap-600","matched_date_and_symbol_sets":true,"known_at_ms":null},
+      {"effective_session":"2022-10-12","additions":["TRGP"],"removals":["NLSN"],"source_url":"https://press.spglobal.com/2022-10-06-Targa-Resources-Set-to-Join-S-P-500-Lantheus-Holdings-to-Join-S-P-MidCap-400-Payoneer-Global-to-Join-S-P-SmallCap-600","matched_date_and_symbol_sets":true,"known_at_ms":null},
+      {"effective_session":"2022-11-01","additions":["ACGL"],"removals":["TWTR"],"source_url":"https://press.spglobal.com/2022-10-27-Arch-Capital-Group-Set-to-Join-S-P-500-RXO-to-Join-S-P-MidCap-400-Bread-Financial-Holdings-to-Join-S-P-SmallCap-600","matched_date_and_symbol_sets":true,"known_at_ms":null}
+    ],
+    "complete_event_chain_certified":false,
+    "two_official_full_anchors_acquired":false,
+    "sp400_history_certified":false,
+    "notebooks_executed":false
+  },
+  "actual_cash_available_at_ms":null,
+  "power_calculated":false,
+  "profit_or_ranking_calculated":false,
+  "forward_collection_enabled":false,
+  "account_queries":0,
+  "order_requests":0
+}

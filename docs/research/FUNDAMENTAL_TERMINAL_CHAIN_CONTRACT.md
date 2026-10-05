@@ -2,6 +2,7 @@
 
 작성: 2026-10-05 (Codex). 기준 코드 `152dea1`.
 이전: [역사 기준점 감사](FUNDAMENTAL_HISTORICAL_ANCHOR_AUDIT.md).
+후속: [무료 과거 복원 경로 재평가](FUNDAMENTAL_FREE_HISTORY_FEASIBILITY.md). 아래는 당시 조회/계약 검사 기록이며 최신 자료 경로/다음 작업은 후속과 Current를 따른다.
 **Phase 0 / REAL_SAMPLE_AUDITED / DATA_NOT_READY 유지. 전략 성과 NOT_TESTED.**
 이 문서는 유료 자료 없는 제한 조사와 연구 전용 계약 검사다. 기존 전략/계좌/주문/일정/UI 변경 없음.
 사용자는 후속 질문에서 **A 과거 복원 계속 — 기존 API 시세만 확인**을 선택했다.
