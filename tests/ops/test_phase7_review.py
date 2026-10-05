@@ -116,6 +116,22 @@ def test_p4_dirty_final_fails_and_aborted_run_is_check() -> None:
     assert info["unfinished"] == ["2026-10-03"]
 
 
+def test_p4_check_clears_only_with_a_recorded_no_trace_confirmation() -> None:
+    days = _days(14)
+    aborted = [
+        _run(d, ok=(d != "2026-10-03"), final=(None if d == "2026-10-03" else True)) for d in days
+    ]
+    confirmed = Cause("external", "네트워크", p4="다음 날 시작 RUNNING [] · 그날 주문 0")
+    crit, info = phase7_review(aborted, {"2026-10-03": confirmed}, until="2026-10-08")
+    assert _status(crit, "P4") == "PASS"
+    assert info["unfinished_confirmed"] == ["2026-10-03"]
+    assert info["verdict"] == "PASS"
+    # 확인이 있어도 다른 날 마무리가 더러우면 FAIL
+    dirty = [*aborted[:-1], _run(days[-1], final=False)]
+    crit, _ = phase7_review(dirty, {"2026-10-03": confirmed}, until="2026-10-08")
+    assert _status(crit, "P4") == "FAIL"
+
+
 def test_restarted_window_counts_from_first() -> None:
     days = _days(14, first="2026-10-01")
     _, info = phase7_review([_run(d) for d in days], {}, until="2026-10-14", first="2026-10-01")

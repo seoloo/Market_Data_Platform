@@ -42,6 +42,8 @@ class Cause:
     text: str
     fixed: str | None = None
     """코드 결함을 고친 날(YYYY-MM-DD). 그날부터 14일을 다시 센다(P3)."""
+    p4: str | None = None
+    """마무리 전에 멈춘 날의 흔적 확인 근거(사람이 적음). 있으면 그날의 P4 CHECK 가 풀린다."""
 
 
 def _day(at: str) -> str:
@@ -129,13 +131,22 @@ def phase7_review(
     else:
         p3 = Criterion("P3", "PASS", "코드 결함 실패 0")
 
+    confirmed = [d for d in unfinished if d in causes and causes[d].p4]
+    unconfirmed = [d for d in unfinished if d not in confirmed]
     if dirty:
         p4 = Criterion("P4", "FAIL", f"마무리 상태가 평탄·주문 0·스톱 0 이 아닌 날 {dirty}")
-    elif unfinished:
+    elif unconfirmed:
         p4 = Criterion(
             "P4",
             "CHECK",
-            f"마무리 전에 멈춘 날 {unfinished} — 다음 실행의 시작 상태로 흔적 여부를 확인",
+            f"마무리 전에 멈춘 날 {unconfirmed} — 다음 실행의 시작 상태로 흔적 여부를 확인",
+        )
+    elif confirmed:
+        p4 = Criterion(
+            "P4",
+            "PASS",
+            f"마무리된 날 모두 평탄·주문 0·스톱 0 · 마무리 전에 멈춘 날 {confirmed}"
+            " 은 흔적 없음 확인",
         )
     else:
         p4 = Criterion("P4", "PASS", f"{len(by_day)}일 모두 마무리 평탄·주문 0·스톱 0")
@@ -177,9 +188,11 @@ def phase7_review(
         "unexplained": unexplained,
         "code_days": code_days,
         "unfinished": unfinished,
+        "unfinished_confirmed": confirmed,
         "dirty": dirty,
         "causes": {
-            d: {"kind": c.kind, "text": c.text, "fixed": c.fixed} for d, c in causes.items()
+            d: {"kind": c.kind, "text": c.text, "fixed": c.fixed, "p4": c.p4}
+            for d, c in causes.items()
         },
         "runs": runs_info,
     }

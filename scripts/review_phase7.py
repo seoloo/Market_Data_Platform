@@ -50,7 +50,7 @@ def load_causes(path: Path) -> dict[str, Cause]:
         return {}
     raw = json.loads(path.read_text(encoding="utf-8"))
     return {
-        day: Cause(kind=str(v["kind"]), text=str(v["text"]), fixed=v.get("fixed"))
+        day: Cause(kind=str(v["kind"]), text=str(v["text"]), fixed=v.get("fixed"), p4=v.get("p4"))
         for day, v in raw.items()
     }
 
