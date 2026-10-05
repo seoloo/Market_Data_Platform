@@ -29,7 +29,8 @@ def test_summary_line_is_shown_with_verdict_detail_folded(tmp_path: Path) -> Non
     assert entry.summary.startswith("판정 2018")
     html = render_page(data, "research")
     assert "BTC·ETH 추세 따라가기 — 통과" in html
-    assert "<details><summary>판정 근거</summary>" in html
+    assert "<details><summary>자세히</summary>" in html
+    assert "<b>무엇을 시험했나</b> 긴 가설 문장." in html and "<b>결과</b> 판정 2018" in html
 
 
 def test_without_summary_falls_back_to_short_hypothesis(tmp_path: Path) -> None:

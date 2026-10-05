@@ -141,6 +141,12 @@ class ResearchEntry:
     summary: str
     about: str = ""
     """무엇을 연구했나 — 결과 (``요약:`` 줄, 없으면 가설 앞부분)."""
+    hypothesis: str = ""
+    """``Hypothesis:`` 전문 — 무엇을 어떻게 시험했나."""
+    failure: str = ""
+    """``Failure:`` — 왜 실패했나."""
+    learned: str = ""
+    """``Learned:`` — 배운 것."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -347,6 +353,22 @@ def _summary(block: Sequence[str]) -> str:
 _ABOUT_MAX = 90
 
 
+def _field(block: Sequence[str], name: str) -> str:
+    """``이름: 내용`` 줄 하나(내용이 비면 아래 ``- `` 목록을 이어 붙임). 마크다운 기호는 뺀다."""
+    for i, line in enumerate(block):
+        if line.startswith(name):
+            text = line.split(":", 1)[1].strip() if ":" in line else ""
+            if not text:
+                items = []
+                for b in block[i + 1 :]:
+                    if not b.startswith("- "):
+                        break
+                    items.append(b[2:].strip())
+                text = " · ".join(items)
+            return text.replace("**", "").replace("`", "")
+    return ""
+
+
 def _about(block: Sequence[str]) -> str:
     """``요약:`` 줄. 없으면 가설 첫 문장을 줄여 쓴다."""
     for line in block:
@@ -385,7 +407,14 @@ def _research(path: Path, errors: list[str]) -> tuple[ResearchEntry, ...]:
         summary = _summary(block)
         out.append(
             ResearchEntry(
-                m.group(1), m.group(2), date.group(0) if date else "", summary, _about(block)
+                m.group(1),
+                m.group(2),
+                date.group(0) if date else "",
+                summary,
+                _about(block),
+                _field(block, "Hypothesis"),
+                _field(block, "Failure"),
+                _field(block, "Learned"),
             )
         )
     return tuple(out)

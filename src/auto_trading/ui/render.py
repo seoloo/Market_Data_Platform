@@ -14,7 +14,14 @@ from pathlib import Path
 
 from auto_trading.ui.ag_render import ag_paper_page
 from auto_trading.ui.charts import Series, line_chart
-from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
+from auto_trading.ui.data import (
+    DashboardData,
+    DrillView,
+    LedgerView,
+    Point,
+    ResearchEntry,
+    WatchView,
+)
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.leader_alert_render import leader_alert_page
@@ -584,27 +591,61 @@ def _risk(data: DashboardData) -> str:
     )
 
 
-def _research(data: DashboardData) -> str:
-    color = {"PASS": "ok", "REJECTED": "bad"}
-    rows = (
-        "".join(
-            f"<tr><td>{escape(r.title)}</td>"
-            f"<td>{_dot(color.get(r.verdict, 'warn'))}{escape(r.verdict)}</td>"
-            f"<td class='mute nowrap'>{escape(r.date)}</td>"
-            f"<td>{escape(r.about or r.summary)}"
-            + (
-                f"<details><summary>판정 근거</summary>"
-                f"<div class='mute'>{escape(r.summary)}</div></details>"
-                if r.about and r.summary
-                else ""
-            )
-            + "</td></tr>"
-            for r in reversed(data.research)
-        )
-        or "<tr><td colspan=4 class='mute'>기록 없음</td></tr>"
+_VERDICT_GROUP = {"PASS": "pass", "REJECTED": "rej"}
+"""그 밖(INCONCLUSIVE · DATA_INSUFFICIENT · NO_ROOM …)은 '기타'."""
+
+
+def _research_row(r: ResearchEntry) -> str:
+    group = _VERDICT_GROUP.get(r.verdict, "etc")
+    color = {"pass": "ok", "rej": "bad"}.get(group, "warn")
+    lines = []
+    if r.hypothesis:
+        lines.append(f"<p><b>무엇을 시험했나</b> {escape(r.hypothesis)}</p>")
+    if r.summary:
+        lines.append(f"<p><b>결과</b> {escape(r.summary)}</p>")
+    if r.failure:
+        lines.append(f"<p><b>왜</b> {escape(r.failure)}</p>")
+    if r.learned:
+        lines.append(f"<p><b>배운 것</b> {escape(r.learned)}</p>")
+    more = (
+        f"<details><summary>자세히</summary><div class='research-more'>{''.join(lines)}</div>"
+        "</details>"
+        if lines
+        else ""
     )
     return (
-        '<div class="panel"><h2>연구 판정 (RESEARCH_HISTORY)</h2>'
+        f'<tr class="v-{group}"><td class="nowrap"><b>{escape(r.title)}</b></td>'
+        f"<td class='nowrap'>{_dot(color)}{escape(r.verdict)}</td>"
+        f"<td class='mute nowrap'>{escape(r.date)}</td>"
+        f"<td>{escape(r.about or r.summary)}{more}</td></tr>"
+    )
+
+
+def _research(data: DashboardData) -> str:
+    entries = sorted(data.research, key=lambda r: (r.title.casefold(), r.date))
+    groups = [_VERDICT_GROUP.get(r.verdict, "etc") for r in entries]
+    filters = (
+        ("rf-all", "전체", len(entries)),
+        ("rf-pass", "통과 PASS", groups.count("pass")),
+        ("rf-rej", "기각 REJECTED", groups.count("rej")),
+        ("rf-etc", "기타", groups.count("etc")),
+    )
+    radios = "".join(
+        f'<input type="radio" name="rf" id="{key}"{" checked" if key == "rf-all" else ""}>'
+        for key, _, _ in filters
+    )
+    labels = "".join(
+        f'<label for="{key}">{label} <span>{n}</span></label>' for key, label, n in filters
+    )
+    rows = "".join(_research_row(r) for r in entries) or (
+        "<tr><td colspan=4 class='mute'>기록 없음</td></tr>"
+    )
+    return (
+        '<div class="panel research">'
+        f"{radios}<div class='row'><h2>연구 판정 (RESEARCH_HISTORY)</h2>"
+        f"<div class='rfilters'>{labels}</div></div>"
+        "<div class='sub'>연구 이름 알파벳 순 · '자세히'를 누르면 무엇을 시험했고 왜 그렇게 "
+        "나왔는지 볼 수 있다.</div>"
         "<table><tr><th>연구</th><th>판정</th>"
         f"<th>날짜</th><th>무엇을 연구했나 — 결과</th></tr>{rows}</table>"
         '<div class="foot">기각된 연구는 파라미터만 바꿔 다시 하지 않는다. '

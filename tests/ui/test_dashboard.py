@@ -105,8 +105,11 @@ def build_root(tmp_path: Path) -> Path:
     docs = tmp_path / "docs" / "current"
     docs.mkdir(parents=True)
     (docs / "RESEARCH_HISTORY.md").write_text(
-        "# 연구\n\n## T — PASS (2026-09-24)\n\n판정 **통과**\n\n"
-        f"## X{EVIL} — REJECTED (2026-09-20)\n\nFailure: 비용\n\n## 비용 이력\n",
+        "# 연구\n\n## T — PASS (2026-09-24)\n\n판정 **통과**\n"
+        "Hypothesis: BTC 추세 **보유**\nLearned: 추세가 답\n\n"
+        f"## X{EVIL} — REJECTED (2026-09-20)\n\nFailure: 비용\n\n"
+        "## A1 — DATA_INSUFFICIENT (2026-09-23)\n\nHypothesis:\n- 첫째\n- 둘째\n\n"
+        "## 비용 이력\n",
         encoding="utf-8",
     )
     return tmp_path
@@ -136,7 +139,12 @@ class TestData:
         assert [(r.title, r.verdict) for r in data.research] == [
             ("T", "PASS"),
             (f"X{EVIL}", "REJECTED"),
+            ("A1", "DATA_INSUFFICIENT"),
         ]
+        assert data.research[0].hypothesis == "BTC 추세 보유"
+        assert data.research[0].learned == "추세가 답"
+        assert data.research[1].failure == "비용"
+        assert data.research[2].hypothesis == "첫째 · 둘째"
         assert data.research[0].summary == "판정 통과"  # 마크다운 기호 제거
         assert any("stream-broken.json" in e for e in data.errors)  # 손상 파일은 건너뛰고 알린다
 
@@ -189,6 +197,22 @@ class TestRender:
             nav = top.split("<nav>", 1)[1].split("</nav>", 1)[0]
             assert nav.count(f'href="{href}"') == 1
             assert f'href="{href}" class="on" aria-current=page' in nav
+
+    def test_research_page_sorts_and_filters_by_verdict(self, root: Path) -> None:
+        html = render_page(load_dashboard(root, P0 + 11 * D), "research")
+        body = html.split("<table>", 1)[1]
+        assert body.index("<b>A1</b>") < body.index("<b>T</b>") < body.index("<b>X")  # 알파벳 순
+        for cls in ('class="v-pass"', 'class="v-rej"', 'class="v-etc"'):
+            assert cls in body
+        for label in (
+            "전체 <span>3</span>",
+            "통과 PASS <span>1</span>",
+            "기각 REJECTED <span>1</span>",
+            "기타 <span>1</span>",
+        ):
+            assert label in html
+        assert "무엇을 시험했나</b> BTC 추세 보유" in html and "배운 것</b> 추세가 답" in html
+        assert "<script" not in html and EVIL not in html
 
     def test_stock_pages_have_separate_navigation_group(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
