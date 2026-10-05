@@ -55,7 +55,7 @@ LIQ_DAYS = 63
 INDEX_SMA = 200
 UNKNOWN = "미분류"
 COMMON = "101"
-EXPECTED_DATA: str | None = None
+EXPECTED_DATA: str | None = "58588878f98dac2c5532f4de4422d11cad44ed3d591f5510fe0ce47f06f4fe68"
 """자료 묶음 해시 — audit 뒤 문서 141 에 적고 여기에 고정한다."""
 WATCH: tuple[str, ...] = (
     "005930",  # 삼성전자
