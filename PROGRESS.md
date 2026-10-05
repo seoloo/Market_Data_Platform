@@ -3,6 +3,13 @@
 최종 갱신: 2026-10-05 · 작성: Claude (도구 역할 분담 AGENTS §9 · IDEAS.md · 실적 연구 Claude 이관).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-05 — Codex 아이디어 담당 전환: 실적 연구 인계 보충
+
+- 사용자 역할 분담 확인에 따라 [IDEAS 4번 인계 보충](docs/research/IDEAS.md)에 연구 질문·미검증 범위·기존 구현/자료 위치·무료 종료 3종목 가격 및 제한 명부 감사의 다음 순서·중단 지점을 기록했다.
+- 체크포인트 본문의 옛 Codex 전용 문구는 역사 기록이며 AGENTS §9의 Claude 담당이 우선함을 명시. 가격/명부/회계에서 이미 확인한 함정과 실패 요청을 정리하여 재작업을 줄인다.
+- 담당/연구 판정/운영 단계는 직전 Claude 기록 그대로. Phase 0 DATA_NOT_READY / NOT_TESTED, 연구 재개·자료 수집·인증 호출·성과 계산 없음. 이번 변경은 IDEAS와 이 작업 기록 2개 문서뿐이다.
+- 검증: 문서 링크·diff 공백·변경 범위 검사 통과. 커밋 규약에 따른 전체 pytest·leakage, mypy 421파일, ruff check/format 586파일, import 계약 5/5 모두 통과. 수익성 검증은 수행하지 않았다.
+
 
 ## 2026-10-05 — 도구 역할 분담: 연구 아이디어 Codex · 코드 Claude Code (AGENTS §9)
 
