@@ -58,3 +58,22 @@ def test_ep_skips_limit_up_close_and_small_volume() -> None:
     s = _stock(o, c, vol)
     trades, _ = ep_trades({"X": s}, {d: {"X"} for d in s.dates}, {"X": [99.0] * n})
     assert trades == []
+
+
+def test_bnf_signal_first_cross_only_and_min_price() -> None:
+    from scripts.run_lt_kr import KrPanel
+    from scripts.run_traders_151 import BNF_MA, bnf_signals
+
+    n = 40
+    days = [f"2010-01-{i + 1:02d}" if i < 31 else f"2010-02-{i - 30:02d}" for i in range(n)]
+    xs: list[float | None] = [1000.0] * n
+    xs[30] = xs[31] = 700.0  # 이틀 연속 아래 → 첫날만 신호
+    tiny: list[float | None] = [x / 500 if x else None for x in xs]  # 2 원 → 1.4 원
+    panel = KrPanel(
+        days, {"A": xs, "B": tiny}, {"A": [1.0] * n, "B": [1.0] * n}, {}, {"A": 0, "B": 0},
+        {"A": n - 1, "B": n - 1},
+    )  # fmt: skip
+    assert BNF_MA == 25
+    got = bnf_signals(panel)
+    assert sorted(got) == [("A", 30), ("B", 30)]
+    assert bnf_signals(panel, 100.0) == [("A", 30)]

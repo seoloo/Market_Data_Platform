@@ -4,6 +4,7 @@
 
     python -m scripts.run_traders_151 audit   # 자료 해시·표본 수 (수익 없음)
     python -m scripts.run_traders_151 run     # 깨끗한 트리 · 자료 해시 일치 · 판정 파일 없음
+    python -m scripts.run_traders_151 run-bnf-v1.1   # v1 BNF 무효 뒤 한 번 (신호일 ≥ 100 원)
 
 * **BNF** (고테가와 다카시): 종가가 25 일선보다 20% 이상 아래로 처음 내려간 종목 → 다음
   거래일 종가에 사서, 종가가 25 일선 위로 돌아온 날 종가(최대 20 거래일)에 판다.
@@ -53,6 +54,10 @@ EXPECTED_DATA: str | None = "8b035208e02fbf230cea11f08f72b4184f9b448d0a0fc718530
 UNIVERSE = 200
 LIQ_DAYS = 63
 BNF_MA, BNF_DEV, BNF_MAX = 25, 0.20, 20
+BNF_MIN_PRICE = 100.0
+"""v1.1 (2026-10-06): 신호일 수정 종가 ≥ 100 원. 한국투자증권 수정 종가는 원 단위 정수라
+뒤에 증자가 많은 종목은 옛 수정 가격이 1~2 원이 되어 1 → 2 원이 +100% 로 보인다(008080).
+한 호가 반올림 오차가 1% 아래가 되는 값으로 정했다 — v1 판정 무효 사유, 문서 151 §7."""
 BNF_FROM, BNF_SPLIT, BNF_TO = "2007-07-01", "2017-01-01", "2026-08-31"
 EP_GAP, EP_VOL, EP_VOL_DAYS, EP_MA, EP_MAX = 0.10, 3.0, 20, 10, 120
 EP_SPLIT, EP_TO = "20220101", "20260831"
@@ -112,8 +117,8 @@ class Trade:
     reason: str
 
 
-def bnf_signals(panel: KrPanel) -> list[tuple[str, int]]:
-    """(종목, 신호일 색인) — 종가 ≤ 25 일선 × 0.8 로 처음 내려간 날."""
+def bnf_signals(panel: KrPanel, min_price: float = 0.0) -> list[tuple[str, int]]:
+    """(종목, 신호일 색인) — 종가 ≤ 25 일선 × 0.8 로 처음 내려간 날 (종가 ≥ ``min_price``)."""
     out: list[tuple[str, int]] = []
     start = next(i for i, d in enumerate(panel.days) if d >= BNF_FROM)
     end = max(i for i, d in enumerate(panel.days) if d <= BNF_TO)
@@ -126,14 +131,14 @@ def bnf_signals(panel: KrPanel) -> list[tuple[str, int]]:
                 prev_below = False
                 continue
             below = c <= m * (1 - BNF_DEV)
-            if below and not prev_below:
+            if below and not prev_below and c >= min_price:
                 out.append((sym, t))
             prev_below = below
     return out
 
 
-def bnf_trades(panel: KrPanel) -> list[Trade]:
-    signals = bnf_signals(panel)
+def bnf_trades(panel: KrPanel, min_price: float = 0.0) -> list[Trade]:
+    signals = bnf_signals(panel, min_price)
     universe = pit_members(panel, [t for _, t in signals])
     end = max(i for i, d in enumerate(panel.days) if d <= BNF_TO)
     busy_until: dict[str, int] = defaultdict(lambda: -1)
@@ -180,8 +185,8 @@ def _week(d: str) -> str:
     return f"{y}-{w:02d}"
 
 
-def run_bnf(panel: KrPanel) -> dict[str, object]:
-    trades = bnf_trades(panel)
+def run_bnf(panel: KrPanel, min_price: float = 0.0) -> dict[str, object]:
+    trades = bnf_trades(panel, min_price)
     nets = [x.ret - 2 * KR_FEE for x in trades]
     dates = [x.date for x in trades]
     weeks = [_week(d) for d in dates]
@@ -437,12 +442,36 @@ def run() -> dict[str, object]:
     return result
 
 
+def run_bnf_v11() -> dict[str, object]:
+    """v1 BNF 판정 무효(정수 수정 종가) 뒤 한 번만 — 다른 시험은 v1 그대로."""
+    target = OUTPUT / "verdict_bnf_v1_1.json"
+    if target.exists():
+        raise SystemExit(f"이미 판정했다: {target}")
+    sha, dirty = git_state()
+    if dirty:
+        raise SystemExit("작업 트리가 깨끗하지 않다 — 커밋 뒤에 실행")
+    digest, _ = data_hash()
+    if EXPECTED_DATA is None or digest != EXPECTED_DATA:
+        raise SystemExit(f"자료 해시가 다르다: {digest}")
+    panel, _ = build_panel()
+    result: dict[str, object] = {
+        "commit": sha,
+        "data_sha256": digest,
+        "BNF_v1_1": run_bnf(panel, BNF_MIN_PRICE),
+    }
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return result
+
+
 def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else "audit"
     if cmd == "audit":
         print(json.dumps(audit(), ensure_ascii=False, indent=2))
     elif cmd == "run":
         print(json.dumps(run(), ensure_ascii=False, indent=2))
+    elif cmd == "run-bnf-v1.1":
+        print(json.dumps(run_bnf_v11(), ensure_ascii=False, indent=2))
     else:
         raise SystemExit(f"알 수 없는 명령: {cmd}")
     return 0
