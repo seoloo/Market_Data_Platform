@@ -6,6 +6,7 @@
     python -m scripts.fetch_kr_stocks prices   # 보통주 수정주가 일봉 (이어 받기 가능)
     python -m scripts.fetch_kr_stocks index    # KOSPI 지수 일봉
     python -m scripts.fetch_kr_stocks flows    # 종목별 투자자 매매(외국인·기관 순매수), 문서 142
+    python -m scripts.fetch_kr_stocks raw      # 비수정 시·고·저·종·거래량 (실적 연구)
 
 * 목록: KIND(kind.krx.co.kr) 유가증권시장 상장법인 목록과 2008-01-01 뒤 상장폐지 현황
   — 로그인 없이 받는다.
@@ -42,6 +43,9 @@ INFO = "/uapi/domestic-stock/v1/quotations/search-stock-info"
 INVESTOR = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"
 FLOWS = DATA / "flows"
 FLOW_START = "20080101"
+RAW = DATA / "raw"
+RAW_START = "20170101"
+"""비수정 일봉 시작 — 실적 연구 신호(2018-04~) 앞 1 년(63 일 거래대금·전날 종가)."""
 FLOW_FIELDS = (
     "frgn_ntby_tr_pbmn",
     "orgn_ntby_tr_pbmn",
@@ -104,6 +108,31 @@ def flow_rows(output2: Sequence[Mapping[str, Any]]) -> list[tuple[str, ...]]:
         d = str(r.get("stck_bsop_date") or "")
         if d:
             out.append((d, *(str(r.get(f) or "0") for f in FLOW_FIELDS)))
+    return sorted(set(out))
+
+
+def raw_rows(output2: Sequence[Mapping[str, Any]]) -> list[tuple[str, ...]]:
+    """기간별 시세(원주가) → (날짜, 시가, 고가, 저가, 종가, 거래량, 거래대금, 락 구분), 오래된 순.
+
+    종가 0 은 버린다. 거래량 0 인 날(거래정지)은 그대로 남긴다 — 거래 없음은 쓰는 쪽에서 판단."""
+    out = []
+    for r in output2:
+        d = str(r.get("stck_bsop_date") or "")
+        c = str(r.get("stck_clpr") or "0")
+        if not d or float(c) <= 0:
+            continue
+        out.append(
+            (
+                d,
+                str(r.get("stck_oprc") or "0"),
+                str(r.get("stck_hgpr") or "0"),
+                str(r.get("stck_lwpr") or "0"),
+                c,
+                str(r.get("acml_vol") or "0"),
+                str(r.get("acml_tr_pbmn") or "0"),
+                str(r.get("flng_cls_code") or ""),
+            )
+        )
     return sorted(set(out))
 
 
@@ -313,6 +342,74 @@ def fetch_flows(shard: int = 0, shards: int = 1) -> int:
     return 0 if failed == 0 else 1
 
 
+def _raw_pages(get: Getter, code: str, lo: str, hi: str) -> list[tuple[str, ...]]:
+    rows: list[tuple[str, ...]] = []
+    cursor = hi
+    while cursor >= lo:
+        out = (
+            get(
+                DAILY,
+                "FHKST03010100",
+                {
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": code,
+                    "FID_INPUT_DATE_1": lo,
+                    "FID_INPUT_DATE_2": cursor,
+                    "FID_PERIOD_DIV_CODE": "D",
+                    "FID_ORG_ADJ_PRC": "1",  # 1 = 원주가(비수정)
+                },
+            ).get("output2")
+            or []
+        )
+        page = raw_rows(out)
+        if not page:
+            break
+        rows.extend(page)
+        if page[0][0] <= lo:
+            break
+        first = date(int(page[0][0][:4]), int(page[0][0][4:6]), int(page[0][0][6:]))
+        cursor = (first - timedelta(days=1)).strftime("%Y%m%d")
+        time.sleep(PAUSE)
+    return sorted(set(rows))
+
+
+RAW_FIELDS = ("open", "high", "low", "close", "volume", "value", "lock")
+
+
+def fetch_raw(shard: int = 0, shards: int = 1) -> int:
+    """종목군에 한 번이라도 들어온 종목(``ever_universe.json``)의 비수정 일봉, 2017-01 ~."""
+    info = json.loads((DATA / "info.json").read_text(encoding="utf-8"))
+    every = json.loads((DATA / "ever_universe.json").read_text(encoding="utf-8"))
+    todo = [c for i, c in enumerate(every) if i % shards == shard]
+    RAW.mkdir(parents=True, exist_ok=True)
+    kis = _kis()
+    done = failed = 0
+    try:
+        for k, code in enumerate(todo, 1):
+            path = RAW / f"{code}.csv"
+            span = window(info[code], start=RAW_START)
+            if path.exists() or span is None:
+                continue
+            try:
+                rows = _raw_pages(kis._get, code, *span)
+            except Exception as exc:  # 한 종목 실패가 전체를 멈추지 않게
+                failed += 1
+                print(f"[{k}/{len(todo)}] {code} 실패: {type(exc).__name__}", flush=True)
+                continue
+            path.write_text(
+                "date," + ",".join(RAW_FIELDS) + "\n" + "".join(",".join(r) + "\n" for r in rows),
+                encoding="utf-8",
+                newline="\n",
+            )
+            done += 1
+            if k % 25 == 0:
+                print(f"[{k}/{len(todo)}] {code} {len(rows)} 일", flush=True)
+    finally:
+        kis.close()
+    print(f"받음 {done} · 실패 {failed} · 대상 {len(todo)}")
+    return 0 if failed == 0 else 1
+
+
 def index_pages(get: Getter, lo: str, hi: str) -> list[tuple[str, float]]:
     """KOSPI 지수 일봉 (한 번에 최대 50 일, 거꾸로)."""
     rows: list[tuple[str, float]] = []
@@ -365,12 +462,12 @@ def fetch_index() -> int:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("lists", "prices", "index", "flows"))
-    parser.add_argument("--shard", default="0/1", help="flows 를 나눠 받기: i/n")
+    parser.add_argument("stage", choices=("lists", "prices", "index", "flows", "raw"))
+    parser.add_argument("--shard", default="0/1", help="flows·raw 를 나눠 받기: i/n")
     args = parser.parse_args(argv)
-    if args.stage == "flows":
+    if args.stage in ("flows", "raw"):
         i, n = (int(x) for x in args.shard.split("/"))
-        return fetch_flows(i, n)
+        return (fetch_flows if args.stage == "flows" else fetch_raw)(i, n)
     stages = {
         "lists": fetch_lists,
         "prices": fetch_prices,

@@ -136,3 +136,36 @@ def test_kind_tables_and_kis_rows_parse() -> None:
     assert window({"lstg": "20100105", "abol": "20170307"}) == ("20100105", "20170307")
     assert window({"lstg": "19750611", "abol": ""}) == ("20070101", "20260831")
     assert window({"lstg": "20270101"}) is None
+
+
+def test_raw_rows_keep_unadjusted_ohlcv_and_halted_days() -> None:
+    from scripts.fetch_kr_stocks import raw_rows
+
+    rows = raw_rows(
+        [
+            {
+                "stck_bsop_date": "20180503",
+                "stck_oprc": "2650000",
+                "stck_hgpr": "2650000",
+                "stck_lwpr": "2650000",
+                "stck_clpr": "2650000",
+                "acml_vol": "0",  # 분할 전 거래정지
+                "acml_tr_pbmn": "0",
+                "flng_cls_code": "00",
+            },
+            {
+                "stck_bsop_date": "20180504",
+                "stck_oprc": "53000",
+                "stck_hgpr": "53900",
+                "stck_lwpr": "51800",
+                "stck_clpr": "51900",
+                "acml_vol": "39565391",
+                "acml_tr_pbmn": "2078601000000",
+                "flng_cls_code": "05",
+            },
+            {"stck_bsop_date": "20180505", "stck_clpr": "0"},
+        ]
+    )
+    assert [r[0] for r in rows] == ["20180503", "20180504"]
+    assert rows[0][4] == "2650000" and rows[0][5] == "0"  # 비수정 종가 · 거래량 0 도 남김
+    assert rows[1][1:5] == ("53000", "53900", "51800", "51900") and rows[1][7] == "05"
