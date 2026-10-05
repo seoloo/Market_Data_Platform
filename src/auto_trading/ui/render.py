@@ -46,6 +46,15 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 )
 _STOCK_PAGES = frozenset({"toss", "lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"})
 _PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"})
+_SECTIONS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
+    "coin": (("", ("compare", "positions")),),
+    "stocks": (
+        ("해외 주식", ("toss", "lt_paper", "qs_paper", "ag_paper")),
+        ("국내 주식", ("kr_shadow", "leader_alert")),
+    ),
+    "system": (("", ("running", "testnet", "risk", "demo")),),
+}
+"""상단 탭 아래 하위 메뉴. 모든 화면이 정확히 한 곳에 들어간다(요약·연구는 화면 하나)."""
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
 _COLORS = {
@@ -100,42 +109,38 @@ def _dot(level: str) -> str:
     return f'<span class="dot {cls}"></span>'
 
 
+def _group(page: str) -> str:
+    """상단 탭 묶음 — 요약 · 코인 · 주식 · 연구 · 시스템."""
+    if page in _STOCK_PAGES:
+        return "stocks"
+    if page in {"running", "testnet", "risk", "demo"}:
+        return "system"
+    if page in {"overview", "research"}:
+        return page
+    return "coin"
+
+
+def _subnav(page: str, group: str) -> str:
+    """고른 상단 탭에 속한 화면만 알약 버튼으로. 화면이 하나뿐인 탭(요약·연구)은 없다."""
+    labels = {key: label for key, _, label in PAGES}
+    hrefs = {key: href for key, href, _ in PAGES}
+    blocks = []
+    for heading, keys in _SECTIONS.get(group, ()):
+        pills = "".join(
+            f'<a href="{hrefs[k]}" class="{"on" if k == page else ""}"'
+            f"{' aria-current=page' if k == page else ''}>{escape(labels[k])}</a>"
+            for k in keys
+        )
+        head = f'<div class="nav-heading">{heading}</div>' if heading else ""
+        blocks.append(f'<div class="nav-group">{head}<div class="pills">{pills}</div></div>')
+    return f'<nav><div class="subnav">{"".join(blocks)}</div></nav>' if blocks else ""
+
+
 def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
-    main_nav = "".join(
-        f'<a href="{href}" class="{"on" if key == page else ""}">{escape(label)}</a>'
-        for key, href, label in PAGES
-        if key not in _STOCK_PAGES
-    )
-    nav = (
-        f'<div class="nav-group"><div class="nav-heading">자동매매</div>{main_nav}</div>'
-        '<div class="nav-group nav-stock"><div class="nav-heading">해외 주식</div>'
-        f'<a href="/toss" class="{"on" if page == "toss" else ""}">'
-        "토스 적립</a>"
-        f'<a href="/lt-paper" class="{"on" if page == "lt_paper" else ""}">'
-        "주도주 Paper</a>"
-        f'<a href="/qs-paper" class="{"on" if page == "qs_paper" else ""}">'
-        "QS Paper</a>"
-        f'<a href="/ag-paper" class="{"on" if page == "ag_paper" else ""}">'
-        "AG Paper</a></div>"
-        '<div class="nav-group nav-stock"><div class="nav-heading">국내 주식</div>'
-        f'<a href="/kr-shadow" class="{"on" if page == "kr_shadow" else ""}">'
-        "국장 주도주 기록</a>"
-        f'<a href="/leader-alert" class="{"on" if page == "leader_alert" else ""}">'
-        "주도주 알림</a></div>"
-    )
+    group = _group(page)
+    nav = _subnav(page, group)
     title = next(label for key, _, label in PAGES if key == page)
     subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
-    group = (
-        "stocks"
-        if page in _STOCK_PAGES
-        else "research"
-        if page == "research"
-        else "system"
-        if page in {"running", "testnet", "risk", "demo"}
-        else "overview"
-        if page == "overview"
-        else "coin"
-    )
     tabs = "".join(
         f'<a href="{href}" class="{"on" if key == group else ""}"'
         f"{' aria-current=page' if key == group else ''}>{label}</a>"
@@ -192,8 +197,7 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         "AUTO <b>TRADING</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
-        f'<div class="layout"><nav><details><summary>상세 메뉴 · {escape(title)}</summary>'
-        f"{nav}</details></nav><main>"
+        f'<div class="layout">{nav}<main>'
         f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
         f"<h1>{'오늘의 운영' if page == 'overview' else escape(title)}</h1>"
         f'<div class="mute">{subtitle}</div></div>'

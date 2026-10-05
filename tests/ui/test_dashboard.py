@@ -178,11 +178,25 @@ class TestRender:
         assert EVIL not in html  # 모든 동적 문자열은 이스케이프
         assert "<form" not in html and "<script" not in html
 
+    def test_every_page_sits_in_exactly_one_tab_menu(self, root: Path) -> None:
+        data = load_dashboard(root, P0 + 11 * D)
+        for key, href, _ in PAGES:
+            html = render_page(data, key)
+            top = html.split("<main>", 1)[0]
+            if key in ("overview", "research"):
+                assert "<nav>" not in top  # 화면이 하나뿐인 탭
+                continue
+            nav = top.split("<nav>", 1)[1].split("</nav>", 1)[0]
+            assert nav.count(f'href="{href}"') == 1
+            assert f'href="{href}" class="on" aria-current=page' in nav
+
     def test_stock_pages_have_separate_navigation_group(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
-        assert '<div class="nav-heading">자동매매</div>' in nav
+        # 하위 메뉴는 고른 상단 탭(주식)의 화면만 — 코인·시스템 화면은 그 탭에서
         assert '<div class="nav-heading">해외 주식</div>' in nav
+        assert '<div class="nav-heading">국내 주식</div>' in nav
+        assert 'href="/compare"' not in nav and 'href="/running"' not in nav
         assert nav.count('href="/toss"') == 1
         assert 'href="/overseas"' not in nav and 'href="/accumulate"' not in nav
         assert "QNDX" in html and "BTQ" in html and "WQTM" in html
