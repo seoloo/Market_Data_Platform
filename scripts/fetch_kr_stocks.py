@@ -277,10 +277,13 @@ def _flow_pages(get: Getter, code: str, lo: str, hi: str) -> list[tuple[str, ...
     return sorted(set(rows))
 
 
-def fetch_flows() -> int:
-    """종목군에 한 번이라도 들어온 종목(``ever_universe.json``)만 받는다."""
+def fetch_flows(shard: int = 0, shards: int = 1) -> int:
+    """종목군에 한 번이라도 들어온 종목(``ever_universe.json``)만 받는다.
+
+    ``shard``/``shards`` 로 나눠 여러 프로세스가 동시에 받을 수 있다(초당 한도 20 건 안)."""
     info = json.loads((DATA / "info.json").read_text(encoding="utf-8"))
-    todo = json.loads((DATA / "ever_universe.json").read_text(encoding="utf-8"))
+    every = json.loads((DATA / "ever_universe.json").read_text(encoding="utf-8"))
+    todo = [c for i, c in enumerate(every) if i % shards == shard]
     FLOWS.mkdir(parents=True, exist_ok=True)
     kis = _kis()
     done = failed = 0
@@ -363,7 +366,11 @@ def fetch_index() -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("lists", "prices", "index", "flows"))
+    parser.add_argument("--shard", default="0/1", help="flows 를 나눠 받기: i/n")
     args = parser.parse_args(argv)
+    if args.stage == "flows":
+        i, n = (int(x) for x in args.shard.split("/"))
+        return fetch_flows(i, n)
     stages = {
         "lists": fetch_lists,
         "prices": fetch_prices,

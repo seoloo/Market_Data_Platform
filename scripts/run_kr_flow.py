@@ -47,7 +47,7 @@ FLOWS = DATA / "flows"
 OUTPUT = REPO / "reports" / "kr_flow"
 WINDOWS = (20, 60)
 MIN_SCORED = 50
-EXPECTED_FLOWS: str | None = None
+EXPECTED_FLOWS: str | None = "63eb6ef92d92806ee5b0814b4fa920a9ee8f98542be66afad4f0ae8b1e52b001"
 """수급 자료 해시 — audit 뒤 문서 142 에 적고 여기에 고정한다."""
 
 
