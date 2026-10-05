@@ -95,5 +95,22 @@ temperature=0만으로 결정론을 보장하지 않는다. 저장 응답 재생
 - [OPERATIONS](docs/current/OPERATIONS.md): 운영·보안·보존 정책.
 - [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md): 연구 판정 요약.
 - [BRIEFING_FOR_LLM](docs/BRIEFING_FOR_LLM.md): 외부 AI 대화용 파생 요약(기준 문서 아님).
+- [IDEAS](docs/research/IDEAS.md): 다음 연구 아이디어 목록(Codex 관리, §9).
 - config/: 실행 설정, src/auto_trading/: 구현, tests/: 검증.
 - [Archive](docs/archive/README.md): 필요할 때만 과거 근거 조회.
+
+## 9. 도구별 역할 — 연구 아이디어는 Codex, 코드는 Claude Code (2026-10-05 사용자 결정)
+
+사용자 원문 (2026-10-05): "앞으로 연구 아이디어 관리는 codex에서 하고 코드 작업은 클로드 코드에서 하도록" → "좋아 그렇게 적어줘".
+
+| | Codex — 연구 아이디어 | Claude Code — 코드 |
+|---|---|---|
+| 하는 일 | 아이디어 목록 관리 · 후보 비교(최대 3 개, §0) · **사전 등록 초안**(가설 · 판정 기준 · 실패하면 버림) · 판정 뒤 아이디어 목록 갱신·다음 후보 정리 | 자료 받기·점검 · 코드·시험 · 사전 등록 **확정 커밋**(수익 보기 전) · 판정 1 회 실행 · 결과 기록 · 운영 코드 |
+| 주로 쓰는 파일 | [docs/research/IDEAS.md](docs/research/IDEAS.md) · 사전 등록 문서의 초안 절(가설·자료·규칙·판정 기준) | `src/` · `scripts/` · `tests/` · `config/` · 사전 등록 문서의 자료 점검·판정 절 |
+| 판정 뒤 공통 문서 | IDEAS.md (상태·다음 후보) | RESEARCH_HISTORY · BRIEFING_FOR_LLM · PROGRESS (§1 규칙 그대로) |
+
+- **흐름:** Codex 초안 → 사용자 선택 → Claude 자료 점검·코드 → 필요하면 초안 보정(수익 보기 전, 이유를 문서에 적음) → Claude 확정 커밋 → 판정 1 회 → Claude 기록 → Codex 가 IDEAS.md 반영.
+- **사전 등록 확정은 Claude 가 한다.** 자료 점검(관문 미달·자료 없음 등) 결과로 초안을 고치는 일이 잦기 때문이다. 확정 뒤에는 누구도 기준을 바꾸지 않는다(§2·BACKTEST_AND_TESTING).
+- **동시에 작업하지 않는다.** 두 도구가 같은 저장소·같은 폴더를 쓴다. 한쪽이 작업 중이면 다른 쪽은 파일 수정·커밋을 하지 않는다(사용자가 알려 줌). 시작 전에 `git status`·`git log` 로 상대의 미커밋 변경·최근 커밋을 확인하고, 자기 파일만 커밋한다.
+- Codex 가 코드를 고쳐야 하는 일(도구 오류 등)이 생기면 직접 고치지 않고 IDEAS.md 나 PROGRESS 에 요청으로 남긴다. Claude 가 연구 아이디어를 새로 떠올리면 IDEAS.md 에 후보로 적어 Codex·사용자 검토로 넘긴다(바로 사전 등록하지 않는다).
+- **실적 개선형 주도주 연구(131~136, 이전 "Codex 전용")는 2026-10-05 사용자 결정으로 Claude 가 이어서 진행한다.** 이어 갈 기준은 [체크포인트](docs/research/FUNDAMENTAL_CODEX_CHECKPOINT.md)와 그 뒤 감사 문서들이다. 지금은 담당만 바꿨고, 재개는 사용자 요청 때 한다.
