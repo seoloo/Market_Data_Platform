@@ -77,3 +77,17 @@ def test_bnf_signal_first_cross_only_and_min_price() -> None:
     got = bnf_signals(panel)
     assert sorted(got) == [("A", 30), ("B", 30)]
     assert bnf_signals(panel, 100.0) == [("A", 30)]
+
+
+def test_bnf_portfolio_puts_one_tenth_per_slot_and_pays_fees() -> None:
+    from scripts.run_lt_kr import KrPanel
+    from scripts.run_traders_151 import Trade, bnf_portfolio
+
+    days = [f"2010-01-{i + 1:02d}" for i in range(31)]
+    xs: list[float | None] = [100.0] * 31
+    xs[20], xs[21], xs[25] = 70.0, 70.0, 77.0
+    panel = KrPanel(days, {"A": xs}, {"A": [1.0] * 31}, {}, {"A": 0}, {"A": 30})
+    trade = Trade("A", days[20], 77.0 / 70.0 - 1, 4, "back_to_ma")  # 21 일 종가 매수 → 25 일
+    _, eq = bnf_portfolio(panel, [trade], fee=0.01)
+    # 10% 를 넣고 +10% · 양쪽 비용 1% — 나머지 90% 는 현금
+    assert eq[-1] == pytest.approx(0.9 + 0.1 * 0.99 * 1.1 * 0.99)

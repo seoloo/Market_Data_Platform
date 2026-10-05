@@ -5,6 +5,7 @@
     python -m scripts.run_traders_151 audit   # 자료 해시·표본 수 (수익 없음)
     python -m scripts.run_traders_151 run     # 깨끗한 트리 · 자료 해시 일치 · 판정 파일 없음
     python -m scripts.run_traders_151 run-bnf-v1.1   # v1 BNF 무효 뒤 한 번 (신호일 ≥ 100 원)
+    python -m scripts.run_traders_151 run-bnf-portfolio   # §9 칸 10 개 계좌 보조 판정 (한 번)
 
 * **BNF** (고테가와 다카시): 종가가 25 일선보다 20% 이상 아래로 처음 내려간 종목 → 다음
   거래일 종가에 사서, 종가가 25 일선 위로 돌아온 날 종가(최대 20 거래일)에 판다.
@@ -442,6 +443,111 @@ def run() -> dict[str, object]:
     return result
 
 
+SLOTS = 10
+
+
+def bnf_portfolio(
+    panel: KrPanel, trades: Sequence[Trade], fee: float = KR_FEE
+) -> tuple[list[str], list[float]]:
+    """§9 보조 판정: 칸 10 개. 들어가는 날 같은 날 신호는 이격도가 깊은 순으로, 빈 칸이 있으면
+    그날 평가액의 1/10(현금이 모자라면 남은 현금)을 넣는다. 현금 이자 0. 매일 종가로 평가."""
+    at = {d: i for i, d in enumerate(panel.days)}
+
+    def dev(x: Trade) -> float:
+        t = at[x.date]
+        c, m = panel.close[x.sym][t], sma_full(panel.close[x.sym], t, BNF_MA)
+        return c / m - 1 if c is not None and m else 0.0
+
+    by_entry: dict[int, list[Trade]] = defaultdict(list)
+    for x in trades:
+        by_entry[at[x.date] + 1].append(x)
+    start = next(i for i, d in enumerate(panel.days) if d >= BNF_FROM)
+    end = max(i for i, d in enumerate(panel.days) if d <= BNF_TO)
+    cash = 1.0
+    open_: list[tuple[Trade, float, float, int]] = []  # (거래, 주식 수, 마지막 가격, 파는 날)
+
+    def px(sym: str, t: int, last: float) -> float:
+        c = panel.close[sym][t]
+        return c if c is not None else last
+
+    days: list[str] = []
+    eq: list[float] = []
+    for t in range(start, end + 1):
+        kept: list[tuple[Trade, float, float, int]] = []
+        for x, q, last, out_t in open_:
+            p = px(x.sym, t, last)
+            if t >= out_t:
+                cash += q * p * (1 - fee)
+            else:
+                kept.append((x, q, p, out_t))
+        open_ = kept
+        value = cash + sum(q * last for _, q, last, _ in open_)
+        for x in sorted(by_entry.get(t, []), key=dev):
+            if len(open_) >= SLOTS:
+                break
+            entry = panel.close[x.sym][t]
+            if entry is None:
+                continue
+            amt = min(cash, value / SLOTS)
+            if amt <= 0:
+                break
+            cash -= amt
+            open_.append((x, amt * (1 - fee) / entry, entry, t + x.days))
+        days.append(panel.days[t])
+        eq.append(cash + sum(q * last for _, q, last, _ in open_))
+    return days, eq
+
+
+def run_bnf_portfolio() -> dict[str, object]:
+    """§9 보조 판정 — v1.1 거래 목록으로 칸 10 개 계좌. 한 번만."""
+    target = OUTPUT / "verdict_bnf_portfolio.json"
+    if target.exists():
+        raise SystemExit(f"이미 판정했다: {target}")
+    sha, dirty = git_state()
+    if dirty:
+        raise SystemExit("작업 트리가 깨끗하지 않다 — 커밋 뒤에 실행")
+    digest, _ = data_hash()
+    if EXPECTED_DATA is None or digest != EXPECTED_DATA:
+        raise SystemExit(f"자료 해시가 다르다: {digest}")
+    panel, _ = build_panel()
+    trades = bnf_trades(panel, BNF_MIN_PRICE)
+    days, eq = bnf_portfolio(panel, trades)
+    _, eq_ref = bnf_portfolio(panel, trades, KR_FEE_REF)
+    kd, kc = load_close(KR / "kospi.csv")
+    kmap = dict(zip(kd, kc, strict=True))
+    k = [kmap[d] for d in days]
+    split = next(i for i, d in enumerate(days) if d >= BNF_SPLIT)
+    full, kos = equity_stats(eq), equity_stats(k)
+    halves = [
+        [equity_stats(eq[:split]), equity_stats(k[:split])],
+        [equity_stats(eq[split:]), equity_stats(k[split:])],
+    ]
+    checks = {
+        "a_cagr_gt_kospi": full["cagr"] > kos["cagr"],
+        "b_sharpe_gt_kospi": full["sharpe"] > kos["sharpe"],
+        "c_halves_cagr_gt_kospi": all(h[0]["cagr"] > h[1]["cagr"] for h in halves),
+    }
+    by_year: dict[str, float] = {}
+    for y in sorted({d[:4] for d in days}):
+        idx = [i for i, d in enumerate(days) if d[:4] == y]
+        lo = max(idx[0] - 1, 0)
+        by_year[y] = round(eq[idx[-1]] / eq[lo] - 1, 4)
+    result: dict[str, object] = {
+        "commit": sha,
+        "data_sha256": digest,
+        "verdict": "PASS" if all(checks.values()) else "REJECT",
+        "checks": checks,
+        "strategy": full,
+        "kospi_price_index": kos,
+        "halves": halves,
+        "ref_cost": equity_stats(eq_ref),
+        "by_year": by_year,
+    }
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return result
+
+
 def run_bnf_v11() -> dict[str, object]:
     """v1 BNF 판정 무효(정수 수정 종가) 뒤 한 번만 — 다른 시험은 v1 그대로."""
     target = OUTPUT / "verdict_bnf_v1_1.json"
@@ -470,6 +576,8 @@ def main(argv: list[str]) -> int:
         print(json.dumps(audit(), ensure_ascii=False, indent=2))
     elif cmd == "run":
         print(json.dumps(run(), ensure_ascii=False, indent=2))
+    elif cmd == "run-bnf-portfolio":
+        print(json.dumps(run_bnf_portfolio(), ensure_ascii=False, indent=2))
     elif cmd == "run-bnf-v1.1":
         print(json.dumps(run_bnf_v11(), ensure_ascii=False, indent=2))
     else:
