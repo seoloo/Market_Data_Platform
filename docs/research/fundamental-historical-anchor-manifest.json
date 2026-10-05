@@ -1,0 +1,74 @@
+{
+  "kind": "BOUNDED_HISTORICAL_HOLDINGS_AND_TERMINAL_EVENT_AUDIT",
+  "base_code_commit": "a91917d",
+  "phase": 0,
+  "data_status": "DATA_NOT_READY",
+  "strategy_result": "NOT_TESTED",
+  "historical_first_seen_status": "NOT_VERIFIED",
+  "terminal_settlement_status": "TERMINAL_SETTLEMENT_UNVERIFIED",
+  "sources": [
+    {"path":"data/research/fundamental_pilot/spy-20220930-n30d.html","url":"https://www.sec.gov/Archives/edgar/data/884394/000119312522293237/d309469dn30d.htm","sha256":"dee9d965f33a4261ebcc3f68173a4d33c95cf2b0a70ad1a4e7b2d3322b06910c","bytes":1174333,"acquired_at_ms":1791185811240},
+    {"path":"data/research/fundamental_pilot/spy-20220930-filing-index.html","url":"https://www.sec.gov/Archives/edgar/data/884394/000119312522293237/0001193125-22-293237-index.htm","sha256":"33f3f43b1b68a32c406e758e9c561f9b168719da19059047e008b74c7568bd93","bytes":7314,"acquired_at_ms":1791185811357},
+    {"path":"data/research/fundamental_pilot/twtr-20221028-nyse-removal.html","url":"https://www.sec.gov/Archives/edgar/data/876661/000087666122000890/ruleprovisionnotice.htm","sha256":"18274d241c402be1e12dee9ed181d4d89aa3460dcf6a65650c91d2dc78b4d215","bytes":1305,"acquired_at_ms":1791185811407},
+    {"path":"data/research/fundamental_pilot/twtr-20221028-form25-index.html","url":"https://www.sec.gov/Archives/edgar/data/1418091/000087666122000890/0000876661-22-000890-index.htm","sha256":"f11083497e32f4ec7f23ac417a8d6c489853e3a9d6f4ddff25246b6c7b2afcb3","bytes":8673,"acquired_at_ms":1791185811517},
+    {"path":"data/research/fundamental_pilot/spdj-20220923-changes.html","url":"https://press.spglobal.com/2022-09-23-PG-E-and-EQT-Set-to-Join-S-P-500-ExlService-to-Join-S-P-MidCap-400-Others-to-Join-S-P-SmallCap-600","sha256":"656b16401b731c15f656a01c5afd925262d0fbb2ea9e4d5b3770bacc2e91096b","bytes":63667,"acquired_at_ms":1791185942190},
+    {"path":"data/research/fundamental_pilot/ctxs-nasdaq-eca2022-262.html","url":"https://www.nasdaqtrader.com/TraderNews.aspx?id=eca2022-262","sha256":"9edae6ed8c4a0859bb549122a195e2bd457216b52ed9500263d83e94141245ca","bytes":60637,"acquired_at_ms":1791185943127}
+  ],
+  "holdings_audit": {
+    "source_period": "2022-09-30",
+    "filing_date": "2022-11-28",
+    "accepted_display": "2022-11-28 13:58:01",
+    "accepted_at_ms": null,
+    "security_rows": 505,
+    "unique_raw_names": 505,
+    "reported_common_stock_value_usd": "330650343579",
+    "extracted_common_stock_value_usd": "330650343579",
+    "checksum_matches": true,
+    "official_index_membership_status": "NOT_CERTIFIED",
+    "tradability_status": "NOT_CERTIFIED",
+    "price_series_status": "NOT_ACQUIRED",
+    "manual_samples": [
+      {"name":"3M Co.","shares":"6052278","value_usd":"668776719"},
+      {"name":"Citrix Systems, Inc. (a)","shares":"1329577","value_usd":"138276008"},
+      {"name":"SVB Financial Group (a)","shares":"636873","value_usd":"213849216"},
+      {"name":"Twitter, Inc. (a)","shares":"7374625","value_usd":"323303560"},
+      {"name":"Zoetis, Inc.","shares":"5149507","value_usd":"763620393"}
+    ]
+  },
+  "manual_terminal_event_evidence": {
+    "TWTR": {
+      "subject_cik": 1418091,
+      "form25_filer_cik": 876661,
+      "merger_effective_date": "2022-10-27",
+      "trading_suspension_session": "2022-10-28_PREOPEN",
+      "index_replacement_session": "2022-11-01_PREOPEN",
+      "exchange_removal_intended_date": "2022-11-08",
+      "exchange_removal_completion_status": "NOT_VERIFIED",
+      "cash_right_usd_per_common_share": "54.20",
+      "cash_right_conditions": "8-K exceptions; no interest; applicable withholding taxes",
+      "cash_available_at_ms": null
+    },
+    "CTXS": {
+      "cusip_display": "177376100",
+      "last_trading_date": "2022-09-29",
+      "halt_display": "2022-09-29 20:00 ET",
+      "merger_effective_date": "2022-09-30",
+      "exchange_suspension_date": "2022-10-03",
+      "index_replacement_session": "2022-10-03_PREOPEN",
+      "cash_right_usd_per_common_share": "104.00",
+      "notice_header_date": "2022-09-26",
+      "notice_body_revision_status": "UPDATED_WITH_2022-09-30_EVENT; HISTORICAL_FIRST_SEEN_UNKNOWN",
+      "cash_available_at_ms": null
+    }
+  },
+  "change_chain_completeness": "NOT_VERIFIED",
+  "raw_sources_added_bytes": 1315929,
+  "prohibited_interpretations": [
+    "ETF holdings automatically certify index membership or tradability",
+    "security row count equals independent samples or power",
+    "late filing or updated notice is available at report/header date",
+    "cash entitlement equals cash available for reinvestment",
+    "fund valuation is a market quote, OHLCV or order execution",
+    "limited event checks certify the entire historical change chain"
+  ]
+}
