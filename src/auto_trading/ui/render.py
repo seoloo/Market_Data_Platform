@@ -16,6 +16,7 @@ from auto_trading.ui.ag_render import ag_paper_page
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
+from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.lt_render import lt_paper_page
 from auto_trading.ui.overview import overview_attention, overview_stocks, overview_summary
 from auto_trading.ui.qndx_render import toss_page
@@ -38,10 +39,11 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("lt_paper", "/lt-paper", "주도주 Paper"),
     ("qs_paper", "/qs-paper", "QS Paper"),
     ("ag_paper", "/ag-paper", "AG Paper"),
+    ("kr_shadow", "/kr-shadow", "국장 주도주 기록"),
     ("research", "/research", "연구 기록"),
 )
-_STOCK_PAGES = frozenset({"toss", "lt_paper", "qs_paper", "ag_paper"})
-_PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper"})
+_STOCK_PAGES = frozenset({"toss", "lt_paper", "qs_paper", "ag_paper", "kr_shadow"})
+_PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper", "kr_shadow"})
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
 _COLORS = {
@@ -113,6 +115,9 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         "QS Paper</a>"
         f'<a href="/ag-paper" class="{"on" if page == "ag_paper" else ""}">'
         "AG Paper</a></div>"
+        '<div class="nav-group nav-stock"><div class="nav-heading">국내 주식</div>'
+        f'<a href="/kr-shadow" class="{"on" if page == "kr_shadow" else ""}">'
+        "국장 주도주 기록</a></div>"
     )
     title = next(label for key, _, label in PAGES if key == page)
     subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
@@ -133,7 +138,7 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         for key, href, label in (
             ("overview", "/", "요약"),
             ("coin", "/compare", "코인"),
-            ("stocks", "/toss", "해외 주식"),
+            ("stocks", "/toss", "주식"),
             ("research", "/research", "연구"),
             ("system", "/running", "시스템"),
         )
@@ -611,6 +616,7 @@ _RENDER = {
     "lt_paper": lt_paper_page,
     "qs_paper": qs_paper_page,
     "ag_paper": ag_paper_page,
+    "kr_shadow": kr_shadow_page,
     "research": _research,
 }
 

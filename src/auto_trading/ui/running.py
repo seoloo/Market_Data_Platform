@@ -174,6 +174,17 @@ TRACKS: tuple[Track, ...] = (
         weekdays_only=True,
     ),
     Track(
+        "kr_shadow",
+        "국장 주도주 기록 (가격·수급·AI)",
+        "PAPER",
+        "유가증권시장 가격(141)·수급(142) 주도주 · 한국어 뉴스 AI 판단 · 두 규칙 Paper (문서 143)",
+        "20:20 월~금",
+        "2026-10-05",
+        None,
+        "glob:kr_shadow/20*.json",
+        weekdays_only=True,
+    ),
+    Track(
         "watchdog",
         "일일 점검",
         "점검",
@@ -190,6 +201,8 @@ MILESTONES: tuple[tuple[str, str], ...] = (
     ("2026-10-08", "Phase 7 테스트넷 14일 판정 — review_phase7 --until 2026-10-08"),
     ("2026-10-23", "O/v3 한 달 보고 — review_phase6 --until 2026-10-22"),
     ("2026-10-24", "4주 점검 · 실거래 1단계 자격 — review_phase6 --until 2026-10-23"),
+    ("2027-01-04", "국장 주도주 기록 첫 보고 (월말 3 번, 문서 143)"),
+    ("2027-10-01", "국장 주도주 기록 판단 (월말 12 번, 문서 143)"),
 )
 
 
@@ -230,6 +243,13 @@ def _content(track: Track, report: dict[str, Any] | None) -> tuple[str, str]:
         return ("ok" if report.get("ok") else "bad"), f"{passed}/{len(checks)} " + (
             "✓" if report.get("ok") else "✗"
         )
+    if track.key == "kr_shadow":
+        ai = report.get("ai")
+        status = (
+            f"가격 {len(report.get('price_leaders') or [])} · "
+            f"수급 {len(report.get('flow_leaders') or [])} · AI {'기록' if ai else '없음'}"
+        )
+        return ("ok" if ai else "warn"), status
     levels = {str(f.get("level")) for f in report.get("findings") or []}
     status = str(report.get("status") or "기록")
     if "CRITICAL" in levels:

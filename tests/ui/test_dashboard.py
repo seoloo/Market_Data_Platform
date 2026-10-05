@@ -171,7 +171,7 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
-        elif page in ("lt_paper", "qs_paper", "ag_paper"):
+        elif page in ("lt_paper", "qs_paper", "ag_paper", "kr_shadow"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
             assert "실거래 비활성" in html
@@ -230,6 +230,60 @@ class TestRender:
         html = render_page(load_dashboard(root, P0 + 11 * D), "lt_paper")
         assert "주도주 추세 보유" in html and "HPE" in html and "$997.50" in html
         assert "추세 꺾임" in html and "뉴스 529 건" in html
+
+    def test_kr_shadow_page_shows_three_lists_paper_and_history(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "kr_shadow"
+        rep.mkdir(parents=True)
+        leader = {"code": "005930", "name": EVIL, "sector": "IT", "score": 0.9, "trend": True}
+        day1 = {
+            "date": "2026-10-02",
+            "universe": 200,
+            "kospi_above_200d": True,
+            "universe_median_6m": 0.012,
+            "flow_coverage": 200,
+            "price_leaders": [leader],
+            "flow_leaders": [{**leader, "name": "S-Oil", "code": "010950"}],
+            "price_sectors": [{"sector": "에너지", "median": 0.87, "n": 2}],
+            "flow_sectors": [],
+            "news": {"items": 595, "fetched_at": "t", "sources_failed": []},
+            "ai": {
+                "model": "gemini:x",
+                "market_room": "neutral",
+                "confidence": 0.65,
+                "themes": ["반도체", "화장품"],
+                "leaders": [{"code": "000660", "name": "SK하이닉스"}],
+                "summary": "요약",
+                "overlap_price": [],
+                "overlap_flow": [],
+            },
+        }
+        day2 = {
+            **day1,
+            "date": "2026-11-03",
+            "paper": {
+                "start": "2026-10-06",
+                "price_rule": {
+                    "value_krw": 10_100_000,
+                    "positions": [{"name": "광전자", "entry": "2026-11-02", "return": 0.01}],
+                    "sell_next_close": {"017900": "stop_35"},
+                },
+                "flow_rule": {"value_krw": 9_900_000, "positions": [], "sell_next_close": {}},
+                "equal_weight_krw": 10_000_000,
+            },
+        }
+        for d in (day1, day2):
+            (rep / f"{d['date']}.json").write_text(json.dumps(d), encoding="utf-8")
+        (rep / "latest.json").write_text(json.dumps(day2), encoding="utf-8")
+        html = render_page(load_dashboard(root, P0 + 11 * D), "kr_shadow")
+        assert "국장 주도주" in html and "S-Oil" in html and "SK하이닉스" in html
+        assert "반도체" in html and "중립" in html and "뉴스 595 건" in html
+        assert "10,100,000원" in html and "고점 −35%" in html and "광전자" in html
+        assert html.count("2026-10-02") >= 1 and "2026-11-03" in html  # 날짜별 기록
+        nav = html.split("<main>")[0]
+        assert '<div class="nav-heading">국내 주식</div>' in nav
+        assert nav.count('href="/kr-shadow"') == 1
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/lt-paper"') == 1
