@@ -1,7 +1,11 @@
 # 연구 이력 요약
 
-기준일: 2026-09-24. ACCEPTED 전략 없음 (T는 사전등록 판정 PASS, 전향 관찰 중·실거래 미승인). 아래 기각은 각 사전등록 가설의 판정이며 자동매매나 모든 차트 분석의 불가능을 뜻하지 않는다.
+기준일: 2026-10-05. 아래 기각은 각 사전등록 가설의 판정이며 자동매매나 모든 차트 분석의 불가능을 뜻하지 않는다.
 선별 통계의 n은 독립 관찰 수이며 실제 체결 거래 수가 아니다. 미측정 PF/MDD/거래성과를 0으로 채우지 않는다.
+
+**한눈에 (2026-10-05):** 판정 받은 수익 가설 약 61 · 통과(PASS) 8 — T(→ T/v2) · O/v1 · O/v2 · QS · AG · 스테이킹 캐리 · 자금 배분(권고) · FLOW-KR.
+지금 쓰는 전략: **QS 실거래(토스)** · T/v2(Paper, 실거래 1단계 후보) · O/v1·O/v2(Paper, O/v2 는 2단계 후보) · AG(Paper) · FLOW-KR(그림자 기록). 스테이킹 캐리는 예치와 비슷해 운영하지 않는다.
+살아남은 것은 거의 모두 **몇 달 단위 추세 보유**다. 며칠 이하 단기 신호(패턴·지표·엘리엇·다이버전스·이벤트)는 비용을 넘지 못했다. 한 항목에 여러 가설을 묶은 곳이 있어 제목 수와 가설 수는 다르다. EXEC-L240(지정가 체결)은 실행 방식 채택이라 수익 가설 개수에 넣지 않았다.
 
 ## H1 — REJECTED
 
@@ -189,6 +193,14 @@ Learned: 과거에는 보험이 낙폭을 줄이지 못하고 비용만 들었�
 Do not retry: 같은 데이터로 거리(15%·25%)·불리폭 변경.
 근거: [27 사전등록·§7 결과](../research/27-o2-catastrophe-stop-preregistration.md).
 
+## EXEC-L240 — PASS (2026-09-25, 실행 방식 채택)
+
+요약: 시장가 대신 post-only 지정가(최대 240분 기다린 뒤 추격)로 T/v2·O 를 체결하면 얼마나 싸지나 — 채택
+
+판정 (1회): 무기한·현물 모두 지정가 L240 채택. 절감의 대부분은 무기한 수수료와 과하게 잡은 슬리피지 가정. 현물 모형 비용 약 10.2bp (가정 15bp). 데모 실측(55) 평균 9.99bp.
+Learned: 역선택(신호 시점 지정가가 불리하게 체결)은 몇 분 단위 단타에서 컸지만(문서 20), 하루 한 번 추세 재조정에서는 작다.
+근거: [42 사전등록·§7 판정](../research/42-execution-cost-limit-orders.md).
+
 ## F1b — REJECTED (2026-09-25)
 
 요약: BTC·ETH 10~40일 빠른 추세를 선물로 롱·숏 — 숏에서 손실, 계좌 정지
@@ -266,6 +278,24 @@ Do not retry (같은 자료로):
 
 근거: [49 사전등록·§7 판정](../research/49-macro-release-drift.md).
 
+## B′ — REJECTED (2026-09-25)
+
+요약: 변동성이 급등하면 O 의 선물 추가분을 자동으로 끄기 — 낙폭이 전혀 줄지 않음
+
+판정 (1회): MDD 감소 0%p → REJECT. 수익 비용도 없었다. 첫 안 B 는 판정 전 철회, B′ 로 재등록.
+Learned: O 의 큰 낙폭은 변동성 급등 뒤가 아니라 추세가 꺾이는 구간에서 나온다.
+Do not retry: 변동성 문턱·창 바꿔 같은 자료로 재판정
+근거: [43 사전등록·§7 판정](../research/43-vol-spike-overlay-cap.md).
+
+## F2 · F3 — REJECTED (2026-09-25)
+
+요약: 세 추세 신호가 모두 위일 때만 선물 추가분(낙폭 때 선물부터 줄이기), 2배까지 — 위험 한도 안에 못 들어옴
+
+판정 (1회, 사용자 승인): F2 REJECT (낙폭 감소 1.95%p < 2%p) · F3 REJECT (2배 MDD 27.1% > 한도 25%). 대조 O/v3(2배)는 과거 경로에서 2022-11-09 계좌 정지.
+Learned: 2배는 지금 위험 한도(MDD 25%·정지 30%) 안에 들어오지 않는다 → 배율을 높이려면 한도 결정이 먼저(82 결정 B).
+Do not retry: 신호 개수·감축 비율 바꿔 같은 자료로 재판정
+근거: [64 사전등록·판정](../research/64-o-futures-first-derisk.md).
+
 ## DDL — REJECTED (2026-09-26, 문서 81·83 의 "H2")
 
 요약: 계좌가 고점이면 2.5배, 낙폭 10% 면 현물만으로 배율 조절 — 대부분 현물만이라 O/v2 보다 덜 벎
@@ -311,6 +341,148 @@ Failure: 눌림목 할인보다 기다리는 동안 놓친 상승이 컸다. RSI
 Learned: 강세 추세의 주가지수 적립에서는 매수 시점을 고르는 것보다 꾸준히 바로 사는 것이 낫다(이 기간).
 Do not retry: RSI 문턱(30·40)·기간·입금 주기·자산을 바꿔 같은 자료로 재판정.
 근거: [87 사전등록·§8 판정](../research/87-rsi-dip-accumulation-preregistration.md).
+
+## 2026-09-25 ~ 10-04 — 그동안 빠져 있던 판정 (스테이킹 · Elliott · 주식)
+
+아래는 다른 세션이 판정했지만 이 문서에 빠져 있던 연구다(2026-10-05 정리). 숫자와 판정은 각 원문서가 기준이다.
+
+## STAKE-CARRY — PASS (2026-09-26, 예치와 거의 같음)
+
+요약: Binance WBETH·BNSOL 보유 + 같은 수량 무기한 숏(증거금 50%, 매주 재조정) — 예치 이자를 0.2~0.3%p 차이로 겨우 넘음
+
+판정 (1회, 2024-09~2026-08): ETH CAGR 3.34% · SOL 3.26% vs USDT 예치 3.08% → PASS, 청산 0 · MDD ≤ 1%. 스테이킹 없는 캐리는 ETH 1.97% · SOL 0.14%.
+Learned: funding 음수 구간(2026 약 3 개월)이 있어 실거래 근거로는 약하다. 운영하지 않는다.
+근거: [92 사전등록·판정](../research/92-binance-staking-carry-preregistration.md).
+
+## EW-REV — INCONCLUSIVE (2026-09-24 · 10-03)
+
+요약: Elliott 5파가 끝났다고 읽힌 뒤 되돌림에 들어가기 (4h·1h·일봉 추세 결합) — 판정 불가 또는 증거 없음
+
+판정 34: 4h 표본 부족(MDE 2.1%p > 관문 2.0%p) 판정 불가 · 93: 2017~ 4h 판정 불가, 1h 증거 없음(−0.02%p, p 0.54), 일봉 추세 결합 증거 없음(−0.03%p, p 0.54).
+Learned: 판독기가 5파 끝을 구분해 읽는 힘이 약하다(103 시장형 합성에서 정답 끝을 거의 못 읽음).
+Do not retry: 같은 자료로 degree·창 바꿔 재판정
+근거: [34](../research/34-elliott-edge-kill-test.md), [93](../research/93-elliott-reversal-longer-history-preregistration.md).
+
+## FIB · DIV — REJECTED (2026-09-25 · 10-03, 증거 없음)
+
+요약: 피보나치 되돌림 구간 첫 진입 · RSI 다이버전스(일봉·15분봉) 뒤 방향 — 모두 증거 없음
+
+판정 37 피보나치: −0.09%p (p 0.79) · 40 RSI 다이버전스 일봉: −0.04%p (p 0.61) · 101 15분봉 10 코인: −0.025%p (p 0.89, 반대 방향). 38 다이버전스 × WA 보유는 검정력 부족으로 미판정.
+Learned: 140(MJ, 1시간봉 + 자금 관리)도 같은 결론 — 다이버전스는 시간 단위를 바꿔도 우위가 없었다.
+Do not retry: 문턱·창·시간 단위 바꿔 같은 자료로 재판정
+근거: [37](../research/37-fib-retracement-edge-test.md), [40](../research/40-divergence-edge-test.md), [101](../research/101-divergence-15m-preregistration.md), [38](../research/38-wa-trend-hold-divergence.md).
+
+## EW-W3 — REJECTED (2026-10-03, 증거 없음)
+
+요약: Elliott 2파 0.5 되돌림에서 3파 진입 (1h) — 비용 뒤 음수
+
+판정 95 단일 코인: 관문 근소 미달(체결 76 건, MDE 0.514R) 판정 불가 · 96 BTC+ETH: 묶음 평균 −0.086R (비용 뒤), p 0.74, 목표 도달 17%.
+Do not retry: 되돌림 비율·목표 바꿔 같은 자료로 재판정
+근거: [95](../research/95-elliott-wave3-entry-1h-preregistration.md), [96](../research/96-elliott-wave3-entry-btc-eth-preregistration.md).
+
+## EW-TRI — REJECTED (2026-10-03, 증거 없음 · 재현 실패)
+
+요약: Elliott 삼각형(수축·확장·러닝) 끝난 뒤 돌파 방향 (1h, SOL·10 코인) — 첫 결과도 재현되지 않음
+
+판정 98 SOL: +0.15%p (이론 방향, p 0.27, 비용 0.19% 미달) · 99 다른 7 코인 재현: −0.41%p (반대 방향, p 0.94) · 105 확장 삼각형 EW-6: −0.02%p (p 0.54) · 109 큰 단위 추세 맥락 EW-7: +0.07%p (p 0.35). 102 대각선·러닝 삼각형: 시장에서 완전 검증 모양이 거의 안 나와 관문 미달.
+Learned: 판독기를 여러 번 고쳐(EW-4~7, 관문 통과) 모양은 더 잘 읽게 됐지만 수익 신호는 끝까지 나오지 않았다. 사용자 결정으로 엘리엇 기계 판독 트랙은 정리.
+Do not retry: 판독기 숫자 바꿔 같은 자료로 재판정
+근거: [98](../research/98-elliott-triangle-thrust-and-correction-end-sol-preregistration.md), [99](../research/99-elliott-triangle-thrust-altcoin-replication-preregistration.md), [102](../research/102-diagonal-reversal-and-running-triangle-preregistration.md), [105](../research/105-ew6-running-expanding-triangle-preregistration.md), [109](../research/109-ew7-expanding-triangle-preregistration.md).
+
+## VOL-SPIKE — REJECTED (2026-10-03, 증거 없음)
+
+요약: 거래량 급증 뒤 방향 (엘리엇 밖 단순 신호) — 증거 없음
+
+판정 108: +0.06%p (p 0.82). 요일 효과는 검정력 부족으로 제외.
+근거: [108](../research/108-simple-signal-candidates.md).
+
+## QS — PASS (2026-10-03, 실거래 중 · 토스)
+
+요약: QQQ 매달 적립 → 하락 추세면 멈추고 현금 → 추세 회복 때 TQQQ — 통과, 지금 토스에서 실거래
+
+판정 (1회, 매달 1,000 USD, 2008~2026, 세금 22%): 최종 1.51 배 · IRR 23.2% vs 그냥 적립 19.6% · 10 년 창 99/99 우세 · 낙폭 50.7% vs 49.6% → PASS (Q1·Q2·Q3). 단 3 배일 때만 이기고(2·1 배는 못 이김) 2010 년 뒤 낙폭은 14%p 큼, 닷컴 구간 없음.
+Learned: 119 닷컴 확인(1990~2010 시작 10 년 창): 최악 낙폭 차이 26.9%p > 25%p 로 비중 축소 제안. 116 Paper 관찰 · 118 실거래(토스 2026-10-04).
+Do not retry: 확인 필터(120)·VIX(124)로 바꾼 판은 학습 문턱 미달 — 지금 QS 유지
+근거: [110 사전등록·판정](../research/110-qqq-tqqq-switch-accumulation-preregistration.md), [119 닷컴](../research/119-qs-dotcom-stress-preregistration.md), [118 실거래](../research/118-qs-live-registration.md).
+
+## SB — REJECTED (2026-10-03)
+
+요약: 강한 주식 돌파를 종가에 사서 며칠 만에 팔기 (다바스·쿨라매기·쟁어·오닐 계열, S&P 500) — 대조보다 유의하게 나쁨
+
+판정 (1회): 돌파 매매가 대조보다 매매당 −0.66%p, 절대 평균 −0.82% → REJECT.
+Learned: 이건 주도주 추세 보유가 아니었다(엔비디아를 3 주 만에 팜) → LT(113)로 이어짐.
+Do not retry: 돌파 정의·보유 기간 바꿔 같은 자료로 재판정
+근거: [111](../research/111-momentum-breakout-stocks-preregistration.md).
+
+## AG — PASS (2026-10-03, 채택 기준 통과 · Paper 관찰)
+
+요약: 소액 공격형 계좌(1,000 USD · 최대 손실 −70% · 10 년) 세 가지 — 셋 다 채택 기준 통과
+
+판정 계산 완료: 셋 다 채택 기준 통과, −70% 에 걸린 시작일 0. 단 AG-US 최대 낙폭 60%, 코인은 6 년치뿐.
+Learned: 117 Paper 로 앞으로 관찰 중.
+근거: [112](../research/112-aggressive-small-account-preregistration.md), [117 Paper](../research/117-ag-paper-registration.md).
+
+## LT — REJECTED (2026-10-03)
+
+요약: 주도 섹터 상위 3 의 주도주 상위 10 을 추세 때 사서 추매·추세 꺾임/−35% 매도 (지금 S&P 500) — 앞 반쪽에서 짐
+
+판정 (1회): 연 20.6% vs 고르게 들기 16.4% · 샤프 0.89 vs 0.63 · 낙폭 33.7% vs 50.3% 였지만 2008~2016 반쪽 연수익 10.8% < 14.8% → REJECT (L2 실패).
+Learned: 생존 편향(지금 S&P 500)과 2017 뒤 미국 대형 기술주 장세에 기댐 — 141(국장, 생존 편향 없음)에서는 고르게 든 것과 같았다. 115 Paper 관찰 중.
+Do not retry: 섹터·종목 수·손절 폭 바꿔 같은 자료로 재판정
+근거: [113](../research/113-leader-trend-hold-preregistration.md), [115 Paper](../research/115-lt-paper-registration.md).
+
+## LT-400 — REJECTED (2026-10-03)
+
+요약: LT 규칙 그대로 S&P 400 중형주에 — 게임스톱 한 건을 빼면 고르게 들기보다 낮음
+
+판정 (1회): L1·L2 실패. 연수익은 높았지만 게임스톱(+3,740%) 한 건을 빼면 EW 보다 낮다.
+근거: [114](../research/114-leader-trend-sp400-replication.md).
+
+## QS-CONFIRM · QS-VIX — REJECTED (2026-10-04)
+
+요약: QS 휩쏘 줄이기(N 일 연속 켜져야 켜짐) · 공포 뒤 회복(VIX) 신호 더하기 — 학습 문턱 미달, 지금 QS 유지
+
+판정 120: 모든 N 이 기준보다 나쁨 · 124: 가장 나은 조합도 최솟값 −0.006 → 둘 다 REJECT (시험 구간 열지 않음).
+Do not retry: N·VIX 문턱 바꿔 같은 자료로 재판정
+근거: [120](../research/120-qs-confirm-filter-preregistration.md), [124](../research/124-qs-vix-recovery-preregistration.md).
+
+## LD — REJECTED (2026-10-04)
+
+요약: 적립하며 빠진 주도주에 먼저 추매(−15%→15%·−25%→20%) vs 고르게 추매 — 엇갈림, 추매 받은 종목 절반이 손실
+
+판정 (1회): C1·C2 실패, C3·C4 통과. S&P 500 IRR 23.6% vs 26.0%, 앞 반쪽 짐, S&P 400 은 LD 우세.
+Do not retry: 추매 문턱·비율 바꿔 같은 자료로 재판정
+근거: [121](../research/121-leader-dip-add-preregistration.md).
+
+## MOM — REJECTED (2026-10-04)
+
+요약: 고전 모멘텀(52 주 신고가 근처 · 12-1 모멘텀), 학습 2008~2016 · 시험 2017~2026 — 학습 문턱 미달
+
+판정 (1회): MOM 10 샤프 +0.078 < 문턱 +0.10 → REJECT, 시험 구간 열지 않음.
+근거: [122](../research/122-classic-momentum-preregistration.md).
+
+## MR-IDX · MR-OFF — REJECTED (2026-10-04)
+
+요약: 지수 ETF 단기 평균회귀(Connors RSI(2)) · 추세가 꺼졌을 때만 평균회귀 — 추세 전략을 보완하지 못함
+
+판정 125: T1·T2·T3 통과, T4(추세 전략 보완 효과) 실패 → REJECT · 126: 샤프 +0.071 < +0.10 학습 문턱 미달 → REJECT.
+Learned: 평균회귀는 혼자서는 돌아가지만 추세 계좌에 더해도 나아지지 않았다.
+근거: [125](../research/125-index-short-mean-reversion-preregistration.md), [126](../research/126-trend-off-mean-reversion-preregistration.md).
+
+## ALLOC — PASS (2026-10-04, 권고)
+
+요약: 통과한 두 전략의 자금 배분: 코인 T/v2 × 나스닥 추세 — 위험 기준 반반(코인 약 50%) 권고
+
+판정 (1회): R1·R2 통과 → RECOMMEND. 위험 기준으로 반반.
+근거: [127](../research/127-crypto-stock-allocation-preregistration.md).
+
+## GEM — REJECTED (2026-10-04)
+
+요약: 듀얼 모멘텀(Antonacci GEM)을 책 밖 2014~2026 에서 — 책 안에서 좋았던 장점이 사라짐
+
+판정 (1회): P1·P2·P3 모두 실패 → REJECT.
+Learned: 책·논문 구간 밖에서는 유명 규칙도 자주 사라진다.
+근거: [128](../research/128-dual-momentum-gem-preregistration.md).
 
 ## GR — REJECTED (2026-10-05)
 
@@ -377,6 +549,14 @@ Failure: 주도 섹터·주도주 고르기가 더한 것이 없음. 시장 필�
 Learned: 113 의 미국 결과는 생존 편향·2017 뒤 미국 대형 기술주 장세 덕일 가능성이 크다. 다른 시장 재현은 스누핑 없이 규칙을 검증하는 좋은 방법이었다. 한국투자증권 조회 API 는 상장폐지 종목 시세도 준다.
 Do not retry: 종목군 크기·거래대금 기간·섹터 표·종목/섹터 수·−35%·기간을 바꿔 같은 자료로 재판정, 시가총액 종목군·코스닥으로 141 재판정.
 근거: [141 사전등록·§8 판정](../research/141-lt-korea-replication-preregistration.md).
+
+## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
+
+- 내부자 매수(129) · 실적 갭 표류(130): 사전 등록만, 사용자 "그냥 진행하지 말아줘"(2026-10-04). 자료·결과 없음. 다시 하려면 그 기준 그대로.
+- BTC 옵션 변동성 보험료 + 선물 헤지(66~80): Phase 0 자료·체결·계좌 위험 관문 미통과로 보류.
+- 실적 개선형 주도주(131~136): **Codex 전용**(2026-10-04 사용자). Phase 0 DATA_NOT_READY. Claude 는 읽기만 한다.
+- Elliott 판독기 개선(EW-3e·EW-4·EW-4n·EW-5~7 — 58·60~62·100·103·104·106·107): 판독기 관문(도구 검증)이지 수익 판정이 아니다. Elliott → 수익 모델 연결(63)은 이 자료로 판정 불가라 중단.
+- 국장 주도주·테마 그림자 기록(143): 2026-10-05 시작, 2027-10 판단. 코스닥 보완판은 KRX 키 승인 뒤.
 
 ## 비용·프로젝트 결정 이력
 
