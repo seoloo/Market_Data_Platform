@@ -23,22 +23,30 @@ __all__ = [
 
 MARKETS = {"kr": "한국 유가증권시장", "us": "미국 S&P 500"}
 MAX_HEADLINES = 200
-MAX_THEMES = 3
-MAX_PICKS = 5
+STAGES = {"now": "지금 주도하는 테마", "emerging": "떠오르는 테마 (아직 초기)"}
+MAX_THEMES = {"now": 2, "emerging": 3}
+MAX_PICKS = {"now": 3, "emerging": 3}
 
 SYSTEM = (
     "너는 주식 시장 뉴스를 읽고 **앞으로 6~24 달** 동안 시장을 이끌 산업·테마를 판단하는 분석가다. "
     "주어진 뉴스 제목만 근거로 쓴다. 가격·차트 정보는 없다. 근거마다 뉴스 번호(예: K12, U7)를 "
-    "반드시 단다 — 번호 없는 주장은 쓰지 않는다. 종목은 주어진 종목군의 코드만 쓴다. "
+    "반드시 단다 — 번호 없는 주장은 쓰지 않는다. "
+    "근거마다 그 제목에 **글자 그대로 있는** 2~6 단어를 "
+    "quote 로 함께 적는다(그 테마·종목과 관련된 부분). 종목은 주어진 종목군의 코드만 쓴다. "
+    "테마를 둘로 나눈다: **지금 주도** = 이미 시장 전체가 주목하고 이끄는 테마, "
+    "**떠오르는 초기** = 뉴스에 막 나오기 시작했거나 언급이 늘고 있지만 아직 시장 전체가 주목하지 "
+    "않는 테마(지금 주도 테마의 다른 이름이면 안 된다). 둘 다 근거 번호가 있어야 한다. "
     "이미 많이 알려져 크게 오른 테마일 가능성이 있으면 위험에 적는다. "
     "투자 권유가 아니라 판단 기록이다. "
     "한국어로, JSON 하나로만 답한다."
 )
 
 SCHEMA = (
-    '{"kr": {"themes": [{"name": "테마", "why": "왜 앞으로 주도할지 2~3 문장", '
-    '"evidence": ["K3", "K17"], "confidence": 0.0~1.0}], '
-    '"picks": [{"symbol": "005930", "theme": "테마", "why": "이유 1~2 문장", "evidence": ["K3"]}], '
+    '{"kr": {"now_themes": [{"name": "테마", "why": "왜 앞으로도 주도할지 2~3 문장", '
+    '"evidence": [{"id": "K3", "quote": "제목에 그대로 있는 2~6 단어"}], "confidence": 0.0~1.0}], '
+    '"emerging_themes": [같은 모양 — 왜 초기라고 보는지도 적기], '
+    '"now_picks": [{"symbol": "005930", "theme": "테마", "why": "이유 1~2 문장", '
+    '"evidence": [{"id": "K3", "quote": "제목 속 문구"}]}], "emerging_picks": [같은 모양], '
     '"risks": ["위험 1 문장"]}, "us": {같은 모양, 근거는 U 번호}, '
     '"summary": "이번 주 한 줄 판단"}'
 )
@@ -74,7 +82,8 @@ def build_messages(
     parts = [
         f"이번 주: {week}",
         f"답 형식: {SCHEMA}",
-        f"테마는 시장마다 최대 {MAX_THEMES} 개, 종목은 최대 {MAX_PICKS} 개.",
+        f"시장마다 지금 주도 테마 최대 {MAX_THEMES['now']} · 떠오르는 테마 최대 "
+        f"{MAX_THEMES['emerging']} · 종목은 각각 최대 {MAX_PICKS['now']} 개.",
     ]
     for market, label in MARKETS.items():
         lines = "\n".join(f"[{h['id']}] {h['title']}" for h in headlines.get(market, []))
@@ -84,8 +93,22 @@ def build_messages(
     return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "\n".join(parts)}]
 
 
-def _ids(raw: Any, valid: set[str]) -> list[str]:
-    return [str(x) for x in raw if str(x) in valid] if isinstance(raw, list) else []
+def _norm(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def _ids(raw: Any, titles: Mapping[str, str]) -> list[str]:
+    """번호가 있고 인용 문구가 그 제목에 글자 그대로 있는 근거만 — 관련 없는 제목을 막는다."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for x in raw:
+        if not isinstance(x, dict):
+            continue
+        hid, quote = str(x.get("id", "")), _norm(str(x.get("quote", "")))
+        if hid in titles and len(quote) >= 3 and quote in _norm(titles[hid]):
+            out.append(hid)
+    return out
 
 
 def parse_weekly(
@@ -104,41 +127,46 @@ def parse_weekly(
     for market in MARKETS:
         raw = body.get(market)
         part: dict[str, Any] = raw if isinstance(raw, dict) else {}
-        valid = {h["id"] for h in headlines.get(market, [])}
+        valid = {h["id"]: h["title"] for h in headlines.get(market, [])}
         uni = universes.get(market, {})
         themes, picks = [], []
-        for t in (part.get("themes") or [])[:MAX_THEMES]:
-            ev = _ids(t.get("evidence"), valid) if isinstance(t, dict) else []
-            if not ev:
-                out["dropped"] += 1
-                continue
-            try:
-                conf = min(max(float(t.get("confidence", 0)), 0.0), 1.0)
-            except (TypeError, ValueError):
-                conf = 0.0
-            themes.append(
-                {
-                    "name": str(t.get("name", ""))[:40],
-                    "why": str(t.get("why", ""))[:300],
-                    "evidence": ev[:3],
-                    "confidence": conf,
-                }
-            )
-        for p in (part.get("picks") or [])[:MAX_PICKS]:
-            sym = str(p.get("symbol", "")).strip() if isinstance(p, dict) else ""
-            ev = _ids(p.get("evidence"), valid) if isinstance(p, dict) else []
-            if sym not in uni or not ev:
-                out["dropped"] += 1
-                continue
-            picks.append(
-                {
-                    "symbol": sym,
-                    "name": uni[sym],
-                    "theme": str(p.get("theme", ""))[:40],
-                    "why": str(p.get("why", ""))[:200],
-                    "evidence": ev[:2],
-                }
-            )
+        for stage in STAGES:
+            for t in (part.get(f"{stage}_themes") or [])[: MAX_THEMES[stage]]:
+                ev = _ids(t.get("evidence"), valid) if isinstance(t, dict) else []
+                if not ev:
+                    out["dropped"] += 1
+                    continue
+                try:
+                    conf = min(max(float(t.get("confidence", 0)), 0.0), 1.0)
+                except (TypeError, ValueError):
+                    conf = 0.0
+                themes.append(
+                    {
+                        "stage": stage,
+                        "name": str(t.get("name", ""))[:40],
+                        "why": str(t.get("why", ""))[:300],
+                        "evidence": ev[:3],
+                        "confidence": conf,
+                    }
+                )
+            for p in (part.get(f"{stage}_picks") or [])[: MAX_PICKS[stage]]:
+                sym = str(p.get("symbol", "")).strip() if isinstance(p, dict) else ""
+                ev = _ids(p.get("evidence"), valid) if isinstance(p, dict) else []
+                stage_names = {_norm(str(t["name"])) for t in themes if t["stage"] == stage}
+                theme = _norm(str(p.get("theme", ""))) if isinstance(p, dict) else ""
+                if sym not in uni or not ev or theme not in stage_names:  # 같은 칸 테마의 종목만
+                    out["dropped"] += 1
+                    continue
+                picks.append(
+                    {
+                        "stage": stage,
+                        "symbol": sym,
+                        "name": uni[sym],
+                        "theme": str(p.get("theme", ""))[:40],
+                        "why": str(p.get("why", ""))[:200],
+                        "evidence": ev[:2],
+                    }
+                )
         risks = [str(r)[:150] for r in (part.get("risks") or [])[:3] if str(r).strip()]
         out[market] = {"themes": themes, "picks": picks, "risks": risks}
     return out
@@ -180,24 +208,31 @@ def format_market(
     lines = [f"🔭 {MARKETS[market]} · 미래 주도 테마 ({week})", ""]
     if not part.get("themes") and not part.get("picks"):
         lines.append("이번 주는 근거가 붙은 판단이 없다.")
-    for i, t in enumerate(part.get("themes", []), 1):
-        lines.append(f"{i}. {t['name']} (확신 {t['confidence']:.0%})")
-        lines.append(f"   왜: {t['why']}")
-        for e in t["evidence"]:
-            lines.append(f"   근거 [{e}] {title_of.get(e, '')[:90]}")
-    if part.get("picks"):
-        lines += ["", "주목 종목 — 우리 자료 확인(AI 아님)"]
-        for p in part["picks"]:
+    for stage, label in STAGES.items():
+        themes = [t for t in part.get("themes", []) if t.get("stage") == stage]
+        picks = [p for p in part.get("picks", []) if p.get("stage") == stage]
+        if not themes and not picks:
+            continue
+        lines += [f"■ {label}"]
+        for i, t in enumerate(themes, 1):
+            lines.append(f"{i}. {t['name']} (확신 {t['confidence']:.0%})")
+            lines.append(f"   왜: {t['why']}")
+            for e in t["evidence"]:
+                lines.append(f"   근거 [{e}] {title_of.get(e, '')[:90]}")
+        if picks:
+            lines.append("   주목 종목 — [ ] 안은 우리 자료(AI 아님)")
+        for p in picks:
             f = facts.get(p["symbol"], {})
             t_up = f.get("trend")
             trend = "추세 위" if t_up is True else "추세 아래" if t_up is False else "추세 ?"
             tags = [trend, f"3 달 {_pct(f.get('ret_3m'))}"]
             tags += [str(x) for x in f.get("in_lists", [])]
-            lines.append(f"• {p['name']} ({p['symbol']}) — {p['theme']}")
-            lines.append(f"   {p['why']}")
-            lines.append(f"   [{' · '.join(tags)}]")
+            lines.append(f"   • {p['name']} ({p['symbol']}) — {p['theme']}")
+            lines.append(f"     {p['why']}")
+            lines.append(f"     [{' · '.join(tags)}]")
+        lines.append("")
     if part.get("risks"):
-        lines += ["", "위험: " + " / ".join(part["risks"])]
+        lines += ["위험: " + " / ".join(part["risks"])]
     if diff and any(diff.values()):
         change = []
         if diff.get("new_themes"):
