@@ -14,6 +14,7 @@
    주도 테마·주도주·KOSPI 여지를 묻는다. 기계 목록과 가격 지표는 주지 않는다(베끼면 비교가 안 됨).
 
 두 기계 규칙은 가상 Paper 로도 굴린다(141·142 의 `simulate_kr` 그대로, 2026-10-06 부터).
+문서 147: 세 목록·종목군·KOSPI 에 매달 같은 금액을 넣고 팔지 않는 **장기 적립 장부**도 굴린다.
 자료는 141·142 연구 자료(해시 고정)를 건드리지 않게 ``data/kr_shadow/`` 에 따로 둔다.
 한국투자증권은 조회만 쓴다.
 """
@@ -51,6 +52,7 @@ from scripts.run_lt_kr import (
 from scripts.run_lt_leaders import trend_up
 
 from auto_trading.ops.news_rss import NewsItem, dedupe, parse_feed
+from auto_trading.ops.theme_acc import accumulate, cohort_returns, irr
 
 REPO = Path(__file__).resolve().parent.parent
 ROOT = REPO / "data" / "kr_shadow"
@@ -60,6 +62,10 @@ NEWS = ROOT / "news"
 AI = ROOT / "ai"
 REPORTS = REPO / "reports" / "kr_shadow"
 PAPER_START = "2026-10-06"
+ACC_MONTHLY = 1_000_000
+"""문서 147 장기 적립: 장부마다 매달 넣는 가상 금액(원)."""
+AI_LOOKBACK = 5
+"""월말 AI 기록이 없으면 그 전 5 거래일 안의 가장 최근 기록을 쓴다."""
 FLOW_DAYS = 100
 """수급은 최근 100 일(달력)을 받아 기존 기록과 합친다 — 60 거래일 창을 채운다."""
 FLOW_POOL = 250
@@ -216,6 +222,87 @@ def _paper(run: Any, names: dict[str, str]) -> dict[str, object]:
     }
 
 
+def _ai_basket(days: Sequence[str], t: int, known: set[str]) -> list[str] | None:
+    """월말 ``t`` 의 AI 주도주(그날 기록, 없으면 그 전 ``AI_LOOKBACK`` 거래일 안 최근 기록)."""
+    for k in range(AI_LOOKBACK + 1):
+        if t - k < 0:
+            break
+        path = AI / f"{days[t - k]}.json"
+        if path.exists():
+            rec = json.loads(path.read_text(encoding="utf-8"))
+            leaders = (rec.get("judgement") or {}).get("leaders") or []
+            return [str(x["symbol"]) for x in leaders if str(x.get("symbol")) in known]
+    return None
+
+
+def _accumulation(panel: Any, lt: Any, fl: Any) -> dict[str, object]:
+    """문서 147 — 다섯 장부에 매달 ``ACC_MONTHLY`` 를 넣고 팔지 않는다."""
+    days = panel.days
+    start = next(i for i, d in enumerate(days) if d >= PAPER_START)
+    month_ends = [t for t in range(start, len(days) - 1) if days[t + 1][:7] != days[t][:7]]
+    known = set(panel.close)
+    rows = (ROOT / "kospi.csv").read_text(encoding="utf-8").splitlines()[1:]
+    kospi_map = {f"{r[:4]}-{r[4:6]}-{r[6:8]}": float(r.split(",")[1]) for r in rows}
+    close: dict[str, Sequence[float | None]] = dict(panel.close)
+    close["KOSPI"] = [kospi_map.get(d) for d in days]
+    ai_missing: list[str] = []
+    baskets: dict[str, dict[int, list[str]]] = {
+        k: {} for k in ("ai", "price", "flow", "ew", "kospi")
+    }
+    for t in month_ends:
+        d = days[t]
+        ai = _ai_basket(days, t, known)
+        if ai is None:
+            ai_missing.append(d)
+        baskets["ai"][t] = ai or []
+        baskets["price"][t] = list(lt.leader_log.get(d, []))
+        baskets["flow"][t] = list(fl.leader_log.get(d, []))
+        baskets["ew"][t] = list(lt.universe_log.get(d, []))
+        baskets["kospi"][t] = ["KOSPI"]
+    books = {
+        key: accumulate(days, close, b, monthly=ACC_MONTHLY, start=start)
+        for key, b in baskets.items()
+    }
+    books["ai_trend"] = accumulate(
+        days,
+        close,
+        baskets["ai"],
+        monthly=ACC_MONTHLY,
+        start=start,
+        keep=lambda sym, t: trend_up(panel.close[sym], t),
+    )
+    last = len(days) - 1
+    ledgers = {}
+    for key, b in books.items():
+        value = b.equity[-1] if b.equity else 0.0
+        r = irr(b.flows, last, value) if b.flows and last - b.flows[0][0] >= 21 else None
+        ledgers[key] = {
+            "contributed": round(b.contributed),
+            "value": round(value),
+            "return": round(value / b.contributed - 1, 4) if b.contributed else None,
+            "irr": round(r, 4) if r is not None else None,
+            "holdings": sum(1 for q in b.qty.values() if q > 0),
+            "cash": round(b.cash),
+        }
+    cohorts = []
+    for t in month_ends:
+        if t + 1 > last:
+            continue
+        row: dict[str, object] = {"month_end": days[t]}
+        for key in ("ai", "price", "flow", "ew", "kospi"):
+            r = cohort_returns(close, baskets[key][t], t, last)
+            row[key] = round(r, 4) if r is not None else None
+        row["ai_names"] = baskets["ai"][t]
+        cohorts.append(row)
+    return {
+        "start": PAPER_START,
+        "monthly_krw": ACC_MONTHLY,
+        "ledgers": ledgers,
+        "cohorts_to_date": cohorts,
+        "ai_missing_month_ends": ai_missing,
+    }
+
+
 def run() -> dict[str, object]:
     """오늘(마지막 거래일) 세 목록·섹터 순위·Paper 를 계산해 보고서를 쓴다."""
     info = json.loads((ROOT / "info.json").read_text(encoding="utf-8"))
@@ -278,6 +365,7 @@ def run() -> dict[str, object]:
             "flow_rule": _paper(fl, names),
             "equal_weight_krw": round(10_000_000 * ew[-1] / ew[0]),
         }
+        report["accumulation"] = _accumulation(panel, lt, fl)
     REPORTS.mkdir(parents=True, exist_ok=True)
     same_day = REPORTS / f"{day}.json"
     if same_day.exists():  # 같은 날 다시 돌리면 이미 모은 뉴스 기록은 그대로 둔다

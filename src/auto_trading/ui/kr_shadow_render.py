@@ -176,6 +176,49 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
     )
 
 
+_ACC_LABELS = (
+    ("ai", "AI 주도주 적립"),
+    ("ai_trend", "AI 주도주 · 추세 위만"),
+    ("price", "가격 주도주 적립"),
+    ("flow", "수급 주도주 적립"),
+    ("ew", "종목군 전체 적립"),
+    ("kospi", "KOSPI 지수 적립"),
+)
+
+
+def _acc_panel(acc: dict[str, Any] | None) -> str:
+    """문서 147 — 매달 같은 금액을 넣고 팔지 않는 장기 적립 장부."""
+    head = '<div class="panel"><h2>장기 적립 장부 (문서 147)</h2>'
+    if not acc:
+        return (
+            head + "<p class='mute'>첫 적립은 2026-10-30 월말 목록 → 11-02 매수. "
+            "매달 장부마다 가상 100 만 원을 넣고 팔지 않는다. 판단 2028-10.</p></div>"
+        )
+    ledgers = acc.get("ledgers") or {}
+    rows = "".join(
+        f"<tr><td>{label}</td><td>{_won(v.get('contributed'))}</td>"
+        f"<td>{_won(v.get('value'))}</td><td>{_pct(v.get('return'))}</td>"
+        f"<td>{_pct(v.get('irr'))}</td><td>{int(v.get('holdings') or 0)}</td></tr>"
+        for key, label in _ACC_LABELS
+        if isinstance(v := ledgers.get(key), dict)
+    )
+    missing = acc.get("ai_missing_month_ends") or []
+    note = (
+        f"<div class='foot'>AI 기록이 없던 월말 {len(missing)} 번 — 그달 돈은 현금으로 남아 "
+        "다음 달 목록에 함께 쓴다.</div>"
+        if missing
+        else ""
+    )
+    return (
+        head + f"<div class='sub'>{escape(str(acc.get('start')))} 부터 · 장부마다 매달 "
+        f"{_won(acc.get('monthly_krw'))} · 팔지 않음 · 수익률은 넣은 돈 대비, 연 수익은 IRR</div>"
+        "<table><tr><th>장부</th><th>넣은 돈</th><th>평가</th><th>수익률</th><th>연 수익(IRR)</th>"
+        f"<th>보유 종목</th></tr>{rows}</table>{note}"
+        "<div class='foot'>판단 2028-10 (문서 147 §4) — 그 전 숫자는 기록일 뿐 규칙을 바꾸는 "
+        "근거로 쓰지 않는다. 실제 주문은 없다.</div></div>"
+    )
+
+
 def _history_table(history: list[dict[str, Any]]) -> str:
     rows = []
     for rep in reversed(history[-HISTORY_DAYS:]):
@@ -255,5 +298,8 @@ def kr_shadow_page(data: Any) -> str:
         + _ai_panel(ai, news)
         + sectors
         + _paper_panel(latest.get("paper"), history)
+        + _acc_panel(
+            latest.get("accumulation") if isinstance(latest.get("accumulation"), dict) else None
+        )
         + _history_table(history)
     )

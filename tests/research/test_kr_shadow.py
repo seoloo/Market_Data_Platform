@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import unquote
 
+import pytest
 from scripts.kr_shadow import KR_FEEDS, merge_csv
 
 from auto_trading.ops.news_ai import parse_reply
@@ -51,3 +53,19 @@ def test_reply_codes_outside_universe_are_set_aside() -> None:
     got = parse_reply(reply, ["005930", "000660"])
     assert [x["symbol"] for x in got["leaders"]] == ["005930"]
     assert got["outside_universe"] == ["247540"]
+
+
+def test_ai_basket_uses_month_end_record_or_recent_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    import scripts.kr_shadow as ks
+
+    monkeypatch.setattr(ks, "AI", tmp_path)
+    days = [f"2026-10-{d:02d}" for d in range(20, 31)]
+    rec = {"judgement": {"leaders": [{"symbol": "005930"}, {"symbol": "999999"}]}}
+    (tmp_path / "2026-10-27.json").write_text(json.dumps(rec), encoding="utf-8")
+    known = {"005930", "000660"}
+    assert ks._ai_basket(days, days.index("2026-10-30"), known) == ["005930"]  # 3 일 전 기록
+    assert ks._ai_basket(days, days.index("2026-10-26"), known) is None  # 그 전엔 기록 없음
