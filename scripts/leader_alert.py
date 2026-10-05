@@ -12,7 +12,8 @@
   일봉 ``data/kr_shadow/prices``
   (종가만 있어 삼각형은 종가 기준).
 * 새로 들어온 종목 = 최근 20 번의 기록에 한 번도 없던 종목. 같은 날짜는 한 번만 알린다(상태 파일).
-* 삼각형 판정은 검증 안 된 참고 규칙이다(:data:`auto_trading.ops.leader_alert.TRIANGLE_RULE`).
+* 삼각형 판정은 참고 규칙이다 — 국장 검증(문서 146)에서 돌파 진입이 무작위 시점보다 나빴다
+  (:data:`auto_trading.ops.leader_alert.TRIANGLE_RULE`).
 """
 
 from __future__ import annotations
