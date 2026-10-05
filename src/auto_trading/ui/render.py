@@ -17,6 +17,7 @@ from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.data import DashboardData, DrillView, LedgerView, Point, WatchView
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.kr_shadow_render import kr_shadow_page
+from auto_trading.ui.leader_alert_render import leader_alert_page
 from auto_trading.ui.lt_render import lt_paper_page
 from auto_trading.ui.overview import overview_attention, overview_stocks, overview_summary
 from auto_trading.ui.qndx_render import toss_page
@@ -40,10 +41,11 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("qs_paper", "/qs-paper", "QS Paper"),
     ("ag_paper", "/ag-paper", "AG Paper"),
     ("kr_shadow", "/kr-shadow", "국장 주도주 기록"),
+    ("leader_alert", "/leader-alert", "주도주 알림"),
     ("research", "/research", "연구 기록"),
 )
-_STOCK_PAGES = frozenset({"toss", "lt_paper", "qs_paper", "ag_paper", "kr_shadow"})
-_PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper", "kr_shadow"})
+_STOCK_PAGES = frozenset({"toss", "lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"})
+_PAPER_PAGES = frozenset({"lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"})
 _KST = timedelta(hours=9)
 _DAY_MS = 86_400_000
 _COLORS = {
@@ -117,7 +119,9 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         "AG Paper</a></div>"
         '<div class="nav-group nav-stock"><div class="nav-heading">국내 주식</div>'
         f'<a href="/kr-shadow" class="{"on" if page == "kr_shadow" else ""}">'
-        "국장 주도주 기록</a></div>"
+        "국장 주도주 기록</a>"
+        f'<a href="/leader-alert" class="{"on" if page == "leader_alert" else ""}">'
+        "주도주 알림</a></div>"
     )
     title = next(label for key, _, label in PAGES if key == page)
     subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
@@ -617,6 +621,7 @@ _RENDER = {
     "qs_paper": qs_paper_page,
     "ag_paper": ag_paper_page,
     "kr_shadow": kr_shadow_page,
+    "leader_alert": leader_alert_page,
     "research": _research,
 }
 

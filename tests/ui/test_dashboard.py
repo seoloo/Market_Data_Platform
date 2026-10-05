@@ -171,7 +171,7 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
-        elif page in ("lt_paper", "qs_paper", "ag_paper", "kr_shadow"):
+        elif page in ("lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
             assert "실거래 비활성" in html
@@ -284,6 +284,40 @@ class TestRender:
         nav = html.split("<main>")[0]
         assert '<div class="nav-heading">국내 주식</div>' in nav
         assert nav.count('href="/kr-shadow"') == 1
+
+    def test_leader_alert_page_shows_new_names_and_triangle_status(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "leader_alert"
+        rep.mkdir(parents=True)
+        tri = {"status": "형성 중", "resistance": 100.0, "touches": 3, "gap_to_resistance": -0.02}
+        (rep / "latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": "t",
+                    "rule": "규칙",
+                    "sent": False,
+                    "sections": [
+                        {
+                            "market": "미국",
+                            "date": "2026-10-02",
+                            "history": 0,
+                            "new": [
+                                {"code": "APH", "name": EVIL, "list": "주도주", "triangle": tri}
+                            ],
+                        },
+                        {"market": "국장", "date": "2026-10-02", "history": 5, "new": []},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "leader_alert")
+        assert (
+            "주도주 처음 잡힘" in html and "APH" in html and "형성 중" in html and "-2.0%" in html
+        )
+        assert "처음엔 거의 모두 새로 보임" in html and "새로 들어온 종목 없음" in html
+        assert html.split("<main>")[0].count('href="/leader-alert"') == 1
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/lt-paper"') == 1
