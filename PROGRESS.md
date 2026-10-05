@@ -1,7 +1,15 @@
 # 작업 현황
 
-최종 갱신: 2026-10-05 · 작성: Claude (도구 역할 분담 AGENTS §9 · IDEAS.md · 실적 연구 Claude 이관).
+최종 갱신: 2026-10-05 · 작성: Claude (실적 개선형 주도주 재개 — 경로 A Tiingo 소표본 · 경로 B 한국 DART 자료 점검).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+
+## 2026-10-05 — 실적 개선형 주도주 재개 (Claude): 경로 A · 경로 B 자료 점검
+
+- 사용자: "codex가 하던 작업 계속 해서 이어가줘" → 재개 점검(원자료 34 개 해시 일치, Tiingo 토큰 없음, 공식 명부 무료 경로 없음) → 사용자가 Tiingo·Open DART 키를 `.env` 에 넣고 "a 진행하고 완료되면 b도 진행해줘".
+- **경로 A (미국):** `scripts/audit_tiingo_terminal_sample.py` — TWTR·CTXS·NLSN 무료 계정으로 HTTP 200, 종료 부근 일별 가격 나옴. 정지 뒤 채움 행(거래량 0)·CTXS 외딴 행이 실제로 있어 '거래량 0 = 거래 없음' 규칙 필요. 남은 관문: 무료 한도(월 500 심볼 → 수집 2~3 달) · 옛 티커 → CIK · 전 기간 대리 명부. 명부는 ETF 보유 대리 사용을 사용자가 수용. [문서](docs/research/FUNDAMENTAL_TIINGO_TERMINAL_SAMPLE.md)
+- **경로 B (한국):** `scripts/audit_dart_feasibility.py` — 유가증권시장 보통주 970 개(상장폐지 198 포함) DART 회사 연결 100%, 표본 재무제표 52/52 에 매출·영업이익·영업현금흐름·접수일. 재무 API 는 2015~ (기간 약 10 년), 금융업은 자료 없음. **비금융은 자료 관문 통과.** [문서](docs/research/FUNDAMENTAL_KR_DART_FEASIBILITY.md)
+- 다음(AGENTS §9): 경로 B 사전 등록 초안(Codex) → 사용자 선택 → Claude 전체 자료 받기(약 2.6 만 요청, 이틀)·확정·판정. 둘 다 NOT_TESTED(수익 미계산). 시험 7 개 추가.
 
 ## 2026-10-05 — Codex 아이디어 담당 전환: 실적 연구 인계 보충
 

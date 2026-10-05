@@ -1,0 +1,1214 @@
+{
+ "purpose": "실적 개선형 주도주 경로 B Phase 0 — Open DART 재무 자료 확보 가능성 (조회만, 수익 없음)",
+ "fetched_at": "2026-10-05T11:10:52+00:00",
+ "coverage": {
+  "corp_codes_with_stock_code": 3998,
+  "kospi_common_listed": 772,
+  "listed_linked": 772,
+  "kospi_common_delisted": 198,
+  "delisted_linked": 198,
+  "ever_universe": 769,
+  "ever_universe_linked": 769
+ },
+ "sample": [
+  {
+   "code": "000020",
+   "name": "동화약품",
+   "delisted": false,
+   "corp_code": "00119195",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2017-04-05",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-19",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "001420",
+   "name": "태원물산",
+   "delisted": false,
+   "corp_code": "00154055",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2024-03-20",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "OFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "003060",
+   "name": "에이프로젠바이오로직스",
+   "delisted": false,
+   "corp_code": "00101044",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-30",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-12",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "004830",
+   "name": "덕성",
+   "delisted": false,
+   "corp_code": "00114093",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-18",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "006880",
+   "name": "신송홀딩스",
+   "delisted": false,
+   "corp_code": "00136402",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-18",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-12",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "009970",
+   "name": "영원무역홀딩스",
+   "delisted": false,
+   "corp_code": "00140964",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-04-01",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "013870",
+   "name": "지엠비코리아",
+   "delisted": false,
+   "corp_code": "00156354",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-21",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "021240",
+   "name": "코웨이",
+   "delisted": false,
+   "corp_code": "00170558",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-29",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "035720",
+   "name": "카카오",
+   "delisted": false,
+   "corp_code": "00258801",
+   "checks": [
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-04-18",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-06-29",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "081000",
+   "name": "일진다이아",
+   "delisted": false,
+   "corp_code": "00508274",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "136490",
+   "name": "선진",
+   "delisted": false,
+   "corp_code": "00855093",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-24",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-25",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-19",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-12",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "272210",
+   "name": "한화시스템",
+   "delisted": false,
+   "corp_code": "00339391",
+   "checks": [
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-10",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "000030",
+   "name": "우리은행",
+   "delisted": true,
+   "corp_code": "00254045",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "자료 없음"
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "자료 없음"
+    }
+   ]
+  },
+  {
+   "code": "001300",
+   "name": "제일모직",
+   "delisted": true,
+   "corp_code": "00148328",
+   "checks": []
+  },
+  {
+   "code": "003560",
+   "name": "IHQ",
+   "delisted": true,
+   "corp_code": "00154426",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2024-03-13",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2023-05-15",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "005190",
+   "name": "동성화학",
+   "delisted": true,
+   "corp_code": "00116356",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "006350",
+   "name": "전북은행",
+   "delisted": true,
+   "corp_code": "00147295",
+   "checks": []
+  },
+  {
+   "code": "008320",
+   "name": "한국기술산업",
+   "delisted": true,
+   "corp_code": "00110176",
+   "checks": []
+  },
+  {
+   "code": "011050",
+   "name": "케드콤",
+   "delisted": true,
+   "corp_code": "00159281",
+   "checks": []
+  },
+  {
+   "code": "012580",
+   "name": "신세계톰보이",
+   "delisted": true,
+   "corp_code": "00132488",
+   "checks": []
+  },
+  {
+   "code": "017170",
+   "name": "씨지브이신도림",
+   "delisted": true,
+   "corp_code": "00188946",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "자료 없음"
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "자료 없음"
+    },
+    {
+     "year": 2023,
+     "report": "사업보고서",
+     "status": "자료 없음"
+    },
+    {
+     "year": 2023,
+     "report": "1분기",
+     "status": "자료 없음"
+    }
+   ]
+  },
+  {
+   "code": "037620",
+   "name": "미래에셋증권",
+   "delisted": true,
+   "corp_code": "00311030",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "자료 없음"
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "자료 없음"
+    }
+   ]
+  },
+  {
+   "code": "079660",
+   "name": "사조해표",
+   "delisted": true,
+   "corp_code": "00503899",
+   "checks": [
+    {
+     "year": 2016,
+     "report": "사업보고서",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2017-03-31",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    },
+    {
+     "year": 2016,
+     "report": "1분기",
+     "status": "있음",
+     "fs_div": "CFS",
+     "receipt_date": "2016-05-16",
+     "revenue": true,
+     "operating_income": true,
+     "operating_cf": true
+    }
+   ]
+  },
+  {
+   "code": "108070",
+   "name": "삼성이미징",
+   "delisted": true,
+   "corp_code": "00721981",
+   "checks": []
+  }
+ ],
+ "files": [
+  {
+   "file": "data/research/fundamental_pilot/dart/corpcode-2026-10-05.zip",
+   "bytes": 3622597,
+   "sha256": "e4604597c08f3630bc8cd850f9e40f7c9c374fc6d027712837166f2551555ad4",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2016-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2016-11011-OFS.json",
+   "bytes": 62474,
+   "sha256": "1b38cac61fe46fb7b0de54b91e3b839dc0df20476cad6da790a04fa0f660d3c6",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2016-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2016-11013-OFS.json",
+   "bytes": 68440,
+   "sha256": "4752c0f5fd5948606c630d455eeab481b93502150368d2c288e00356ee47078a",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2023-11011-CFS.json",
+   "bytes": 139993,
+   "sha256": "4dd2efe96aa7396fd4dac4fad965330b56c89914b9c569f390b46b05dd6c72a9",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000020-2023-11013-CFS.json",
+   "bytes": 91427,
+   "sha256": "7d70dcfc5ee36632bdce9a24ee7e66a06865186cc063e15c69fdc63f791ab7a2",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2016-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2016-11011-OFS.json",
+   "bytes": 67770,
+   "sha256": "21269d43d92265d0088ccac2ed2509d6bf09a8ae6fbc6d3d8a9b0c8ae682800a",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2016-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2016-11013-OFS.json",
+   "bytes": 74850,
+   "sha256": "21a648b59cbf2e49d9d69451c8c015e81348d286a2abce835909e007d390cb94",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2023-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2023-11011-OFS.json",
+   "bytes": 74270,
+   "sha256": "0487702f5c1231139328c124506afc8da9a25cc548acbc4f5b28331c59724eb9",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2023-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-001420-2023-11013-OFS.json",
+   "bytes": 64267,
+   "sha256": "2d974a94da669756ffef690f1c5a8209b4c8b5d32cd3d8265697fa23a168dfc1",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003060-2016-11011-CFS.json",
+   "bytes": 90867,
+   "sha256": "34135b6fd8eabb60779851e5bbf164e73df46923eb1eadba9aa72c3d190c348d",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003060-2016-11013-CFS.json",
+   "bytes": 100353,
+   "sha256": "cad6c6e7e08a60655efc530e50672842f11e9b4bc019416e089ce7ea7e526761",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003060-2023-11011-CFS.json",
+   "bytes": 156399,
+   "sha256": "b6de58c1d090fa688b96cbba5751cb0aa4052329c70342e02977330c051e79d1",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003060-2023-11013-CFS.json",
+   "bytes": 87789,
+   "sha256": "ba2b3e126b118587e37490ed9bd775b6ae2f9b55622818dadb8a8008f2195c19",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-004830-2016-11011-CFS.json",
+   "bytes": 85178,
+   "sha256": "e64b6a25f2c2aa4cf2fd57b88e0e6cb3c3ac76d51e065d228f85ef163b68341f",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-004830-2016-11013-CFS.json",
+   "bytes": 95729,
+   "sha256": "dadc7c006f9c130daa404c52485eaabaf901cf07c89bdeea81b8101f0500fb81",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-004830-2023-11011-CFS.json",
+   "bytes": 89419,
+   "sha256": "728a4cc8516900ca1aedaf73201d7335fba13a166d0116754854304730955c5f",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-004830-2023-11013-CFS.json",
+   "bytes": 82859,
+   "sha256": "bd3c6ba7c9c659a1da55ddf25292524159039e35015652f2bb92decc7b02f359",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-006880-2016-11011-CFS.json",
+   "bytes": 60756,
+   "sha256": "183f75a1230cb1226311ccecaf9bb0801c6270fd17ec8b8e3061dcadf25d0440",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-006880-2016-11013-CFS.json",
+   "bytes": 68234,
+   "sha256": "9be955bac6ef371d74f5acbea4e18bb3496947547e073534d30d235a1c151b0d",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-006880-2023-11011-CFS.json",
+   "bytes": 64391,
+   "sha256": "dc53ff7c08bec5f1852459824b394d0d2a02b6437b16bc48f1840dde5722b18c",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-006880-2023-11013-CFS.json",
+   "bytes": 52474,
+   "sha256": "8d3bfac2ad5f5492d49d5daf587982571aadcc8759ddeb20ccdd97e8b94d1f83",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-009970-2016-11011-CFS.json",
+   "bytes": 92246,
+   "sha256": "0ed3e3d7a42558c89f820fe0cdb03a86288b84ecfe377340d5ef3fddd954c4fb",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-009970-2016-11013-CFS.json",
+   "bytes": 99790,
+   "sha256": "fa184607a66e6202f0ff0820c41fd7b606b947858d61eea3f770416e9a1be952",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-009970-2023-11011-CFS.json",
+   "bytes": 74786,
+   "sha256": "43d36c1a2b2c32d0c2a689f9aa89b29d0178c938c25778a81947ad635db0195d",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-009970-2023-11013-CFS.json",
+   "bytes": 61135,
+   "sha256": "55a8fe8785b5b072e60e2bff13730ca7ec7ad2699f63e782b0e0883f27af48f0",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-013870-2016-11011-CFS.json",
+   "bytes": 74459,
+   "sha256": "07a4e9b3f416e7b33c9ddf6ac4718f0f3ea13e081d4949529ee21eb9a37c915a",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-013870-2016-11013-CFS.json",
+   "bytes": 83763,
+   "sha256": "59c5adbf8bcbf18ca93cd9614b077e71e2c62e339dd766004aebc727ccdafefc",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-013870-2023-11011-CFS.json",
+   "bytes": 82928,
+   "sha256": "ed15e0128e465260bf7825e0c8e8463bd5871846c0521d8da869c38dc761895c",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-013870-2023-11013-CFS.json",
+   "bytes": 67386,
+   "sha256": "ae4752a7033bba0be77f85807a9320b3714180c6116e72a2307d953b0801773d",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-021240-2016-11011-CFS.json",
+   "bytes": 76262,
+   "sha256": "0203ad1cc58839b5c1a59a95aad43657ccb26dacf489ee640b4c3694172ab1cc",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-021240-2016-11013-CFS.json",
+   "bytes": 85893,
+   "sha256": "05518dd12199f351e88f29038e9203f798247adf7fb7001ba955cdac56ae3bf6",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-021240-2023-11011-CFS.json",
+   "bytes": 69807,
+   "sha256": "7bb5c743f3f1f386f9f9f2f7f622d577c058466808808f88df45dcce781a37f9",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-021240-2023-11013-CFS.json",
+   "bytes": 58095,
+   "sha256": "424a6c6c2cb79fb5dbfda6c598da8ed84dd4e528342678d1d08d79028e9fe101",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-035720-2023-11011-CFS.json",
+   "bytes": 158369,
+   "sha256": "53e45461f46ca3adc5b9313aae60006cf7b0bec39d91bccbdeea9e6e743b7755",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-035720-2023-11013-CFS.json",
+   "bytes": 99132,
+   "sha256": "5a440abc636946f53635fa866dcbaf07e96841b6d18a820896ce2c814ef76e36",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-081000-2016-11011-CFS.json",
+   "bytes": 76336,
+   "sha256": "978c65620b09dc3b65389cd95b45773b8f9785855ed886b995993290e34635a1",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-081000-2016-11013-CFS.json",
+   "bytes": 86704,
+   "sha256": "2232e5abdcbdd3b6e2578528d75c6a9a03f14c89d65dbd034342402b0f5bd20f",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-081000-2023-11011-CFS.json",
+   "bytes": 89213,
+   "sha256": "a352c0c6ba749e1cf0a6de9809bbd02752cfbd0879e35b6de7766b1e4a79ff98",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-081000-2023-11013-CFS.json",
+   "bytes": 64591,
+   "sha256": "4260a420353b33d8a715e110ad1eeb362f1b466774a0c12beecc5c79801de76f",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-136490-2016-11011-CFS.json",
+   "bytes": 99747,
+   "sha256": "48e00906b257d5333979905b0bd4ead64d69c8c147f45cb2d5cbc54af65df786",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-136490-2016-11013-CFS.json",
+   "bytes": 106809,
+   "sha256": "c6c189ed20c37fc4b81df3f0149e17a84ea21146d72b3c66aa02a6cef042710c",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-136490-2023-11011-CFS.json",
+   "bytes": 117795,
+   "sha256": "d1488131513e496694499778aa641ca2e58dff8f51599c53261290153f4445c8",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-136490-2023-11013-CFS.json",
+   "bytes": 61353,
+   "sha256": "76bf387a0c4133c57760109e3ee2deec2f874577cdcc52c806002480d68e7077",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-272210-2023-11011-CFS.json",
+   "bytes": 121776,
+   "sha256": "07e0b39c78ed098e460e2994b537245b5a986dbf8ce7144450ba76a4211ea3ed",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-272210-2023-11013-CFS.json",
+   "bytes": 78284,
+   "sha256": "cd9d986b8459f15a34dcb980340eacae6b9e6565d53e9cebcceec25354b9da52",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000030-2016-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000030-2016-11011-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000030-2016-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-000030-2016-11013-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003560-2016-11011-CFS.json",
+   "bytes": 69857,
+   "sha256": "9391b049dc2368eb0d4ba3173d2ba9f570665bbfbda58c825d43a5a90a8d5bfd",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003560-2016-11013-CFS.json",
+   "bytes": 74204,
+   "sha256": "c56544d71a7225ca5967c8f0c38372570bbb07a15bee28b03ccc84e4f621a1e5",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003560-2023-11011-CFS.json",
+   "bytes": 87770,
+   "sha256": "ff096eced9555dcaa7a29e3caef2f1d5e81ec68251d09923f48d83daeef61444",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-003560-2023-11013-CFS.json",
+   "bytes": 59074,
+   "sha256": "a2331ece943d58d912b6eb8fa8478c846dfb4f1157579deee7a3451984ef0f4b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-005190-2016-11011-CFS.json",
+   "bytes": 86969,
+   "sha256": "0acab56d2ac4e9e88958691a5497391e0abb946ae2c8c7024667b45d04671be9",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-005190-2016-11013-CFS.json",
+   "bytes": 94401,
+   "sha256": "295dc8ed72e82bc8148eca0db4508bfe7baa6a26130802881ae194da8cd4c9fd",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2016-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2016-11011-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2016-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2016-11013-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2023-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2023-11011-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2023-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-017170-2023-11013-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-037620-2016-11011-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-037620-2016-11011-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-037620-2016-11013-CFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-037620-2016-11013-OFS.json",
+   "bytes": 65,
+   "sha256": "5b9f448765008cd323ab5b94081c873aa00d39974e7ed5aa1964b00a19e8242b",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-079660-2016-11011-CFS.json",
+   "bytes": 74999,
+   "sha256": "0c3cd172584bb506688a1315d15bdfbd7cde49ee67236843fdb08f79aeaf1dbe",
+   "http_status": 200
+  },
+  {
+   "file": "data/research/fundamental_pilot/dart/fnltt-079660-2016-11013-CFS.json",
+   "bytes": 85698,
+   "sha256": "77c956422d09738f52234b42dc39bd1bf6754daea561a28be1b323fdc88ccfbc",
+   "http_status": 200
+  }
+ ],
+ "note": "원응답은 git 제외 로컬 파일. 키는 DART 요청 주소에만 실었고 어디에도 남기지 않았다."
+}
