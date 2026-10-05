@@ -1,0 +1,88 @@
+{
+  "kind": "BOUNDED_TERMINAL_PRICE_PROBES_AND_CASH_PROCEDURE_AUDIT",
+  "base_code_commit": "152dea1",
+  "phase": 0,
+  "data_status": "DATA_NOT_READY",
+  "strategy_result": "NOT_TESTED",
+  "terminal_price_status": "NOT_ACQUIRED",
+  "terminal_settlement_status": "TERMINAL_SETTLEMENT_UNVERIFIED",
+  "historical_membership_completeness": "NOT_CERTIFIED",
+  "user_selected_route": "HISTORICAL_RECONSTRUCTION_MARKET_ONLY_KIS_APPROVED",
+  "kis_diagnostic": {
+    "kind": "SANITIZED_MARKET_ONLY_DIAGNOSTIC_NOT_FULL_RAW_RESPONSE",
+    "official_reference": "https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/overseas_stock/dailyprice/dailyprice.py",
+    "endpoint": "/uapi/overseas-price/v1/quotations/dailyprice",
+    "tr_id": "HHDFS76240000",
+    "common_params": {"AUTH": "", "EXCD": "NYS", "SYMB": "TWTR", "GUBN": "0", "MODP": "0"},
+    "requests": [
+      {
+        "BYMD": "20221031",
+        "observed_at_ms": 1791190733524,
+        "http_status": 200,
+        "rt_cd": "0",
+        "msg_cd": "MCA00000",
+        "status": "SUCCESS_WITHOUT_PRICE_ROWS",
+        "returned_rows": 0
+      },
+      {
+        "BYMD": "20221027",
+        "observed_at_ms": 1791190792303,
+        "http_status": 200,
+        "rt_cd": "0",
+        "msg_cd": "MCA00000",
+        "status": "SUCCESS_WITHOUT_PRICE_ROWS",
+        "returned_rows": 0
+      }
+    ],
+    "account_queries": 0,
+    "order_requests": 0,
+    "stored_auth_material": false,
+    "full_response_archived": false,
+    "scope": "Two dates for one historical symbol and one endpoint; not provider-wide delisted coverage certification"
+  },
+  "sources": [
+    {
+      "path": "data/research/fundamental_pilot/twtr-yahoo-chart-probe-20261005.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/TWTR?period1=1664582400&period2=1667260800&interval=1d",
+      "http_status": 404,
+      "role": "FAILED_PRICE_PROBE_NOT_OHLCV",
+      "observation": "chart.result=null; Not Found; symbol may be delisted",
+      "bytes": 108,
+      "sha256": "f0b5f9feeac9f1fc93c31b1edc03fbc1fda4acb3ec5e233ebb39d6f8b66e1769",
+      "acquired_at_ms": 1791189491249
+    },
+    {
+      "path": "data/research/fundamental_pilot/twtr-stooq-price-probe-20261005.txt",
+      "url": "https://stooq.com/q/d/l/?s=twtr.us&d1=20221001&d2=20221031&i=d",
+      "http_status": 200,
+      "role": "BROWSER_VERIFICATION_RESPONSE_NOT_OHLCV",
+      "observation": "HTML browser verification, not CSV; stopped without executing verification",
+      "bytes": 796,
+      "sha256": "af88b2dae803b8fc5c6fc544ecfb53db7a1ef16aec8ce0c141577ba1fe2f73c6",
+      "acquired_at_ms": 1791189492372
+    },
+    {
+      "path": "data/research/fundamental_pilot/twtr-20220425-merger-agreement.html",
+      "url": "https://www.sec.gov/Archives/edgar/data/1418091/000119312522120461/d310843dex21.htm",
+      "http_status": 200,
+      "role": "CONTRACT_PROCEDURE_NOT_ACTUAL_CASH_RECEIPT",
+      "reviewed_sections": ["3.1(c)", "3.2(a)", "3.2(b)", "3.2(c)", "3.2(g)"],
+      "bytes": 492144,
+      "sha256": "1b6a8da9907b1069033aabb7beff1f813b46ae2f16276094fd16acf4bb9cc810",
+      "acquired_at_ms": 1791189522417
+    }
+  ],
+  "raw_sources_added_bytes": 493048,
+  "normal_price_rows_acquired": 0,
+  "actual_cash_available_at_ms": null,
+  "membership_match_means_complete": false,
+  "parameters_or_pnl_fitted": false,
+  "prohibited_interpretations": [
+    "HTTP 200 or failed query is a valid price series",
+    "two-business-day mailing obligation is an account cash availability date",
+    "a merger contract proves consummation or actual receipt",
+    "gross cash right is spendable cash or an automatically certified NAV",
+    "matched endpoint memberships certify all intermediate changes",
+    "synthetic contract tests certify actual timestamps, IDs, coverage or strategy profit"
+  ]
+}

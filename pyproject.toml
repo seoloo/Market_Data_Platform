@@ -200,4 +200,5 @@ forbidden_modules = [
     "auto_trading.research.staking_carry",
     "auto_trading.research.fundamental_pit",
     "auto_trading.research.sec_fundamentals",
+    "auto_trading.research.fundamental_market_audit",
 ]

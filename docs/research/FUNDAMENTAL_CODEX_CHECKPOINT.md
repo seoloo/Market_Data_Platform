@@ -1,8 +1,8 @@
 # 실적 개선형 주도주 — Codex 전용 재개·인계 기록
 
-기록일: 2026-10-04, 재개 갱신: 2026-10-05. 마지막 연구 코드 변경 커밋: `7acf920`.
+기록일: 2026-10-04, 재개 갱신: 2026-10-05. 최신 연구 도구 변경은 이 체크포인트와 같은 커밋의 `fundamental_market_audit.py`(작업 기준 HEAD `152dea1`).
 현재: **Phase 0 / REAL_SAMPLE_AUDITED / DATA_NOT_READY**.
-작업 진행 상태: **10/05 사용자 요청으로 재개, 역사 기준점 제한 감사 완료; 연구는 미완료**.
+작업 진행 상태: **역사 기준점·종료 현금/명부 계약 제한 검사 및 승인된 KIS 시세 확인 완료; 연구 미완료, 사용자 선택 A 과거 복원 유지**.
 
 ## 1. 담당과 이번 종료 범위
 
@@ -25,6 +25,7 @@ Opus/Claude는 맥락 확인을 위해 이 기록을 읽을 수 있으나, 아�
 - [134](134-apple-fundamental-pilot.md)·[135](135-microsoft-fundamental-pilot.md): Apple 9개·Microsoft 12개 실제 금액 및 Q4 대조, 공시 버전·결산 길이·접수 metadata 점검. 데이터 검산이지 매수 추천/수익성 판정이 아니다.
 - [136](136-fundamental-universe-accounting-gates.md): 무료 지수 변경·합병 사례, 거래정지/퇴출/현금 권리의 서로 다른 시각과 실제 회계 기준 전환 감사. 다른 basis 혼합/태그 전역 alias/미래 값 소급/결측 0 대체를 허용하지 않는다.
 - [10/05 역사 기준점 감사](FUNDAMENTAL_HISTORICAL_ANCHOR_AUDIT.md): SPY 2022-09-30 보유명세 505행 전체 합계 일치, 11/28 공개 시차·CTXS 거래정지 잔존 보유와 현금 권리·TWTR Form 25 제거 예정 통지 확인. 공식 구성/거래 가능성·변경 체인·종료 가격/실제 정산은 미인증.
+- [10/05 종료 현금·명부 계약](FUNDAMENTAL_TERMINAL_CHAIN_CONTRACT.md): TWTR 무료 가격 2주소 실패 보존, SEC 계약의 지급 절차 검토. 순수 현금 권리/입금/가용 분리·공식 명부 변경 대조·합성 회귀 35건·운영 import 차단. 끝 명부 일치로 전 구간 완전성을 증명할 수 없다는 반례 포함. 사용자 A 선택 후 기존 KIS 일봉 두 날짜도 정상 응답/0행 확인, 계좌·잔고·주문 조회 없음. 실제 가격/현금 가용 미확보.
 
 Microsoft FY2017의 원래 보고값과 다음 해 재작성 표준 fact를 구분했다.
 재작성 매출과 같은 숫자는 2017의 예상 조정 주석에도 이미 공개되어 있었다.
@@ -35,12 +36,13 @@ API 행 부재를 당시 원문 정보 부재와 혼동하지 않는다. 인수�
 
 - 연구 문서 131~136과 각 source manifest.
 - 순수 모듈: [fundamental_pit.py](../../src/auto_trading/research/fundamental_pit.py), [sec_fundamentals.py](../../src/auto_trading/research/sec_fundamentals.py).
+- 새 순수 자료 계약: [fundamental_market_audit.py](../../src/auto_trading/research/fundamental_market_audit.py), [합성 회귀](../../tests/research/test_fundamental_market_audit.py). 실제 자료·달력·정산의 인증은 외부 원문 감사가 제공해야 한다.
 - 오프라인 감사 실행기: [Apple](../../scripts/audit_apple_fundamentals.py), [Microsoft](../../scripts/audit_microsoft_fundamentals.py).
 - `tests/fixtures/fundamental/`, 해당 `tests/research/test_fundamental*.py`·`test_sec_fundamentals.py` 및 `tests/scripts/test_audit_*_fundamentals.py`.
 - `data/research/fundamental_pilot/`의 원자료, `reports/fundamental_pilot/`의 감사 결과. 삭제/덮어쓰기 없이 보존한다.
 - 공유 `PROGRESS.md`·CURRENT_SPEC·BRIEFING_FOR_LLM에서는 이 연구 항목만 담당 경계를 보존한다. 관련 import 계약도 임의 완화하지 않는다.
 
-원자료는 누적 **26개(7+8+5+6)**이며 Git 제외 로컬 보관이다. 새 6개는 [manifest](fundamental-historical-anchor-manifest.json)를 따른다.
+원자료/실패 응답은 누적 **29개(7+8+5+6+3)**이며 Git 제외 로컬 보관이다. 기준점 6개는 [manifest](fundamental-historical-anchor-manifest.json), 후속 3개는 [manifest](fundamental-terminal-chain-manifest.json)를 따른다. 실패 응답 2개는 가격/시장 커버리지로 세지 않는다. KIS 두 요청은 민감정보 제외 진단 요약만 manifest에 보관하며 응답 전문/원자료 수량에 포함하지 않는다.
 Git 복제만으로 전체 원본 감사를 재현할 수 없다. 같은 작업 공간에서도 먼저 manifest의 파일 존재·SHA256을 확인한다.
 Git의 최소 발췌 fixture는 원본 전체를 대체하지 않는다. API 키/연락처/계좌 정보를 인계 문서에 넣지 않는다.
 감사 실행기는 기존 보고서 덮어쓰기를 거부하므로 재검산 시 별도의 새 출력 경로를 지정한다.
@@ -49,12 +51,13 @@ Git의 최소 발췌 fixture는 원본 전체를 대체하지 않는다. API 키
 
 10/04의 다음 작업이었던 기준점/종료 사건 제한 감사를 10/05에 수행했다. ETF 보유 기준점은 확보했지만
 공식 지수 명부로 채택하지 않았고 종료 가격/정산·전체 변경 체인은 미확보다.
-**다음은 Phase 0 — 종료 사례 하나의 무료 가격 원본/현금 전환 경로와 변경 체인 누락 검출 계약**이다.
+그 후 TWTR 무료 가격 2주소를 점검했으나 미확보, 현금 권리/가용·명부 누락 계약만 연구 도구로 구현했다.
+**사용자는 A 과거 복원 계속 — 기존 API 시세만 확인을 선택했고, 이번 조회 범위는 완료**했다.
 
-1. TWTR/CTXS 중 하나의 무료 과거 가격 원본·증권 ID·배당/분할·현금 전환 경로를 검토한다. ETF 평가액을 가격으로 대체하지 않는다.
-2. SPY 보유 기준점과 공식 S&P 구성의 차이·이후 변경 체인 누락 검출 계약을 설계한다. ETF 대리 유니버스 채택은 별도 사용자 결정 전 하지 않는다.
-3. 거래정지·현금 권리와 실제 수령/가용 시점을 분리한다. 미확인 날짜를 임의 거래일로 채우지 않고 성과 시험하지 않는다.
-4. 자료가 부족하면 과거 복원 계속 vs 앞으로만 동결 관찰의 시간·근거·독립 표본/검정력 차이를 사용자에게 제시한다. 전향 수집·예약을 임의 시작하지 않는다.
+1. 기존 KIS TWTR/NYS 일별 시세 20221031·20221027은 모두 HTTP 200/rt_cd=0이나 0행이었다. 기존 인증을 사용했고 계좌/잔고/주문 요청은 하지 않았다. 같은 빈 요청을 반복하거나 KIS 전체 종료 종목 미지원으로 일반화하지 않는다.
+2. 다음 Phase 0은 **과거 복원 안에서 다른 무료 종료 가격원·공식 중간 구성 명부/변경 목록의 확보 가능성 재평가**다. B 전향 관찰은 미선택이고 수집/예약을 켜지 않는다. API 시세 확인 승인이 계좌/주문/유료 구매 권한으로 확대되지 않는다.
+3. 어느 경로든 실제 증권 식별·세션 마감/가용 시각·회계 원문·종료 가격/현금 전환 근거가 필요하다. 합성 테스트 입력을 실제 빈칸 대체값으로 쓰지 않는다.
+4. ETF 대리 유니버스 채택·새 사전등록·랭킹/성과 시험·Paper/실거래 승격은 하지 않는다. C9·기존 운영/다른 연구 경계 유지.
 
 추가 미해결: 종료 증권 총수익, 증권/CIK 연결, 배당/분할, 회계 태그 정의·원문 추출,
 역사적 first-seen·일반 거래일 달력, 시장 커버리지, 독립 표본과 80% 검정력, 미열람 평가 분할.
@@ -69,9 +72,11 @@ strict mypy **404파일**, ruff check/format **560파일**, import 계약 **5/5*
 기존 전략·위험·계좌·예약·UI·개인 QS 적립·성과 골든 변경 없음. Current의 기존 C9 미해결은 유지한다.
 
 10/04 체크포인트만 기록할 때는 문서 링크·보존·범위 검사만 했고 코드 테스트를 재실행하지 않았다.
-10/05 후속은 Python 코드 변경 없이 자료·문서 검산을 수행했고 최신 AGENTS에 따라 전체 로컬 검증도 재실행했다:
+10/05 1차(`152dea1`)는 Python 코드 변경 없이 자료·문서 검산을 수행했고 최신 AGENTS에 따라 전체 로컬 검증도 재실행했다:
 pytest **2,633건**, leakage **88건**, strict mypy **419파일**, ruff check/format **584파일**, import 계약 **5/5** 통과.
 새 6개/기존 20개 원본 해시·전체 505행 합계·수동 5행·잘못된 해시/행수/합계 거부 검산과 링크/JSON/범위/연락처 비보관 검사도 수행했다.
+10/05 2차(이번 커밋)는 연구 전용 계약 모듈/합성 회귀를 추가했다. 전체 pytest **2,668건**(177.28초), leakage **90건**,
+strict mypy **421파일**, ruff check/format **586파일**, import 계약 **5/5** 통과. 새 3개/기존 26개 해시 불변·실패 응답/JSON·문서 링크/범위/연락처 비보관 검사 별도.
 이 연구 자체는 **PASS/REJECT가 아니며**, 자료 결함을 전략 실패로 판정한 상태도 아니다.
 
 ## 6. 연구 마무리 후 Claude 인계 조건
