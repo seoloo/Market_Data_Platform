@@ -5,6 +5,7 @@
     python -m scripts.fetch_kr_stocks lists    # KIND 상장·상장폐지 목록 + 한국투자증권 종목 정보
     python -m scripts.fetch_kr_stocks prices   # 보통주 수정주가 일봉 (이어 받기 가능)
     python -m scripts.fetch_kr_stocks index    # KOSPI 지수 일봉
+    python -m scripts.fetch_kr_stocks flows    # 종목별 투자자 매매(외국인·기관 순매수), 문서 142
 
 * 목록: KIND(kind.krx.co.kr) 유가증권시장 상장법인 목록과 2008-01-01 뒤 상장폐지 현황
   — 로그인 없이 받는다.
@@ -38,6 +39,16 @@ KIND_DELISTED = "https://kind.krx.co.kr/investwarn/delcompany.do"
 DAILY = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
 INDEX = "/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice"
 INFO = "/uapi/domestic-stock/v1/quotations/search-stock-info"
+INVESTOR = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"
+FLOWS = DATA / "flows"
+FLOW_START = "20080101"
+FLOW_FIELDS = (
+    "frgn_ntby_tr_pbmn",
+    "orgn_ntby_tr_pbmn",
+    "prsn_ntby_tr_pbmn",
+    "acml_tr_pbmn",
+)
+"""순매수 금액(백만 원)·거래대금(원). 한 번에 30 거래일, 2006 년부터·상장폐지 종목도 받아짐."""
 PAUSE = 0.06
 COMMON = "101"
 """한국투자증권 ``stck_kind_cd`` 보통주."""
@@ -83,6 +94,16 @@ def daily_rows(output2: Sequence[Mapping[str, Any]]) -> list[tuple[str, float, f
         c = float(r.get("stck_clpr") or 0)
         if d and c > 0:
             out.append((d, c, float(r.get("acml_vol") or 0), float(r.get("acml_tr_pbmn") or 0)))
+    return sorted(set(out))
+
+
+def flow_rows(output2: Sequence[Mapping[str, Any]]) -> list[tuple[str, ...]]:
+    """종목별 투자자 매매(일별) → (날짜, 외국인·기관·개인 순매수 금액, 거래대금), 오래된 순."""
+    out = []
+    for r in output2:
+        d = str(r.get("stck_bsop_date") or "")
+        if d:
+            out.append((d, *(str(r.get(f) or "0") for f in FLOW_FIELDS)))
     return sorted(set(out))
 
 
@@ -226,39 +247,108 @@ def fetch_prices() -> int:
     return 0 if failed == 0 else 1
 
 
+def _flow_pages(get: Getter, code: str, lo: str, hi: str) -> list[tuple[str, ...]]:
+    rows: list[tuple[str, ...]] = []
+    cursor = hi
+    while cursor >= lo:
+        out = (
+            get(
+                INVESTOR,
+                "FHPTJ04160001",
+                {
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": code,
+                    "FID_INPUT_DATE_1": cursor,
+                    "FID_ORG_ADJ_PRC": "",
+                    "FID_ETC_CLS_CODE": "",
+                },
+            ).get("output2")
+            or []
+        )
+        page = flow_rows(out)
+        if not page:
+            break
+        rows.extend(r for r in page if r[0] >= lo)
+        if page[0][0] <= lo:
+            break
+        first = date(int(page[0][0][:4]), int(page[0][0][4:6]), int(page[0][0][6:]))
+        cursor = (first - timedelta(days=1)).strftime("%Y%m%d")
+        time.sleep(PAUSE)
+    return sorted(set(rows))
+
+
+def fetch_flows() -> int:
+    """종목군에 한 번이라도 들어온 종목(``ever_universe.json``)만 받는다."""
+    info = json.loads((DATA / "info.json").read_text(encoding="utf-8"))
+    todo = json.loads((DATA / "ever_universe.json").read_text(encoding="utf-8"))
+    FLOWS.mkdir(parents=True, exist_ok=True)
+    kis = _kis()
+    done = failed = 0
+    try:
+        for k, code in enumerate(todo, 1):
+            path = FLOWS / f"{code}.csv"
+            span = window(info[code], start=FLOW_START)
+            if path.exists() or span is None:
+                continue
+            try:
+                rows = _flow_pages(kis._get, code, *span)
+            except Exception as exc:  # 한 종목 실패가 전체를 멈추지 않게
+                failed += 1
+                print(f"[{k}/{len(todo)}] {code} 실패: {type(exc).__name__}", flush=True)
+                continue
+            path.write_text(
+                "date," + ",".join(FLOW_FIELDS) + "\n" + "".join(",".join(r) + "\n" for r in rows),
+                encoding="utf-8",
+                newline="\n",
+            )
+            done += 1
+            if k % 25 == 0:
+                print(f"[{k}/{len(todo)}] {code} {len(rows)} 일", flush=True)
+    finally:
+        kis.close()
+    print(f"받음 {done} · 실패 {failed} · 대상 {len(todo)}")
+    return 0 if failed == 0 else 1
+
+
+def index_pages(get: Getter, lo: str, hi: str) -> list[tuple[str, float]]:
+    """KOSPI 지수 일봉 (한 번에 최대 50 일, 거꾸로)."""
+    rows: list[tuple[str, float]] = []
+    cursor = hi
+    while cursor >= lo:
+        out = (
+            get(
+                INDEX,
+                "FHKUP03500100",
+                {
+                    "FID_COND_MRKT_DIV_CODE": "U",
+                    "FID_INPUT_ISCD": "0001",
+                    "FID_INPUT_DATE_1": lo,
+                    "FID_INPUT_DATE_2": cursor,
+                    "FID_PERIOD_DIV_CODE": "D",
+                },
+            ).get("output2")
+            or []
+        )
+        page = sorted(
+            (str(r["stck_bsop_date"]), float(r["bstp_nmix_prpr"]))
+            for r in out
+            if r.get("stck_bsop_date") and float(r.get("bstp_nmix_prpr") or 0) > 0
+        )
+        if not page:
+            break
+        rows.extend(p for p in page if p[0] >= lo)
+        if page[0][0] <= lo:
+            break
+        first = date(int(page[0][0][:4]), int(page[0][0][4:6]), int(page[0][0][6:]))
+        cursor = (first - timedelta(days=1)).strftime("%Y%m%d")
+        time.sleep(PAUSE)
+    return sorted(set(rows))
+
+
 def fetch_index() -> int:
     kis = _kis()
-    rows: list[tuple[str, float]] = []
-    cursor = END
     try:
-        while cursor >= START:
-            out = (
-                kis._get(
-                    INDEX,
-                    "FHKUP03500100",
-                    {
-                        "FID_COND_MRKT_DIV_CODE": "U",
-                        "FID_INPUT_ISCD": "0001",
-                        "FID_INPUT_DATE_1": START,
-                        "FID_INPUT_DATE_2": cursor,
-                        "FID_PERIOD_DIV_CODE": "D",
-                    },
-                ).get("output2")
-                or []
-            )
-            page = sorted(
-                (str(r["stck_bsop_date"]), float(r["bstp_nmix_prpr"]))
-                for r in out
-                if r.get("stck_bsop_date") and float(r.get("bstp_nmix_prpr") or 0) > 0
-            )
-            if not page:
-                break
-            rows.extend(page)
-            if page[0][0] <= START:
-                break
-            first = date(int(page[0][0][:4]), int(page[0][0][4:6]), int(page[0][0][6:]))
-            cursor = (first - timedelta(days=1)).strftime("%Y%m%d")
-            time.sleep(PAUSE)
+        rows = index_pages(kis._get, START, END)
     finally:
         kis.close()
     rows = sorted(set(rows))
@@ -272,9 +362,15 @@ def fetch_index() -> int:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("lists", "prices", "index"))
+    parser.add_argument("stage", choices=("lists", "prices", "index", "flows"))
     args = parser.parse_args(argv)
-    return {"lists": fetch_lists, "prices": fetch_prices, "index": fetch_index}[args.stage]()
+    stages = {
+        "lists": fetch_lists,
+        "prices": fetch_prices,
+        "index": fetch_index,
+        "flows": fetch_flows,
+    }
+    return stages[args.stage]()
 
 
 if __name__ == "__main__":

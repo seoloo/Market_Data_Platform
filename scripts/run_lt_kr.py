@@ -26,7 +26,7 @@ import json
 import statistics
 import sys
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -171,6 +171,10 @@ class Run:
     trades: list[dict[str, object]] = field(default_factory=list)
     leader_log: dict[str, list[str]] = field(default_factory=dict)
     universe_log: dict[str, list[str]] = field(default_factory=dict)
+    positions: dict[str, dict[str, object]] = field(default_factory=dict)
+    """끝난 날 들고 있는 종목: 수량·원가·진입일·지금 평가 (그림자 기록 보고용)."""
+    pending_sells: dict[str, str] = field(default_factory=dict)
+    """끝난 날 종가로 정한, 다음 거래일 종가에 팔 종목과 이유."""
 
 
 def _last_px(panel: KrPanel, sym: str, t: int) -> float:
@@ -180,13 +184,23 @@ def _last_px(panel: KrPanel, sym: str, t: int) -> float:
     return xs[t]  # type: ignore[return-value]
 
 
-def simulate_kr(panel: KrPanel, index_ok: Sequence[bool]) -> Run:
+Picker = Callable[["KrPanel", int, Sequence[str]], list[tuple[str, float]]]
+"""월말 ``t`` 에 종목군 안에서 주도주(점수 높은 순)를 고르는 함수."""
+
+
+def simulate_kr(
+    panel: KrPanel,
+    index_ok: Sequence[bool],
+    pick: Picker | None = None,
+    start_date: str = FROM,
+) -> Run:
     """문서 113 ``simulate`` 와 같은 순서(어제 신호 → 오늘 종가 실행 → 오늘 종가로 내일 할 일).
 
     다른 점: 거래 못 하는 날은 사고팔지 않는다(매도는 넘어감), 상장폐지 종목은 마지막 거래일에 판다,
-    주도주는 그 시점 종목군에서 고른다."""
+    주도주는 그 시점 종목군에서 고른다. ``pick`` 이 없으면 113 의 주도 점수(:func:`leaders_pit`),
+    있으면 그 함수로 고른다(문서 142 수급 판)."""
     days = panel.days
-    start = next(i for i, d in enumerate(days) if d >= FROM)
+    start = next(i for i, d in enumerate(days) if d >= start_date)
     cash = 1.0
     pos: dict[str, list[float]] = {}  # sym -> [수량, 원가, 진입 뒤 최고 종가, 진입 색인]
     run = Run()
@@ -252,7 +266,7 @@ def simulate_kr(panel: KrPanel, index_ok: Sequence[bool]) -> Run:
         if month_end:
             pool = members(panel, t)
             run.universe_log[d] = pool
-            lead = leaders_pit(panel, t, pool)
+            lead = (pick or leaders_pit)(panel, t, pool)
             run.leader_log[d] = [s for s, _ in lead]
             if index_ok[t]:
                 pending_buy = [
@@ -261,17 +275,31 @@ def simulate_kr(panel: KrPanel, index_ok: Sequence[bool]) -> Run:
                     if s not in pos and s not in pending_sell and trend_up(panel.close[s], t)
                 ]
         run.equity.append(cash + sum(q * _last_px(panel, s, t) for s, (q, *_r) in pos.items()))
+    last = len(days) - 1
+    run.positions = {
+        s: {
+            "qty": q,
+            "cost": cost,
+            "entry": days[int(i0)],
+            "value": q * _last_px(panel, s, last),
+            "peak": peak,
+        }
+        for s, (q, cost, peak, i0) in pos.items()
+    }
+    run.pending_sells = dict(pending_sell)
     return run
 
 
-def equal_weight_pit(panel: KrPanel, universe_log: Mapping[str, Sequence[str]]) -> list[float]:
+def equal_weight_pit(
+    panel: KrPanel, universe_log: Mapping[str, Sequence[str]], start_date: str = FROM
+) -> list[float]:
     """그 시점 종목군을 매달 똑같은 비중으로.
 
     월말 종목군 → 다음 거래일 종가에 맞춤, 바뀐 금액에 0.25%.
 
     거래 못 하는 종목은 그날 그대로 둔다. 상장폐지 종목은 마지막 거래일 종가에 현금이 된다."""
     days = panel.days
-    start = next(i for i, d in enumerate(days) if d >= FROM)
+    start = next(i for i, d in enumerate(days) if d >= start_date)
     hold: dict[str, float] = {}
     cash, out = 1.0, []
     target: Sequence[str] | None = universe_log.get(days[start - 1]) or members(panel, start - 1)
@@ -318,11 +346,12 @@ def data_hash() -> tuple[str, int]:
     return h.hexdigest(), len(files)
 
 
-def build_panel() -> tuple[KrPanel, list[bool]]:
-    info = json.loads((DATA / "info.json").read_text(encoding="utf-8"))
-    rows = (DATA / "kospi.csv").read_text(encoding="utf-8").splitlines()[1:]
+def build_panel(data: Path = DATA, to: str = TO) -> tuple[KrPanel, list[bool]]:
+    """``data`` 폴더(info.json · kospi.csv · prices/)로 판을 만든다. 기본은 141 고정 자료·기간."""
+    info = json.loads((data / "info.json").read_text(encoding="utf-8"))
+    rows = (data / "kospi.csv").read_text(encoding="utf-8").splitlines()[1:]
     kospi = {_iso(r.split(",")[0]): float(r.split(",")[1]) for r in rows}
-    days = sorted(d for d in kospi if d <= TO)
+    days = sorted(d for d in kospi if d <= to)
     at = {d: i for i, d in enumerate(days)}
     close: dict[str, list[float | None]] = {}
     value: dict[str, list[float]] = {}
@@ -330,7 +359,7 @@ def build_panel() -> tuple[KrPanel, list[bool]]:
     listed_from: dict[str, int] = {}
     last: dict[str, int] = {}
     delisted: set[str] = set()
-    for path in sorted((DATA / "prices").glob("*.csv")):
+    for path in sorted((data / "prices").glob("*.csv")):
         sym = path.stem
         v = info.get(sym)
         if v is None or v.get("kind") != COMMON:
