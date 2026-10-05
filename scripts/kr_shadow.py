@@ -162,8 +162,9 @@ def flows() -> dict[str, object]:
     panel, _ok = build_panel(ROOT, to="9999-12-31")
     t = len(panel.days) - 1
     pool = members(panel, t, size=FLOW_POOL)
-    today = _today()
-    lo = (datetime.now() - timedelta(days=FLOW_DAYS)).strftime("%Y%m%d")  # noqa: DTZ005
+    # 오늘 날짜를 장중에 물으면 "TIME LIMIT 00:00 ~ 15:40" 으로 거절된다 → 일봉의 마지막 거래일까지
+    hi = panel.days[t].replace("-", "")
+    lo = (date.fromisoformat(panel.days[t]) - timedelta(days=FLOW_DAYS)).strftime("%Y%m%d")
     FLOWS.mkdir(parents=True, exist_ok=True)
     kis = _kis()
     done = failed = 0
@@ -172,7 +173,7 @@ def flows() -> dict[str, object]:
         for code in pool:
             path = FLOWS / f"{code}.csv"
             try:
-                rows = _flow_pages(kis._get, code, lo, today)
+                rows = _flow_pages(kis._get, code, lo, hi)
             except Exception:  # 한 종목 실패가 전체를 멈추지 않게
                 failed += 1
                 continue
@@ -181,7 +182,7 @@ def flows() -> dict[str, object]:
             done += 1
     finally:
         kis.close()
-    return {"flows": done, "failed": failed, "pool": len(pool)}
+    return {"flows": done, "failed": failed, "pool": len(pool), "to": hi}
 
 
 def _sector_rank(scores: dict[str, float], sector: dict[str, str]) -> list[dict[str, object]]:
@@ -278,8 +279,12 @@ def run() -> dict[str, object]:
             "equal_weight_krw": round(10_000_000 * ew[-1] / ew[0]),
         }
     REPORTS.mkdir(parents=True, exist_ok=True)
-    for path in (REPORTS / f"{day}.json", REPORTS / "latest.json"):
-        path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    same_day = REPORTS / f"{day}.json"
+    if same_day.exists():  # 같은 날 다시 돌리면 이미 모은 뉴스 기록은 그대로 둔다
+        before = json.loads(same_day.read_text(encoding="utf-8"))
+        if "news" in before:
+            report["news"] = before["news"]
+    _save_report(report)
     return {
         "date": day,
         "price_leaders": [x["name"] for x in report["price_leaders"]],
@@ -318,7 +323,7 @@ def news() -> dict[str, object]:
         for it in items:
             fh.write(json.dumps(it.to_json(), ensure_ascii=False) + "\n")
     report["news"] = {
-        "file": str(path.relative_to(REPO)),
+        "file": path.relative_to(REPO).as_posix(),
         "items": len(items),
         "sources_failed": failed,
         "fetched_at": fetched_at,
