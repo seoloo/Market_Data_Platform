@@ -1,0 +1,267 @@
+{
+ "purpose": "실적 개선형 주도주 Phase 0 — 종료 3 종목 Tiingo 무료 가격 소표본 (가격 제공 여부·정지 뒤 행·raw/수정)",
+ "window": [
+  "2022-09-01",
+  "2022-11-15"
+ ],
+ "files": [
+  {
+   "file": "data/research/fundamental_pilot/tiingo-twtr-meta-20261005.json",
+   "bytes": 215,
+   "sha256": "e3d42f63c309253012195551ec23e9fac7f83890f14f0b1e08116b4b3c44e778",
+   "symbol": "TWTR",
+   "kind": "meta",
+   "url": "https://api.tiingo.com/tiingo/daily/TWTR",
+   "params": null,
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  },
+  {
+   "file": "data/research/fundamental_pilot/tiingo-twtr-prices-20261005.json",
+   "bytes": 9048,
+   "sha256": "5da9597a9925b002e146f6e8c2485cc4547709d13676db1412a7496214f7fab2",
+   "symbol": "TWTR",
+   "kind": "prices",
+   "url": "https://api.tiingo.com/tiingo/daily/TWTR/prices",
+   "params": {
+    "startDate": "2022-09-01",
+    "endDate": "2022-11-15"
+   },
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  },
+  {
+   "file": "data/research/fundamental_pilot/tiingo-ctxs-meta-20261005.json",
+   "bytes": 497,
+   "sha256": "72d878629a2de4cb2387cf43d156ca68baf5cc4f91bad5518227d73570c079dc",
+   "symbol": "CTXS",
+   "kind": "meta",
+   "url": "https://api.tiingo.com/tiingo/daily/CTXS",
+   "params": null,
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  },
+  {
+   "file": "data/research/fundamental_pilot/tiingo-ctxs-prices-20261005.json",
+   "bytes": 6006,
+   "sha256": "3f599b299a3cf30a4b78c3e66131dfbd5488924de15289051ccc52cd00b956fa",
+   "symbol": "CTXS",
+   "kind": "prices",
+   "url": "https://api.tiingo.com/tiingo/daily/CTXS/prices",
+   "params": {
+    "startDate": "2022-09-01",
+    "endDate": "2022-11-15"
+   },
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  },
+  {
+   "file": "data/research/fundamental_pilot/tiingo-nlsn-meta-20261005.json",
+   "bytes": 556,
+   "sha256": "2863c3d26c043211bfc72e5ca4103859863e2fe9c1354eb2dcb4847cae6be427",
+   "symbol": "NLSN",
+   "kind": "meta",
+   "url": "https://api.tiingo.com/tiingo/daily/NLSN",
+   "params": null,
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  },
+  {
+   "file": "data/research/fundamental_pilot/tiingo-nlsn-prices-20261005.json",
+   "bytes": 6191,
+   "sha256": "73958589a1c7317c9646c686cfa1fd1d9ec141041c666dcb8f76773b608f79e3",
+   "symbol": "NLSN",
+   "kind": "prices",
+   "url": "https://api.tiingo.com/tiingo/daily/NLSN/prices",
+   "params": {
+    "startDate": "2022-09-01",
+    "endDate": "2022-11-15"
+   },
+   "http_status": 200,
+   "fetched_at": "2026-10-05T11:04:20+00:00"
+  }
+ ],
+ "summary": [
+  {
+   "symbol": "TWTR",
+   "meta_start": "2013-11-07",
+   "meta_end": "2022-10-28",
+   "rows": 41,
+   "first_date": "2022-09-01",
+   "last_date": "2022-10-28",
+   "known_last_trade": "2022-10-27",
+   "rows_after_known_last_trade": [
+    {
+     "date": "2022-10-28",
+     "close": 53.7,
+     "volume": 0
+    }
+   ],
+   "zero_volume_rows": 1,
+   "adj_differs_rows": 0,
+   "div_cash_rows": 0,
+   "split_rows": 0,
+   "last_rows": [
+    {
+     "date": "2022-10-26T00:00:00.000Z",
+     "open": 52.95,
+     "high": 53.5,
+     "low": 52.77,
+     "close": 53.35,
+     "volume": 28064973,
+     "adjClose": 53.35,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-10-27T00:00:00.000Z",
+     "open": 53.91,
+     "high": 54.0,
+     "low": 53.7,
+     "close": 53.7,
+     "volume": 140831508,
+     "adjClose": 53.7,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-10-28T00:00:00.000Z",
+     "open": 53.7,
+     "high": 53.7,
+     "low": 53.7,
+     "close": 53.7,
+     "volume": 0,
+     "adjClose": 53.7,
+     "divCash": 0.0
+    }
+   ]
+  },
+  {
+   "symbol": "CTXS",
+   "meta_start": "1995-12-08",
+   "meta_end": "2022-11-02",
+   "rows": 27,
+   "first_date": "2022-09-01",
+   "last_date": "2022-11-02",
+   "known_last_trade": "2022-09-29",
+   "rows_after_known_last_trade": [
+    {
+     "date": "2022-09-30",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-10-03",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-10-04",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-10-05",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-10-06",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-10-07",
+     "close": 103.9,
+     "volume": 0
+    },
+    {
+     "date": "2022-11-02",
+     "close": 103.9,
+     "volume": 33
+    }
+   ],
+   "zero_volume_rows": 6,
+   "adj_differs_rows": 0,
+   "div_cash_rows": 0,
+   "split_rows": 0,
+   "last_rows": [
+    {
+     "date": "2022-10-06T00:00:00.000Z",
+     "open": 103.9,
+     "high": 103.9,
+     "low": 103.9,
+     "close": 103.9,
+     "volume": 0,
+     "adjClose": 103.9,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-10-07T00:00:00.000Z",
+     "open": 103.9,
+     "high": 103.9,
+     "low": 103.9,
+     "close": 103.9,
+     "volume": 0,
+     "adjClose": 103.9,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-11-02T00:00:00.000Z",
+     "open": 103.9,
+     "high": 103.9,
+     "low": 103.9,
+     "close": 103.9,
+     "volume": 33,
+     "adjClose": 103.9,
+     "divCash": 0.0
+    }
+   ]
+  },
+  {
+   "symbol": "NLSN",
+   "meta_start": "2011-01-27",
+   "meta_end": "2022-10-11",
+   "rows": 28,
+   "first_date": "2022-09-01",
+   "last_date": "2022-10-11",
+   "known_last_trade": null,
+   "rows_after_known_last_trade": [],
+   "zero_volume_rows": 0,
+   "adj_differs_rows": 0,
+   "div_cash_rows": 0,
+   "split_rows": 0,
+   "last_rows": [
+    {
+     "date": "2022-10-07T00:00:00.000Z",
+     "open": 27.94,
+     "high": 27.97,
+     "low": 27.94,
+     "close": 27.96,
+     "volume": 5523191,
+     "adjClose": 27.96,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-10-10T00:00:00.000Z",
+     "open": 27.96,
+     "high": 27.99,
+     "low": 27.96,
+     "close": 27.97,
+     "volume": 3578429,
+     "adjClose": 27.97,
+     "divCash": 0.0
+    },
+    {
+     "date": "2022-10-11T00:00:00.000Z",
+     "open": 27.98,
+     "high": 28.0,
+     "low": 27.97,
+     "close": 27.98,
+     "volume": 22430307,
+     "adjClose": 27.98,
+     "divCash": 0.0
+    }
+   ]
+  }
+ ],
+ "note": "원응답은 git 제외 로컬 파일. 재배포하지 않는다. 키·계정 정보는 남기지 않았다."
+}
