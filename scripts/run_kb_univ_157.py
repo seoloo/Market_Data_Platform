@@ -37,7 +37,7 @@ REPO = Path(__file__).resolve().parent.parent
 VISION = REPO / "data" / "external" / "binance_vision" / "spot"
 UNIV = REPO / "data" / "research" / "alt_universe"
 OUTPUT = REPO / "reports" / "kb_univ_157"
-EXPECTED_DATA: str | None = None
+EXPECTED_DATA: str | None = "ed7b61c75fdbc9a1574f6fcbe0da5304e37ae72f47825722d9d210b4e36416f9"
 """자료 묶음 해시 — audit 뒤 문서 157 에 적고 여기에 고정한다."""
 MIN_ENTRIES = 100
 SPLIT = "2022-01-01"

@@ -51,7 +51,9 @@ def base_of(sym: str) -> str:
 
 def eligible(symbols: Iterable[str]) -> list[str]:
     """빼는 규칙을 적용한 USDT 페어 (순수)."""
-    usdt = {s for s in symbols if s.endswith("USDT") and len(s) > 4}
+    usdt = {
+        s for s in symbols if re.fullmatch(r"[A-Z0-9]+USDT", s) and len(s) > 4
+    }  # 한자 이름 페어 제외
     bases = {base_of(s) for s in usdt}
     out = []
     for s in sorted(usdt):
