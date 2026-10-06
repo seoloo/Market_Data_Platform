@@ -21,6 +21,13 @@
 - 코드·설정·시장 자료·DB·운영 원장 변경, 수집·학습·신호/성과 계산 없음. 이번 문서 커밋은 Claude의 **확정 사전등록 커밋이 아니다**.
 - 검증: 로컬 문서 링크 214개 누락 0, IDEAS 기존 18행·PROGRESS 과거 본문 보존, `git diff --check` 통과. 커밋 전 기준 코드 검사도 실행: pytest 2,777건·leakage 90건, mypy strict 451파일, ruff check·format 638파일, import 계약 5/5 통과. 이는 기존 코드 회귀 검사이며 DMN 수익성/모델 검증이 아니다.
 
+## 2026-10-07 — IDEAS 21 · 20 주식 ML: Phase 0 감사 — 확정 불가, 사용자 결정 7 개 (학습·성과 없음)
+
+- 사용자 요청(Codex 초안 `4f87eb9` 셋): 21(기업정보 RF vs Ridge) → 20(비용 고려 배분) 순서로 자료·위험·검정력 감사, 관문 전 학습·성과·확정 금지.
+- 한국 권고(미국은 무료 명부 없음). 지배주주 자본 96% 확보 · KRX 시가총액 2015 ~ · 배당·비용표·지정가 엔진 있음. 막힌 것: DART 재무·XBRL 수집 중, **KRX 일별 업종 칸 비어 있어 당시 업종 출처 없음**(DART 서식 판정은 계약 문구와 충돌), 폐지 회계·운영 위험 규칙(1% · 2% · 30%)과의 충돌, numpy · scikit-learn · scipy 미설치.
+- 검정력(대리, 이미 본 141 · 142 규칙 차이 SD 6.3 ~ 7.8%/월): 표본 밖 88 개월 → RF − Ridge 가 SD 2 ~ 3% 여도 연 7 ~ 11%p 이상만 검출 · 20 은 SD 1% 면 연 3.6%p(경계선).
+- `scripts/audit_equity_ml_phase0.py` + 시험 2 개 · [EQUITY_ML_PHASE0_AUDIT](docs/research/EQUITY_ML_PHASE0_AUDIT.md). 운영·IDEAS.md 변경 없음.
+
 ## 2026-10-07 — IDEAS 19 비용 고려 DMN: Phase 0 감사 `DATA_INSUFFICIENT` → 사용자 "버림으로" (학습·성과 없음)
 
 - 사용자 "IDEAS 19번과 DMN 사전등록 초안을 읽고 Phase 0 자료·실행·검정력 감사부터 … 미확정 관문을 해결하기 전에는 학습·성과 판정을 실행하지 말고". Codex 초안 `345a49a`.
