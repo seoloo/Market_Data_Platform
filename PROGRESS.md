@@ -1,9 +1,17 @@
 # 작업 현황
 
-최종 갱신: 2026-10-07 · 작성: Claude (146~157) · Codex (IDEAS 19 초안 인계).
+최종 갱신: 2026-10-07 · 작성: Claude (146~157) · Codex (IDEAS 19·20·21 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
 
+
+## 2026-10-07 — Codex: 주식 논문 1·2 초안 → IDEAS 20·21 (연구 미실행)
+
+- 사용자 "1, 2번을 진행할 수 있도록 초안 만들어줘". 1번 [비용 고려 배분](docs/research/EQUITY_COST_AWARE_PREREGISTRATION_DRAFT.md)은 IDEAS 20, 2번 [기업정보 수익 예측](docs/research/EQUITY_RETURN_PREDICTION_PREREGISTRATION_DRAFT.md)은 IDEAS 21. [공통 계약](docs/research/EQUITY_ML_COMMON_RESEARCH_CONTRACT_DRAFT.md)에 PIT·지정가/위험·독립 월수·검정력·열람 경계를 묶었다.
+- **Phase 0 / DRAFT / NOT_TESTED**. 제안 순서는 공통 감사 → 21의 단일 얕은 RF vs Ridge → 20의 동일 예측 비용 고려 vs 비용 무시 배분. 두 모델 성과 경연/자동 실행 승인 아님. 한국 무료 재무 경로를 우선 제안하되 시장 미확정, 미국 논문의 정확한 재현 아님.
+- Opus 다음: 무료 자료/노출 지도·주식 보호/위험 계약·모델 용량·최소 추가 효과와 월 단위 80% 검정력 감사. 계획 학습 파일럿은 별도 승인. 부족하면 멈추고, 사용자 선택/미확정 관문 해결 뒤 성과 전 확정 커밋한다.
+- 버린 19와 기존 연구·운영·일정은 불변. 코드·DB·시장 자료 변경, 수집·학습·예측/성과 계산 없음. 과거 인계 기록은 아래에 보존한다.
+- 검증: 로컬 문서 링크 230개 누락 0, IDEAS 기존 19행·PROGRESS 과거 본문 보존, `git diff --check` 통과. 기존 코드 회귀 검사: pytest 2,780건·leakage 90건, mypy strict 452파일, ruff check·format 640파일, import 계약 5/5 통과. 이는 새 모델 구현/수익성 검증이 아니다. 변경은 문서 6개뿐이다.
 
 ## 2026-10-07 — Codex: IDEAS 19 비용 고려 DMN 초안 · Opus 인계 (연구 미실행)
 

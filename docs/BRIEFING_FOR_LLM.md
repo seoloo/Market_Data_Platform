@@ -190,6 +190,13 @@
 
 ## 6. 지금 고민하는 질문 (대화 주제)
 
+### 2026-10-07 추가 인계 — 주식 논문 1·2 / IDEAS 20·21 (초안만)
+
+- 사용자 "1, 2번을 진행할 수 있도록 초안 만들어줘". 1번은 [20 비용 고려 배분](research/EQUITY_COST_AWARE_PREREGISTRATION_DRAFT.md), 2번은 [21 기업정보 수익 예측](research/EQUITY_RETURN_PREDICTION_PREREGISTRATION_DRAFT.md). [공통 계약](research/EQUITY_ML_COMMON_RESEARCH_CONTRACT_DRAFT.md)을 함께 읽는다. **Phase 0 / DRAFT / NOT_TESTED**, 학습·성과/운영 미실행.
+- 제안 순서는 무료 PIT·주식 지정가/보호·위험·모델 용량·독립 월수/80% 감사 → 사용자 선택 → 21 단일 RF vs Ridge → 별도 선택/관문 뒤 20 동일 예측 비용 고려 vs 비용 무시 배분. 미국 논문의 정확한 재현 아님. 한국 무료 경로 우선 제안, 시장과 최소 효과/확인 기간 미확정. 두 초안 요청을 두 모델 성과 경연 승인으로 해석하지 않는다.
+- 종목×월은 독립 투자기간이 아니고 기준선 단독 SD는 모델 간 차이 SD가 아니다. 계획 학습 파일럿은 별도 승인·노출 계약이 필요하다. 이미 본 역사 자료의 지지는 최종 검증과 구분한다. 원논문 전체 학습·유료 자료·숏/레버리지·운영 변경은 범위 밖.
+- **19 DMN은 Claude Phase 0 감사 뒤 사용자 결정으로 버림.** 아래 19의 과거 초안 인계가 재개 지시가 아니다. 기존 4·5 실적 연구·운영 Phase 6·판정·일정은 변경하지 않았다. Claude가 관문 해결 뒤 성과 전 확정 커밋하고 승인된 구현·1회 판정을 담당한다.
+
 ### 2026-10-07 추가 인계 — IDEAS 19 비용 고려 DMN (초안만, 연구 미실행)
 
 - 사용자 요청으로 Codex가 [DMN 초안](research/DMN_COST_AWARE_PREREGISTRATION_DRAFT.md)과 [IDEAS 19](research/IDEAS.md)에 논문 비교·단일 모델·비용/체결·표본/검정력·기각 기준을 기록했다. **Phase 0 / DRAFT / NOT_TESTED**이며 확정 사전등록이나 성과 실행 승인이 아니다.
