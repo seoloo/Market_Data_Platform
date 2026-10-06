@@ -31,3 +31,13 @@ def test_filing_is_usable_from_the_close_of_the_next_trading_day() -> None:
 def test_stale_after_180_days_from_quarter_end() -> None:
     assert not stale("2024-06-28", "2024-03")
     assert stale("2024-12-31", "2024-03")
+
+
+def test_krx_rows_to_csv_keeps_chosen_fields_without_commas() -> None:
+    from scripts.fetch_krx import FIELDS, to_csv
+
+    text = to_csv([{"ISU_CD": "005930", "MKTCAP": "1,234", "EXTRA": "x"}]).decode("utf-8")
+    head, row = text.strip().split("\n")
+    assert head.split(",") == list(FIELDS)
+    cells = row.split(",")
+    assert cells[0] == "005930" and cells[FIELDS.index("MKTCAP")] == "1234"
