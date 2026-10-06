@@ -40,3 +40,14 @@ def test_min_sector_drops_small_and_unknown_sectors_before_picking() -> None:
 
     min_sector(pick)(panel, 0, sorted(sector))
     assert sorted(seen) == [f"A{i}" for i in range(5)]
+
+
+def test_panic_trade_buys_next_close_and_holds_twenty_days() -> None:
+    from scripts.run_kq_154 import PANIC_FEE, PANIC_HOLD, panic_trades
+
+    days = [f"d{i:03d}" for i in range(30)]
+    index = [100.0] * 30
+    index[22] = 110.0  # 1 + 1 + 20
+    got = panic_trades(days, index, ["d001", "d020"])  # d020 은 보유가 안 끝남
+    assert PANIC_HOLD == 20
+    assert got == [110.0 / 100.0 - 1 - 2 * PANIC_FEE]

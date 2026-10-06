@@ -134,13 +134,14 @@ def fetch_info() -> int:
     return 0
 
 
-def fetch_prices() -> int:
+def fetch_prices(shard: int = 0, shards: int = 1) -> int:
     PRICES.mkdir(parents=True, exist_ok=True)
     kis = _kis()
     done = failed = 0
     cands = _cands()
+    todo = [(c, v) for i, (c, v) in enumerate(sorted(cands.items())) if i % shards == shard]
     try:
-        for k, (code, c) in enumerate(sorted(cands.items()), 1):
+        for k, (code, c) in enumerate(todo, 1):
             path = PRICES / f"{code}.csv"
             if path.exists():
                 continue
@@ -215,9 +216,18 @@ def fetch_index() -> int:
 
 
 def fetch_flows(shard: int = 0, shards: int = 1) -> int:
+    """``ever_universe.json``(판에서 종목군에 든 종목과 첫·마지막 월말, ``run_kq_154 ever``)이
+    있으면 그 종목·기간만(첫 월말 120 일 앞 ~ 마지막 월말 — 수급 점수는 월말 직전 60 거래일만
+    쓴다), 없으면 후보 전체·코스닥 기간."""
     FLOWS.mkdir(parents=True, exist_ok=True)
     cands = _cands()
-    todo = [c for i, c in enumerate(sorted(cands)) if i % shards == shard]
+    ever = DATA / "ever_universe.json"
+    spans: dict[str, list[str]] = (
+        json.loads(ever.read_text(encoding="utf-8"))
+        if ever.exists()
+        else {c: [v["first"], v["last"]] for c, v in cands.items()}
+    )
+    todo = [c for i, c in enumerate(sorted(spans)) if i % shards == shard]
     kis = _kis()
     done = failed = 0
     try:
@@ -225,8 +235,8 @@ def fetch_flows(shard: int = 0, shards: int = 1) -> int:
             path = FLOWS / f"{code}.csv"
             if path.exists():
                 continue
-            c = cands[code]
-            lo, hi = max(START, _shift(c["first"], FLOW_LEAD)), min(c["last"], END)
+            first, last = spans[code]  # 종목군에 든 첫 · 마지막 월말 (없으면 코스닥 기간)
+            lo, hi = max(START, _shift(first, FLOW_LEAD)), min(last, END)
             try:
                 rows = _flow_pages(kis._get, code, lo, hi)
             except Exception as exc:  # 한 종목 실패가 전체를 멈추지 않게
@@ -250,17 +260,14 @@ def fetch_flows(shard: int = 0, shards: int = 1) -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("universe", "info", "prices", "index", "flows"))
-    parser.add_argument("--shard", default="0/1", help="flows 나눠 받기: i/n")
+    parser.add_argument("--shard", default="0/1", help="prices·flows 나눠 받기: i/n")
     args = parser.parse_args(argv)
+    i, n = (int(x) for x in args.shard.split("/"))
     if args.stage == "flows":
-        i, n = (int(x) for x in args.shard.split("/"))
         return fetch_flows(i, n)
-    stages = {
-        "universe": build_universe,
-        "info": fetch_info,
-        "prices": fetch_prices,
-        "index": fetch_index,
-    }
+    if args.stage == "prices":
+        return fetch_prices(i, n)
+    stages = {"universe": build_universe, "info": fetch_info, "index": fetch_index}
     return stages[args.stage]()
 
 

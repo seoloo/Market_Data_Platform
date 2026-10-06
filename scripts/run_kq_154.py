@@ -43,13 +43,15 @@ REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "research" / "kq_stocks"
 KRX = REPO / "data" / "research" / "krx" / "ksq"
 OUTPUT = REPO / "reports" / "kq_154"
-EXPECTED_DATA: str | None = None
+EXPECTED_DATA: str | None = "66cec2b5da49e25e83f6059aea9864a4879219fdf2800993e424bd8e6d568052"
 """자료 묶음 해시 — audit 뒤 문서 154 에 적고 여기에 고정한다."""
 FROM, SPLIT, TO = "2011-01-01", "2017-01-01", "2026-08-31"
 INDEX_SMA = 200
 MIN_SECTOR = 5
 SPAC = "스팩"
 PANIC_DEV, PANIC_SHARE, PANIC_GAP = 0.20, 0.10, 20
+PANIC_HOLD, PANIC_FEE, PANIC_MIN = 20, 0.001, 30
+"""IDEAS 14: 공포 첫날 다음 거래일 종가에 코스닥 지수(ETF) 매수 → 20 거래일 보유, 편도 0.1%."""
 
 
 def _iso(d: str) -> str:
@@ -152,6 +154,49 @@ def panic_episodes(panel: KrPanel, month_ends: Sequence[int]) -> list[str]:
     return out
 
 
+def panic_trades(
+    days: Sequence[str], index: Sequence[float], episodes: Sequence[str]
+) -> list[float]:
+    """공포 첫날 t → t+1 종가 매수, t+1+20 종가 매도, 비용 뺀 수익 (보유가 끝나는 것만)."""
+    at = {d: i for i, d in enumerate(days)}
+    out = []
+    for e in episodes:
+        t = at[e]
+        if t + 1 + PANIC_HOLD < len(days):
+            out.append(index[t + 1 + PANIC_HOLD] / index[t + 1] - 1 - 2 * PANIC_FEE)
+    return out
+
+
+def panic_verdict(
+    days: Sequence[str], index: Sequence[float], episodes: Sequence[str]
+) -> dict[str, object]:
+    import math
+
+    nets = panic_trades(days, index, episodes)
+    held = [e for e in episodes if days.index(e) + 1 + PANIC_HOLD < len(days)]
+    if len(nets) < PANIC_MIN:
+        return {"verdict": "DATA_INSUFFICIENT", "n": len(nets)}
+    mean = statistics.fmean(nets)
+    se = statistics.stdev(nets) / math.sqrt(len(nets))
+    halves = [
+        statistics.fmean([x for x, e in zip(nets, held, strict=True) if e < SPLIT] or [0.0]),
+        statistics.fmean([x for x, e in zip(nets, held, strict=True) if e >= SPLIT] or [0.0]),
+    ]
+    start = next(i for i, d in enumerate(days) if d >= FROM)
+    base = [index[i + PANIC_HOLD] / index[i] - 1 for i in range(start, len(days) - PANIC_HOLD)]
+    ok = mean > 0 and mean - 2 * se > 0 and all(h > 0 for h in halves)
+    return {
+        "verdict": "PASS" if ok else "REJECT",
+        "n": len(nets),
+        "mean": round(mean, 4),
+        "se": round(se, 4),
+        "lo2": round(mean - 2 * se, 4),
+        "halves": [round(h, 4) for h in halves],
+        "win": round(sum(x > 0 for x in nets) / len(nets), 3),
+        "any_day_20d_mean_gross": round(statistics.fmean(base), 4),
+    }
+
+
 def _month_ends(panel: KrPanel) -> list[int]:
     days = panel.days
     start = next(i for i, d in enumerate(days) if d >= FROM)
@@ -206,13 +251,33 @@ def audit() -> dict[str, object]:
     }
 
 
+ALLOWED_DIRTY = ("docs/research/IDEAS.md",)
+"""Codex 가 작업 중인 아이디어 목록 — 판정 계산과 무관해 커밋 전이어도 판정을 막지 않는다
+(Codex 파일은 건드리지 않는다, AGENTS §9). 판정 파일에 그 사실을 남긴다."""
+
+
+def dirty_paths() -> list[str]:
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "status", "--porcelain"], check=True, capture_output=True, text=True
+    ).stdout
+    return [line[3:].strip() for line in out.splitlines() if line.strip()]
+
+
+def foreign_changes() -> list[str]:
+    """커밋 안 된 변경 중 ``ALLOWED_DIRTY`` 밖의 경로."""
+    return [p for p in dirty_paths() if p not in ALLOWED_DIRTY]
+
+
 def run() -> dict[str, object]:
     target = OUTPUT / "verdict.json"
     if target.exists():
         raise SystemExit(f"이미 판정했다: {target}")
-    sha, dirty = git_state()
-    if dirty:
-        raise SystemExit("작업 트리가 깨끗하지 않다 — 커밋 뒤에 실행")
+    sha, _dirty = git_state()
+    others = foreign_changes()
+    if others:
+        raise SystemExit(f"작업 트리가 깨끗하지 않다 — 커밋 뒤에 실행: {others}")
     digest, _ = data_hash()
     if EXPECTED_DATA is None or digest != EXPECTED_DATA:
         raise SystemExit(f"자료 해시가 다르다: {digest}")
@@ -240,9 +305,13 @@ def run() -> dict[str, object]:
         ]
 
     base = three(ew)
+    closes = [idx[d] for d in panel.days]
+    episodes = panic_episodes(panel, _month_ends(panel))
     out: dict[str, object] = {
+        "PANIC_KQ": panic_verdict(panel.days, closes, episodes),
         "commit": sha,
         "data_sha256": digest,
+        "uncommitted_allowed": [p for p in dirty_paths() if p in ALLOWED_DIRTY],
         "EW": base,
         "KOSDAQ": three(kosdaq),
     }
@@ -270,9 +339,23 @@ def run() -> dict[str, object]:
     return out
 
 
+def ever() -> dict[str, object]:
+    """수급을 받을 종목: 2011-01 ~ 월말 종목군(141 정의)에 한 번이라도 든 종목 (수익 없음)."""
+    panel, _ = build_kq_panel()
+    span: dict[str, list[str]] = {}
+    for t in _month_ends(panel):
+        for s in members(panel, t):
+            d = panel.days[t].replace("-", "")
+            span.setdefault(s, [d, d])[1] = d
+    (DATA / "ever_universe.json").write_text(json.dumps(span, sort_keys=True), encoding="utf-8")
+    return {"ever_in_universe": len(span)}
+
+
 def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else "audit"
-    if cmd == "audit":
+    if cmd == "ever":
+        print(json.dumps(ever(), ensure_ascii=False))
+    elif cmd == "audit":
         print(json.dumps(audit(), ensure_ascii=False, indent=2))
     elif cmd == "run":
         print(json.dumps(run(), ensure_ascii=False, indent=2))
