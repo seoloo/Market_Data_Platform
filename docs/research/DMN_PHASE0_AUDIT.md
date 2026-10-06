@@ -3,7 +3,7 @@
 작성: 2026-10-07 (Claude). 초안: [DMN_COST_AWARE_PREREGISTRATION_DRAFT](DMN_COST_AWARE_PREREGISTRATION_DRAFT.md)(Codex, `345a49a`).
 사용자 (2026-10-07): "IDEAS 19번과 DMN 사전등록 초안을 읽고 Phase 0 자료·실행·검정력 감사부터 진행해줘. 기존 운영 전략은 수정하지 말고 유료 자료는 구매하지 마. 미확정 관문을 해결하기 전에는 학습·성과 판정을 실행하지 말고, 확정이 가능해지면 성과 열람 전에 사전등록을 커밋해줘."
 
-**결론: `DATA_INSUFFICIENT` (검정력) — 사전 등록을 확정할 수 없다.** 그 밖에 실행·자원 관문 셋이 미해결이고 그중 둘은 사용자 결정이 필요하다. 모델 학습·후보 신호·후보 성과는 만들지 않았다. 운영 코드·설정·원장·일정은 바꾸지 않았고, 유료 자료(Pinnacle CLC 등)는 쓰지 않았다.
+**결론: `DATA_INSUFFICIENT` (검정력) — 사전 등록을 확정할 수 없다. → 사용자 결정 (2026-10-07): "버림으로" — IDEAS 19 버림.** 그 밖에 실행·자원 관문 셋이 미해결이고 그중 둘은 사용자 결정이 필요하다. 모델 학습·후보 신호·후보 성과는 만들지 않았다. 운영 코드·설정·원장·일정은 바꾸지 않았고, 유료 자료(Pinnacle CLC 등)는 쓰지 않았다.
 
 코드: `python -m scripts.audit_dmn_phase0 --out reports/dmn_phase0/audit.json` (거래 DB 읽기 전용).
 
