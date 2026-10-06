@@ -281,10 +281,98 @@ def coverage() -> dict[str, Any]:
     }
 
 
+KR_STOCKS = REPO / "data" / "research" / "kr_stocks"
+KRX = REPO / "data" / "research" / "krx"
+TR_OUT = KR_STOCKS / "kospi_tr.csv"
+
+
+def _krx_day(day: str) -> tuple[float, dict[str, float]] | None:
+    """KRX 유가증권 일별 파일 → (시가총액 합, 종목 → 상장주식수). 없으면 None."""
+    import csv
+    import gzip
+    import io
+
+    path = KRX / "stk" / f"{day}.csv.gz"
+    if not path.exists():
+        return None
+    text = gzip.decompress(path.read_bytes()).decode("utf-8")
+    rows = list(csv.DictReader(io.StringIO(text)))
+    cap = sum(float(r["MKTCAP"] or 0) for r in rows)
+    return cap, {r["ISU_CD"]: float(r["LIST_SHRS"] or 0) for r in rows}
+
+
+def build_tr() -> dict[str, Any]:
+    """KOSPI 총수익 대리 지수 (관문 문서 §6 — 사용자 결정으로 K4 판정 기준)."""
+    from auto_trading.research.kr_total_return import (
+        business_days,
+        cum_index,
+        total_return_index,
+    )
+
+    lines = (KR_STOCKS / "kospi.csv").read_text(encoding="utf-8").splitlines()[1:]
+    pairs = [(x.split(",")[0], float(x.split(",")[1])) for x in lines]
+    pairs = [p for p in pairs if p[0] >= "20150101"]
+    days = [d for d, _ in pairs]
+    price = [v for _, v in pairs]
+    biz = business_days(days)
+    caps: list[float] = []
+    shares: list[dict[str, float]] = []
+    missing = 0
+    for d in days:
+        got = _krx_day(d)
+        if got is None:
+            missing += 1
+            got = (caps[-1] if caps else 0.0, shares[-1] if shares else {})
+        caps.append(got[0])
+        shares.append(got[1])
+    divs: dict[int, float] = defaultdict(float)
+    events = no_shares = 0
+    for path in sorted((KR_STOCKS / "dividends").glob("*.json")):
+        code = path.stem
+        for r in json.loads(path.read_text(encoding="utf-8")):
+            dps = float(r.get("dps") or 0)
+            if dps <= 0:
+                continue
+            ci = cum_index(days, biz, r["record_date"])
+            if ci is None or ci + 1 >= len(days):
+                continue
+            n = shares[ci].get(code, 0.0)
+            if n <= 0:
+                no_shares += 1
+                continue
+            divs[ci + 1] += dps * n
+            events += 1
+    tr = total_return_index(price, divs, caps)
+    TR_OUT.write_text(
+        "date,price,tr\n"
+        + "".join(f"{d},{p},{v:.8f}\n" for d, p, v in zip(days, price, tr, strict=True)),
+        encoding="utf-8",
+    )
+    yearly: dict[str, dict[str, float]] = {}
+    for y in sorted({d[:4] for d in days}):
+        idx = [i for i, d in enumerate(days) if d[:4] == y]
+        lo = max(idx[0] - 1, 0)
+        dy = sum(divs.get(i, 0.0) / caps[i - 1] for i in idx if i > 0 and caps[i - 1] > 0)
+        yearly[y] = {
+            "price": round(price[idx[-1]] / price[lo] - 1, 4),
+            "total": round(tr[idx[-1]] / tr[lo] - 1, 4),
+            "dividend_yield": round(dy, 4),
+        }
+    return {
+        "days": len(days),
+        "krx_missing_days": missing,
+        "dividend_events": events,
+        "events_without_shares": no_shares,
+        "yearly": yearly,
+        "out": str(TR_OUT.relative_to(REPO)),
+    }
+
+
 def main(argv: list[str]) -> int:
-    if argv != ["coverage"]:
-        raise SystemExit("usage: python -m scripts.fundamental_kr coverage")
-    sys.stdout.write(json.dumps(coverage(), ensure_ascii=False, indent=1) + "\n")
+    stages = {"coverage": coverage, "tr": build_tr}
+    if len(argv) != 1 or argv[0] not in stages:
+        raise SystemExit("usage: python -m scripts.fundamental_kr coverage|tr")
+    sys.stdout.write(json.dumps(stages[argv[0]](), ensure_ascii=False, indent=1) + "\n")
     return 0
 
 
