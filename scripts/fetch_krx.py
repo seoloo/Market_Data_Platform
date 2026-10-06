@@ -3,6 +3,7 @@
 사용 예::
 
     python -m scripts.fetch_krx daily     # 2015-01 ~ 2026-08 거래일마다 유가증권·코스닥
+    python -m scripts.fetch_krx daily ksq 20100101 20141231   # 시장·기간을 골라서 (코스닥 시험)
     python -m scripts.fetch_krx kosdaq_info   # 코스닥 종목 기본정보 (지금 상장 종목)
     python -m scripts.fetch_krx status
 
@@ -57,10 +58,10 @@ def to_csv(rows: Sequence[Mapping[str, Any]]) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
-def trading_days() -> list[str]:
-    """KOSPI 지수 자료의 거래일 (YYYYMMDD) — 141 자료와 같은 달력."""
+def trading_days(start: str = START, end: str = END) -> list[str]:
+    """KOSPI 지수 자료의 거래일 (YYYYMMDD) — 141 자료와 같은 달력. KRX 는 2010 년부터 준다."""
     rows = (REPO / "data" / "research" / "kr_stocks" / "kospi.csv").read_text().splitlines()[1:]
-    return [r.split(",")[0] for r in rows if START <= r.split(",")[0] <= END]
+    return [r.split(",")[0] for r in rows if start <= r.split(",")[0] <= end]
 
 
 def _key() -> str:
@@ -72,14 +73,17 @@ def _key() -> str:
     return key
 
 
-def fetch_daily() -> dict[str, Any]:
+def fetch_daily(
+    markets: Sequence[str] = tuple(MARKETS), start: str = START, end: str = END
+) -> dict[str, Any]:
     import httpx
 
     key = _key()
     got = skipped = empty = failed = 0
     with httpx.Client(timeout=60, headers={"AUTH_KEY": key}) as client:
-        for day in trading_days():
-            for mk, ep in MARKETS.items():
+        for day in trading_days(start, end):
+            for mk in markets:
+                ep = MARKETS[mk]
                 path = ROOT / mk / f"{day}.csv.gz"
                 mark = path.with_suffix(".empty")
                 if path.exists() or mark.exists():
@@ -132,10 +136,14 @@ def status() -> dict[str, Any]:
 
 
 def main(argv: list[str]) -> int:
-    stages = {"daily": fetch_daily, "kosdaq_info": fetch_kosdaq_info, "status": status}
-    if len(argv) != 1 or argv[0] not in stages:
-        raise SystemExit("usage: python -m scripts.fetch_krx daily|kosdaq_info|status")
-    sys.stdout.write(json.dumps(stages[argv[0]](), ensure_ascii=False) + "\n")
+    if argv[:1] == ["daily"] and len(argv) == 4:
+        out = fetch_daily((argv[1],), argv[2], argv[3])
+    else:
+        stages = {"daily": fetch_daily, "kosdaq_info": fetch_kosdaq_info, "status": status}
+        if len(argv) != 1 or argv[0] not in stages:
+            raise SystemExit("usage: python -m scripts.fetch_krx daily [시장 시작 끝]|status")
+        out = stages[argv[0]]()
+    sys.stdout.write(json.dumps(out, ensure_ascii=False) + "\n")
     return 0
 
 
