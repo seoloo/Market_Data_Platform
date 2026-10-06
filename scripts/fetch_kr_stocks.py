@@ -7,6 +7,7 @@
     python -m scripts.fetch_kr_stocks index    # KOSPI 지수 일봉
     python -m scripts.fetch_kr_stocks flows    # 종목별 투자자 매매(외국인·기관 순매수), 문서 142
     python -m scripts.fetch_kr_stocks raw      # 비수정 시·고·저·종·거래량 (실적 연구)
+    python -m scripts.fetch_kr_stocks dividends  # 예탁원 배당일정 (기준일·주당 배당금·지급일)
 
 * 목록: KIND(kind.krx.co.kr) 유가증권시장 상장법인 목록과 2008-01-01 뒤 상장폐지 현황
   — 로그인 없이 받는다.
@@ -53,6 +54,10 @@ FLOW_FIELDS = (
     "acml_tr_pbmn",
 )
 """순매수 금액(백만 원)·거래대금(원). 한 번에 30 거래일, 2006 년부터·상장폐지 종목도 받아짐."""
+DIVIDEND = "/uapi/domestic-stock/v1/ksdinfo/dividend"
+DIVIDENDS = DATA / "dividends"
+DIV_BLOCKS = (("20150101", "20181231"), ("20190101", "20221231"), ("20230101", END))
+"""배당일정은 기간을 나눠 묻는다 (한 응답에 다 오는지 몰라서 — 종목당 3 번)."""
 PAUSE = 0.06
 COMMON = "101"
 """한국투자증권 ``stck_kind_cd`` 보통주."""
@@ -134,6 +139,26 @@ def raw_rows(output2: Sequence[Mapping[str, Any]]) -> list[tuple[str, ...]]:
             )
         )
     return sorted(set(out))
+
+
+def dividend_rows(output: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
+    """예탁원 배당일정 응답 → 보통주 현금 배당 줄 (기준일 순, 같은 기준일·구분 한 번)."""
+    seen: dict[tuple[str, str], dict[str, str]] = {}
+    for r in output:
+        if str(r.get("stk_kind", "보통")) != "보통":
+            continue
+        rec = str(r.get("record_date", ""))
+        if not re.fullmatch(r"\d{8}", rec):
+            continue
+        row = {
+            "record_date": rec,
+            "kind": str(r.get("divi_kind", "")),
+            "dps": str(r.get("per_sto_divi_amt", "0")).replace(",", "") or "0",
+            "pay_date": str(r.get("divi_pay_dt", "")).replace("/", ""),
+            "face": str(r.get("face_val", "")),
+        }
+        seen[(rec, row["kind"])] = row
+    return [seen[k] for k in sorted(seen)]
 
 
 def window(info: Mapping[str, str], start: str = START, end: str = END) -> tuple[str, str] | None:
@@ -460,9 +485,49 @@ def fetch_index() -> int:
     return 0
 
 
+def fetch_dividends() -> int:
+    """2015 ~ 상장해 있던 모든 보통주의 예탁원 배당일정 (실적 연구 총수익, 관문 문서 §5)."""
+    info = json.loads((DATA / "info.json").read_text(encoding="utf-8"))
+    todo = sorted(c for c, v in info.items() if v.get("kind") == COMMON)
+    DIVIDENDS.mkdir(parents=True, exist_ok=True)
+    kis = _kis()
+    done = failed = 0
+    try:
+        for k, code in enumerate(todo, 1):
+            path = DIVIDENDS / f"{code}.json"
+            span = window(info[code], start=DIV_BLOCKS[0][0])
+            if path.exists() or span is None:
+                continue
+            rows: list[Mapping[str, Any]] = []
+            try:
+                for lo, hi in DIV_BLOCKS:
+                    if hi < span[0] or lo > span[1]:
+                        continue
+                    got = kis._get(
+                        DIVIDEND,
+                        "HHKDB669102C0",
+                        {"CTS": "", "GB1": "0", "F_DT": lo, "T_DT": hi, "SHT_CD": code,
+                         "HIGH_GB": ""},
+                    )  # fmt: skip
+                    rows += list(got.get("output1") or [])
+                    time.sleep(PAUSE)
+            except Exception as exc:  # 한 종목 실패가 전체를 멈추지 않게
+                failed += 1
+                print(f"[{k}/{len(todo)}] {code} 실패: {type(exc).__name__}", flush=True)
+                continue
+            path.write_text(json.dumps(dividend_rows(rows), ensure_ascii=False), encoding="utf-8")
+            done += 1
+            if k % 100 == 0:
+                print(f"[{k}/{len(todo)}] {code}", flush=True)
+    finally:
+        kis.close()
+    print(f"받음 {done} · 실패 {failed} · 대상 {len(todo)}")
+    return 0 if failed == 0 else 1
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("lists", "prices", "index", "flows", "raw"))
+    parser.add_argument("stage", choices=("lists", "prices", "index", "flows", "raw", "dividends"))
     parser.add_argument("--shard", default="0/1", help="flows·raw 를 나눠 받기: i/n")
     args = parser.parse_args(argv)
     if args.stage in ("flows", "raw"):
@@ -473,6 +538,7 @@ def main(argv: list[str]) -> int:
         "prices": fetch_prices,
         "index": fetch_index,
         "flows": fetch_flows,
+        "dividends": fetch_dividends,
     }
     return stages[args.stage]()
 
