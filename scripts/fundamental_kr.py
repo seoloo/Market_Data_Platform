@@ -3,6 +3,7 @@
 사용 예::
 
     python -m scripts.fundamental_kr coverage   # 월말마다 종목군 · 계산 가능 수 · 못 한 이유
+    python -m scripts.fundamental_kr tr         # KOSPI 총수익 대리 지수 만들기 + 해마다 배당 수익률
 
 * 종목군(초안 §4): 월말에 그날 거래한 유가증권시장 보통주 중 직전 63 거래일 평균 거래대금
   상위 200 (141 의 수익률 자격·시장 필터는 쓰지 않는다).
