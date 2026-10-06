@@ -143,7 +143,7 @@ def panic_episodes(panel: KrPanel, month_ends: Sequence[int]) -> list[str]:
             if t < 24 or any(x is None for x in w):
                 continue
             n += 1
-            if w[-1] <= (1 - PANIC_DEV) * sum(w) / 25:  # type: ignore[operator, arg-type]
+            if w[-1] <= (1 - PANIC_DEV) * sum(w) / 25:  # type: ignore[arg-type]
                 below += 1
         if n and below / n >= PANIC_SHARE:
             if t - last_hit > PANIC_GAP:
