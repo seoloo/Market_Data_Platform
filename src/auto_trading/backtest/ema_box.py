@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 __all__ = [
@@ -72,6 +72,10 @@ class BoxResult:
     full_exits: int = 0
     fees: float = 0.0
     r_multiples: list[float] = field(default_factory=list)
+    r_entry_ms: list[int] = field(default_factory=list)
+    """``r_multiples`` 와 같은 순서의 진입 봉 시작 ms."""
+    end_exits: int = 0
+    """``close_at_end`` 로 끝에 정리한 묶음 수."""
     """묶음마다 (비용 뒤 손익) ÷ (진입 때 위험 금액)."""
 
 
@@ -182,6 +186,7 @@ class _Lot:
     risk_amt: float
     basis: float
     pnl: float = 0.0
+    t0: int = 0
 
 
 def _mark(res: BoxResult, day: int, equity: float, value: float) -> None:
@@ -207,7 +212,19 @@ def _fill_days(res: BoxResult, from_ms: int, to_ms: int, start: float) -> BoxRes
     return res
 
 
-def simulate_box(b: Bars, *, from_ms: int, to_ms: int, initial: float, cfg: BoxConfig) -> BoxResult:
+def simulate_box(
+    b: Bars,
+    *,
+    from_ms: int,
+    to_ms: int,
+    initial: float,
+    cfg: BoxConfig,
+    can_enter: Callable[[int], bool] | None = None,
+    close_at_end: bool = False,
+) -> BoxResult:
+    """``can_enter(봉 시작 ms)`` 가 거짓인 봉에서는 신호를 내지 않는다(종목군 밖 — 이미 든 묶음의
+    손절·익절은 그대로). ``close_at_end`` 면 처리한 마지막 봉(기간 끝 또는 자료 끝 = 상장폐지)
+    종가에 남은 묶음을 팔고 R 을 기록한다. 둘 다 기본값이면 139 · 156 과 똑같다(문서 157)."""
     ind = _indicators(b, cfg)
     res = BoxResult()
     cash = initial
@@ -217,6 +234,7 @@ def simulate_box(b: Bars, *, from_ms: int, to_ms: int, initial: float, cfg: BoxC
     half_taken = False
     below1 = below2 = 0
     end = to_ms + DAY_MS
+    last_i = -1
 
     def held() -> float:
         return sum(lot.qty for lot in lots)
@@ -234,6 +252,7 @@ def simulate_box(b: Bars, *, from_ms: int, to_ms: int, initial: float, cfg: BoxC
 
     def close_lot(lot: _Lot) -> None:
         res.r_multiples.append(lot.pnl / lot.risk_amt if lot.risk_amt > 0 else 0.0)
+        res.r_entry_ms.append(lot.t0)
 
     for i in range(len(b.t)):
         t = b.t[i]
@@ -275,7 +294,7 @@ def simulate_box(b: Bars, *, from_ms: int, to_ms: int, initial: float, cfg: BoxC
                         else:
                             res.entries += 1
                             half_taken = False
-                        lots.append(_Lot(qty, stop, qty * dist, cost + f))
+                        lots.append(_Lot(qty, stop, qty * dist, cost + f, t0=t))
             pending = None
             # 2. 봉 안 손절
             keep: list[_Lot] = []
@@ -299,12 +318,22 @@ def simulate_box(b: Bars, *, from_ms: int, to_ms: int, initial: float, cfg: BoxC
                 want_half = True
                 half_taken = True
         stop_px = signal_at(b, ind, i, cfg)
-        if stop_px is not None and active:
+        if stop_px is not None and active and (can_enter is None or can_enter(t)):
             res.signals += 1
             pending = (cl * (1 + cfg.entry_slack), stop_px)
         if active:
             value = held() * cl
             _mark(res, t - t % DAY_MS, cash + value, value)
+            last_i = i
+    if close_at_end and lots and last_i >= 0:
+        cl = b.c[last_i]
+        for lot in lots:
+            sell(lot, lot.qty, cl)
+            close_lot(lot)
+        res.end_exits += len(lots)
+        lots = []
+        value = 0.0
+        _mark(res, b.t[last_i] - b.t[last_i] % DAY_MS, cash, value)
     return _fill_days(res, from_ms, to_ms, initial)
 
 
