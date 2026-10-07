@@ -15,7 +15,7 @@
 
 ## 1. 테마 · 종목 (2026-10-08 고정, 결과 전)
 
-`docs/research/theme-leaders-162.json` (sha256 `ff37583b…b17db4dd`). 사람이 지금 정한 목록이다. 자료가 있는 종목만 남았다.
+`docs/research/theme-leaders-162.json` (sha256, 줄 끝 LF 기준 `37eaf6b8…b4a942af` · 임시 폴더 CRLF 원본 `ff37583b…b17db4dd`, 내용 같음). 사람이 지금 정한 목록이다. 자료가 있는 종목만 남았다.
 
 | 국장 테마 | 종목 수 | 미장 테마 | 종목 수 |
 |---|---:|---|---:|

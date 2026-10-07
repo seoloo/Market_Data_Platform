@@ -48,7 +48,8 @@ from auto_trading.research.theme_leaders import (  # noqa: E402
 
 R = REPO_ROOT / "data" / "research"
 SPEC = REPO_ROOT / "docs" / "research" / "theme-leaders-162.json"
-SPEC_SHA = "ff37583bdd4563706e095be30561ebdb9907d6ec1b1d43c9e84053ebb17db4dd"
+SPEC_SHA = "37eaf6b885dfa627784ce3bae100691e86b5a171ef174262bb0e3515b4a942af"
+"""줄 끝을 LF 로 맞춘 해시. 10-08 임시 폴더의 CRLF 원본은 ``ff37583b…`` — 내용은 같다."""
 Z = 2.24
 COST = {"KR": 0.0025, "US": 0.0010}
 START = {
@@ -348,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
     rule = args[0]
     if rule not in ("momentum", "mcap"):
         raise SystemExit("momentum | mcap")
-    raw = SPEC.read_bytes()
+    raw = SPEC.read_bytes().replace(b"\r\n", b"\n")
     if hashlib.sha256(raw).hexdigest() != SPEC_SHA:
         raise SystemExit("테마 목록 해시 불일치")
     themes = json.loads(raw.decode("utf-8"))
