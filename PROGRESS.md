@@ -5,6 +5,14 @@
 
 
 
+## 2026-10-08 — IDEAS 25 차트 상태 변화 순서: Phase 0 감사 — 초안 그대로면 DATA_INSUFFICIENT, 사용자 결정 대기 (모델·성과 없음)
+
+- 사용자 "ideas 확인하고 작업 진행해줘". 밤사이 다른 세션 커밋 4 개(23 · 24 초안 → 160 판정 REJECT · 25 초안) 확인, 남은 25 를 감사.
+- 중복: 질문 형태(O − S)는 새롭지만 H1 · 158 · 159 · VOL-SPIKE 와 같은 단기 가격·거래량 정보라 사전 기대 낮음.
+- 검정력(무조건 5 일 분포만): 상위 20 원 수익 최소 증분 R² 1.84 ~ 34.9%p → DATA_INSUFFICIENT. 상위 100 · 횡단면 순위 0.06 ~ 5.5%p(종목 사이 상관에 달림, 결과 전 미확인). 상위 100 첨도 171.
+- 선택지: ① 보류(권고) ② 상위 100 · 순위 라벨 정보 연구(4h 281 페어 추가 · 상관 가정 사전 고정) ③ 전향 기록.
+- `scripts/audit_order_phase0.py` + 시험 2 개 · `fetch_alt_universe.monthly_top(top=)` · [ORDER_PHASE0_AUDIT](docs/research/ORDER_PHASE0_AUDIT.md). 운영·IDEAS.md 변경 없음.
+
 ## 2026-10-08 — Codex: 차트 상태 변화 순서 → IDEAS 25 초안 (연구 미실행)
 
 - 사용자 "다음설계 해줘" → "ideas에 넣어줘". [IDEAS 25](docs/research/IDEAS.md)에 폐지 포함 코인 4시간봉·최근 72시간 3구간·약 14개 입력·5일 label 제안과 Ridge B/S/O 비교를 기록. 주 질문은 같은 구간 관측값의 시간 순서가 추가 정보를 주는가이며 모두 감사 전 초안이다.

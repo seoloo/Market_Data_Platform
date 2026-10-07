@@ -156,9 +156,9 @@ def daily_quote_volume(sym: str) -> dict[str, float]:
 
 
 def monthly_top(
-    vols: Mapping[str, Mapping[str, float]], month_ends: Sequence[str]
+    vols: Mapping[str, Mapping[str, float]], month_ends: Sequence[str], top: int = TOP
 ) -> dict[str, list[str]]:
-    """월말마다 그날까지 일봉이 60 일 이상인 페어 중 지난 30 일 평균 거래대금 상위 20 (순수)."""
+    """월말마다 일봉 60 일 이상인 페어 중 지난 30 일 평균 거래대금 상위 ``top`` (순수)."""
     import bisect
 
     order = {sym: sorted(v) for sym, v in vols.items()}
@@ -172,7 +172,7 @@ def monthly_top(
                 continue  # 60 일 이상 · 그달 말일에 거래 중이어야 한다
             last = days[k - VOL_DAYS : k]
             ranked.append((-sum(v[d] for d in last) / len(last), sym))
-        out[me] = [s for _, s in sorted(ranked)[:TOP]]
+        out[me] = [s for _, s in sorted(ranked)[:top]]
     return out
 
 
