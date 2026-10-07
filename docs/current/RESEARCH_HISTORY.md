@@ -712,6 +712,7 @@ Do not retry: 종목군 크기·거래대금 창·제외 목록·KB 숫자를 �
 근거: [157 사전등록·§6 판정](../research/157-kb-survivorship-free-preregistration.md).
 
 ## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
+- 차트·보조지표 조합(IDEAS 22, Codex 초안): 2026-10-07 Phase 0 조사·감사 — 34 항목 대부분 기각 가설 중복(H1·I3·A1·SB·KB·DIV·MR 등), **재지 않은 가족은 반전형 패턴(역 H&S·이중 바닥) × 거래량 추세뿐** → 후보 A 국장 일봉(권고) · B 코인 알트 4h, 사용자 선택 대기. 추세 강도 관문은 연 2%p 검출에 약 90 년(대리)이라 뺌. 수정 주가 불가능 수익 308 건 → 정제 관문. 성과 미열람. [감사](../research/INDICATOR_COMBINATION_PHASE0_AUDIT.md).
 - 주식 ML(IDEAS 21 기업정보 RF vs Ridge → 20 비용 고려 배분, Codex 초안): 2026-10-07 Phase 0 감사 — 확정 불가 → **사용자 결정으로 보류(5 번 결과 뒤 재검토)**. DART 수집 중 · 당시 업종 출처 없음 · 폐지 회계·위험 규칙·라이브러리·최소 효과·파일럿은 사용자 결정. 88 개월로 21 은 연 7 ~ 11%p 이상만 검출(대리). [감사](../research/EQUITY_ML_PHASE0_AUDIT.md).
 - 비용 고려 DMN(IDEAS 19, Codex 초안): 2026-10-07 Phase 0 감사 **`DATA_INSUFFICIENT` → 사용자 결정으로 버림** — 3%p/년 검출에 1,700 ~ 10,000 개월 필요, 가용 약 60 개월(60 개월로 잡히는 최소 효과 연 16 ~ 32%p). LSTM 1,425 파라미터 vs 12 개월 학습 표본 720, torch 미설치, 선물 보호·지정가 계약은 사용자 결정 필요. 학습·성과 없음. [감사](../research/DMN_PHASE0_AUDIT.md).
 

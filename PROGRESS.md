@@ -5,6 +5,15 @@
 
 
 
+## 2026-10-07 — IDEAS 22 차트·보조지표 조합: Phase 0 조사·감사 — 후보 2 개, 사용자 선택 대기 (성과 없음)
+
+- 사용자 요청: 지표·패턴 정의·기존 연구 중복·무료 자료·체결 비용·검정력 확인 → 성과 전 후보 최대 3 개, 선택 전 조합 백테스트·전략 수정 금지.
+- 34 항목 표(원 정의·입력·확인 지연·구현 ○/△/×). 같은 식 3 쌍(Stochastic = Williams %R · CMF ≈ Chaikin Osc · ROC = T 부호). 조합 유형 10 가지 중 8 가지가 기각 가설 중복, 거래량 압력 종목 고르기는 FLOW-KR 재포장이라 보류.
+- 진단(신호 없이 무조건 초과 수익 분산): 국장 20 일 SD 15 ~ 19% → 순 1% 에 독립 사건 1,844 ~ 2,943 · 코인 알트 5 일 9.6% → 738. 추세 강도 관문 대리: 연 2%p 에 91 ~ 227 년.
+- 후보 A 국장 일봉 역 H&S · 이중 바닥(LMW 정의) × 거래량 추세, 20 일 보유, 롱만(권고) · B 같은 질문 코인 알트 4h. 첫 단계는 수익 없이 사건 수만 세기.
+- 발견: KIS 수정 주가에 제한폭으로 불가능한 수익 308 건(5·10 일 창) → 패턴 전 정제 규칙 G-KR1 필요.
+- `scripts/audit_indicator_phase0.py` + 시험 3 개 · [INDICATOR_COMBINATION_PHASE0_AUDIT](docs/research/INDICATOR_COMBINATION_PHASE0_AUDIT.md). 운영·IDEAS.md 변경 없음.
+
 ## 2026-10-07 — Codex: 차트·보조지표 조합 조사 → IDEAS 22 (연구 미실행)
 
 - 사용자 "ideas에 넣고 opus가 작업할 수 있게". [IDEAS 22](docs/research/IDEAS.md)와 [상세 초안](docs/research/INDICATOR_COMBINATION_RESEARCH_DRAFT.md)에 6개 역할·34개 초기 지표/패턴 조사 항목, 기계 정의·기존 기각 중복·상호작용·무료 자료·인과성·지정가/보호·독립 표본/80% 관문을 기록했다.
