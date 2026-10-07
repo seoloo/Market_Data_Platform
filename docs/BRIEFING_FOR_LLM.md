@@ -190,6 +190,13 @@
 
 ## 6. 지금 고민하는 질문 (대화 주제)
 
+### 2026-10-07 추가 인계 — IDEAS 22 차트·보조지표 조합 (조사 초안, 연구 미실행)
+
+- 사용자 요청으로 [IDEAS 22](research/IDEAS.md)와 [조사·설계 초안](research/INDICATOR_COMBINATION_RESEARCH_DRAFT.md)을 작성했다. **Phase 0 / DRAFT / NOT_TESTED**. 앞서 언급한 지표에 한정하지 않고 6개 역할·34개 초기 지표/패턴의 공식·역할·확인 시점·중복·자료/기존 구현을 비교한다.
+- Opus 다음: 지표/패턴 조사 → 기존 H1·KB·MJ/다이버전스·삼각형·V·체결 흐름 중복 감사 → 무료 자료/열람·인과성·지정가/보호·독립 표본/80% 관문 → 성과를 보지 않고 최대 3개 설계 후보 제시. 사용자 하나 선택과 관문 해결 뒤 Claude가 성과 전 사전등록을 확정한다.
+- 목록 전체 구현·수백/수천 조합 탐색·학습·백테스트·성과 열람·운영 적용은 승인하지 않았다. 넓은 탐색은 별도 사용자 승인과 전체 시도 수/다중검정/미열람 검증 계획부터. 지표 추가나 숫자 변경으로 기각 연구를 다시 열지 않는다.
+- 19 DMN은 버림, 20·21은 5번 결과 뒤 재검토하는 보류 상태 유지. 5의 자료 관문 진행과 운영 Phase 6·기존 전략/위험/판정/일정은 변경하지 않았다. Elliott/뉴스/JEV는 Shadow 전용, Elliott 최소 마감 4시간봉, D22 제외를 유지한다.
+
 ### 2026-10-07 추가 인계 — 주식 논문 1·2 / IDEAS 20·21 (초안만)
 
 - 사용자 "1, 2번을 진행할 수 있도록 초안 만들어줘". 1번은 [20 비용 고려 배분](research/EQUITY_COST_AWARE_PREREGISTRATION_DRAFT.md), 2번은 [21 기업정보 수익 예측](research/EQUITY_RETURN_PREDICTION_PREREGISTRATION_DRAFT.md). [공통 계약](research/EQUITY_ML_COMMON_RESEARCH_CONTRACT_DRAFT.md)을 함께 읽는다. **Phase 0 / DRAFT / NOT_TESTED**, 학습·성과/운영 미실행.
