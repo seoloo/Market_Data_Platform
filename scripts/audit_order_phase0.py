@@ -85,11 +85,13 @@ def window_moments(
     }
 
 
-def power_rows(m: Mapping[str, Any], kurtosis: float) -> dict[str, Any]:
+def power_rows(
+    m: Mapping[str, Any], kurtosis: float, windows_per_year: float = 365 / H_DAYS
+) -> dict[str, Any]:
     """첨도로 부풀림 h 를 잡아 두 극단 N_eff 의 최소 증분 R² 와 필요 연수 (순수)."""
     h = max(1.0, kurtosis / 3)
     lo, hi = m["windows"], m["windows"] * m["pairs_per_window"]
-    per_year_lo, per_year_hi = 365 / H_DAYS, 365 / H_DAYS * m["pairs_per_window"]
+    per_year_lo, per_year_hi = windows_per_year, windows_per_year * m["pairs_per_window"]
     return {
         "inflation_h": round(h, 2),
         "n_eff_low_dates_only": lo,
