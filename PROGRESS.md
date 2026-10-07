@@ -5,6 +5,12 @@
 
 
 
+## 2026-10-08 — 161 판정 REJECT · IDEAS 26 ~ 28 Phase 0 감사 (사용자 "판정 먼저 확인하고 ideas 연구 작업 진행해줘")
+
+- 161(국장 순서 정보 연구) 확정 `4d6d989` → 1 회 판정: O − S ΔR² +0.017%p(SE 0.029%p, 하한 −0.042%p) · 반쪽 −0.033 / +0.067%p → REJECT. 보고: S − B +0.26%p(최근 3 일 정보는 있음, 순서는 없음). 실제 SE 가 시험 어림의 약 3 배.
+- 26 ~ 28(Codex `f2eeefc`) 감사: 26 O/v2 방어 · 복귀 DATA_INSUFFICIENT(추가분 연 변동성 8.9%, 꺼 둔 날 20 ~ 50% 면 6.5 년으로 연 4.4 ~ 7.0%p 만 검출, 20% 낙폭 3 번) · 27 배분 판정형 불가(78 개월 연 2.7 ~ 5.4%p, 코인 실거래 흐름 없음, QNDX 가격 파일 없음) → T/v2 결정 뒤 회계 도구 · 28 한국 분해는 설명용(연 26%p) · 미국 13F DATA_NOT_READY.
+- `scripts/audit_followup_26_28.py` · [FOLLOWUP_26_28_PHASE0_AUDIT](docs/research/FOLLOWUP_26_28_PHASE0_AUDIT.md). 운영 · IDEAS.md 변경 없음.
+
 ## 2026-10-08 — IDEAS 26~28 후속 연구 초안: 선물 방어·복귀 / 실제 배분 / 한국·미국 개별주 (Codex)
 
 - 사용자 세 방향 선택과 "손실을 피해도 복귀하지 못해 전체 수익이 줄면 안 된다"는 목표를 [IDEAS](docs/research/IDEAS.md) 26~28에 기록. **Phase 0 / DRAFT / NOT_TESTED**. 코드·설정·자료 수집·신규 백테스트·판정·예약·운영 변경 없음.
