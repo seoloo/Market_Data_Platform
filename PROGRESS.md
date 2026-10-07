@@ -1,9 +1,18 @@
 # 작업 현황
 
-최종 갱신: 2026-10-07 · 작성: Claude (146~159) · Codex (IDEAS 19~24 초안 인계).
+최종 갱신: 2026-10-07 · 작성: Claude (146~160) · Codex (IDEAS 19~24 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
 
+
+## 2026-10-07 — 160 ETF 흐름 23 LONG · 24 SHORT: 감사 → 사전 등록 → 판정 둘 다 REJECT
+
+- 사용자 "지금 코덱스가 만든 ideas 분석해서 작업해줘" → "판정까지 진행해줘 난 자려고". 사용자 결정 자리는 보수적으로 정하고 [160](docs/research/160-btc-etf-flow-preregistration.md) §7 에 적음.
+- Phase 0: Farside 전체 표(703 행) · Wayback 스냅숏 127 개 · FINRA CNMS 686 파일 · Yahoo ETF 종가. Farside 는 IBIT 가 가장 늦게 차고, 묶인 완성 7.9 ~ 15.4 시간 · 수정 0 건 → 23 평가 = 마감 + 24 시간. FINRA `Last-Modified` 약 17:18 ET → 24 평가 = 19:00 ET 뒤, 다음 날 이후 고친 파일 2 개 제외. AUM PIT 없음 → 순유입 USD.
+- 사전 등록 `1b45255`(수익 미열람, 해시 고정): 23 신호 147(거래 91) · 24 신호 70. 80% 검출 최소 효과 1.33% · 0.85% — 검정력 관문은 엄밀히 미달이라고 적고 진행.
+- 판정 1 회씩: **23 REJECT** — 거래당 +0.38%(SE 0.39%), 신호 − 나머지 +0.36%p(SE 0.47%), 반쪽 · 해마다 + 지만 유의하지 않음. **24 REJECT** — −0.41%, 비용 전 −0.23%, 두 반쪽 −. 결합 · 반전 · 재판정 안 함.
+- `scripts/fetch_etf_flow.py` · `scripts/run_etf_flow_160.py` · `research/etf_flow.py` + 시험 9 개. 운영 · 전략 · 위험 · IDEAS.md 변경 없음(IDEAS 상태 갱신은 Codex 몫).
+- 검증: pytest 2,815 · leakage 90 · mypy 461 파일 · ruff check/format · import 계약 5/5 통과.
 
 ## 2026-10-07 — Codex: 미국 현물 BTC ETF 흐름 LONG / SHORT → IDEAS 23·24 (연구 미실행)
 
