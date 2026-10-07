@@ -1,9 +1,17 @@
 # 작업 현황
 
-최종 갱신: 2026-10-07 · 작성: Claude (146~157) · Codex (IDEAS 19·20·21·22 초안 인계).
+최종 갱신: 2026-10-07 · 작성: Claude (146~159) · Codex (IDEAS 19~24 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
 
+
+## 2026-10-07 — Codex: 미국 현물 BTC ETF 흐름 LONG / SHORT → IDEAS 23·24 (연구 미실행)
+
+- 사용자 지정 두 독립 연구를 [IDEAS 23·24](docs/research/IDEAS.md)에 가설 → 데이터 → 진입/청산 초안 → 비용 → 판정 기준 → 결과 순서로 기록. 23은 ETF 순유입 LONG, 24는 ETF short-selling flow SHORT이며 대칭 반전/즉시 결합 금지.
+- **Phase 0 / DRAFT / NOT_TESTED**. Opus 다음: 무료 자료·실제 의미/범위·공개 시각/당시 버전·독립 표본/80% 관문 → 각각 성과 전 확정 → 승인된 범위에서 순차 독립 검증. 두 독립 검증 모두 통과한 뒤에만 결합의 새 사전등록·미열람 검증을 제안한다.
+- 웹에서 발행사/Farside 공개 자료 후보·FINRA 공식 필드/게시 안내·SEC 현물 설정/환매 제도 변경을 확인했다. FINRA short volume ≠ short interest/기관 순숏, ShortVolume에 exempt 포함, 중복 집계·잘못된 분모·수정본 누수 주의를 명시. 과거 원자료 확보/PIT·검정력·성과는 미실행. 유료 구매/새 예약/코드/DB/운영 변경 없음.
+- 22 A·B 기각·19 버림·20/21 보류·5 자료 관문·운영 Phase 6과 기존 일정/판정 유지. BRIEFING에 같은 인계 추가.
+- 검증: 문서 3개 로컬 링크 238개 누락 0·기존 IDEAS 1~22/과거 기록 보존·변경 범위/공백 검사 통과. pytest 2,806건·leakage 90건·mypy 459파일·ruff check/format(652파일)·import 계약 5개 통과. 기존 코드의 회귀검사이며 ETF 자료 가용·검정력·신규 수익성 관문 통과를 주장하지 않는다.
 
 ## 2026-10-07 — 159 코인 알트 반전형 패턴 판정: REJECT (IDEAS 22 후보 B)
 
