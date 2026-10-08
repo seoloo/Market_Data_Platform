@@ -67,4 +67,4 @@ $a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trad
   - NBG ↔ BASE: 낙폭 · 샤프 차이(178 이 말한 대로 낙폭이 작은가).
   - NBG_ISA ↔ NBG: 국내 상장판이 미국판을 따라가는가(원화 환율 · 선물 롤 · 보수 차이). 원화 수익과 달러 수익이라 환율 몫이 섞인다.
 - 국내 상장 매니지드 퓨처스(추세 추종) ETF 는 찾지 못했다 → MIX 의 ISA 판은 없다.
-- 세금 차이는 Paper 에 넣지 않는다. 계좌별 세후 비교는 179(작성 중).
+- 세금 차이는 Paper 에 넣지 않는다. 계좌별 세후 비교는 [179](179-isa-vs-taxable-account.md)(ISA ≈ 토스, `NO_CLEAR_EDGE`).

@@ -84,7 +84,7 @@ def _book_from(d: dict[str, Any]) -> Book:
         peak=d["peak"],
         mdd=d["mdd"],
         costs=d["costs"],
-        history=[tuple(x) for x in d["history"]],  # type: ignore[misc]
+        history=[tuple(x) for x in d["history"]],
     )
 
 

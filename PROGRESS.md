@@ -3,6 +3,13 @@
 최종 갱신: 2026-10-09 · 작성: Claude (146~175) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-09 아침 — 177 Paper 에 60/20/20 장부 둘 · 179 ISA vs 토스 세후: NO_CLEAR_EDGE
+
+- 사용자: "1. 같이해줘 2. isa 계좌도 시험해줘 3. 1,2번 끝나면 진행해줘".
+- Paper(`scripts/mf_paper.py`)에 **NBG**(QNDX 60 · IEF 20 · GLDM 20, 1,000 USD) · **NBG_ISA**(133690 · 305080 · 411060, 100 만 원, 편도 0.02%) 추가, 2026-10-08 종가 시작. 장부마다 거래일 줄 · `last_day`. MIX · BASE 그대로. [177 §6](docs/research/177-mf-sleeve-paper-registration.md).
+- [179](docs/research/179-isa-vs-taxable-account.md) (사전 등록 `2e61f6b`): 매달 65 만 원 · 10 년 창 368 개, 60/20/20 ISA 세후 ÷ 토스 세후 − 1 중앙 **+0.03%**(50.8% 창) → `NO_CLEAR_EDGE`. ISA 가 세금 약 590 만 원을 아끼지만 국내 ETF 추적 손해(나스닥 −0.65 · 채권 선물 −1.33 · 금 −0.49%/년)로 상쇄. 보고: 토스 250 만 공제를 QS 가 쓰면 ISA +2.7% · 나스닥만 +3.8% · 일반 계좌 + 국내 ETF 는 항상 나쁨.
+- `research/account_tax.py` + 시험 5 · 스크립트 시험 2.
+
 ## 2026-10-09 새벽 — ③ IDEAS 5 한국 실적: 전체 자료 커버리지 · 자료 처리 고침 → 엄격 기준 `DATA_NOT_READY` (수익 미열람)
 
 - DART 수집은 10-08 밤 끝났다(공시 목록 880 · 재무 48,773 · XBRL 원본 4,899). **예약 작업 `AutoTrading_KR_DART` 해제 필요(사용자).**
