@@ -59,6 +59,7 @@ from auto_trading.execution.overlay_futures import (  # noqa: E402
     OverlayFuturesExecutor,
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
+from auto_trading.notify.style import RULE, sub  # noqa: E402
 from auto_trading.ops.kill_switch import halted_reason  # noqa: E402
 from auto_trading.storage.db import connect  # noqa: E402
 from auto_trading.storage.migrations import apply_migrations  # noqa: E402
@@ -131,11 +132,19 @@ def leg_message(
     """선물 다리 하나의 알림 — 무엇을 했고(롱 추가·늘림·줄임·청산·유지) 왜 했는지 짧게."""
     head = f"[데모·선물 O/v2] {p.symbol}"
     trend = "추세 정보 없음" if ups is None else f"20·60·120일 추세 {ups}/3 상승"
-    stop = f"비상 스톱 {p.stop} (전날 무기한 종가 × 0.8)" if p.stop else "스톱 없음"
+    stop = f"🛡 비상 스톱 {p.stop}" if p.stop else "🛡 스톱 없음"
+    stop_lines = [stop] + ([sub("전날 무기한 종가 × 0.8")] if p.stop else [])
     if after == before:
-        return (
-            f"{head} 오늘 주문 없음 — 선물 롱 {after} 유지 (목표와 차이가 자본의 2.5% 밴드 안)\n"
-            f"{trend} · T/v2 목표 {p.weight:.1%} → 선물 {p.weight * EXTRA:.1%} · {stop}"
+        return "\n".join(
+            [
+                f"💤 {head} 오늘 주문 없음",
+                RULE,
+                f"선물 롱 {after} 유지",
+                sub("목표와 차이가 자본의 2.5% 밴드 안"),
+                f"📈 {trend}",
+                sub(f"T/v2 목표 {p.weight:.1%} → 선물 {p.weight * EXTRA:.1%}"),
+                *stop_lines,
+            ]
         )
     if after == 0:
         action, why = (
@@ -154,7 +163,9 @@ def leg_message(
             f"현물 T/v2 가 롱 중({trend}, 목표 {p.weight:.1%}) → 그 절반({p.weight * EXTRA:.1%})을 "
             f"선물로 더 얹어 총 1.5배 (현물 자본 {equity:,.0f} USDT 기준)"
         )
-    return f"{head} {action} {before} → {after}\n이유: {why}\n{stop}"
+    return "\n".join(
+        [f"🛒 {head}", RULE, f"{action} {before} → {after}", f"이유: {why}", *stop_lines]
+    )
 
 
 def state_message(rep: OverlayExecutionReport) -> str:
@@ -168,7 +179,15 @@ def state_message(rep: OverlayExecutionReport) -> str:
         "DEGRADED": "노출을 늘리지 않고 줄이기·보호만 했다",
         "HALTED": "아무 주문도 내지 않았다 — 사람 확인 필요",
     }.get(rep.state, "")
-    return f"[데모·선물 O/v2] {rep.state} — {meaning}\n원인: {' | '.join(reasons) or '기록 확인'}"
+    return "\n".join(
+        [
+            f"⚠️ [데모·선물 O/v2] {rep.state}",
+            RULE,
+            meaning,
+            "원인:",
+            *(f"• {r}" for r in reasons or ["기록 확인"]),
+        ]
+    )
 
 
 class Notify:

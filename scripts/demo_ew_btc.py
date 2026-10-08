@@ -49,6 +49,7 @@ from auto_trading.core.types import Candle  # noqa: E402
 from auto_trading.exchange.binance_usdm_testnet import BinanceUsdmTestnet  # noqa: E402
 from auto_trading.exchange.futures import OrderStatus  # noqa: E402
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
+from auto_trading.notify.style import RULE, arrow, sub  # noqa: E402
 from auto_trading.research.elliott.demo_setup import (  # noqa: E402
     EwSetup,
     agreement,
@@ -163,11 +164,14 @@ def scan(minutes: list[Candle]) -> list[ScanRow]:
 
 def no_setup_message(info: dict[str, Any]) -> str:
     """새 꼭짓점이 확정됐지만 들어가지 않은 이유 한 줄."""
-    return (
-        f"[데모·선물 Elliott] 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}"
-        " — 진입 안 함\n"
-        f"이유: 상위 {info['top']}개 시나리오 중 '충격파 5파 종료' 합의 "
-        f"상승 {info['up']} · 하락 {info['down']} (같은 방향 6개 이상 필요)"
+    return "\n".join(
+        [
+            f"🌊 [데모·선물 Elliott] 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}"
+            " — 진입 안 함",
+            RULE,
+            f"상위 {info['top']}개 시나리오 중 '충격파 5파 종료' 합의",
+            f"🔺 상승 {info['up']} · 🔻 하락 {info['down']} (같은 방향 6개 이상 필요)",
+        ]
     )
 
 
@@ -260,8 +264,8 @@ class EwDemoRunner:
         if (mark - entry) * s.direction <= 0:
             self.store.event("skip_passed", setup=_setup_row(s), mark=str(mark))
             self.notify(
-                f"{TAG}\n셋업 건너뜀: 확정 시점에 이미 0.5 되돌림({_fmt(entry)})을 지났다 "
-                f"(현재 {_fmt(mark)})"
+                f"⏭ {TAG}\n{RULE}\n셋업 건너뜀: 확정 시점에 이미 0.5 되돌림을 지났다\n"
+                + sub(f"되돌림 {_fmt(entry)} · 현재 {_fmt(mark)}")
             )
             return
         equity = self.api.asset_balance(ASSET)
@@ -271,7 +275,7 @@ class EwDemoRunner:
         ) * self.filters.step_size
         if qty * entry < self.filters.min_notional:
             self.store.event("skip_small", setup=_setup_row(s), qty=str(qty))
-            self.notify(f"{TAG}\n셋업 건너뜀: 1% 위험 크기 {qty} 가 최소 주문 미만")
+            self.notify(f"⏭ {TAG}\n{RULE}\n셋업 건너뜀: 1% 위험 크기 {qty} 가 최소 주문 미만")
             return
         self.api.set_margin_type(SYMBOL, "CROSSED")
         self.api.set_leverage(SYMBOL, LEVERAGE)
@@ -280,7 +284,7 @@ class EwDemoRunner:
             result = self.api.place_limit_order(SYMBOL, side, qty, entry, ids["entry"])
         except OrderRejectedError as exc:
             self.store.event("entry_rejected", error=str(exc))
-            self.notify(f"{TAG}\n예약 거절: {exc}")
+            self.notify(f"❌ {TAG}\n{RULE}\n예약 거절: {exc}")
             return
         self.state.update(
             phase="PENDING",
@@ -298,10 +302,22 @@ class EwDemoRunner:
         way = "롱" if s.direction > 0 else "숏"
         leg = "상승" if s.direction > 0 else "하락"
         self.notify(
-            f"{TAG}\n{SYMBOL} {way} 지정가 예약 {qty} @{_fmt(entry)} (충격파 0.5 되돌림)\n"
-            f"손절 {_fmt(stop)} (충격파 시작 — 넘으면 해석 무효) · 목표 {_fmt(target)} (1.618)\n"
-            f"이유: 상위 {s.top_n}개 시나리오 중 {s.agree}개가 {leg} 충격파 5파 종료"
-            f"({_fmt(s.a)}→{_fmt(s.b)}, {s.impulse_pct:.1%})로 읽음 → 2·4파 되돌림 진입. 위험 1%"
+            "\n".join(
+                [
+                    f"🛒 {TAG}",
+                    RULE,
+                    f"{SYMBOL} {way} 지정가 예약 {qty} @{_fmt(entry)}",
+                    sub("충격파 0.5 되돌림"),
+                    f"🛑 손절 {_fmt(stop)}",
+                    sub("충격파 시작 — 넘으면 해석 무효"),
+                    f"🎯 목표 {_fmt(target)} (1.618)",
+                    f"이유: 상위 {s.top_n}개 시나리오 중 {s.agree}개가 {leg} 충격파 5파 종료",
+                    sub(
+                        f"{_fmt(s.a)}→{_fmt(s.b)}, {s.impulse_pct:.1%}"
+                        " → 2·4파 되돌림 진입 · 위험 1%"
+                    ),
+                ]
+            )
         )
 
     def cancel_pending(self, why: str) -> None:
@@ -313,7 +329,7 @@ class EwDemoRunner:
             self.on_entry_fill(result.executed_qty, result.avg_price)
             return
         self.store.event("cancelled", why=why)
-        self.notify(f"[데모·선물] {SYMBOL} 예약 취소: {why}")
+        self.notify(f"🚫 [데모·선물] {SYMBOL} 예약 취소\n{sub(why)}")
         self.state = {"phase": "IDLE", "last_trigger_ms": self.state.get("last_trigger_ms", 0)}
         self._save()
 
@@ -360,10 +376,16 @@ class EwDemoRunner:
         )
         way = "롱" if self._long() else "숏"
         self.notify(
-            f"[데모·선물] {SYMBOL} {way} 진입 체결 {qty} @{_fmt(price)} · "
-            f"손절 {_fmt(Decimal(self.state['stop']))}·"
-            f"목표 {_fmt(Decimal(self.state['target']))} 걸림"
-            f" (보호까지 {gap_ms / 1000:.1f}초)"
+            "\n".join(
+                [
+                    f"✅ [데모·선물] {SYMBOL} {way} 진입 체결",
+                    RULE,
+                    f"{qty} @{_fmt(price)}",
+                    f"🛑 손절 {_fmt(Decimal(self.state['stop']))}",
+                    f"🎯 목표 {_fmt(Decimal(self.state['target']))}",
+                    sub(f"보호 주문까지 {gap_ms / 1000:.1f}초"),
+                ]
+            )
         )
 
     # -------------------------------------------------- 청산
@@ -390,8 +412,13 @@ class EwDemoRunner:
         risk = Decimal(self.state["equity_at_setup"]) * RISK
         r_mult = None if pnl is None else pnl / risk
         self.store.event("closed", how=how, price=str(price), pnl=str(pnl), r=str(r_mult))
-        tail = "" if pnl is None else f" · 손익 {pnl:+.1f} {ASSET} ({r_mult:+.2f}R, 수수료 제외)"
-        self.notify(f"[데모·선물] {SYMBOL} 청산 — {how} @{_fmt(price) if price else '?'}{tail}")
+        icon = "🛑" if how == "손절" else "🎯" if how == "목표" else "🏁"
+        lines = [f"{icon} [데모·선물] {SYMBOL} 청산 — {how}", RULE]
+        lines.append(f"@{_fmt(price) if price else '?'}")
+        if pnl is not None:
+            lines.append(f"{arrow(float(pnl))} 손익 {pnl:+.1f} {ASSET} ({r_mult:+.2f}R)")
+            lines.append(sub("수수료 제외"))
+        self.notify("\n".join(lines))
         self.state = {"phase": "IDLE", "last_trigger_ms": self.state.get("last_trigger_ms", 0)}
         self._save()
 
@@ -402,7 +429,7 @@ class EwDemoRunner:
             side = "SELL" if pos > 0 else "BUY"
             self.api.place_market_order(SYMBOL, side, abs(pos), ids["exit"], reduce_only=True)
         self.store.event("time_exit")
-        self.notify(f"[데모·선물] {SYMBOL} 30일 보유 한도 — 시장가 청산")
+        self.notify(f"⏰ [데모·선물] {SYMBOL} 30일 보유 한도\n{sub('시장가 청산')}")
         self.on_flat()
 
     # -------------------------------------------------- 한 번 점검
