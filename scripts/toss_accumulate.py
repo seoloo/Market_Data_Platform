@@ -98,6 +98,12 @@ QS_LIVE = False
 """2026-10-09 사용자 "전략 qs는 그냥 페이퍼에만 등록 해줘" → 토스 실거래 QS(TQQQ 전환) 끔.
 QS 는 Paper(`scripts/qs_paper.py`, 예약 AutoTrading_QS_Paper)로만 기록한다.
 상태 파일은 그대로 둔다."""
+QUIET_ROUTINE = True
+"""2026-10-09 사용자 "매달 1달러씩 적립 매수하는건 알림 보내지 않아도 돼,
+단 달러 부족하면 환전 알림".
+밤 적립 결과는 거절 · 결과 모름 · 수수료 변경(❌ · ⚠) 이 있을 때만 텔레그램으로 보낸다.
+환전 알림(``fx``) · 실패 알림은 그대로다."""
+ALERT_MARKS = ("❌", "⚠")
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -624,7 +630,8 @@ def run(telegram: bool = True) -> int:
         + "\n",
         "utf-8",
     )
-    _notify(text, telegram)
+    if not QUIET_ROUTINE or any(mark in text for mark in ALERT_MARKS):
+        _notify(text, telegram)
     print(text)
     return 0
 

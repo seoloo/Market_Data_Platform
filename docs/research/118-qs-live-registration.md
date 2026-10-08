@@ -86,3 +86,4 @@
 - `toss_accumulate.QS_LIVE = False`. 토스에서 QS 신호 갱신 · TQQQ 주문을 하지 않는다. 상태 파일(`QS_SWITCH.json`)은 그대로 둔다.
 - QS 는 원래 있던 Paper(`scripts/qs_paper.py`, 예약 `AutoTrading_QS_Paper` 21:15)로만 기록한다(10-08 실행 정상).
 - 같은 날 WQTM 적립을 매일 4 → 1 달러로 줄였다(10-10 부터, 그 전에 쌓인 적립금 24 달러는 이어짐 — `Plan.changes`).
+- 같은 날 사용자 "매달 1달러씩 적립 매수하는건 알림 보내지 않아도 돼, 단 달러 부족하면 환전 알림" → `QUIET_ROUTINE`. 밤 적립 결과는 거절 · 결과 모름 · 수수료 변경(❌ · ⚠)이 있을 때만 텔레그램. 환전 알림(09 · 12 · 15 시)과 실패 알림은 그대로.

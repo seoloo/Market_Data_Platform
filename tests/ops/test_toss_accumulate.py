@@ -281,3 +281,16 @@ def test_qs_live_off_sends_no_tqqq(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     _seed(mod)
     assert mod.run(telegram=False) == 0
     assert all(o[0] != "TQQQ" for o in fake.sent)
+
+
+def test_routine_run_is_quiet_but_rejection_alerts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sent: list[str] = []
+    fake = FakeToss()
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
+    monkeypatch.setattr(mod, "QUIET_ROUTINE", True)
+    _seed(mod)
+    assert mod.run(telegram=False) == 0
+    assert all(any(m in x for m in mod.ALERT_MARKS) for x in sent)
