@@ -12,6 +12,12 @@
   (178 의 ISA 판, 국내 상장 · 원화 1,000,000).
   국내 상장 매니지드 퓨처스 ETF 는 없어 B 의 ISA 판은 없다.
 * 시세: Yahoo 일봉 배당 조정 종가(키 없음). 빈 날은 직전 값. 장부마다 첫 종목의 거래일 줄로 맞춘다.
+* LD_M0 · LD_M2 · LD_M3 = TQQQ + SCHD (182, 1,000 USD 씩).
+  - M0 고정 60/40.
+  - M2 낙폭 브레이크: 최근 12 개 달 말 고점 대비 −15% 면 TQQQ 30%, −30% 면 0.
+  - M3 변동성 맞춤: QQQ 20 일 변동성이 20% 를 넘으면 TQQQ 60% × 0.20/σ.
+  - 몫은 직전 달 말 정보로 정해 매달 첫 거래일에 맞춘다.
+  - M3 는 182 에서 REJECT 였지만 사용자 결정(2026-10-09 "m2 m3 로 해줘")으로 기록한다.
 * 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도: 미국 ETF 0.15%(수수료 0.10% + 환전 0.05%) ·
   국내 ETF(ISA) 0.02%.
 * 상태 ``data/mf_paper/state.json`` · 보고 ``reports/mf_paper/latest.json``.
@@ -29,12 +35,17 @@ from pathlib import Path
 from typing import Any
 
 from auto_trading.ops.mf_paper import (
+    LEV_MAX,
     Book,
     judge,
+    lev_share_dd,
+    lev_share_vol,
     mark,
+    month_end_values,
     monthly_returns,
     new_month,
     open_book,
+    realized_vol,
     rebalance,
 )
 
@@ -56,6 +67,16 @@ BOOKS: dict[str, dict[str, Any]] = {
     "NBG": {"targets": NBG, "capital": CAPITAL, "cost": COST, "ccy": "USD"},
     "NBG_ISA": {"targets": NBG_ISA, "capital": 1_000_000.0, "cost": 0.0002, "ccy": "KRW"},
 }
+LD = {"TQQQ": LEV_MAX, "SCHD": 1 - LEV_MAX}
+for _name, _rule in (("LD_M0", "M0"), ("LD_M2", "M2"), ("LD_M3", "M3")):
+    BOOKS[_name] = {
+        "targets": LD,
+        "capital": CAPITAL,
+        "cost": COST,
+        "ccy": "USD",
+        "rule": _rule,
+    }
+SIGNAL = "QQQ"
 FIRST_START = "2026-10-08"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 
@@ -64,7 +85,7 @@ def _prices(span: str = "3mo") -> dict[str, dict[str, float]]:
     import httpx
 
     out: dict[str, dict[str, float]] = {}
-    for sym in sorted({sym for b in BOOKS.values() for sym in b["targets"]}):
+    for sym in sorted({SIGNAL} | {sym for b in BOOKS.values() for sym in b["targets"]}):
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={span}&interval=1d"
         res = httpx.get(url, headers={"User-Agent": UA}, timeout=60).json()["chart"]["result"][0]
         adj = res["indicators"]["adjclose"][0]["adjclose"]
@@ -108,6 +129,21 @@ def _filled(
     return out
 
 
+def targets_for(
+    cfg: dict[str, Any], book: Book | None, qqq: dict[str, float], day: str
+) -> dict[str, float]:
+    """182 장부: ``day`` 가 든 달 직전 달 말까지의 정보로 레버리지 몫을 정한다. 다른 장부는 고정."""
+    rule = cfg.get("rule")
+    if rule not in ("M2", "M3"):
+        return dict(cfg["targets"])
+    if rule == "M2":
+        share = lev_share_dd(month_end_values(book.history if book else [], day))
+    else:
+        closes = [qqq[d] for d in sorted(qqq) if d[:7] < day[:7]]
+        share = lev_share_vol(realized_vol(closes))
+    return {"TQQQ": share, "SCHD": 1 - share}
+
+
 def run() -> dict[str, Any]:
     px = _prices()
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -123,18 +159,26 @@ def run() -> dict[str, Any]:
         filled = _filled(px, syms, 7 if cfg["ccy"] == "KRW" else 21)
         if not filled:
             continue
+        share = None
         if name in st["books"]:
             raw = st["books"][name]
             book, start, last_day = _book_from(raw), raw["start"], raw["last_day"]
+            share = raw.get("lev_share")
         else:
             start = min((d for d in filled if d >= FIRST_START), default=max(filled))
-            book = open_book(cfg["capital"], cfg["targets"], filled[start], cfg["cost"])
+            tg = targets_for(cfg, None, px[SIGNAL], start)
+            book = open_book(cfg["capital"], tg, filled[start], cfg["cost"])
+            if "rule" in cfg:
+                share = tg["TQQQ"]
             mark(book, start, filled[start])
             last_day = start
         for d in [d for d in sorted(filled) if d > last_day]:
             if new_month(last_day, d):
-                fee = rebalance(book, cfg["targets"], filled[d], cfg["cost"])
+                tg = targets_for(cfg, book, px[SIGNAL], d)
+                fee = rebalance(book, tg, filled[d], cfg["cost"])
                 rebal.append([d, name, round(fee, 4)])
+                if "rule" in cfg:
+                    share = tg["TQQQ"]
             mark(book, d, filled[d])
             last_day = d
         st["books"][name] = {
@@ -142,6 +186,7 @@ def run() -> dict[str, Any]:
             "start": start,
             "last_day": last_day,
             "ccy": cfg["ccy"],
+            **({"lev_share": share} if "rule" in cfg else {}),
         }
     STATE.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
     report = _report(st, rebal)
@@ -167,6 +212,8 @@ def _report(state: dict[str, Any], rebal: list[Any]) -> dict[str, Any]:
             "mdd": round(b["mdd"], 4),
             "costs": round(b["costs"], 2),
         }
+        if b.get("lev_share") is not None:
+            out[name]["tqqq_share"] = round(b["lev_share"], 3)
     return out
 
 

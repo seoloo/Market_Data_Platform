@@ -8,7 +8,7 @@
 - 사용자: "tqqq랑 qld를 배당주랑 섞어서 낙폭을 줄이는 방법을 연구해보자" → "셋 다 비교" · "둘 다 판정". 사전 등록 `114545f`.
 - M0 고정 60/40 대비(1986 ~): M1 추세 스위치 낙폭 98 → 72%(3 배) · 88 → 64%(2 배), M2 낙폭 브레이크 98 → 64% · 88 → 61%, 수익 0.7 ~ 1.7%p 만 내줌 → **둘 다 HISTORICAL_SUPPORT**. M3 변동성 맞춤은 2 배 뒤 반쪽 낙폭 −3%p 로 REJECT(수익 · 샤프 최고).
 - 실제 ETF(2010 ~): M2 가 낙폭 최소(TQQQ + SCHD 58 → 37%), M1 은 강세장 수익 손실 큼. [182](docs/research/182-leveraged-dividend-drawdown-control-preregistration.md).
-- 다음(사용자 결정): Paper 기록 여부 · 상품 · 매일/매달 확인 · 세금.
+- 사용자 "m2 m3 로 해줘" → Paper(`scripts/mf_paper.py`)에 **LD_M0 · LD_M2 · LD_M3**(TQQQ + SCHD, 1,000 USD 씩, 2026-10-08 시작, 월 1 회) 추가. M3 는 REJECT 지만 사용자 결정으로 기록. [177 §7](docs/research/177-mf-sleeve-paper-registration.md).
 
 ## 2026-10-09 아침 — 181 나스닥 레버리지 + 배당주: 3 배 60/40 REJECT (낙폭)
 

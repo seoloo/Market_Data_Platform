@@ -128,3 +128,45 @@ def judge(
         "J3": j3,
         "eligible_for_small_live_review": j1 and j2 and j3,
     }
+
+
+# ------------------------------------------------------------------ 182 레버리지 + 배당 장부
+
+LEV_MAX = 0.6
+DD_FULL = 0.30
+VOL_REF = 0.20
+
+
+def month_end_values(history: Sequence[tuple[str, float]], before: str) -> list[float]:
+    """``before`` (YYYY-MM-DD) 달 전까지 달마다 마지막 평가액 (순수, 오래된 것부터)."""
+    last: dict[str, float] = {}
+    for d, v in history:
+        if d[:7] < before[:7]:
+            last[d[:7]] = v
+    return [last[m] for m in sorted(last)]
+
+
+def lev_share_dd(values: Sequence[float]) -> float:
+    """182 M2 낙폭 브레이크: 60% × clip(1 − DD12 / 0.30, 0, 1).
+
+    DD12 는 최근 12 개 달 말 고점 대비 낙폭."""
+    if not values:
+        return LEV_MAX
+    peak = max(values[-12:])
+    dd = 1 - values[-1] / peak if peak > 0 else 0.0
+    return LEV_MAX * min(1.0, max(0.0, 1 - dd / DD_FULL))
+
+
+def realized_vol(closes: Sequence[float], n: int = 20) -> float | None:
+    """마지막 ``n`` 개 일간 수익의 표준편차 × √252 (순수). 모자라면 None."""
+    if len(closes) < n + 1:
+        return None
+    rets = [b / a - 1 for a, b in zip(closes[-n - 1 : -1], closes[-n:], strict=True)]
+    return statistics.pstdev(rets) * math.sqrt(252)
+
+
+def lev_share_vol(vol: float | None) -> float:
+    """182 M3 변동성 맞춤: 60% × min(1, 0.20 / σ20)."""
+    if vol is None or vol <= 0:
+        return LEV_MAX
+    return LEV_MAX * min(1.0, VOL_REF / vol)

@@ -54,3 +54,23 @@ def test_judge_rules() -> None:
     assert r["J2"] is True and r["J2_sleeve_aqr_corr"] == pytest.approx(1.0)
     assert corr([1, 2, 3], [1, 2, 3]) == pytest.approx(1.0)
     assert corr([1, 1, 1], [1, 2, 3]) is None
+
+
+def test_182_lev_share_rules() -> None:
+    from auto_trading.ops.mf_paper import (
+        LEV_MAX,
+        lev_share_dd,
+        lev_share_vol,
+        month_end_values,
+        realized_vol,
+    )
+
+    hist = [("2026-10-08", 100.0), ("2026-10-30", 110.0), ("2026-11-27", 93.5), ("2026-12-01", 1.0)]
+    vals = month_end_values(hist, "2026-12-01")
+    assert vals == [110.0, 93.5]
+    assert lev_share_dd(vals) == pytest.approx(LEV_MAX * 0.5)
+    assert lev_share_dd([]) == LEV_MAX
+    assert lev_share_vol(0.4) == pytest.approx(LEV_MAX * 0.5)
+    assert lev_share_vol(None) == LEV_MAX
+    assert realized_vol([1.0] * 5) is None
+    assert realized_vol([1.0] * 21) == pytest.approx(0.0)
