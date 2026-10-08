@@ -58,6 +58,11 @@ class M3State:
     months: list[list[Any]] = field(default_factory=list)
     """[달, 변동성, TQQQ 몫]."""
     orders: list[M3Order] = field(default_factory=list)
+    amounts: dict[str, float] = field(default_factory=dict)
+    """달 → 사용자가 텔레그램으로 정한 납입(원). 없으면 기본 금액."""
+    ask_month: str = ""
+    ask_ts: int = 0
+    tg_offset: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -73,11 +78,37 @@ class M3State:
             dividends=list(d.get("dividends") or []),
             months=list(d.get("months") or []),
             orders=[M3Order(**o) for o in d.get("orders") or []],
+            amounts={k: float(v) for k, v in (d.get("amounts") or {}).items()},
+            ask_month=d.get("ask_month", ""),
+            ask_ts=int(d.get("ask_ts", 0)),
+            tg_offset=int(d.get("tg_offset", 0)),
         )
 
 
 def due(state: M3State, today: str) -> bool:
     return state.done_month != today[:7]
+
+
+def deposited(state: M3State, month: str) -> bool:
+    return any(str(d[0])[:7] == month for d in state.deposits)
+
+
+def amount_target(state: M3State, today: str) -> str | None:
+    """텔레그램 금액 답이 들어갈 달: 이번 달 매수 전이면 이번 달, 아니면 물어본 다음 달."""
+    if due(state, today) and not deposited(state, today[:7]):
+        return today[:7]
+    if state.ask_month > today[:7] and not deposited(state, state.ask_month):
+        return state.ask_month
+    return None
+
+
+def next_weekday(today: str) -> str:
+    from datetime import date, timedelta
+
+    d = date.fromisoformat(today) + timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d.isoformat()
 
 
 def lev_share(closes: Sequence[tuple[str, float]], today: str) -> tuple[float | None, float]:

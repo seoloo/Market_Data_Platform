@@ -50,6 +50,7 @@ from auto_trading.ops.m3_live import (
     LEV,
     M3Order,
     M3State,
+    amount_target,
     apply_fill,
     choose,
     credit_dividends,
@@ -57,6 +58,7 @@ from auto_trading.ops.m3_live import (
     due,
     lev_share,
     limit_price,
+    next_weekday,
 )
 from auto_trading.ops.m3_live import SYMBOLS as M3_SYMBOLS
 from auto_trading.ops.qndx_alert import (
@@ -126,6 +128,8 @@ M3_FILE = "M3.json"
 M3_MAX_QTY = {DIV: 40}
 """한 번에 SCHD 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
 M3_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
+M3_MAX_KRW = 5_000_000.0
+"""텔레그램 금액 답의 상한 (오타 방지). 넘으면 다시 묻는다."""
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -315,11 +319,74 @@ def _m3_plan(day: Day, m3: M3State) -> tuple[dict[str, int], float | None, float
     closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
     vol, share = lev_share(closes, day.today)
     notes = credit_dividends(m3, _dividend_events(), day.today, _since)
-    usd = deposit(m3, day.today, M3_MONTHLY_KRW, day.fx)
+    krw = m3.amounts.get(day.today[:7], M3_MONTHLY_KRW)
+    usd = deposit(m3, day.today, krw, day.fx)
     if usd:
-        notes.append(f"이번 달 납입 {M3_MONTHLY_KRW:,.0f}원 = ${usd:,.2f} (환율 {day.fx:,.1f})")
+        src = "텔레그램 답" if day.today[:7] in m3.amounts else "기본"
+        notes.append(f"이번 달 납입 {krw:,.0f}원({src}) = ${usd:,.2f} (환율 {day.fx:,.1f})")
+    elif krw <= 0:
+        notes.append("이번 달 납입 0원(텔레그램 답) — 이월 현금 · 배당만으로")
     last = {s: day.prices[s] for s in M3_SYMBOLS}
     return choose(m3.qty, m3.cash_usd, last, share, day.fee), vol, share, notes
+
+
+def _m3_poll(today: str, telegram: bool) -> None:
+    """텔레그램 답으로 이번(또는 물어본 다음) 달 M3 금액을 정한다. 등록 채팅의 글만 읽는다."""
+    from auto_trading.notify.channels import NotifyError
+    from auto_trading.notify.inbox import TelegramInbox, parse_krw
+
+    creds = load_telegram_credentials(REPO / ".env")
+    if not M3_ENABLED or not telegram or creds is None:
+        return
+    m3 = _load_m3()
+    try:
+        msgs, nxt = TelegramInbox(creds).fetch(m3.tg_offset)
+    except NotifyError as exc:
+        print(f"텔레그램 받기 실패: {exc}")
+        return
+    m3.tg_offset = nxt
+    for msg in msgs:
+        target = amount_target(m3, today)
+        if target is None:
+            continue
+        if target == m3.ask_month and msg.date < m3.ask_ts:
+            continue
+        krw = parse_krw(msg.text)
+        if krw is None:
+            _notify("❓ 금액으로 읽지 못했어요. 예: 30만 · 500000 · 0(이번 달 쉬기)", telegram)
+        elif krw > M3_MAX_KRW:
+            _notify(
+                f"❓ {krw:,.0f}원은 상한({M3_MAX_KRW:,.0f}원)보다 커요. 다시 보내 주세요", telegram
+            )
+        else:
+            m3.amounts[target] = krw
+            _notify(f"📈 M3 {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
+    _save_m3(m3)
+
+
+def _m3_maybe_ask(today: str, telegram: bool) -> None:
+    """다음 평일이 새 달이면(= 내일이 그 달 첫 거래일) 금액을 묻는다. 달마다 한 번."""
+    if not M3_ENABLED:
+        return
+    m3 = _load_m3()
+    nxt = next_weekday(today)
+    if nxt[:7] == today[:7] or m3.ask_month == nxt[:7]:
+        return
+    m3.ask_month, m3.ask_ts = nxt[:7], int(time.time())
+    _save_m3(m3)
+    _notify(
+        "\n".join(
+            [
+                f"📈 M3 · {nxt} 밤 매수 예정",
+                RULE,
+                f"{nxt[:7]} 은 얼마 매수하시겠습니까?",
+                sub("예: 30만 · 500000 · 0(이번 달 쉬기)"),
+                sub(f"답이 없으면 {M3_MONTHLY_KRW:,.0f}원"),
+                sub("내일 아침 환전 알림에 반영돼요"),
+            ]
+        ),
+        telegram,
+    )
 
 
 def _m3_needs(day: Day) -> list[dict[str, Any]]:
@@ -572,6 +639,7 @@ def fx(telegram: bool = True) -> int:
     if not states:
         print("아직 시작 전 (start)")
         return 2
+    _m3_poll(now.strftime("%Y-%m-%d"), telegram)
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
@@ -794,6 +862,7 @@ def run(telegram: bool = True) -> int:
             ]
             lines = head + ([SUB + qline] if qline else []) + ["", RULE] + lines
         if M3_ENABLED:
+            _m3_poll(today, telegram)
             m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted)
             if m3_lines:
                 lines = [*m3_lines, *(["", RULE] if lines else []), *lines]
@@ -829,6 +898,7 @@ def run(telegram: bool = True) -> int:
     if not QUIET_ROUTINE or any(mark in text for mark in ALERT_MARKS):
         _notify(text, telegram)
     print(text)
+    _m3_maybe_ask(today, telegram)
     return 0
 
 

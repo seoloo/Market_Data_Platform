@@ -57,3 +57,16 @@ def test_lev_share_uses_previous_month() -> None:
     closes = [(f"2026-09-{d:02d}", 100.0) for d in range(1, 30)] + [("2026-10-01", 50.0)]
     vol, share = lev_share(closes, "2026-10-09")
     assert vol == pytest.approx(0.0) and share == pytest.approx(0.6)
+
+
+def test_amount_target_and_next_weekday() -> None:
+    from auto_trading.ops.m3_live import amount_target, next_weekday
+
+    assert next_weekday("2026-10-30") == "2026-11-02"  # 금 → 월
+    st = M3State("2026-10-01", done_month="2026-10")
+    assert amount_target(st, "2026-10-30") is None
+    st.ask_month = "2026-11"
+    assert amount_target(st, "2026-10-30") == "2026-11"
+    assert amount_target(st, "2026-11-02") == "2026-11"  # 그 달 매수 전
+    deposit(st, "2026-11-02", 500_000, 1350)
+    assert amount_target(st, "2026-11-02") is None

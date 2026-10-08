@@ -353,3 +353,44 @@ def test_m3_insufficient_usd_retries_next_day(
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["done_month"] == ""
     assert len(state["deposits"]) == 1
+
+
+def test_m3_telegram_amount_sets_month_and_asks_day_before(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from auto_trading.notify import inbox as inbox_mod
+    from auto_trading.notify.inbox import InboxMessage
+
+    sent: list[str] = []
+    fake = FakeToss(usd="2000")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
+    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "load_telegram_credentials", lambda path: object())
+
+    class FakeInbox:
+        def __init__(self, creds: object) -> None:
+            pass
+
+        def fetch(self, offset: int) -> tuple[list[InboxMessage], int]:
+            return [InboxMessage(offset, 9_999_999_999, "50만")], offset + 1
+
+    monkeypatch.setattr(inbox_mod, "TelegramInbox", FakeInbox)
+    _seed(mod)
+    assert mod.run(telegram=True) == 0
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["amounts"] == {"2026-10": 500_000.0}
+    assert state["deposits"][0][1] == 500_000.0
+    assert any("50" in x and "정했어요" in x for x in sent)
+    # 10-30(금) 밤: 다음 평일 11-02 → 묻기
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 30, 21, 0, tzinfo=UTC))
+    for k in range(1, len(fake.sent) + 1):
+        fake.statuses.setdefault(
+            f"OID-{k}", TossOrderStatus("FILLED", Decimal(1), Decimal(1), Decimal(1), Decimal(0))
+        )
+    sent.clear()
+    assert mod.run(telegram=True) == 0
+    assert any("얼마 매수하시겠습니까" in x for x in sent)
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["ask_month"] == "2026-11"
