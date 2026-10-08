@@ -48,7 +48,8 @@ EFFECT = 0.0025
 Z_ALPHA, Z_BETA_ONE, Z_BETA_JOINT = 2.0, 0.8416, 1.501
 NW_LAG = 3
 TRAIN_MONTHS, HISTORY_MONTHS = 36, 32
-COVERAGE_SHARE, COVERAGE_MIN = 0.90, 100
+COVERAGE_SHARE, COVERAGE_MIN = 0.85, 100
+"""2026-10-09 사용자 결정 "85로 진행해줘" (관문 문서 §11). 초안 제안값 0.90 → 0.85."""
 
 
 def sell_tax(day: str) -> float:
