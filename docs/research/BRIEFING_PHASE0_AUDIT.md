@@ -1,7 +1,7 @@
 # 시장 · 종목 하락 브리핑 (IDEAS 29) — Phase 0 자료 · 정확성 감사
 
 작성: 2026-10-08 · Opus · 근거: [IDEAS 29 인계](IDEAS.md) §29 (Codex `2676ba8`)
-상태: **감사만 했다. 수집 · 분석 · 구현 · 예약 없음.** 수익 연구가 아니라 읽기 전용 정보 도구다(매매 신호 아님).
+상태: **감사 → 사용자 결정(§8) → 미국 첫판 구현 · 첫 실행 · 텔레그램 전송(2026-10-08). 정확성 검산 전.** 수익 연구가 아니라 읽기 전용 정보 도구다(매매 신호 아님).
 접속 점검 코드: `scripts/audit_briefing_sources.py`. 공개 주소에 한 번씩 GET 하고 상태만 적는다. 개인 정보는 보내지 않는다.
 
 ## 0. 결론 먼저
@@ -93,3 +93,49 @@
 3. **대형주 범위**: 'SPY 비중 상위 10 + 보유 · 관심 종목'(권고)으로 줄여도 되는지. 관심 종목 목록도 함께.
 4. **시각 · 전달**: 매일 KST 07:30 보고서 + 텔레그램 알림(선택) / 보고서만.
 5. **구현 요청**: 위가 정해지면 기존 주문 경로와 분리된 읽기 전용 도구로 구현 · 시험 → 30 사례 검산 → 예약 등록(사용자).
+
+## 8. 사용자 결정 · 미국 첫판 구현 (2026-10-08)
+
+사용자 결정:
+1. "미국 먼저하고 이후 한국"
+2. SEC 연락처로 사용자 이메일 사용 허용 — `.env` 의 `SEC_CONTACT_EMAIL` 에만 둔다(Git 제외). SEC 요청 머리말에만 쓴다.
+3. "상위 10 그리고 qqq도 해줘"
+4. "알림으로 보고서 형식으로"
+
+**구현 (읽기 전용 · 주문 경로 없음):**
+- 순수 계산 · 검사 · 문장: `src/auto_trading/ops/market_brief.py`(+ 시험 5 개)
+- 수집 · 실행: `scripts/market_brief.py`
+
+| 부분 | 내용 |
+|---|---|
+| 수치 | Yahoo 일봉(SPY · QQQ · 상위 종목 · 관심 QNDX · BTQ · WQTM · QS). 끝나지 않은 오늘 봉은 버린다. Cboe VIX 일별 종가 · 1 년 분포 위치 |
+| 구성 | **SPY 상위 10**: SPDR 일일 보유 XLSX 비중(대리). **QQQ 상위 10**: Nasdaq 공식 나스닥 100 목록의 시총 비중(대리 — Invesco QQQ 보유가 403 이라 대안). 둘 다 '기여 = 비중 × 그날 수익'과 나머지 몫 |
+| 근거 | 연준 보도 RSS(공식) · CNBC 시장 RSS · Yahoo 종목 RSS · SEC EDGAR 최근 2 일 8-K · 10-Q · 10-K(공식) |
+| **시간 정렬** | 원인 근거는 **직전 세션 마감 ~ 이 세션 마감 + 15 분**에 공개된 것만 쓴다. 마감 뒤 소식은 '다음 세션 참고'로 따로 보여 주고 분석에 넣지 않는다. 첫 시험에서 다음 날 선물 기사가 원인으로 쓰인 것을 고쳤다 |
+| AI | Gemini 무료 등급만, temperature 0, JSON. **모델별 시도 결과 · 거절 사유를 보고서에 남긴다**(첫 시험: flash-latest 503 '수요 몰림' → flash-lite 200, 입력 약 7 천 토큰) |
+| 검사 | 근거 번호가 없거나 없는 번호면 뺀다. 수치 블록 · 근거 글에 없는 숫자를 쓴 주장도 뺀다. 증거 상태(공식 원문 · 기사 · 요약만)는 코드가 붙인다. 뺀 주장은 보고서 파일에 남긴다 |
+| 출력 | `reports/brief/<세션>.json · .txt` + `outbox.log` + 텔레그램(보고서 형식) |
+
+**첫 실행 (2026-10-07 세션):**
+- SPY −0.24% · QQQ −0.25% · VIX 15.08(1 년 중 12% 위치).
+- 근거 58 건(공식 1 = 연준 FOMC 의사록).
+- AI 원인 후보: '국채 금리 상승 · FOMC 의사록 경계'(기사 수준). 반대 근거로 '10 년물 입찰 뒤 금리 후퇴'를 함께 표시.
+- 텔레그램 전송 성공.
+
+**한계 (보고서에도 '대리' · '기사 · 요약만'으로 표시):**
+- 비중은 지수 공식 비중이 아니다.
+- RSS 요약만 읽고 본문은 읽지 않는다.
+- 장중 시각을 모른다.
+- 한국어 단위 환산(예: 80 billion → 800 억)은 숫자 검사를 비껴갈 수 있다.
+- 무료 모델이 몰릴 때는 경량 모델로 답한다.
+
+**예약 작업(사용자 등록)**: 화 ~ 토 07:30 KST(미국 월 ~ 금 마감 뒤).
+
+```powershell
+$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.market_brief run" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:30; Register-ScheduledTask -TaskName "AutoTrading_MarketBrief" -Action $a -Trigger $t -Description "미국 시장 브리핑 (IDEAS 29, 읽기 전용)"
+```
+
+**정확성 검산(§6) 진행 방식:**
+- 과거 뉴스는 RSS 로 다시 받을 수 없다. 그래서 검산은 **앞으로 쌓이는 브리핑 30 개**로 한다(약 6 주).
+- 사람이 사건 날의 원문과 대조해 '확인된 사실' 오류 · 시각 오류 · 누락을 센다.
+- 합격선(§6)을 넘기 전까지 보고서는 '검산 전'이다. 한국 2 단계는 검산 뒤에 연다.

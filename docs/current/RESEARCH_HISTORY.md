@@ -855,7 +855,7 @@ Do not retry: θ · 비중 · 간격 바꾸기, 이긴 시장만 골라 쓰기.
 근거: [170 사전등록 · §3 판정](../research/170-dip-boost-leverage.md).
 
 ## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
-- 하락 브리핑 정보 도구(IDEAS 29, Codex 초안, 수익 연구 아님): 2026-10-08 Phase 0 감사 — 미국 첫판 무료로 가능(VIX · SPY 보유 · 연준 RSS · Gemini), QQQ 보유 · SEC · BLS 403. 사용자 결정 대기. [감사](../research/BRIEFING_PHASE0_AUDIT.md).
+- 하락 브리핑 정보 도구(IDEAS 29, Codex 초안, 수익 연구 아님): 2026-10-08 Phase 0 감사 → 사용자 결정(미국 먼저 · SEC 연락처 · SPY/QQQ 상위 10 · 텔레그램) → 미국 첫판 구현 · 첫 전송. 정확성 검산(앞으로 30 개) 전, 한국은 그 뒤. [감사](../research/BRIEFING_PHASE0_AUDIT.md).
 - **관찰 바구니(171, 2026-10-08 ~, 돈 없음)**: 160-23 ETF 순유입 LONG(W1) · PANIC-KQ(W2) 를 원 규칙 그대로 2026-09 이후 자료로 그림자 기록. W1 30 건 · W2 5 번에 판단(앞으로 평균 > 0 · 합친 2.24 SE 하한 > 0 → 소액 검토 자격). 원 판정(REJECT)은 그대로. [171](../research/171-watchlist-shadow-registration.md).
 - **점검 문서(2026-10-08, 판정 불변)**: [통과 다중검정](../research/PASS_FDR_AUDIT.md)(T/v2 · T · O/v1 만 BH q 0.10, QS t 1.41 · FLOW-KR t 0.77) · [기대 범위](../research/FORWARD_BAND.md)(전향 REVIEW · ALERT 기준) · [FLOW 자료 품질](../research/KR_FLOW_DATAQUALITY.md)(G-KR1 영향 없음) · [자료 열람 장부](../research/DATA_EXPOSURE_LEDGER.md)(2026-09-01 이후 = 전향 확인 구간).
 - 차트 상태 변화 순서(IDEAS 25): 코인판 Phase 0 DATA_INSUFFICIENT(보류), 주식판은 161 REJECT 로 판정 끝.
