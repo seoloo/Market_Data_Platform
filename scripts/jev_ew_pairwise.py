@@ -117,7 +117,10 @@ def main(argv: list[str]) -> int:
             raise SystemExit("TYPESAFE_API_KEY 와 --budget 이 필요하다")
         post = http_post(key)
     started = time.time()
-    rows = evaluate(cases(SEEDS[mode], pilot=mode == "pilot"), post, budget)
+    cs = cases(SEEDS[mode], pilot=mode == "pilot")
+    if mode == "confirm":  # 문서 173 §2: 판정 칸(잡음 0.1% 300 경로)만 호출 — 비용 약 $0.54
+        cs = [c for c in cs if c.noise > 0]
+    rows = evaluate(cs, post, budget)
     groups: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         groups.setdefault(f"noise={r['noise']}|{r['pattern']}", []).append(r)
