@@ -118,6 +118,10 @@ def test_validate_answer_keeps_supported_and_drops_unsupported() -> None:
     }
     assert out["causes"][0]["state"] == "기사 · 요약만"
     assert out["unknown"] == ["정확한 원인"]
+    both = validate_answer(
+        {"facts": [{"text": "회의록과 금리", "evidence": ["E1", "E2"]}]}, _ev(), ""
+    )
+    assert both["facts"][0]["state"] == "공식 원문 / 기사 · 요약만"
 
 
 def test_render_and_numbers_block() -> None:
@@ -137,8 +141,10 @@ def test_render_and_numbers_block() -> None:
         "status": {"evidence": 2, "official": 1, "model": "gemini:x"},
     }
     text = render_telegram(brief)
-    assert "SPY -0.24%" in text and "VIX 15.08" in text and "BTQ 미확보" in text
-    assert "나스닥 100 상위 10 (시총 비중 대리): 미확보" in text
+    assert "SPY  -0.24%" in text and "VIX  15.08" in text and "BTQ  미확보" in text
+    assert "나스닥 100 상위 10\n   미확보" in text
+    assert "🔺 A  +1.00%  (기여 +0.10%p)" in text
     assert "마감 뒤 소식" in text and "매매 신호 아님" in text
+    assert text.count("\n") > 15  # 한 줄에 하나
     nums = describe_numbers(brief)
     assert "SPY_return_pct=-0.24" in nums and "spy:A weight_pct=10.00" in nums

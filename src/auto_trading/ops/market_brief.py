@@ -203,7 +203,7 @@ def validate_answer(
                 dropped.append({"where": key, "text": text, "reason": reason})
                 continue
             states = sorted({ids[r].state for r in refs})
-            kept[key].append({"text": text, "evidence": refs, "state": " · ".join(states)})
+            kept[key].append({"text": text, "evidence": refs, "state": " / ".join(states)})
     unknown = [str(x) for x in answer.get("unknown", []) or [] if str(x).strip()]
     to_check = [str(x) for x in answer.get("to_check", []) or [] if str(x).strip()]
     return {**kept, "unknown": unknown, "to_check": to_check, "dropped": dropped}
@@ -216,73 +216,90 @@ def _pct(x: float | None) -> str:
     return "미확보" if x is None else f"{x * 100:+.2f}%"
 
 
+def _arrow(x: float | None) -> str:
+    if x is None:
+        return "·"
+    return "🔺" if x > 0 else "🔻" if x < 0 else "▫️"
+
+
+_STATE_SHORT = {"공식 원문": "공식", "기사 · 요약만": "기사"}
+RULE = "━━━━━━━━━━━━"
+
+
+def _tag(item: Mapping[str, Any]) -> str:
+    states = [_STATE_SHORT.get(x.strip(), x.strip()) for x in str(item["state"]).split(" / ")]
+    return f"   └ {', '.join(item['evidence'])} · {'/'.join(x for x in states if x)}"
+
+
 def render_telegram(brief: Mapping[str, Any]) -> str:
-    """텔레그램 보고서 (순수). 수치 → 기여 → 관심 종목 → AI 칸(검사 통과분) → 자료 상태 순."""
+    """텔레그램 보고서 (순수, 휴대폰에서 읽기 쉽게 한 줄에 하나).
+
+    순서: 시장 → 대형주 기여 → 관심 종목 → AI 칸(검사 통과분) → 마감 뒤 소식 → 자료 상태."""
     m = brief["market"]
-    lines = [f"📊 미국 시장 브리핑 — {brief['session']} 종가 기준"]
+    lines = ["📊 미국 시장 브리핑", f"{brief['session']} 미국 종가 기준", RULE]
+    for k in ("SPY", "QQQ"):
+        lines.append(f"{_arrow(m.get(k))} {k}  {_pct(m.get(k))}")
     vix = m.get("vix")
-    vix_txt = "VIX 미확보"
     if vix:
-        vix_txt = (
-            f"VIX {vix['close']:.2f} ({vix['change']:+.2f}, "
-            f"1 년 중 {vix['pct_rank']:.0f}% 위치 · {vix['date']} 종가)"
-        )
-    lines.append(f"SPY {_pct(m.get('SPY'))} · QQQ {_pct(m.get('QQQ'))} · {vix_txt}")
-    for label, key in (
-        ("S&P 500 상위 10 (SPY 보유 비중 대리)", "spy"),
-        ("나스닥 100 상위 10 (시총 비중 대리)", "qqq"),
-    ):
-        c = brief.get("contrib", {}).get(key)
+        lines.append(f"😰 VIX  {vix['close']:.2f} ({vix['change']:+.2f})")
+        lines.append(f"   └ 1 년 중 {vix['pct_rank']:.0f}% 위치 · {vix['date']} 종가")
+    else:
+        lines.append("😰 VIX  미확보")
+    groups = (
+        ("🏢 S&P 500 상위 10", "SPY 보유 비중 기준", "spy"),
+        ("💻 나스닥 100 상위 10", "시가총액 비중 기준(근사)", "qqq"),
+    )
+    for title, basis, key in groups:
+        lines += ["", title]
+        c = (brief.get("contrib") or {}).get(key)
         if not c:
-            lines.append(f"\n{label}: 미확보")
+            lines.append("   미확보")
             continue
-        movers = sorted(
-            (r for r in c["rows"] if r["contrib"] is not None),
-            key=lambda r: abs(r["contrib"]),
-            reverse=True,
-        )[:5]
-        lines.append(
-            f"\n{label}: 상위 10 기여 {c['top_sum'] * 100:+.2f}%p · 나머지 {c['rest'] * 100:+.2f}%p"
-        )
-        lines.append(
-            "  "
-            + " · ".join(
-                f"{r['symbol']} {_pct(r['ret'])}({r['contrib'] * 100:+.2f}%p)" for r in movers
-            )
-        )
-    watch = brief.get("watch", {})
+        lines.append(f"   상위 10 합 {c['top_sum'] * 100:+.2f}%p · 나머지 {c['rest'] * 100:+.2f}%p")
+        lines.append(f"   ({basis}, 지수 기여 = 비중 × 등락)")
+        known = [r for r in c["rows"] if r["contrib"] is not None]
+        for r in sorted(known, key=lambda r: abs(r["contrib"]), reverse=True)[:5]:
+            share = f"(기여 {r['contrib'] * 100:+.2f}%p)"
+            lines.append(f"{_arrow(r['ret'])} {r['symbol']}  {_pct(r['ret'])}  {share}")
+        missing = [r["symbol"] for r in c["rows"] if r["contrib"] is None]
+        if missing:
+            lines.append(f"   미확보: {', '.join(missing)}")
+    watch = brief.get("watch") or {}
     if watch:
-        lines.append("\n관심 종목: " + " · ".join(f"{s} {_pct(r)}" for s, r in watch.items()))
+        lines += ["", "⭐ 관심 종목"]
+        lines.extend(f"{_arrow(r)} {s}  {_pct(r)}" for s, r in watch.items())
     ai = brief.get("ai")
     if ai:
-        sections = (
+        lines += ["", RULE, "🤖 AI 정리 (근거 번호 · 공식/기사)"]
+        for title, key in (
             ("✅ 확인된 사실", "facts"),
             ("🔎 원인 후보", "causes"),
-            ("↔ 반대 근거", "counter"),
-        )
-        for title, key in sections:
+            ("↔️ 반대 근거", "counter"),
+        ):
             items = ai.get(key) or []
             if items:
-                lines.append(f"\n{title}")
-                lines.extend(
-                    f"- {x['text']} [{', '.join(x['evidence'])} · {x['state']}]" for x in items[:5]
-                )
-        for title, key in (("❓ 확인 불가", "unknown"), ("📌 추가 확인", "to_check")):
+                lines += ["", title]
+                for x in items[:5]:
+                    lines += [f"• {x['text']}", _tag(x)]
+        for title, key in (("❓ 확인 불가", "unknown"), ("📌 추가로 볼 것", "to_check")):
             items = ai.get(key) or []
             if items:
-                lines.append(f"\n{title}")
-                lines.extend(f"- {x}" for x in items[:4])
+                lines += ["", title]
+                lines.extend(f"• {x}" for x in items[:4])
         if ai.get("dropped"):
-            lines.append(f"\n(검사에서 뺀 AI 주장 {len(ai['dropped'])} 건 — 보고서 파일 참고)")
+            lines += ["", f"(검사에서 뺀 AI 주장 {len(ai['dropped'])} 건 — 보고서 파일 참고)"]
     after = brief.get("after_close") or []
     if after:
-        lines.append("\n🕗 마감 뒤 소식 (다음 세션 참고, 원인 분석에는 안 씀)")
-        lines.extend(f"- {x['title']}" for x in after[:3])
+        lines += ["", RULE, "🕗 마감 뒤 소식 (다음 날 참고 · 원인 분석엔 안 씀)"]
+        lines.extend(f"• {x['title']}" for x in after[:3])
     status = brief.get("status", {})
-    lines.append(
-        f"\n자료: 근거 {status.get('evidence', 0)} 건(공식 {status.get('official', 0)}) · "
-        f"AI {status.get('model', '없음')} · 매매 신호 아님"
-    )
+    lines += [
+        "",
+        RULE,
+        f"자료: 근거 {status.get('evidence', 0)} 건 (공식 {status.get('official', 0)})",
+        f"AI: {status.get('model', '없음')}",
+        "※ 정보용 · 매매 신호 아님 · 정확성 검산 전",
+    ]
     return "\n".join(lines)
 
 
