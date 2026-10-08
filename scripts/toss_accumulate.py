@@ -43,6 +43,7 @@ from auto_trading.exchange.toss import (
     TossTrader,
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
+from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.ops.qndx_alert import (
     LIMIT_BUFFER,
@@ -383,13 +384,18 @@ def fx(telegram: bool = True) -> int:
         print(f"환전 필요 없음 — 오늘 밤 매수 {len(needs)}건, 달러 {day.usd:,.2f}")
         return 0
     usd_to_buy = math.ceil(short)
-    items = " · ".join(f"{n['symbol']} {n['qty']}주(약 ${n['usd']:,.2f})" for n in needs)
-    text = (
-        f"💱 오늘 밤 매수 예정: {items}\n"
-        f"필요 약 ${total:,.2f} · 지금 달러 ${day.usd:,.2f}\n"
-        f"👉 ${usd_to_buy:,} (약 {usd_to_buy * day.fx:,.0f}원) 환전해 주세요"
-        " — 15:30 까지 95% 우대\n"
-        "환전을 못 해도 밤에 그대로 주문한다(원화 자동 환전이 안 되면 알림)"
+    items = [f"• {n['symbol']} {n['qty']}주  약 ${n['usd']:,.2f}" for n in needs]
+    text = "\n".join(
+        [
+            "💱 환전 알림 · 오늘 밤 매수 예정",
+            RULE,
+            *items,
+            f"필요 약 ${total:,.2f} · 지금 달러 ${day.usd:,.2f}",
+            "",
+            f"👉 ${usd_to_buy:,} (약 {usd_to_buy * day.fx:,.0f}원) 환전해 주세요",
+            sub("15:30 까지 95% 우대"),
+            sub("못 해도 밤에 그대로 주문 (원화 자동 환전이 안 되면 알림)"),
+        ]
     )
     _notify(text, telegram)
     print(text)
@@ -490,7 +496,7 @@ def run(telegram: bool = True) -> int:
                 line = f"⏸ 자동 매수 안 함 — {reason}"
             _save_plan_state(state)
             text_one = message(a, [], order_line=line)
-            lines.append(text_one)
+            lines += ([""] if lines else []) + [text_one]
             _write_report(
                 plan.symbol,
                 today,
@@ -558,14 +564,16 @@ def run(telegram: bool = True) -> int:
             )
             p = ctx["parts"]
             head = [
-                f"📊 QS: QQQ 추세 {'켜짐' if ctx['on'] else '꺼짐'} ({ctx['as_of']} 종가 · 20일 "
-                f"{p['r20']:+.1%} · 60일 {p['r60']:+.1%} · 120일 {p['r120']:+.1%})",
-                f"QS TQQQ {qs.strategy_qty:g}주 · TQQQ 순지출 {qs.net_krw():,.0f}원"
-                f" · 할 일 {qs.want}",
+                f"📊 QS  QQQ 추세 {'🟢 켜짐' if ctx['on'] else '🔴 꺼짐'}",
+                sub(
+                    f"{ctx['as_of']} 종가 · 20일 {p['r20']:+.1%} · 60일 {p['r60']:+.1%}"
+                    f" · 120일 {p['r120']:+.1%}"
+                ),
+                f"{SUB}TQQQ {qs.strategy_qty:g}주 · 순지출 {qs.net_krw():,.0f}원 · 할 일 {qs.want}",
             ]
-            lines = head + ([qline] if qline else []) + [""] + lines
+            lines = head + ([SUB + qline] if qline else []) + ["", RULE] + lines
     except (AutoTradingError, TossApiError) as exc:
-        text = f"⚠ 토스 적립 실패: {exc}"
+        text = f"⚠ 토스 적립 실패\n{RULE}\n{exc}"
         if isinstance(exc, TossApiError) and exc.status == 403:
             text += "\n허용 IP 가 바뀌었을 수 있다 — WTS 설정 > Open API > 허용 IP 관리"
         _notify(text, telegram)
@@ -575,7 +583,8 @@ def run(telegram: bool = True) -> int:
         trader.close()
     if abs(day.fee - TOSS_FEE) > 1e-9:  # 0.1% 의 '적용 종료일'이 하루씩 밀리는 값이라 바뀌면 알린다
         day.notes.insert(0, f"⚠ 토스 미국 수수료가 {day.fee:.3%} 로 바뀌었다 (기존 {TOSS_FEE:.3%})")
-    text = "\n".join(["[토스]", *day.notes, *lines])
+    notes = [f"📌 {n}" for n in day.notes]
+    text = "\n".join([f"💰 토스 적립 · {today}", RULE, *notes, *([""] if notes else []), *lines])
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / f"{today}.json").write_text(
         json.dumps(

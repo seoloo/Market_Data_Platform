@@ -120,9 +120,7 @@ def test_run_buys_qndx_with_loc_when_accrued(
     saved = json.loads((tmp_path / "data" / "QNDX.json").read_text(encoding="utf-8"))
     assert saved["orders"][-1]["status"] == "SENT" and saved["orders"][-1]["code"] == "OID-1"
     report = json.loads((tmp_path / "reports" / "2026-10-06.json").read_text(encoding="utf-8"))
-    assert (
-        "장 마감 지정가 매수 접수" in report["message"] and "QS: QQQ 추세 켜짐" in report["message"]
-    )
+    assert "장 마감 지정가 매수 접수" in report["message"] and "추세 🟢 켜짐" in report["message"]
 
 
 def test_trend_off_pauses_qndx_and_sells_qs_tqqq(

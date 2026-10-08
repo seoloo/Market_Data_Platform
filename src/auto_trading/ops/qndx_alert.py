@@ -18,6 +18,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import date
 from typing import Any
 
+from auto_trading.notify.style import SUB, sub
+
 __all__ = [
     "FEE",
     "ORDER_WINDOW",
@@ -302,26 +304,25 @@ def message(advice: Advice, notes: list[str], *, order_line: str | None = None) 
     """종목 한 덩어리. ``order_line`` 이 있으면 자동 매수 결과 줄, 없으면 앱에서 직접 사는 안내."""
     a, c = advice, advice.currency
     head = {
-        "BUY": f"🟢 {a.symbol} 오늘 1주 살 차례",
-        "WAIT": f"⏳ {a.symbol} 적립 중 — 약 {a.days_to_go}일 뒤 1주",
-        "CAP": f"⏸ {a.symbol} 이번 달 한도({money(a.monthly_cap, c)}) — 다음 달에",
-        "PAUSE": f"⏸ {a.symbol} 매수 멈춤 (QS) — 적립금은 현금으로 쌓는다",
+        "BUY": f"🟢 {a.symbol}  오늘 1주 살 차례",
+        "WAIT": f"⏳ {a.symbol}  적립 중 · 약 {a.days_to_go}일 뒤 1주",
+        "CAP": f"⏸ {a.symbol}  이번 달 한도({money(a.monthly_cap, c)}) · 다음 달에",
+        "PAUSE": f"⏸ {a.symbol}  매수 멈춤 (QS) · 적립금은 현금으로 쌓는다",
     }[a.status]
     per_share = f"{a.last_usd:.2f} USD" + (f" × {a.fx_rate:,.2f}원" if c == "KRW" else "")
     lines = [
         head,
-        f"적립 {money(a.accrued, c)} / 1주 {money(a.price, c)} ({per_share}, 수수료 포함)",
-        f"이번 달 매수 {money(a.month_spent, c)} · 지금까지 적립 매수 {a.bought_qty:g}주",
+        f"{SUB}적립 {money(a.accrued, c)} / 1주 {money(a.price, c)}",
+        sub(f"{per_share} · 수수료 포함"),
+        f"{SUB}이번 달 {money(a.month_spent, c)} · 적립 매수 누적 {a.bought_qty:g}주",
     ]
     if a.status == "BUY":
         if order_line is not None:
-            lines.append(order_line)
+            lines.append(SUB + order_line)
         else:
             if a.weekend:
-                lines.append("주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
-            lines.append(
-                f"앱: 해외주식 → {a.symbol} → 매수 1주, 지정가 {a.limit_usd:.2f} USD 이하"
-                " (장 전이면 예약주문)"
-            )
-    lines += notes
+                lines.append(f"{SUB}주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
+            lines.append(f"{SUB}📱 앱: 해외주식 → {a.symbol} → 매수 1주")
+            lines.append(sub(f"지정가 {a.limit_usd:.2f} USD 이하 (장 전이면 예약주문)"))
+    lines += [SUB + n for n in notes]
     return "\n".join(lines)
