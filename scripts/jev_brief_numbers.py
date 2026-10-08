@@ -64,11 +64,12 @@ def synthetic_brief(rng: random.Random, k: int) -> dict[str, Any]:
     # 같은 종목은 두 목록에서 같은 수익률 (실제 자료처럼)
 
     def rows(names: Sequence[str]) -> dict[str, Any]:
-        out = []
+        out: list[dict[str, Any]] = []
+        top = 0.0
         for s in names:
             w, r = rng.uniform(0.02, 0.09), rets[s]
             out.append({"symbol": s, "weight": w, "ret": r, "contrib": w * r})
-        top = sum(x["contrib"] for x in out)
+            top += w * r
         return {"rows": out, "top_sum": top, "rest": rng.gauss(0, 0.004)}
 
     vix = rng.uniform(12, 35)
