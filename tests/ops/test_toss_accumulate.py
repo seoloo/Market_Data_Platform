@@ -88,6 +88,7 @@ def _mod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeToss) -> Any
     monkeypatch.setattr(mod, "_trader", lambda: fake)
     monkeypatch.setattr(mod, "_kst_now", lambda: NOW_KST)
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: None)
+    monkeypatch.setattr(mod, "STOPPED", {})
     return mod
 
 
@@ -259,3 +260,14 @@ def test_old_qs_strategy_file_is_moved_once(
     mod._save_plan_state(State("QS", "2026-10-05", 0.0, 0.0, 0.0))
     mod._migrate_qs_switch()
     assert old.exists()
+
+
+def test_stopped_plan_sends_no_order_and_no_qs_funding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeToss()
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "STOPPED", {"QNDX": "시험"})
+    _seed(mod)
+    assert mod.run(telegram=False) == 0
+    assert all(o[0] != "QNDX" for o in fake.sent)

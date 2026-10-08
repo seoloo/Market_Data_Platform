@@ -88,6 +88,10 @@ PLANS: tuple[Plan, ...] = (
 """토스 적립 종목: QNDX·BTQ(문서 89 그대로) + WQTM 매일 4 달러·월 124 달러(2026-10-04 사용자 추가,
 2026-10-02 종가 32.5 USD) + QS(퀀텀스케이프, 나스닥) 매일 1 달러·월 31 달러(2026-10-04 사용자 추가,
 2026-10-02 종가 4.57 USD, BTQ 와 같은 방식). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다."""
+STOPPED: dict[str, str] = {"QNDX": '2026-10-09 사용자 "qndx 적립 매수 중단 해줘"'}
+"""적립을 멈춘 종목 → 이유. 주문을 내지 않는다.
+QNDX 면 QS 의 TQQQ 재원(멈춘 동안 쌓인 적립금)도 0 으로 본다.
+보유 · 상태 파일은 그대로 둔다(다시 켜면 이어서). 다시 켜려면 여기서 지운다."""
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -286,6 +290,8 @@ def _needs(day: Day, states: dict[str, State], qs: QsLiveState | None) -> list[d
         state = states.get(plan.symbol)
         if state is None:
             continue
+        if plan.symbol in STOPPED:
+            continue
         a = day.plan_advice(plan, state, qs)
         if plan.symbol == "QNDX":
             accrued_qndx = a.accrued
@@ -474,6 +480,12 @@ def run(telegram: bool = True) -> int:
                     f"{plan.symbol} 적립 시작 (매일 {money(plan.daily, plan.currency)})"
                 )
             day.resolve(state.orders)
+            if plan.symbol in STOPPED:
+                _save_plan_state(state)
+                stop_line = f"⏹ {plan.symbol} 적립 중단 — {STOPPED[plan.symbol]}"
+                lines += ([""] if lines else []) + [stop_line]
+                _write_report(plan.symbol, today, {"symbol": plan.symbol, "status": "STOPPED"})
+                continue
             a = day.plan_advice(plan, state, qs)
             if plan.symbol == "QNDX":
                 accrued_qndx = a.accrued
@@ -623,7 +635,11 @@ def preview() -> int:
         states, qs = copy.deepcopy(states), copy.deepcopy(qs)
         ctx = day.qs_prepare(qs, datetime.now(tz=UTC)) if qs is not None else None
         needs = _needs(day, states, qs)
-        advices = [day.plan_advice(p, states[p.symbol], qs) for p in PLANS if p.symbol in states]
+        advices = [
+            day.plan_advice(p, states[p.symbol], qs)
+            for p in PLANS
+            if p.symbol in states and p.symbol not in STOPPED
+        ]
     finally:
         reader.close()
     print("[미리 보기 — 주문·저장 없음]")
@@ -647,8 +663,10 @@ def status() -> int:
             print(f"{plan.symbol}: 시작 전")
             continue
         spent = sum(b.cost for b in s.buys)
+        stop = f" · 적립 중단 ({STOPPED[plan.symbol]})" if plan.symbol in STOPPED else ""
         print(
-            f"{plan.symbol}: 시작 {s.start_date} · 적립 매수 {sum(b.qty for b in s.buys):g}주 "
+            f"{plan.symbol}{stop}: 시작 {s.start_date}"
+            f" · 적립 매수 {sum(b.qty for b in s.buys):g}주 "
             f"· 쓴 돈 {money(spent, plan.currency)}"
         )
     qs = _load_qs()
