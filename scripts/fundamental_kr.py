@@ -216,12 +216,13 @@ def financial_years(code: str, root: Path = ROOT) -> set[int]:
     은행 · 보험 · 증권 서식 회사가 그렇다(관문 문서 §3). 2015 년 1 ~ 3 분기는 모두 013 이라 뺀다.
     2026-10-09 진단: 이 회사들도 최근 몇 해는 정상 응답이 나와 '정상 응답이 하나도 없음' 규칙으로는
     비금융 분모에 섞였다 → 그 시점까지의 과거 해로 판정한다(:func:`is_financial`)."""
+    filed = filed_years(code, root)
     by_year: dict[int, list[str]] = defaultdict(list)
     folder = root / "fin" / code
     for path in folder.glob("*.json") if folder.exists() else []:
         year = int(path.stem.split("-")[0])
-        if year < FIN_FROM_YEAR:
-            continue
+        if year < FIN_FROM_YEAR or year not in filed:
+            continue  # 정기보고서를 내지 않은 해(상장 전 등)의 013 은 서식 근거가 아니다
         try:
             by_year[year].append(str(json.loads(path.read_text(encoding="utf-8")).get("status")))
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -229,12 +230,31 @@ def financial_years(code: str, root: Path = ROOT) -> set[int]:
     return {y for y, sts in by_year.items() if sts and all(s == "013" for s in sts)}
 
 
+def filed_years(code: str, root: Path = ROOT) -> set[int]:
+    """공시 목록에 정기보고서(사업 · 반기 · 분기)가 있는 사업연도."""
+    listing = root / "filings" / f"{code}.json"
+    if not listing.exists():
+        return set()
+    out: set[int] = set()
+    for row in json.loads(listing.read_text(encoding="utf-8")).get("list") or []:
+        m = re.search(r"\((\d{4})\.\d{2}\)", str(row.get("report_nm", "")))
+        if m:
+            out.add(int(m.group(1)))
+    return out
+
+
 FIN_FROM_YEAR = 2016
 
 
+FIN_MIN_YEARS = 2
+"""2026-10-09 진단(수익 미열람): 013 만 받은 해가 하나뿐인 비금융 회사 12 곳(상장 · 폐지 무렵 —
+삼성바이오로직스 2016 · 크래프톤 2020 · 롯데렌탈 2020 등)이 있었다. 은행 · 보험 · 증권은 2016 ~ 2022
+일곱 해 내리 013 이다 → 과거 두 해 이상일 때만 금융 서식으로 본다."""
+
+
 def is_financial(years: set[int], day: str) -> bool:
-    """월말 ``day`` 에 금융 서식인가 — 그해 전(과거 해)에 013 만 받은 해가 있으면."""
-    return any(y < int(day[:4]) for y in years)
+    """월말 ``day`` 에 금융 서식인가 — 그해 전(과거 해)에 013 만 받은 해가 두 해 이상이면."""
+    return sum(1 for y in years if y < int(day[:4])) >= FIN_MIN_YEARS
 
 
 def computable(
