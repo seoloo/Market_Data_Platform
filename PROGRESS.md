@@ -1,9 +1,16 @@
 # 작업 현황
 
-최종 갱신: 2026-10-08 · 작성: Claude (146~170) · Codex (IDEAS 19~29 초안 인계).
+최종 갱신: 2026-10-08 · 작성: Claude (146~170) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
 
+
+## 2026-10-08 — IDEAS 30 JEV × Elliott 판독 비교시험 초안 (Codex, 문서만)
+
+- 사용자 선택 1번을 [IDEAS 30](docs/research/IDEAS.md)에 기록: **Phase 0 / DRAFT / NOT_IMPLEMENTED / NOT_TESTED**. 기존 Phase 6 운영/전략/일정·Elliott 기각/D22 제외 유지. 이번 API 호출·설치·코드/설정·예약·주문 변경 없음.
+- 같은 인과적 후보 묶음에서 JEV와 동결 순위 규칙을 비교. 최소 마감 4h, 후보 포함률/조건부 선택률/전체 경로 paired 성공 차이·헛검출 분리. 합성 판독 개선≠실시장 정확도≠비용 후 수익. 기존 evaluator 계약 재사용과 결측/거부/실패 구분 제안.
+- 다음: **Phase 0 — Claude의 현재 계약·seed 미사용·누수/노출·모델/SDK·가격·80% 검정력 감사 → 사전등록 확정 → 연구 전용 비교시험**. 전향 Shadow/새 예약·수익 가설/전략 적용은 별도 승인. 초기 파일럿 누적 $1 상한 제안, $10 전액 소진/추가 충전 승인 아님.
+- [외부 LLM 인계](docs/BRIEFING_FOR_LLM.md) 갱신. 검증: 전체 pytest **2,865 passed** · leakage **90 passed** · strict mypy **480 파일** 오류 0 · ruff check/format **695 파일** 통과 · import 계약 **5/5**. 문서 링크 누락 0·IDEAS 기존 상세 보존·변경 범위/diff 검사 통과. 기존 코드 회귀 검사이지 새 JEV 정확도·수익성 검증이 아니다.
 
 ## 2026-10-08 — IDEAS 29 미국 시장 브리핑 첫판 구현 · 첫 전송 (읽기 전용, 사용자 결정 넷)
 
