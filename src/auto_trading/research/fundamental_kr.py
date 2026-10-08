@@ -94,7 +94,28 @@ def _pick(rows: Sequence[Mapping[str, Any]], key: str) -> Mapping[str, Any] | No
     if by_id:
         return by_id[0]
     by_name = sorted((r for r in cand if _norm(str(r.get("account_nm", ""))) in wanted), key=order)
-    return by_name[0] if by_name else None
+    if by_name:
+        return by_name[0]
+    if key == "operating_cf":  # 2026-10-09 진단(수익 미열람): 표준 코드 없는 합계 줄의 이름 변형
+        loose = sorted(
+            (r for r in cand if _CF_TOTAL.fullmatch(_strip_no(str(r.get("account_nm", ""))))),
+            key=order,
+        )
+        return loose[0] if loose else None
+    return None
+
+
+_CF_TOTAL = re.compile(
+    r"영업활동(으로인한|으로부터의|에서의|으로부터|의)?(순)?현금(흐름)?(유입|유입\(유출\)|\(유출\)유입)?(합계)?"
+)
+"""영업현금흐름 합계 줄 이름: '영업활동 순현금흐름유입' · '영업활동으로부터의 순현금유입' ·
+'Ⅰ. 영업활동현금흐름' 등. '영업활동에서 창출된 현금' · '…자산 · 부채의 변동' 은 맞지 않는다."""
+
+
+def _strip_no(name: str) -> str:
+    """앞의 번호(Ⅰ. · 1. · (1) · 가.)와 빈칸을 뗀다."""
+    s = _norm(name)
+    return re.sub(r"^(\(?[0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ가-하]{1,3}[.)]\)?)", "", s)
 
 
 @dataclass(frozen=True, slots=True)

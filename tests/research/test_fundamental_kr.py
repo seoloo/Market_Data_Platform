@@ -142,3 +142,23 @@ def test_parse_xbrl_picks_standard_tags_single_dimension_and_periods() -> None:
     sep = parse_xbrl(_XBRL, "11012", "OFS", "2020-06")
     assert sep is not None and sep.rev_cum is None  # 별도 값 없음
     assert parse_xbrl(b"not xml", "11012", "CFS", "2020-06") is None
+
+
+def test_operating_cf_total_name_variants_without_standard_code() -> None:
+    from auto_trading.research.fundamental_kr import _pick
+
+    def rows(name: str) -> list[dict[str, str]]:
+        return [
+            {
+                "sj_div": "CF",
+                "account_id": "-표준계정코드 미사용-",
+                "account_nm": "영업활동에서 창출된 현금",
+                "ord": "1",
+            },
+            {"sj_div": "CF", "account_id": "-표준계정코드 미사용-", "account_nm": name, "ord": "2"},
+        ]
+
+    for name in ("영업활동 순현금흐름유입", "Ⅰ. 영업활동현금흐름", "영업활동으로부터의 순현금유입"):
+        got = _pick(rows(name), "operating_cf")
+        assert got is not None and got["account_nm"] == name
+    assert _pick(rows("영업활동으로 인한 자산·부채의 변동"), "operating_cf") is None
