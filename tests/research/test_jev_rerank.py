@@ -71,7 +71,7 @@ def _scenario(sid: str, starts: list[int], distance: float) -> dict[str, Any]:
 
 
 SWINGS = tuple(Swing("L" if i % 2 == 0 else "H", str(100 + i), i * H, i % 2 == 0) for i in range(6))
-SET = {
+SET: dict[str, Any] = {
     "schema_version": "ew-scenario-set/1",
     "scenarios": [
         _scenario("EW3d:ZIGZAG:b", [1, 2, 3, 5], 0.111111),
