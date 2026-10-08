@@ -7,8 +7,13 @@
     python -m scripts.mf_paper judge    # 등록 §4 판단 (2027-10 · 2028-10, AQR 월 자료 다시 받음)
 
 * MIX = QNDX 80% + DBMF · KMLM · CTA 각 6.67%(소매 20%) · BASE = QNDX 100%. 시작 1,000 USD.
-* 시세: Yahoo 일봉 배당 조정 종가(키 없음). 빈 날은 직전 값. 모두 QNDX 거래일 줄로 맞춘다.
-* 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도 0.15%(수수료 0.10% + 환전 0.05%, 176 과 같음).
+* NBG = QNDX 60% + IEF 20% + GLDM 20% (178, 토스판, 1,000 USD).
+* NBG_ISA = TIGER 미국나스닥100 60% + TIGER 미국채10년선물 20% + ACE KRX금현물 20%
+  (178 의 ISA 판, 국내 상장 · 원화 1,000,000).
+  국내 상장 매니지드 퓨처스 ETF 는 없어 B 의 ISA 판은 없다.
+* 시세: Yahoo 일봉 배당 조정 종가(키 없음). 빈 날은 직전 값. 장부마다 첫 종목의 거래일 줄로 맞춘다.
+* 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도: 미국 ETF 0.15%(수수료 0.10% + 환전 0.05%) ·
+  국내 ETF(ISA) 0.02%.
 * 상태 ``data/mf_paper/state.json`` · 보고 ``reports/mf_paper/latest.json``.
 """
 
@@ -43,6 +48,15 @@ MIX = {EQUITY: 0.8, **{s: 0.2 / len(SLEEVE) for s in SLEEVE}}
 BASE = {EQUITY: 1.0}
 CAPITAL = 1_000.0
 COST = 0.0015
+NBG = {EQUITY: 0.6, "IEF": 0.2, "GLDM": 0.2}
+NBG_ISA = {"133690.KS": 0.6, "305080.KS": 0.2, "411060.KS": 0.2}
+BOOKS: dict[str, dict[str, Any]] = {
+    "MIX": {"targets": MIX, "capital": CAPITAL, "cost": COST, "ccy": "USD"},
+    "BASE": {"targets": BASE, "capital": CAPITAL, "cost": COST, "ccy": "USD"},
+    "NBG": {"targets": NBG, "capital": CAPITAL, "cost": COST, "ccy": "USD"},
+    "NBG_ISA": {"targets": NBG_ISA, "capital": 1_000_000.0, "cost": 0.0002, "ccy": "KRW"},
+}
+FIRST_START = "2026-10-08"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 
 
@@ -50,7 +64,7 @@ def _prices(span: str = "3mo") -> dict[str, dict[str, float]]:
     import httpx
 
     out: dict[str, dict[str, float]] = {}
-    for sym in (EQUITY, *SLEEVE):
+    for sym in sorted({sym for b in BOOKS.values() for sym in b["targets"]}):
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={span}&interval=1d"
         res = httpx.get(url, headers={"User-Agent": UA}, timeout=60).json()["chart"]["result"][0]
         adj = res["indicators"]["adjclose"][0]["adjclose"]
@@ -74,52 +88,63 @@ def _book_from(d: dict[str, Any]) -> Book:
     )
 
 
-def run() -> dict[str, Any]:
-    px = _prices()
-    days = sorted(px[EQUITY])
-    today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
-    # 아직 끝나지 않은 오늘 봉(미국 장중)은 쓰지 않는다
-    days = [d for d in days if d < today_utc or datetime.now(UTC).hour >= 21]
-    filled: dict[str, dict[str, float]] = {}
+def _filled(
+    px: dict[str, dict[str, float]], syms: list[str], close_hour_utc: int
+) -> dict[str, dict[str, float]]:
+    """장부 종목들의 날짜 줄(첫 종목 거래일). 빈 날은 직전 값, 아직 안 끝난 오늘 봉은 뺀다."""
+    now = datetime.now(UTC)
+    today = now.strftime("%Y-%m-%d")
+    ok = {d for d in px[syms[0]] if d < today or now.hour >= close_hour_utc}
+    out: dict[str, dict[str, float]] = {}
     last: dict[str, float] = {}
-    for d in days:
-        for s in px:
+    for d in sorted(set().union(*(px[s] for s in syms))):
+        if d >= today and now.hour < close_hour_utc:
+            continue
+        for s in syms:
             if d in px[s]:
                 last[s] = px[s][d]
-        if all(s in last for s in px):
-            filled[d] = dict(last)
+        if d in ok and all(s in last for s in syms):
+            out[d] = {s: last[s] for s in syms}
+    return out
+
+
+def run() -> dict[str, Any]:
+    px = _prices()
     ROOT.mkdir(parents=True, exist_ok=True)
-    if STATE.exists():
-        st = json.loads(STATE.read_text(encoding="utf-8"))
-        books = {k: _book_from(v) for k, v in st["books"].items()}
-        last_day = st["last_day"]
-        start = st["start"]
-    else:
-        start = max(filled)
-        books = {
-            "MIX": open_book(CAPITAL, MIX, filled[start], COST),
-            "BASE": open_book(CAPITAL, BASE, filled[start], COST),
-        }
-        for b in books.values():
-            mark(b, start, filled[start])
-        last_day = start
-    new_days = [d for d in sorted(filled) if d > last_day]
-    rebal = []
-    for d in new_days:
-        if new_month(last_day, d):
-            for name, b in books.items():
-                fee = rebalance(b, MIX if name == "MIX" else BASE, filled[d], COST)
+    st = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {"books": {}}
+    if "last_day" in st:  # 장부 하나 날짜 → 장부마다 날짜로 옮긴다(2026-10-09)
+        for v in st["books"].values():
+            v.setdefault("start", st["start"])
+            v.setdefault("last_day", st["last_day"])
+        st = {"books": st["books"]}
+    rebal: list[Any] = []
+    for name, cfg in BOOKS.items():
+        syms = list(cfg["targets"])
+        filled = _filled(px, syms, 7 if cfg["ccy"] == "KRW" else 21)
+        if not filled:
+            continue
+        if name in st["books"]:
+            raw = st["books"][name]
+            book, start, last_day = _book_from(raw), raw["start"], raw["last_day"]
+        else:
+            start = min((d for d in filled if d >= FIRST_START), default=max(filled))
+            book = open_book(cfg["capital"], cfg["targets"], filled[start], cfg["cost"])
+            mark(book, start, filled[start])
+            last_day = start
+        for d in [d for d in sorted(filled) if d > last_day]:
+            if new_month(last_day, d):
+                fee = rebalance(book, cfg["targets"], filled[d], cfg["cost"])
                 rebal.append([d, name, round(fee, 4)])
-        for b in books.values():
-            mark(b, d, filled[d])
-        last_day = d
-    state = {
-        "start": start,
-        "last_day": last_day,
-        "books": {k: asdict(v) for k, v in books.items()},
-    }
-    STATE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
-    report = _report(state, filled, rebal)
+            mark(book, d, filled[d])
+            last_day = d
+        st["books"][name] = {
+            **asdict(book),
+            "start": start,
+            "last_day": last_day,
+            "ccy": cfg["ccy"],
+        }
+    STATE.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
+    report = _report(st, rebal)
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / "latest.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8"
@@ -127,26 +152,21 @@ def run() -> dict[str, Any]:
     return report
 
 
-def _report(
-    state: dict[str, Any], filled: dict[str, dict[str, float]], rebal: list[Any]
-) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        "start": state["start"],
-        "last_day": state["last_day"],
-        "rebalanced_today": rebal,
-    }
+def _report(state: dict[str, Any], rebal: list[Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {"rebalanced_today": rebal}
     for name, b in state["books"].items():
         hist = b["history"]
+        v0 = BOOKS[name]["capital"] if name in BOOKS else hist[0][1]
         v = hist[-1][1]
         out[name] = {
+            "ccy": b.get("ccy", "USD"),
+            "start": b.get("start"),
+            "last_day": b.get("last_day"),
             "value": round(v, 2),
-            "return": round(v / CAPITAL - 1, 4),
+            "return": round(v / v0 - 1, 4),
             "mdd": round(b["mdd"], 4),
             "costs": round(b["costs"], 2),
         }
-    if filled and state["start"] in filled:
-        s0, s1 = filled[state["start"]], filled[state["last_day"]]
-        out["since_start"] = {s: round(s1[s] / s0[s] - 1, 4) for s in s0}
     return out
 
 
@@ -154,7 +174,7 @@ def status() -> dict[str, Any]:
     if not STATE.exists():
         return {"state": "아직 시작 전"}
     st = json.loads(STATE.read_text(encoding="utf-8"))
-    return _report(st, {}, [])
+    return _report(st, [])
 
 
 def judge_now() -> dict[str, Any]:
@@ -181,7 +201,7 @@ def judge_now() -> dict[str, Any]:
             except ValueError:
                 continue
     px = _prices("5y")
-    start = st["start"]
+    start = st["books"]["MIX"]["start"]
 
     def month_end(series: dict[str, float]) -> dict[str, float]:
         out: dict[str, float] = {}
