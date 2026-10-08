@@ -102,6 +102,8 @@ class Result:
     round_trips: list[float] = field(default_factory=list)
     taxes_by_year: dict[str, float] = field(default_factory=dict)
     flows: list[tuple[str, float]] = field(default_factory=list)
+    navs: list[tuple[str, float]] = field(default_factory=list)
+    """날마다 (날짜, 단위 NAV) — 보고용 기록(판정 값에 영향 없음)."""
 
 
 def simulate(
@@ -183,6 +185,7 @@ def simulate(
         res.max_cash = max(res.max_cash, cash)
         value = q_sh * qqq[d] + l_sh * lev[d] + cash
         nav = value / units if units > 0 else 1.0
+        res.navs.append((d, nav))
         peak_nav = max(peak_nav, nav)
         if peak_nav > 0:
             res.max_drawdown = max(res.max_drawdown, 1 - nav / peak_nav)
