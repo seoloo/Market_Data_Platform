@@ -160,9 +160,9 @@ def finra() -> None:
                         else ""
                     )
                     for line in body.decode("utf-8", "replace").splitlines()[1:]:
-                        f = line.split("|")
-                        if len(f) >= 6 and f[1] in ETFS:
-                            wo.writerow([day.isoformat(), f[1], f[2], f[3], f[4], f[5]])
+                        cols = line.split("|")
+                        if len(cols) >= 6 and cols[1] in ETFS:
+                            wo.writerow([day.isoformat(), *cols[1:6]])
                 if st in (200, 403, 404):
                     wm.writerow([day.isoformat(), st, lm])
                 fo.flush()
