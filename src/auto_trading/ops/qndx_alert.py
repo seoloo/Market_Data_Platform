@@ -62,6 +62,25 @@ class Plan:
     monthly_cap: float
     max_limit_usd: float
     """지정가 상한 — 설정 실수로 비싼 주문이 나가지 않게."""
+    changes: tuple[tuple[str, float], ...] = ()
+    """하루 금액 바꾸기 (그날부터, 새 하루 금액). 그 전까지 쌓인 적립금은 그대로 이어진다."""
+
+    def rate_on(self, day: str) -> float:
+        rate = self.daily
+        for start, new in sorted(self.changes):
+            if day >= start:
+                rate = new
+        return rate
+
+    def accrual(self, start: str, today: str) -> float:
+        """``start`` ~ ``today`` (양 끝 포함) 하루 금액의 합 — 바뀐 날부터는 새 금액."""
+        total = 0.0
+        edges = sorted(c for c in self.changes if start < c[0] <= today)
+        seg_start, rate = start, self.rate_on(start)
+        for day, new in edges:
+            total += rate * (_days(seg_start, day) - 1)
+            seg_start, rate = day, new
+        return total + rate * _days(seg_start, today)
 
 
 PLANS: tuple[Plan, ...] = (
@@ -268,9 +287,7 @@ def advise(
     문서 118 QS: ``extra_spent`` = TQQQ 에 쓴 돈 − TQQQ 에서 돌아온 돈 (적립금에서 더 뺀다,
     월 한도에는 넣지 않는다), ``paused`` 면 QNDX 를 사지 않는다(PAUSE).
     """
-    accrued = (
-        plan.daily * _days(state.start_date, today) - sum(b.cost for b in state.buys) - extra_spent
-    )
+    accrued = plan.accrual(state.start_date, today) - sum(b.cost for b in state.buys) - extra_spent
     price = _in_plan(last_usd, fx_rate, plan) * (1 + fee)
     month_spent = sum(b.cost for b in state.buys if b.date[:7] == today[:7])
     if paused:
@@ -292,7 +309,7 @@ def advise(
         last_usd=last_usd,
         fx_rate=fx_rate,
         limit_usd=math.floor(last_usd * (1 + LIMIT_BUFFER) * 100) / 100,
-        days_to_go=math.ceil(short / plan.daily - 1e-9),
+        days_to_go=math.ceil(short / plan.rate_on(today) - 1e-9),
         month_spent=month_spent,
         monthly_cap=plan.monthly_cap,
         weekend=weekday >= 5,

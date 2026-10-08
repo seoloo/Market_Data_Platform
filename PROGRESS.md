@@ -3,6 +3,12 @@
 최종 갱신: 2026-10-09 · 작성: Claude (146~175) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-09 아침 — 토스 QS 실거래 끔(Paper 만) · WQTM 매일 1 달러
+
+- 사용자 "전략 qs는 그냥 페이퍼에만 등록 해줘" → `toss_accumulate.QS_LIVE = False`(TQQQ 주문 · 신호 갱신 없음). QS Paper(`AutoTrading_QS_Paper`)는 그대로.
+- 사용자 "지금 모인 적립금으로 계속 이어가고 wqtm 1달러로 변경해줘" → `Plan.changes`(하루 금액 변경, 그 전 적립금 유지). WQTM 10-10 부터 매일 1 달러.
+- 다음: 사용자는 M3(182, TQQQ + SCHD 변동성 맞춤)로 실거래 예정 — 이번 달 30 만 원.
+
 ## 2026-10-09 아침 — 토스 QNDX 적립 중단 (사용자)
 
 - 사용자 "qndx 적립 매수 중단 해줘" → `toss_accumulate.STOPPED = {QNDX}`. 그날 밤부터 QNDX 주문 없음, 보유 · 상태 그대로. QS 의 TQQQ 재원(멈춘 QNDX 적립금)도 0 → QS 는 사실상 쉼(지금 QS TQQQ 0 주). BTQ · WQTM · QS(퀀텀스케이프) 적립은 계속. [118](docs/research/118-qs-live-registration.md).

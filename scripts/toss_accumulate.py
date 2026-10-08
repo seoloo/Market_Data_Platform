@@ -82,16 +82,22 @@ QS_KEY = "QS_SWITCH"
 QS_FILE = f"{QS_KEY}.json"
 PLANS: tuple[Plan, ...] = (
     *KIS_PLANS,
-    Plan("WQTM", "AMS", "AMEX", "USD", 4.0, 124.0, 60.0),
+    Plan("WQTM", "AMS", "AMEX", "USD", 4.0, 124.0, 60.0, changes=(("2026-10-10", 1.0),)),
     Plan("QS", "NAS", "NASD", "USD", 1.0, 31.0, 10.0),
 )
 """토스 적립 종목: QNDX·BTQ(문서 89 그대로) + WQTM 매일 4 달러·월 124 달러(2026-10-04 사용자 추가,
 2026-10-02 종가 32.5 USD) + QS(퀀텀스케이프, 나스닥) 매일 1 달러·월 31 달러(2026-10-04 사용자 추가,
-2026-10-02 종가 4.57 USD, BTQ 와 같은 방식). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다."""
+2026-10-02 종가 4.57 USD, BTQ 와 같은 방식). 상태 파일이 없는 종목은 ``run`` 이 그날 시작한다.
+2026-10-09 사용자 "지금 모인 적립금으로 계속 이어가고 wqtm 1달러로 변경해줘"
+→ WQTM 은 10-10 부터 매일 1 달러(그 전 4 달러로 쌓인 적립금은 그대로)."""
 STOPPED: dict[str, str] = {"QNDX": '2026-10-09 사용자 "qndx 적립 매수 중단 해줘"'}
 """적립을 멈춘 종목 → 이유. 주문을 내지 않는다.
 QNDX 면 QS 의 TQQQ 재원(멈춘 동안 쌓인 적립금)도 0 으로 본다.
 보유 · 상태 파일은 그대로 둔다(다시 켜면 이어서). 다시 켜려면 여기서 지운다."""
+QS_LIVE = False
+"""2026-10-09 사용자 "전략 qs는 그냥 페이퍼에만 등록 해줘" → 토스 실거래 QS(TQQQ 전환) 끔.
+QS 는 Paper(`scripts/qs_paper.py`, 예약 AutoTrading_QS_Paper)로만 기록한다.
+상태 파일은 그대로 둔다."""
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -143,6 +149,11 @@ def _load_qs() -> QsLiveState | None:
     _migrate_qs_switch()
     p = _path(QS_FILE)
     return QsLiveState.from_dict(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
+
+
+def _live_qs() -> QsLiveState | None:
+    """실거래 QS 상태 — ``QS_LIVE`` 가 꺼져 있으면 None (주문 · 신호 갱신 없음)."""
+    return _load_qs() if QS_LIVE else None
 
 
 def _save_qs(qs: QsLiveState) -> None:
@@ -359,7 +370,7 @@ def fx(telegram: bool = True) -> int:
         print("주말 — 오늘 밤 미국 장 없음")
         return 0
     states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
-    qs = _load_qs()
+    qs = _live_qs()
     if not states:
         print("아직 시작 전 (start)")
         return 2
@@ -456,7 +467,7 @@ def run(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
     states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
-    qs = _load_qs()
+    qs = _live_qs()
     if not states:
         print("아직 시작 전 (start)")
         return 2
@@ -621,7 +632,7 @@ def run(telegram: bool = True) -> int:
 def preview() -> int:
     now = _kst_now()
     states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
-    qs = _load_qs()
+    qs = _live_qs()
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
@@ -672,7 +683,8 @@ def status() -> int:
     qs = _load_qs()
     if qs is not None:
         print(
-            f"QS: 추세 {qs.prev_on} · 할 일 {qs.want} · QS TQQQ {qs.strategy_qty:g}주 "
+            ("QS (실거래 꺼짐 — Paper 만): " if not QS_LIVE else "")
+            + f"QS: 추세 {qs.prev_on} · 할 일 {qs.want} · QS TQQQ {qs.strategy_qty:g}주 "
             f"· 순지출 {qs.net_krw():,.0f}원"
         )
     return 0

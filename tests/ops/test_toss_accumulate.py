@@ -89,6 +89,7 @@ def _mod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeToss) -> Any
     monkeypatch.setattr(mod, "_kst_now", lambda: NOW_KST)
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: None)
     monkeypatch.setattr(mod, "STOPPED", {})
+    monkeypatch.setattr(mod, "QS_LIVE", True)
     return mod
 
 
@@ -271,3 +272,12 @@ def test_stopped_plan_sends_no_order_and_no_qs_funding(
     _seed(mod)
     assert mod.run(telegram=False) == 0
     assert all(o[0] != "QNDX" for o in fake.sent)
+
+
+def test_qs_live_off_sends_no_tqqq(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = FakeToss()
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "QS_LIVE", False)
+    _seed(mod)
+    assert mod.run(telegram=False) == 0
+    assert all(o[0] != "TQQQ" for o in fake.sent)

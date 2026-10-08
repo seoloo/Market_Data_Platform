@@ -334,3 +334,12 @@ def test_run_retries_failed_plans_then_notifies_again(
     tries.append(["done"])  # 두 번째 호출부터 성공하도록
     assert mod.run(True, wait_s=0) == 0
     assert sent[-2:] == [True, True]
+
+
+def test_plan_rate_change_keeps_accrued() -> None:
+    from auto_trading.ops.qndx_alert import Plan
+
+    p = Plan("W", "AMS", "AMEX", "USD", 4.0, 124.0, 60.0, changes=(("2026-10-10", 1.0),))
+    assert p.accrual("2026-10-04", "2026-10-09") == 24.0
+    assert p.accrual("2026-10-04", "2026-10-12") == 27.0
+    assert p.rate_on("2026-10-09") == 4.0 and p.rate_on("2026-10-10") == 1.0

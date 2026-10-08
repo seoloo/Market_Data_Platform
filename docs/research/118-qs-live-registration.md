@@ -79,3 +79,10 @@
 - **QS 영향:** QS 의 TQQQ 재원은 '추세가 꺼진 동안 멈춘 QNDX 적립금' 이다. QNDX 를 멈추면 재원이 0 이라 QS 는 새 TQQQ 를 사지 않는다.
   - 중단 시점 QS 의 TQQQ 는 0 주다(추세 켜짐 · 할 일 없음). 그래서 지킬 포지션도 없다.
   - BTQ · WQTM · QS(퀀텀스케이프) 적립은 계속한다.
+
+## QS 실거래 끔 · Paper 만 (2026-10-09)
+
+- 사용자: **"전략 qs는 그냥 페이퍼에만 등록 해줘. 전략 m3로 진행할 생각"**.
+- `toss_accumulate.QS_LIVE = False`. 토스에서 QS 신호 갱신 · TQQQ 주문을 하지 않는다. 상태 파일(`QS_SWITCH.json`)은 그대로 둔다.
+- QS 는 원래 있던 Paper(`scripts/qs_paper.py`, 예약 `AutoTrading_QS_Paper` 21:15)로만 기록한다(10-08 실행 정상).
+- 같은 날 WQTM 적립을 매일 4 → 1 달러로 줄였다(10-10 부터, 그 전에 쌓인 적립금 24 달러는 이어짐 — `Plan.changes`).
