@@ -162,7 +162,8 @@ def test_message_uses_real_titles_and_our_facts() -> None:
     now, emerging = text.index("■ 지금 주도하는 테마"), text.index("■ 떠오르는 테마 (아직 초기)")
     assert now < text.index("전력기기 (확신 70%)") < emerging < text.index("원전 수출 (확신 40%)")
     assert "[추세 위 · 3 달 +12.3% · 가격 주도주]" in text
-    assert "지난주 대비: 새 테마 전력기기" in text and "검증된 매매 신호 아님" in text
+    assert "🔄 지난주 대비" in text and "🆕 새 테마 전력기기" in text
+    assert "검증된 매매 신호 아님" in text
 
 
 def test_diff_weeks() -> None:

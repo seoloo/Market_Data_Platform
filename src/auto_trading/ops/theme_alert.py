@@ -12,6 +12,8 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from auto_trading.notify.style import RULE, SUB, arrow, sub
+
 __all__ = [
     "MARKETS",
     "build_messages",
@@ -205,42 +207,48 @@ def format_market(
     """텔레그램 한 통(시장 하나). 근거는 실제 뉴스 제목, 사실은 우리 자료."""
     title_of = {h["id"]: h["title"] for h in headlines}
     part = judged.get(market) or {}
-    lines = [f"🔭 {MARKETS[market]} · 미래 주도 테마 ({week})", ""]
+    lines = [f"🔭 {MARKETS[market]} · 미래 주도 테마", f"{week} 주간", RULE]
     if not part.get("themes") and not part.get("picks"):
         lines.append("이번 주는 근거가 붙은 판단이 없다.")
+    first = True
     for stage, label in STAGES.items():
         themes = [t for t in part.get("themes", []) if t.get("stage") == stage]
         picks = [p for p in part.get("picks", []) if p.get("stage") == stage]
         if not themes and not picks:
             continue
-        lines += [f"■ {label}"]
+        lines += ([] if first else ["", RULE]) + [f"■ {label}"]
+        first = False
         for i, t in enumerate(themes, 1):
-            lines.append(f"{i}. {t['name']} (확신 {t['confidence']:.0%})")
-            lines.append(f"   왜: {t['why']}")
+            lines += ["", f"{i}. {t['name']} (확신 {t['confidence']:.0%})"]
+            lines.append(f"{SUB}왜: {t['why']}")
             for e in t["evidence"]:
-                lines.append(f"   근거 [{e}] {title_of.get(e, '')[:90]}")
+                lines.append(sub(f"근거 [{e}] {title_of.get(e, '')[:90]}"))
         if picks:
-            lines.append("   주목 종목 — [ ] 안은 우리 자료(AI 아님)")
+            lines += ["", "⭐ 주목 종목 — [ ] 안은 우리 자료(AI 아님)"]
         for p in picks:
             f = facts.get(p["symbol"], {})
             t_up = f.get("trend")
             trend = "추세 위" if t_up is True else "추세 아래" if t_up is False else "추세 ?"
             tags = [trend, f"3 달 {_pct(f.get('ret_3m'))}"]
             tags += [str(x) for x in f.get("in_lists", [])]
-            lines.append(f"   • {p['name']} ({p['symbol']}) — {p['theme']}")
-            lines.append(f"     {p['why']}")
-            lines.append(f"     [{' · '.join(tags)}]")
-        lines.append("")
+            icon = arrow(1.0 if t_up is True else -1.0 if t_up is False else None)
+            name = p["name"] if p["name"] == p["symbol"] else f"{p['name']} ({p['symbol']})"
+            lines.append(f"{icon} {name} — {p['theme']}")
+            lines.append(f"{SUB}{p['why']}")
+            lines.append(sub(f"[{' · '.join(tags)}]"))
     if part.get("risks"):
-        lines += ["위험: " + " / ".join(part["risks"])]
+        lines += ["", RULE, "⚠️ 위험"] + [f"• {r}" for r in part["risks"]]
     if diff and any(diff.values()):
-        change = []
+        lines += ["", RULE, "🔄 지난주 대비"]
         if diff.get("new_themes"):
-            change.append("새 테마 " + ", ".join(diff["new_themes"]))
+            lines.append("🆕 새 테마 " + ", ".join(diff["new_themes"]))
         if diff.get("gone_themes"):
-            change.append("빠진 테마 " + ", ".join(diff["gone_themes"]))
+            lines.append("➖ 빠진 테마 " + ", ".join(diff["gone_themes"]))
         if diff.get("new_picks"):
-            change.append("새 종목 " + ", ".join(diff["new_picks"]))
-        lines += ["", "지난주 대비: " + " · ".join(change)]
-    lines += ["", "참고용 정보 — 검증된 매매 신호 아님. AI 판단의 성적은 문서 147 장부로 기록 중."]
+            lines.append("🆕 새 종목 " + ", ".join(diff["new_picks"]))
+    lines += [
+        "",
+        "※ 참고용 정보 — 검증된 매매 신호 아님",
+        sub("AI 판단의 성적은 문서 147 장부로 기록 중"),
+    ]
     return "\n".join(lines)

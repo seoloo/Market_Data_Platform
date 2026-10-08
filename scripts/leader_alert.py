@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from auto_trading.notify.style import RULE, sub
 from auto_trading.ops.leader_alert import TRIANGLE_RULE, Triangle, ascending_triangle, new_entries
 
 REPO = Path(__file__).resolve().parent.parent
@@ -135,24 +136,35 @@ def kr_section(root: Path) -> dict[str, Any] | None:
 
 
 def render(sections: Sequence[dict[str, Any]]) -> str:
-    lines = ["[주도주 처음 잡힘] — 최근 20 번 기록에 없던 종목 (매매 아님, 정보)"]
+    lines = ["🌟 주도주 처음 잡힘", "최근 20 번 기록에 없던 종목 · 매매 아님, 정보"]
+    flag = {"미국": "🇺🇸", "국장": "🇰🇷"}
+    mark = {"돌파": "🚀", "형성 중": "📐"}
     for sec in sections:
-        head = f"\n■ {sec['market']} {sec['date']} 종가 · 새 종목 {len(sec['new'])}"
+        lines += [
+            "",
+            RULE,
+            f"{flag.get(sec['market'], '■')} {sec['market']} {sec['date']} 종가"
+            f" · 새 종목 {len(sec['new'])}",
+        ]
         if sec["history"] < FEW:
-            head += f" (비교할 과거 기록 {sec['history']} 번 — 처음엔 거의 모두 새로 보임)"
-        lines.append(head)
+            lines.append(sub(f"비교할 과거 기록 {sec['history']} 번 — 처음엔 거의 모두 새로 보임"))
         for it in sec["new"]:
             t = it["triangle"]
             gap = (
-                f", 저항선 {t['gap_to_resistance']:+.1%}"
+                f" · 저항선 {t['gap_to_resistance']:+.1%}"
                 if t.get("gap_to_resistance") is not None
                 else ""
             )
             label = f"{it['name']}" + (f" ({it['code']})" if it["name"] != it["code"] else "")
-            lines.append(f"· [{it['list']}] {label} — 삼각형: {t['status']}{gap}")
-    lines.append(f"\n삼각형 판정: {TRIANGLE_RULE}")
+            lines.append(f"{mark.get(t['status'], '•')} {label}  [{it['list']}]")
+            lines.append(sub(f"삼각형: {t['status']}{gap}"))
+    rule, _, caveat = TRIANGLE_RULE.partition(". 참고 규칙 — ")
+    lines += ["", RULE, "📐 삼각형 판정 (참고)"]
+    lines += [f"• {part}" for part in rule.split(" · ")]
+    if caveat:
+        lines.append(f"⚠️ {caveat}")
     if sections and any(s["market"] == "국장" for s in sections):
-        lines.append("국장은 종가만 있어 종가 기준으로 판정.")
+        lines.append("• 국장은 종가만 있어 종가 기준으로 판정.")
     return "\n".join(lines)
 
 
