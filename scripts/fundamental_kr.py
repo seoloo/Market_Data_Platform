@@ -257,15 +257,15 @@ def is_financial(years: set[int], day: str) -> bool:
     return sum(1 for y in years if y < int(day[:4])) >= FIN_MIN_YEARS
 
 
-def computable(
+def classify(
     panel: KrPanel, t: int, hists: Mapping[str, Hist], financial: Mapping[str, set[int]]
-) -> tuple[dict[str, Inputs], Counter[str], int, int]:
-    """월말 t: (계산 가능 종목 → 값, 못 한 이유, 비금융 종목군 수, 금융 서식 수)."""
+) -> tuple[dict[str, Inputs], dict[str, str], int]:
+    """월말 t: (계산 가능 종목 → 값, 못 한 종목 → 이유, 금융 서식 수)."""
     pool = liquid_top(panel, t)
     day = panel.days[t]
     rest = [s for s in pool if not is_financial(financial.get(s, set()), day)]
     ok: dict[str, Inputs] = {}
-    why: Counter[str] = Counter()
+    missing: dict[str, str] = {}
     for s in rest:
         qs: list[QuarterValue] = []
         if s in hists:
@@ -274,12 +274,20 @@ def computable(
         if x is None:
             if reason in (SHORT, NO_FILING) and new_listing(panel, s, t):
                 reason = NEW_LISTING
-            why[reason] += 1
+            missing[s] = reason
         elif stale(panel.days[t], x.end):
-            why["180 일 넘게 묵음"] += 1
+            missing[s] = "180 일 넘게 묵음"
         else:
             ok[s] = x
-    return ok, why, len(rest), len(pool) - len(rest)
+    return ok, missing, len(pool) - len(rest)
+
+
+def computable(
+    panel: KrPanel, t: int, hists: Mapping[str, Hist], financial: Mapping[str, set[int]]
+) -> tuple[dict[str, Inputs], Counter[str], int, int]:
+    """월말 t: (계산 가능 종목 → 값, 못 한 이유, 비금융 종목군 수, 금융 서식 수)."""
+    ok, missing, nfin = classify(panel, t, hists, financial)
+    return ok, Counter(missing.values()), len(ok) + len(missing), nfin
 
 
 SHORT = "12 분기 모자람"
