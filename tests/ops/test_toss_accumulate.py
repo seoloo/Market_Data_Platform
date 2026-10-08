@@ -31,7 +31,14 @@ class FakeToss:
         return self.holding
 
     def prices(self, symbols: list[str]) -> dict[str, Decimal]:
-        table = {"QNDX": "25.4", "BTQ": "3.17", "WQTM": "32.5", "QS": "4.57", "TQQQ": "81.07"}
+        table = {
+            "QNDX": "25.4",
+            "BTQ": "3.17",
+            "WQTM": "32.5",
+            "QS": "4.57",
+            "TQQQ": "81.07",
+            "SCHD": "33.15",
+        }
         return {s: Decimal(table[s]) for s in symbols}
 
     def usd_krw(self) -> Decimal:
@@ -90,6 +97,8 @@ def _mod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeToss) -> Any
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: None)
     monkeypatch.setattr(mod, "STOPPED", {})
     monkeypatch.setattr(mod, "QS_LIVE", True)
+    monkeypatch.setattr(mod, "M3_ENABLED", False)
+    monkeypatch.setattr(mod, "_dividend_events", lambda: [])
     return mod
 
 
@@ -294,3 +303,53 @@ def test_routine_run_is_quiet_but_rejection_alerts(
     _seed(mod)
     assert mod.run(telegram=False) == 0
     assert all(any(m in x for m in mod.ALERT_MARKS) for x in sent)
+
+
+def test_m3_first_month_buys_whole_shares_then_settles(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeToss(usd="500")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    _seed(mod)
+    assert mod.run(telegram=False) == 0
+    m3 = [o for o in fake.sent if o[4].startswith("M3")]
+    # 30 만 원 / 1350 = 222.2 USD, 변동성 작음 → TQQQ 60%: TQQQ 1 주 + SCHD 3 주
+    assert sorted((o[0], o[1], o[2]) for o in m3) == [("SCHD", "BUY", 3), ("TQQQ", "BUY", 1)]
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["done_month"] == "2026-10"
+    # 다음 날: 체결 반영, 같은 달 다시 사지 않음
+    for o in state["orders"]:
+        fake.statuses[o["order_id"]] = TossOrderStatus(
+            "FILLED",
+            Decimal(o["qty"]),
+            Decimal("80") if o["symbol"] == "TQQQ" else Decimal("33"),
+            Decimal("80") if o["symbol"] == "TQQQ" else Decimal("99"),
+            Decimal("0.1"),
+        )
+    for k in range(1, len(fake.sent) + 1):
+        fake.statuses.setdefault(
+            f"OID-{k}", TossOrderStatus("FILLED", Decimal(1), Decimal(1), Decimal(1), Decimal(0))
+        )
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 21, 0, tzinfo=UTC))
+    n_sent = len(fake.sent)
+    assert mod.run(telegram=False) == 0
+    assert not any(o[4].startswith("M3") for o in fake.sent[n_sent:])
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["qty"] == {"TQQQ": 1.0, "SCHD": 3.0}
+    assert abs(state["cash_usd"] - (300_000 / 1350 - 179 - 0.2)) < 1e-6
+
+
+def test_m3_insufficient_usd_retries_next_day(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeToss(outcome="insufficient-buying-power")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    _seed(mod)
+    mod.run(telegram=False)
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["done_month"] == ""
+    assert len(state["deposits"]) == 1

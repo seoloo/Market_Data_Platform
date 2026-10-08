@@ -45,6 +45,20 @@ from auto_trading.exchange.toss import (
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.m3_live import (
+    DIV,
+    LEV,
+    M3Order,
+    M3State,
+    apply_fill,
+    choose,
+    credit_dividends,
+    deposit,
+    due,
+    lev_share,
+    limit_price,
+)
+from auto_trading.ops.m3_live import SYMBOLS as M3_SYMBOLS
 from auto_trading.ops.qndx_alert import (
     LIMIT_BUFFER,
     OPEN_ORDER,
@@ -103,7 +117,15 @@ QUIET_ROUTINE = True
 단 달러 부족하면 환전 알림".
 밤 적립 결과는 거절 · 결과 모름 · 수수료 변경(❌ · ⚠) 이 있을 때만 텔레그램으로 보낸다.
 환전 알림(``fx``) · 실패 알림은 그대로다."""
-ALERT_MARKS = ("❌", "⚠")
+ALERT_MARKS = ("❌", "⚠", "📈")
+M3_ENABLED = True
+M3_START = "2026-10-09"
+M3_MONTHLY_KRW = 300_000.0
+"""2026-10-09 사용자 "첫 거래일로 하고 당분간은 월 30만원으로만 매수해줘" (문서 182 M3, 토스)."""
+M3_FILE = "M3.json"
+M3_MAX_QTY = {DIV: 40}
+"""한 번에 SCHD 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
+M3_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -184,14 +206,14 @@ def _notify(text: str, telegram: bool) -> None:
 
 
 def _trader() -> TossTrader:
-    symbols = {p.symbol for p in PLANS} | {TQQQ}
+    symbols = {p.symbol for p in PLANS} | {TQQQ} | set(M3_SYMBOLS)
     limit = max([p.max_limit_usd for p in PLANS] + [MAX_TQQQ_LIMIT_USD])
     return TossTrader(
         load_toss_credentials(REPO / ".env"),
         TossTokenCache(TOKEN),
         allowed_symbols=frozenset(symbols),
-        max_qty={TQQQ: MAX_TQQQ_QTY},
-        sell_symbols=frozenset({TQQQ}),
+        max_qty={TQQQ: MAX_TQQQ_QTY, **M3_MAX_QTY},
+        sell_symbols=frozenset({TQQQ, DIV}),
         max_limit_usd=Decimal(str(limit)),
     )
 
@@ -207,6 +229,175 @@ def _write_report(name: str, today: str, body: dict[str, Any]) -> None:
 
 def _client_id(symbol: str, today: str, n: int) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "", f"{symbol}-{today}-{n}")[:36]
+
+
+# ---------------------------------------------------------------- M3 (문서 182)
+
+
+def _load_m3() -> M3State:
+    p = _path(M3_FILE)
+    if p.exists():
+        return M3State.from_dict(json.loads(p.read_text(encoding="utf-8")))
+    return M3State(M3_START)
+
+
+def _save_m3(m3: M3State) -> None:
+    DATA.mkdir(parents=True, exist_ok=True)
+    _path(M3_FILE).write_text(
+        json.dumps(m3.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8"
+    )
+
+
+def _dividend_events() -> list[tuple[str, str, float]]:
+    """Yahoo 배당 기록 (배당락일, 종목, 주당). 실패하면 빈 목록 — 다음 날 다시."""
+    import httpx
+
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
+    out: list[tuple[str, str, float]] = []
+    for sym in M3_SYMBOLS:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+            res = httpx.get(
+                url,
+                params={"range": "1y", "interval": "1d", "events": "div"},
+                headers={"User-Agent": ua},
+                timeout=30,
+            ).json()["chart"]["result"][0]
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+            continue
+        for ev in ((res.get("events") or {}).get("dividends") or {}).values():
+            ex = datetime.fromtimestamp(int(ev["date"]), UTC).astimezone(NY).strftime("%Y-%m-%d")
+            out.append((ex, sym, float(ev["amount"])))
+    return out
+
+
+def _since(a: str, b: str) -> int:
+    from datetime import date as _date
+
+    return (_date.fromisoformat(b) - _date.fromisoformat(a)).days
+
+
+def _m3_resolve(day: Day, m3: M3State) -> list[str]:
+    """지난 M3 주문을 주문 상세로 정리해 장부에 넣는다."""
+    notes = []
+    for o in m3.orders:
+        if o.date >= day.today:
+            continue
+        if o.status == "UNKNOWN":
+            o.status = "EXPIRED"
+            notes.append(
+                f"⚠ M3 {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
+            )
+            continue
+        if o.status != "SENT":
+            continue
+        st = day.reader.order_status(o.order_id)
+        if st.status in ("PENDING", "PENDING_CANCEL"):
+            continue
+        o.filled_qty = float(st.filled_qty)
+        amount = st.filled_amount
+        if amount is None and st.avg_price is not None:
+            amount = st.filled_qty * st.avg_price
+        o.filled_usd = float(amount or 0)
+        o.commission = float(st.commission or 0)
+        o.status = "FILLED" if o.filled_qty > 0 else "EXPIRED"
+        apply_fill(m3, o)
+        word = "매수" if o.side == "BUY" else "매도"
+        if o.filled_qty > 0:
+            notes.append(f"M3 {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
+        else:
+            notes.append(f"M3 {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
+    return notes
+
+
+def _m3_plan(day: Day, m3: M3State) -> tuple[dict[str, int], float | None, float, list[str]]:
+    """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
+    closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
+    vol, share = lev_share(closes, day.today)
+    notes = credit_dividends(m3, _dividend_events(), day.today, _since)
+    usd = deposit(m3, day.today, M3_MONTHLY_KRW, day.fx)
+    if usd:
+        notes.append(f"이번 달 납입 {M3_MONTHLY_KRW:,.0f}원 = ${usd:,.2f} (환율 {day.fx:,.1f})")
+    last = {s: day.prices[s] for s in M3_SYMBOLS}
+    return choose(m3.qty, m3.cash_usd, last, share, day.fee), vol, share, notes
+
+
+def _m3_needs(day: Day) -> list[dict[str, Any]]:
+    """오늘 밤 M3 매수 (환전 알림용). 상태는 복사본으로만 계산한다."""
+    if not M3_ENABLED:
+        return []
+    m3 = copy.deepcopy(_load_m3())
+    if not due(m3, day.today):
+        return []
+    plan, _, _, _ = _m3_plan(day, m3)
+    return [
+        {"symbol": s, "qty": n, "limit": limit_price(day.prices[s], "BUY")}
+        for s, n in plan.items()
+        if n > 0
+    ]
+
+
+def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) -> list[str]:
+    """M3 하루치. 이번 달 주문을 다 접수하면 그 달은 끝, 돈 · 시간 문제로 거절되면 다음 날 다시."""
+    m3 = _load_m3()
+    notes = _m3_resolve(day, m3)
+    if not due(m3, day.today):
+        _save_m3(m3)
+        return [f"📈 M3 · {x}" for x in notes]
+    plan, vol, share, more = _m3_plan(day, m3)
+    notes += more
+    if not any(str(x[0]) == day.today[:7] for x in m3.months):
+        m3.months.append([day.today[:7], vol, share])
+    vol_txt = f"{vol:.1%}" if vol is not None else "모름"
+    head = (
+        f"📈 M3 · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
+        f" (QQQ 20일 변동성 {vol_txt})"
+    )
+    if not enabled or halted:
+        _save_m3(m3)
+        why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
+        return [head, *notes, f"⏸ M3 주문 안 함 — {why} (다음 날 다시)"]
+    retry = False
+    lines = []
+    for sym, n in sorted(plan.items(), key=lambda kv: kv[1]):  # 파는 것 먼저
+        side = "BUY" if n > 0 else "SELL"
+        qty = abs(n)
+        limit = limit_price(day.prices[sym], side)
+        cid = _client_id(f"M3{sym}", day.today, len(m3.orders) + 1)
+        order = M3Order(day.today, sym, side, qty, limit, cid)
+        m3.orders.append(order)
+        _save_m3(m3)
+        word = "매수" if side == "BUY" else "매도"
+        try:
+            res = trader.order(sym, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
+        except OrderStateUnknownError as exc:
+            lines.append(f"⚠ M3 {sym} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}")
+            continue
+        except TradingDisabledError as exc:
+            order.status = "REJECTED"
+            lines.append(f"❌ M3 {sym} {word} 안 보냄: {exc}")
+            continue
+        if res.accepted:
+            order.status, order.order_id = "SENT", res.code
+            lines.append(f"🛒 M3 {sym} {qty}주 장 마감 지정가 {word} 접수 — {limit:.2f} USD")
+        else:
+            order.status, order.code = "REJECTED", res.code
+            if res.code in M3_RETRY:
+                retry = True
+            lines.append(f"❌ M3 {sym} {word} 거절 {res.code}: {res.message}")
+        _save_m3(m3)
+    if not plan:
+        lines.append("살 것 없음 (돈이 1 주 값보다 적음) — 다음 달로 이월")
+    if retry:
+        lines.append("↻ 달러 부족 · 장 시간 문제 — 다음 거래일 밤에 다시 시도")
+    else:
+        m3.done_month = day.today[:7]
+    lines.append(
+        f"전략 현금 ${m3.cash_usd:,.2f} (체결 뒤 정산) · 보유 TQQQ {m3.qty.get(LEV, 0):g}"
+        f" · SCHD {m3.qty.get(DIV, 0):g}"
+    )
+    _save_m3(m3)
+    return [head, *notes, *lines]
 
 
 # ---------------------------------------------------------------- 신호
@@ -239,7 +430,7 @@ class Day:
         self.notes: list[str] = []
         self.holdings: dict[str, TossPosition] = reader.holdings()
         self.prices = {
-            k: float(v) for k, v in reader.prices([p.symbol for p in PLANS] + [TQQQ]).items()
+            k: float(v) for k, v in reader.prices([p.symbol for p in PLANS] + [TQQQ, DIV]).items()
         }
         self.fx = float(reader.usd_krw())
         fee = reader.us_commission()
@@ -329,6 +520,7 @@ def _needs(day: Day, states: dict[str, State], qs: QsLiveState | None) -> list[d
         )
         if order.side == "BUY":
             out.append({"symbol": TQQQ, "qty": order.qty, "limit": order.limit_usd})
+    out += _m3_needs(day)
     for o in out:
         o["usd"] = round(o["qty"] * o["limit"] * (1 + day.fee), 2)
     return out
@@ -601,6 +793,10 @@ def run(telegram: bool = True) -> int:
                 f"{SUB}TQQQ {qs.strategy_qty:g}주 · 순지출 {qs.net_krw():,.0f}원 · 할 일 {qs.want}",
             ]
             lines = head + ([SUB + qline] if qline else []) + ["", RULE] + lines
+        if M3_ENABLED:
+            m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted)
+            if m3_lines:
+                lines = [*m3_lines, *(["", RULE] if lines else []), *lines]
     except (AutoTradingError, TossApiError) as exc:
         text = f"⚠ 토스 적립 실패\n{RULE}\n{exc}"
         if isinstance(exc, TossApiError) and exc.status == 403:
@@ -693,6 +889,13 @@ def status() -> int:
             ("QS (실거래 꺼짐 — Paper 만): " if not QS_LIVE else "")
             + f"QS: 추세 {qs.prev_on} · 할 일 {qs.want} · QS TQQQ {qs.strategy_qty:g}주 "
             f"· 순지출 {qs.net_krw():,.0f}원"
+        )
+    if M3_ENABLED:
+        m3 = _load_m3()
+        print(
+            f"M3: 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
+            f" · 전략 현금 ${m3.cash_usd:,.2f} · TQQQ {m3.qty.get(LEV, 0):g}"
+            f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {M3_MONTHLY_KRW:,.0f}원"
         )
     return 0
 

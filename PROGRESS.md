@@ -3,6 +3,12 @@
 최종 갱신: 2026-10-09 · 작성: Claude (146~175) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-09 아침 — M3 실거래 등록 (토스, 월 30 만 원, 첫 거래일)
+
+- 사용자: "첫 거래일로 하고 당분간은 월 30만원으로만 매수해줘" · 토스 · 1 주 단위 + 이월 · 배당 재투자.
+- `ops/m3_live.py` + `toss_accumulate` M3 단계: 매달 첫 실행일 지난달 말 QQQ σ20 → TQQQ 60% × min(1, 0.20/σ) · SCHD 나머지, 정수 주 최소 오차 조합, 장 마감 지정가, 배당(85%) 재원 포함, 거절(달러 · 장 시간) 시 다음 날 다시. 시험 6 개.
+- 첫 달 10-09 밤: TQQQ 1 주 + SCHD 3 주(약 $185). 환전 필요 약 $125(10-09 아침 기준, 달러 $72.53). [182 §8](docs/research/182-leveraged-dividend-drawdown-control-preregistration.md).
+
 ## 2026-10-09 아침 — 토스 QS 실거래 끔(Paper 만) · WQTM 매일 1 달러
 
 - 사용자 "전략 qs는 그냥 페이퍼에만 등록 해줘" → `toss_accumulate.QS_LIVE = False`(TQQQ 주문 · 신호 갱신 없음). QS Paper(`AutoTrading_QS_Paper`)는 그대로.
