@@ -210,12 +210,40 @@ def stale(day: str, end: str) -> bool:
     return (date.fromisoformat(day) - last).days > STALE_DAYS
 
 
+def financial_years(code: str, root: Path = ROOT) -> set[int]:
+    """재무 API 가 그 해(2016 ~) 모든 응답(연결 · 별도, 모든 보고서)에 '013 자료 없음' 만 준 해.
+
+    은행 · 보험 · 증권 서식 회사가 그렇다(관문 문서 §3). 2015 년 1 ~ 3 분기는 모두 013 이라 뺀다.
+    2026-10-09 진단: 이 회사들도 최근 몇 해는 정상 응답이 나와 '정상 응답이 하나도 없음' 규칙으로는
+    비금융 분모에 섞였다 → 그 시점까지의 과거 해로 판정한다(:func:`is_financial`)."""
+    by_year: dict[int, list[str]] = defaultdict(list)
+    folder = root / "fin" / code
+    for path in folder.glob("*.json") if folder.exists() else []:
+        year = int(path.stem.split("-")[0])
+        if year < FIN_FROM_YEAR:
+            continue
+        try:
+            by_year[year].append(str(json.loads(path.read_text(encoding="utf-8")).get("status")))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+    return {y for y, sts in by_year.items() if sts and all(s == "013" for s in sts)}
+
+
+FIN_FROM_YEAR = 2016
+
+
+def is_financial(years: set[int], day: str) -> bool:
+    """월말 ``day`` 에 금융 서식인가 — 그해 전(과거 해)에 013 만 받은 해가 있으면."""
+    return any(y < int(day[:4]) for y in years)
+
+
 def computable(
-    panel: KrPanel, t: int, hists: Mapping[str, Hist], financial: set[str]
+    panel: KrPanel, t: int, hists: Mapping[str, Hist], financial: Mapping[str, set[int]]
 ) -> tuple[dict[str, Inputs], Counter[str], int, int]:
     """월말 t: (계산 가능 종목 → 값, 못 한 이유, 비금융 종목군 수, 금융 서식 수)."""
     pool = liquid_top(panel, t)
-    rest = [s for s in pool if s not in financial]
+    day = panel.days[t]
+    rest = [s for s in pool if not is_financial(financial.get(s, set()), day)]
     ok: dict[str, Inputs] = {}
     why: Counter[str] = Counter()
     for s in rest:
@@ -224,6 +252,8 @@ def computable(
             qs, _ = quarters(snapshot(hists[s], t))
         x, reason = inputs_at(qs)
         if x is None:
+            if reason == SHORT and new_listing(panel, s, t):
+                reason = NEW_LISTING
             why[reason] += 1
         elif stale(panel.days[t], x.end):
             why["180 일 넘게 묵음"] += 1
@@ -232,15 +262,33 @@ def computable(
     return ok, why, len(rest), len(pool) - len(rest)
 
 
-def load_all(panel: KrPanel) -> tuple[dict[str, Hist], set[str], Counter[str]]:
+SHORT = "12 분기 모자람"
+NEW_LISTING = "신규 상장 3 년 미만 — 자격 전"
+"""초안 §2: 이력이 모자란 신규 상장사는 사전 자격 제외로 따로 센다(복원 실패와 구분)."""
+
+
+def new_listing(panel: KrPanel, s: str, t: int) -> bool:
+    """유가증권시장 상장 뒤 3 년(756 거래일)이 안 됐나 (상장일 = 판의 ``listed_from``)."""
+    return panel.listed_from[s] > 0 and t - panel.listed_from[s] < 756
+
+
+def coverage_share(n_ok: int, n: int, why: Counter[str]) -> float:
+    """계산 가능 ÷ (비금융 종목군 − 신규 상장 자격 전)."""
+    base = n - why[NEW_LISTING]
+    return n_ok / base if base > 0 else 0.0
+
+
+def load_all(panel: KrPanel) -> tuple[dict[str, Hist], dict[str, set[int]], Counter[str]]:
+    """(이력, 종목 → 금융 서식 해, 센 것). 금융 서식 판정은 :func:`is_financial` 로 그 시점마다."""
     hists: dict[str, Hist] = {}
-    financial: set[str] = set()
+    financial: dict[str, set[int]] = {}
     why: Counter[str] = Counter()
     for code in sorted(panel.close):
-        hist, w, any_ok = corp_history(code, panel.days)
+        hist, w, _ = corp_history(code, panel.days)
         why.update(w)
-        if (ROOT / "fin" / code).exists() and not any_ok:
-            financial.add(code)
+        years = financial_years(code)
+        if years:
+            financial[code] = years
         hists[code] = hist
     return hists, financial, why
 
@@ -259,7 +307,9 @@ def coverage() -> dict[str, Any]:
                 "universe_nonfin": n,
                 "financial_format": nfin,
                 "computable": len(ok),
-                "share": round(len(ok) / n, 3) if n else 0.0,
+                "share": round(coverage_share(len(ok), n, why), 3),
+                "share_raw": round(len(ok) / n, 3) if n else 0.0,
+                "new_listing": why[NEW_LISTING],
                 "eligible_all_positive": sum(
                     1
                     for x in ok.values()

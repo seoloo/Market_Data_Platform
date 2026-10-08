@@ -43,10 +43,22 @@ MEASURES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "ifrs-full_CashFlowsFromUsedInOperatingActivities",
             "ifrs_CashFlowsFromUsedInOperatingActivities",
         ),
-        ("영업활동현금흐름", "영업활동으로인한현금흐름", "영업활동으로 인한 현금흐름"),
+        (
+            "영업활동현금흐름",
+            "영업활동으로인한현금흐름",
+            "영업활동으로 인한 현금흐름",
+            # 2026-10-09 커버리지 진단(수익 열람 전): 2023 보고서 일부가 합계 줄을 표준 코드 없이
+            # 아래 이름으로 낸다(삼성전기 · 이마트 · 풍산 등). '영업활동에서 창출된 현금'(이자 ·
+            # 법인세 전)은 다른 항목이라 넣지 않는다.
+            "영업활동순현금흐름",
+            "영업활동순현금흐름 합계",
+            "영업활동현금흐름 합계",
+            "영업활동으로 인한 순현금흐름",
+        ),
     ),
 }
-"""경로 B 감사(``scripts.audit_dart_feasibility.MEASURES``)와 같은 표 — 결과 전에 고정."""
+"""경로 B 감사(``scripts.audit_dart_feasibility.MEASURES``)와 같은 표 — 결과 전에 고정.
+영업현금흐름 이름 넷은 2026-10-09 전체 자료 커버리지 진단으로 더했다(전략 수익 보기 전)."""
 
 _SHEETS = {"revenue": ("IS", "CIS"), "operating_income": ("IS", "CIS"), "operating_cf": ("CF",)}
 CODES = ("11013", "11012", "11014", "11011")
