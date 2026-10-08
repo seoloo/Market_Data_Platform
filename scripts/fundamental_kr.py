@@ -272,7 +272,7 @@ def computable(
             qs, _ = quarters(snapshot(hists[s], t))
         x, reason = inputs_at(qs)
         if x is None:
-            if reason == SHORT and new_listing(panel, s, t):
+            if reason in (SHORT, NO_FILING) and new_listing(panel, s, t):
                 reason = NEW_LISTING
             why[reason] += 1
         elif stale(panel.days[t], x.end):
@@ -283,6 +283,7 @@ def computable(
 
 
 SHORT = "12 분기 모자람"
+NO_FILING = "공시 없음"
 NEW_LISTING = "신규 상장 3 년 미만 — 자격 전"
 """초안 §2: 이력이 모자란 신규 상장사는 사전 자격 제외로 따로 센다(복원 실패와 구분)."""
 
