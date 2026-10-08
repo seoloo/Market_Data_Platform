@@ -25,6 +25,7 @@ from typing import Any, Literal
 
 from auto_trading.backtest.overlay import OverlayConfig
 from auto_trading.execution.paper_overlay import verify_ledger
+from auto_trading.notify.style import RULE, arrow, sub
 from auto_trading.storage.repositories.paper_days import PaperDay
 from auto_trading.storage.repositories.paper_overlay_days import OverlayPaperDay
 
@@ -141,7 +142,8 @@ def check_t2(
         day_change=change,
         drawdown=drawdown,
         days=len(rows),
-        detail=f"체결 {len(last.executed)}건 · 내일 목표 {targets}",
+        detail=f"체결 {len(last.executed)}건 · 내일 목표 "
+        + (" ".join(f"{k.removesuffix('USDT')} {v}" for k, v in targets.items()) or "없음"),
     )
     return summary, findings
 
@@ -336,20 +338,32 @@ def render_report(
     """텔레그램·로컬 기록에 그대로 보내는 일일 보고 (평문). ``extra``는 원장 요약 뒤에 붙는 줄."""
     code = exit_code(findings)
     head = {0: "✅ 이상 없음", 1: "⚠️ 경고", 2: "🚨 조치 필요"}[code]
-    lines = [f"[일일 점검 {_date(expected_decision_ms(now_ms))}] {head}"]
-    for s in summaries:
-        if s is None:
-            continue
-        change = "—" if s.day_change is None else f"{s.day_change:+.2%}"
-        lines.append(
-            f"{s.ledger}: {s.equity:,.2f} USDT ({change}) · 고점 대비 −{s.drawdown:.1%}"
-            f" · {s.status} · {s.days}일"
-        )
-        lines.append(f"  {s.detail}")
-    lines.extend(extra)
+    lines = [f"🩺 일일 점검 {_date(expected_decision_ms(now_ms))}  {head}", RULE]
     order = {"CRITICAL": 0, "WARN": 1, "INFO": 2}
-    for f in sorted(findings, key=lambda f: order[f.level]):
-        lines.append(f"- {f.level} [{f.ledger}] {f.message}")
+    mark = {"CRITICAL": "🚨", "WARN": "⚠️", "INFO": "ℹ️"}
+    ranked = sorted(findings, key=lambda f: order[f.level])
+    urgent = [f for f in ranked if f.level != "INFO"]
+    if urgent:  # 조치할 것을 맨 위에, 참고(INFO)는 맨 아래
+        lines.append("📋 확인할 것")
+        lines += [f"- {f.level} {mark[f.level]} [{f.ledger}] {f.message}" for f in urgent]
+        lines += ["", RULE]
+    rows = [s for s in summaries if s is not None]
+    if rows:
+        lines.append("💼 Paper 원장")
+        for s in rows:
+            change = "—" if s.day_change is None else f"{s.day_change:+.2%}"
+            lines.append(f"{arrow(s.day_change)} {s.ledger}: {s.equity:,.2f} USDT  {change}")
+            lines.append(sub(f"고점 대비 −{s.drawdown:.1%} · {s.status} · {s.days}일"))
+            lines.append(sub(s.detail))
+    if extra:
+        lines += ["", RULE, "🧰 운영 · 데모"]
+        for e in extra:  # "이름: 내용" 은 이름 한 줄 + 내용 아랫줄
+            name, sep, rest = e.partition(": ")
+            lines += [f"• {name}", sub(rest)] if sep and len(name) <= 20 else [e]
+    info = [f for f in ranked if f.level == "INFO"]
+    if info:
+        lines += ["", RULE, "ℹ️ 참고"]
+        lines += [f"- {f.level} [{f.ledger}] {f.message}" for f in info]
     return "\n".join(lines)
 
 

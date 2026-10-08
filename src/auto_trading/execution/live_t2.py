@@ -49,6 +49,7 @@ from auto_trading.core.types import Candle
 from auto_trading.exchange.spot import OrderStatus, SpotFilters, SpotOrderResult
 from auto_trading.execution.demo_limit import DemoSpotVenue
 from auto_trading.execution.spot_orders import client_order_id
+from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.storage.repositories.paper_days import PaperDay, PaperDayRepository
 from auto_trading.storage.repositories.risk_events import RiskEvent, RiskEventRepository
@@ -247,6 +248,26 @@ class TradeReason:
             f"{trend} → {strength}. 목표 비중 {self.target:.1%} ({size}) ← 현재 {self.current:.1%}"
         )
 
+    def lines(self, symbol: str) -> list[str]:
+        """알림용 여러 줄 — 종목·추세 한 줄, 목표·근거는 아랫줄."""
+        trend = f"20·60·120일 추세 {self.ups}/3 상승"
+        if self.target <= 0:
+            return [
+                f"⚪ {symbol}: {trend}",
+                sub(f"상승 추세가 아니라 현금 (현재 {self.current:.1%})"),
+            ]
+        size = (
+            f"상한 {self.cap:.0%}"
+            if self.target >= self.cap
+            else f"{self.target_vol:.0%} ÷ 60일 변동성 {self.vol:.0%}"
+        )
+        icon, strength = ("🟢", "상승 추세") if self.ups == 3 else ("🟡", "상승 우세")
+        return [
+            f"{icon} {symbol}: {trend} → {strength}",
+            sub(f"목표 비중 {self.target:.1%} ← 현재 {self.current:.1%}"),
+            sub(size),
+        ]
+
 
 Planned = tuple[SpotSide, str, Decimal, Decimal]
 """(방향, 종목, 수량, 목표 비중)."""
@@ -392,7 +413,7 @@ class LiveT2Runner:
                 "새 매수 다시 허용 · 고점 재설정",
             )
         )
-        self._notify(f"[{self._opt.mode}·현물 T/v2] 낙폭 정지 해제 — 사유: {reason}")
+        self._notify(f"🔓 [{self._opt.mode}·현물 T/v2] 낙폭 정지 해제\n{sub('사유: ' + reason)}")
 
     def _mid(self, symbol: str) -> tuple[Decimal, Decimal, Decimal]:
         bids, asks = self._venue.order_book(symbol, limit=5)
@@ -580,22 +601,19 @@ class LiveT2Runner:
         side = "매수" if r.side == "BUY" else "매도"
         head = f"[{self._opt.mode}·현물 T/v2] {r.symbol} {side}"
         if not r.filled:
-            return f"{head} 체결 없음 — {' | '.join(r.notes) or '확인 필요'}"
+            return f"⚠️ {head} 체결 없음\n" + "\n".join(sub(n) for n in r.notes or ["확인 필요"])
         costs = r.cost_bps()
-        cost = (
-            "" if costs is None else f" · 중간가 대비 {costs[0]:+.1f}bp + 수수료 {costs[1]:.1f}bp"
-        )
-        wait = (
-            ""
-            if r.posted_ms is None or r.done_ms is None
-            else f" · 대기 {(r.done_ms - r.posted_ms) / 60_000:.0f}분"
-        )
         how = (
             f"지정가 {r.maker_qty} + 시장가 추격 {r.taker_qty}"
             if r.chased
             else f"지정가 체결 {r.filled}"
         )
-        return f"{head} {how} @{r.avg_price:.2f}{wait}{cost}"
+        lines = [f"✅ {head}", f"{SUB}{how} @{r.avg_price:.2f}"]
+        if r.posted_ms is not None and r.done_ms is not None:
+            lines.append(sub(f"대기 {(r.done_ms - r.posted_ms) / 60_000:.0f}분"))
+        if costs is not None:
+            lines.append(sub(f"중간가 대비 {costs[0]:+.1f}bp + 수수료 {costs[1]:.1f}bp"))
+        return "\n".join(lines)
 
     # ------------------------------------------------------------ 복구
 
@@ -622,7 +640,8 @@ class LiveT2Runner:
             working.append(_Working(resolved, report, deadline))
         if working:
             self._notify(
-                f"[{self._opt.mode}·현물 T/v2] 재시작: 걸려 있던 주문 {len(working)}건을 이어받음"
+                f"🔄 [{self._opt.mode}·현물 T/v2] 재시작"
+                f" · 걸려 있던 주문 {len(working)}건을 이어받음"
             )
             self._wait(working, filters)
         return not self._unresolved()
@@ -753,15 +772,22 @@ class LiveT2Runner:
             )
         self._days.insert(day)  # 선기록 — 주문보다 먼저
         if note is not None and status != "NO_PRIOR_DECISION":
-            self._notify(f"[{self._opt.mode}·현물 T/v2] {status}: {note}")
+            self._notify(f"⚠️ [{self._opt.mode}·현물 T/v2] {status}\n{sub(note)}")
         if prev is None:
             return day
         if not planned:
             if status == "OK":
+                body = [x for s, r in sorted(reasons.items()) for x in r.lines(s)]
                 self._notify(
-                    f"[{self._opt.mode}·현물 T/v2] 오늘 주문 없음 — 목표와 현재 비중 차이가 "
-                    f"밴드 {self._cfg.band:.0%}p 안\n"
-                    + "\n".join(f"{s}: {r.why}" for s, r in sorted(reasons.items()))
+                    "\n".join(
+                        [
+                            f"💤 [{self._opt.mode}·현물 T/v2] 오늘 주문 없음",
+                            RULE,
+                            f"목표와 현재 비중 차이가 밴드 {self._cfg.band:.0%}p 안",
+                            "",
+                            *body,
+                        ]
+                    )
                 )
             return day
         working: list[_Working] = []
@@ -774,10 +800,11 @@ class LiveT2Runner:
                 why = reasons.get(symbol)
                 action = why.action(side) if why else side.value
                 self._notify(
-                    f"[{self._opt.mode}·현물 T/v2] {symbol} {action} {qty} "
-                    f"@{report.limit_price} 지정가 예약 (최대 {self._opt.timeout_min // 60}시간)\n"
+                    f"🛒 [{self._opt.mode}·현물 T/v2] {symbol} {action} {qty}\n"
+                    f"{RULE}\n"
+                    f"지정가 @{report.limit_price} 예약 (최대 {self._opt.timeout_min // 60}시간)\n"
                     f"이유: {why.why if why else ''}\n"
-                    "(T/v2 는 현물 롱 전용 — 상승 추세면 사고, 꺾이면 팔아 현금으로. 숏 없음)"
+                    + sub("T/v2 는 현물 롱 전용 — 상승 추세면 사고, 꺾이면 팔아 현금으로. 숏 없음")
                 )
             deadline = (report.posted_ms or self._clock()) + self._opt.timeout_min * 60_000
             if record.state in ("REJECTED",):

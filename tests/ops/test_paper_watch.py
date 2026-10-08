@@ -327,7 +327,7 @@ class TestTestnetDrill:
         rows = t2_rows([10_000, 10_050])
         summary, findings = check_t2(rows, now_for(rows))
         text = render_report([summary], findings, now_for(rows), extra=["테스트넷 훈련: 요약"])
-        assert text.splitlines()[-1] == "테스트넷 훈련: 요약"
+        assert "• 테스트넷 훈련\n   └ 요약" in text
 
 
 class TestShadow:
