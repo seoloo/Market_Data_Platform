@@ -172,9 +172,9 @@ def build_request(
 
 
 def estimate_cost_usd(request: Mapping[str, Any]) -> float:
-    """보수적 사전 추정 — 문자 3 개를 토큰 1 개로 (실측은 응답 usage 로 따로 쌓는다)."""
+    """보수적 사전 추정 — 문자 2 개를 토큰 1 개로 (G0 실측: 약 2.4 자 = 1 토큰). 실측은 usage 로."""
     chars = len(json.dumps(request, ensure_ascii=False, separators=(",", ":")))
-    return chars / 3 * PRICE_PER_INPUT_TOKEN_USD
+    return chars / 2 * PRICE_PER_INPUT_TOKEN_USD
 
 
 def parse_response(
