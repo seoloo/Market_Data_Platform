@@ -3,6 +3,14 @@
 최종 갱신: 2026-10-08 · 작성: Claude (146~170) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-08 — 172 JEV × Elliott 재순위 Phase 0 감사 · 어댑터 · 사전 등록 초안 (유료 호출 0)
+
+- [문서 172](docs/research/172-jev-elliott-rerank-preregistration.md): 기존 `ew-scenario-set/1` → `ew-scenario-eval/1` 계약 재사용, 생성기 **EW-3e** · N = 50 · `ranking.py` `2dccbb0f…` 동결. 예약 seed **20260927 사용 흔적 없음**(코드 · 보고서 · data 확인, 보고서 6 개가 미사용 표시).
+- TypeSafe 공식 문서(10-08): `jev-1.13.0` 고정, 입력만 $0.042 / 100만 토큰, 64k 한도, REST(SDK 설치 없음). 누수 차단: 기준 순위 · 정답 · **`GUIDELINE_DISTANCE`(기준 순위의 둘째 키)** · 되돌림/무효화 가격을 입력에서 뺌.
+- 판정 규칙(결과 전): 잡음 0.1% 300 경로의 전체 1등 성공 짝 차이, 한쪽 McNemar p < 0.05 + ≥ +5%p. 검정력: +10%p 에 약 247 경로 필요 ≤ 300. 무구조 경로 헛검출은 G1 에서 못 잼(G2 로).
+- 코드: `research/elliott/jev_rerank.py`(순수) · `scripts/jev_ew_compare.py`(예산 상한 · 캐시 · 재시도 · 채점) · 시험 7 개. 크기(호출 없음): 요청 중앙값 25.7k 토큰, 420 경로 보수적 **$0.45**.
+- 다음: **사용자 승인 — G0 파일럿(개발 seed 12 묶음, 상한 $0.10) → 동결 커밋 → G1 확인(seed 20260927 1 회, 상한 $0.70)**.
+
 
 
 ## 2026-10-08 — IDEAS 30 JEV × Elliott 판독 비교시험 초안 (Codex, 문서만)
