@@ -172,7 +172,8 @@ def _corr(a: Sequence[float], b: Sequence[float]) -> float:
     ma, mb = sum(a) / n, sum(b) / n
     sa = (sum((x - ma) ** 2 for x in a) / n) ** 0.5
     sb = (sum((y - mb) ** 2 for y in b) / n) ** 0.5
-    return sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True)) / (n * sa * sb)
+    cov = sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True)) / n
+    return float(cov / (sa * sb))
 
 
 def _mix(

@@ -158,8 +158,8 @@ def _wb() -> tuple[dict[str, float], dict[str, float]]:
     prev = None
     for m in sorted(comm):
         if prev is not None:
-            r = 0.5 * (comm[m][0] / comm[prev][0] - 1) + 0.5 * (comm[m][1] / comm[prev][1] - 1)
-            level *= 1 + r
+            step = 0.5 * (comm[m][0] / comm[prev][0] - 1) + 0.5 * (comm[m][1] / comm[prev][1] - 1)
+            level *= 1 + step
         out[m] = level
         prev = m
     return gold, out
@@ -410,9 +410,9 @@ def run_c() -> dict[str, Any]:
     n = min(len(v) for v in finals.values())
     rel = []
     for k in range(n):
-        q = sum(finals[name][k][0] for name in idxs)
-        a = sum(finals[name][k][1] for name in idxs)
-        rel.append(q / a)
+        q_sum = sum(finals[name][k][0] for name in idxs)
+        a_sum = sum(finals[name][k][1] for name in idxs)
+        rel.append(q_sum / a_sum)
     out["split"] = {
         "windows": n,
         "vs_A_median": round(statistics.median(rel), 4),
