@@ -5,6 +5,13 @@
 
 
 
+## 2026-10-08 — IDEAS 29 하락 브리핑 정보 도구 Phase 0 감사 (구현 없음, 사용자 결정 대기)
+
+- 기존 경로: RSS 6 개 + Yahoo 종목 RSS(제목 · 요약 · 수집 시각), 주도주용 뉴스 AI, 테마 분석 인용 검사, Gemini 무료 호출(모델 순차 · **거절 사유 미기록**, 실제 답은 flash-lite).
+- 접속 점검(공개 주소, 개인 정보 없음): Cboe VIX 일별 CSV · SPY 보유 XLSX · 연준 RSS · KIND 200 / Invesco QQQ 보유 · SEC · BLS 403. 시총 상위 20 은 무료로 정확히 못 구함.
+- 권고: 미국 첫판(VIX · SPY 비중 상위 10 + 보유 · 관심 종목 · 연준 · 종목 RSS · Gemini 요약, 하루 1 회) → 30 사례 검산 → 한국 2 단계. 결정: 범위 · SEC 연락처 머리말(이메일) · 대형주 범위 · 시각 · 구현 요청.
+- `scripts/audit_briefing_sources.py` · [BRIEFING_PHASE0_AUDIT](docs/research/BRIEFING_PHASE0_AUDIT.md).
+
 ## 2026-10-08 — IDEAS 29 정보 도구 초안: 무료 Gemini·VIX·미국 대형주 하락 브리핑 (Codex)
 
 - 사용자 뉴스 입력 범위·무료 Gemini 보완·VIX·미국 시총 큰 기업 뉴스 요청을 [IDEAS 29](docs/research/IDEAS.md)에 상세 기록. **Phase 0 / DRAFT / NOT_IMPLEMENTED / 정확성 미검증**. 수익 가설이 아닌 근거 기반 읽기 전용 설명 도구이며 신규 수집/API·코드/설정·예약·UI/알림·매매 변경 없음.
