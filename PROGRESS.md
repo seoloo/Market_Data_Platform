@@ -5,6 +5,11 @@
 
 
 
+## 2026-10-08 — FLOW-KR · FLOW-KQ 자료 품질 점검 (사용자 보완 2 번, 판정 불변)
+
+- 158 의 G-KR1(제한폭으로 불가능한 수정 주가 수익) 날의 점프만 없애고 판정 코드 그대로 재실행: 고친 날 유가 319 · 코스닥 730, **FLOW 결과 그대로**(KR 5.14% · 0.367, KQ 3.53% · 0.265), EW 만 연 0.05 ~ 0.06%p. 통과는 자료 오류에 기대지 않음. 판정 숫자 재현도 확인.
+- `scripts/audit_kr_flow_dataquality.py` + 시험 2 개 · [KR_FLOW_DATAQUALITY](docs/research/KR_FLOW_DATAQUALITY.md).
+
 ## 2026-10-08 — 통과 전략 기대 범위(앞으로의 성과 점검 기준) 고정 (사용자 보완 3 번, 운영 무변경)
 
 - `scripts/forward_band.py`(bands · check, DB 읽기 전용) + 시험 2 개 · [FORWARD_BAND](docs/research/FORWARD_BAND.md). 길이 L 일 누적 수익 < 백테스트 5% 분위 또는 낙폭 > 95% → REVIEW, 1% · 99% → ALERT.
