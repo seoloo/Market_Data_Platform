@@ -43,10 +43,13 @@ from auto_trading.config.secrets import (  # noqa: E402
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
 from auto_trading.ops.market_brief import (  # noqa: E402
+    JEV_PROMPT_VERSION,
     Evidence,
     Holding,
     contributions,
     describe_numbers,
+    jev_check_parse,
+    jev_check_requests,
     parse_nasdaq100,
     parse_spy_holdings,
     pct_rank,
@@ -398,10 +401,66 @@ def build(no_ai: bool = False) -> dict[str, Any]:
             status["model"] = next(a["model"] for a in attempts if a.get("status") == 200)
             brief["ai_raw"] = answer
             brief["ai"] = validate_answer(answer, ev, allowed)
+            brief["jev_check"] = jev_shadow(brief["ai"], ev, numbers)
         else:
             status["model"] = "실패(분석 보류)"
     brief["status"] = status
     return brief
+
+
+JEV_MAX_USD = 0.01
+"""한 번 실행의 JEV 대조 상한 (보통 $0.0001 안팎)."""
+
+
+def jev_shadow(ai: dict[str, Any], ev: list[Evidence], numbers: str) -> dict[str, Any]:
+    """JEV 로 남은 AI 문장을 근거와 대조해 **기록만** 한다 (문서 173 §5.3 · 2026-10-09 사용자 승인).
+
+    보고서 문장 · 텔레그램은 바꾸지 않는다. 키가 없거나 실패해도 브리핑은 그대로 나간다."""
+    key = read_env_file(REPO / ".env").get("TYPESAFE_API_KEY", "").strip()
+    if not key:
+        return {"skipped": "TYPESAFE_API_KEY 없음"}
+    source, data, keys = jev_check_requests(ai, ev, numbers)
+    if not keys:
+        return {"skipped": "대조할 문장 없음"}
+    est = len(json.dumps([source, data], ensure_ascii=False)) / 2 * 0.042 / 1_000_000
+    if est > JEV_MAX_USD:
+        return {"skipped": f"추정 비용 ${est:.4f} > 상한 ${JEV_MAX_USD}"}
+    bodies: list[dict[str, Any] | None] = []
+    errors: list[str] = []
+    tokens = 0
+    for request in (source, data):
+        if not request["questions"]:
+            bodies.append(None)
+            continue
+        try:
+            r = httpx.post(
+                "https://api.typesafe.ai/v1/systemone",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json=request,
+                timeout=30,
+            )
+            if r.status_code != 200:
+                errors.append(f"HTTP {r.status_code}: {r.text[:120]}")
+                bodies.append(None)
+                continue
+            body = r.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            errors.append(type(exc).__name__)
+            bodies.append(None)
+            continue
+        bodies.append(body)
+        tokens += int((body.get("usage") or {}).get("input_tokens") or 0)
+    results = jev_check_parse(ai, keys, bodies[0], bodies[1])
+    return {
+        "model": next((b.get("model") for b in bodies if b), None),
+        "prompt_version": JEV_PROMPT_VERSION,
+        "mode": "SHADOW_RECORD_ONLY",
+        "flagged": sum(1 for x in results if x["flag"]),
+        "results": results,
+        "errors": errors,
+        "input_tokens": tokens,
+        "cost_usd": round(tokens * 0.042 / 1_000_000, 6),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

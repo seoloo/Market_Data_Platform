@@ -148,3 +148,37 @@ def test_render_and_numbers_block() -> None:
     assert text.count("\n") > 15  # 한 줄에 하나
     nums = describe_numbers(brief)
     assert "SPY_return_pct=-0.24" in nums and "spy:A weight_pct=10.00" in nums
+
+
+def test_jev_check_two_questions_record_only() -> None:
+    from auto_trading.ops.market_brief import jev_check_parse, jev_check_requests
+
+    ai = {
+        "facts": [{"text": "금리가 4.31% 로 올랐다", "evidence": ["E2"]}],
+        "causes": [{"text": "금리 상승 부담", "evidence": ["E9"]}],
+        "counter": [],
+    }
+    source, data, keys = jev_check_requests(ai, _ev(), "SPY_return_pct=-0.24")
+    assert keys == {"fa00": ("facts", 0), "ca00": ("causes", 0)}
+    assert list(source["questions"]) == ["fa00"]  # 인용 출처가 없는 문장은 (A) 를 묻지 않는다
+    assert source["questions"]["fa00"]["instructions"]["cited_sources"] == [
+        "Yields rise to 4.31% — 10-year yield 4.31%"
+    ]
+    assert "data_block" not in str(
+        source["state"]
+    )  # 출처 질문에 자료표를 섞지 않는다 (/1 실패 원인)
+    assert data["state"] == {"data_block": "SPY_return_pct=-0.24"} and set(
+        data["questions"]
+    ) == set(keys)
+    out = jev_check_parse(
+        ai,
+        keys,
+        {"answers": {"fa00": {"noul": 0.9}}},
+        {"answers": {"fa00": {"noul": 0.05}, "ca00": {"noul": 0.97}}},
+    )
+    assert [(x["source"], x["contradiction"], x["flag"]) for x in out] == [
+        (0.9, 0.05, False),
+        (None, 0.97, True),
+    ]
+    none = jev_check_parse(ai, keys, None, {"answers": {"fa00": {"noul": 1.7}}})
+    assert [x["flag"] for x in none] == [None, None]

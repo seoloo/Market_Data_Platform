@@ -27,6 +27,8 @@ __all__ = [
     "Holding",
     "contributions",
     "describe_numbers",
+    "jev_check_parse",
+    "jev_check_requests",
     "parse_nasdaq100",
     "parse_spy_holdings",
     "pct_rank",
@@ -207,6 +209,116 @@ def validate_answer(
     unknown = [str(x) for x in answer.get("unknown", []) or [] if str(x).strip()]
     to_check = [str(x) for x in answer.get("to_check", []) or [] if str(x).strip()]
     return {**kept, "unknown": unknown, "to_check": to_check, "dropped": dropped}
+
+
+# ---------------------------------------------------------------- JEV 대조 (그림자 기록, 문서 173)
+
+JEV_MODEL = "jev-1.13.0"
+JEV_PROMPT_VERSION = "brief-jev-check/2"
+"""/1 은 출처 · 자료표를 한 질문에 묶어 맞는 뉴스 문장까지 모두 틀렸다고 봤다(2026-10-09 첫 실행).
+/2 는 두 질문으로 나눈다 — (A) 인용 출처에 있나, (B) 자료표 숫자와 어긋나나."""
+_SOURCE_Q = {
+    "question": (
+        "Do the cited sources (English headlines and summaries) state what this Korean sentence "
+        "says? Ignore wording and language differences; check the facts, directions (up/down, "
+        "rise/fall, hike/cut) and numbers."
+    ),
+}
+_SOURCE_C = {
+    "true": "The sources state the same facts, with the same directions and numbers.",
+    "false": (
+        "The sources say something different, the opposite direction, a different number, "
+        "or do not mention it."
+    ),
+}
+_DATA_Q = {
+    "question": (
+        "Does this Korean sentence state a return for an index or stock that appears in the data "
+        "block in the state, and get its direction or number wrong? Sentences about other things, "
+        "or about items not in the data block, are not contradictions."
+    ),
+}
+_DATA_C = {
+    "true": (
+        "It names an item from the data block and states the opposite direction or a different "
+        "number."
+    ),
+    "false": (
+        "It matches the data block, or it does not state a return for any item in the data block."
+    ),
+}
+
+
+def jev_check_requests(
+    ai: Mapping[str, Any], evidence: Sequence[Evidence], numbers: str
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, int]]]:
+    """검사를 통과해 남은 AI 문장마다 (A) 출처 대조 · (B) 자료표 모순 Noul. 결과는 기록만.
+
+    (출처 요청, 자료표 요청, {질문 키: (구역, 순번)}). 인용 출처가 없으면 (A) 를 묻지 않는다."""
+    by_id = {e.id: e for e in evidence}
+    source_q: dict[str, Any] = {}
+    data_q: dict[str, Any] = {}
+    keys: dict[str, tuple[str, int]] = {}
+    for section in ("facts", "causes", "counter"):
+        for i, item in enumerate(ai.get(section) or []):
+            key = f"{section[:2]}{i:02d}"
+            keys[key] = (section, i)
+            text = str(item.get("text", ""))
+            cited = [by_id[r] for r in item.get("evidence", []) if r in by_id]
+            if cited:
+                source_q[key] = {
+                    "type": "noul",
+                    "instructions": {
+                        **_SOURCE_Q,
+                        "sentence": text,
+                        "cited_sources": [f"{e.title} — {e.summary}".strip(" —") for e in cited],
+                    },
+                    "criteria": _SOURCE_C,
+                }
+            data_q[key] = {
+                "type": "noul",
+                "instructions": {**_DATA_Q, "sentence": text},
+                "criteria": _DATA_C,
+            }
+    source = {
+        "state": "Fact check of a market report against its cited sources.",
+        "model": JEV_MODEL,
+        "questions": source_q,
+    }
+    data = {"state": {"data_block": numbers}, "model": JEV_MODEL, "questions": data_q}
+    return source, data, keys
+
+
+def _noul(body: Mapping[str, Any] | None, key: str) -> float | None:
+    answer = ((body or {}).get("answers") or {}).get(key)
+    value = answer.get("noul") if isinstance(answer, Mapping) else None
+    return float(value) if isinstance(value, int | float) and 0 <= value <= 1 else None
+
+
+def jev_check_parse(
+    ai: Mapping[str, Any],
+    keys: Mapping[str, tuple[str, int]],
+    source_body: Mapping[str, Any] | None,
+    data_body: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """문장별 (A) ``source`` · (B) ``contradiction`` 값과 ``flag``.
+
+    flag = 출처에 없다(A < 0.5) 또는 자료표와 어긋난다(B > 0.5). 둘 다 답이 없으면 None."""
+    out = []
+    for key, (section, i) in keys.items():
+        src, bad = _noul(source_body, key), _noul(data_body, key)
+        flags = (src is not None and src < 0.5, bad is not None and bad > 0.5)
+        out.append(
+            {
+                "where": section,
+                "index": i,
+                "text": str(ai[section][i].get("text", "")),
+                "source": src,
+                "contradiction": bad,
+                "flag": None if src is None and bad is None else any(flags),
+            }
+        )
+    return out
 
 
 # ---------------------------------------------------------------- 문장
