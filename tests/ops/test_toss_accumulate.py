@@ -394,3 +394,27 @@ def test_m3_telegram_amount_sets_month_and_asks_day_before(
     assert any("얼마 매수하시겠습니까" in x for x in sent)
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["ask_month"] == "2026-11"
+
+
+def test_m3_retry_command_buys_after_funds_arrive(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeToss(outcome="insufficient-buying-power")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    _seed(mod)
+    mod.run(telegram=False)
+    fake.outcome = "ok"
+    # 같은 날 23:40, 그리고 자정 넘은 03:30 은 전날 일로 본다
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 3, 30, tzinfo=UTC))
+    n = len(fake.sent)
+    assert mod.m3_only(telegram=False) == 0
+    m3 = [o for o in fake.sent[n:] if o[4].startswith("M3")]
+    assert sorted((o[0], o[2]) for o in m3) == [("SCHD", 3), ("TQQQ", 1)]
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["done_month"] == "2026-10" and len(state["deposits"]) == 1
+    # 한 번 더 불러도 같은 달은 다시 사지 않는다
+    n = len(fake.sent)
+    assert mod.m3_only(telegram=False) == 0
+    assert len(fake.sent) == n

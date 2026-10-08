@@ -327,7 +327,14 @@ def _m3_plan(day: Day, m3: M3State) -> tuple[dict[str, int], float | None, float
     elif krw <= 0:
         notes.append("이번 달 납입 0원(텔레그램 답) — 이월 현금 · 배당만으로")
     last = {s: day.prices[s] for s in M3_SYMBOLS}
-    return choose(m3.qty, m3.cash_usd, last, share, day.fee), vol, share, notes
+    # 오늘 이미 접수된 주문(아직 체결 전)은 산 것 · 판 것으로 보고 다시 사지 않는다
+    qty, cash = dict(m3.qty), m3.cash_usd
+    for o in m3.orders:
+        if o.status == "SENT" and o.date == day.today:
+            sign = 1 if o.side == "BUY" else -1
+            qty[o.symbol] = qty.get(o.symbol, 0.0) + sign * o.qty
+            cash -= sign * o.qty * o.limit * (1 + day.fee)
+    return choose(qty, cash, last, share, day.fee), vol, share, notes
 
 
 def _m3_poll(today: str, telegram: bool) -> None:
@@ -456,7 +463,9 @@ def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) 
     if not plan:
         lines.append("살 것 없음 (돈이 1 주 값보다 적음) — 다음 달로 이월")
     if retry:
-        lines.append("↻ 달러 부족 · 장 시간 문제 — 다음 거래일 밤에 다시 시도")
+        lines.append(
+            "↻ 달러 부족 · 장 시간 문제 — 오늘 23:40 · 03:30 에 다시, 안 되면 다음 거래일 밤"
+        )
     else:
         m3.done_month = day.today[:7]
     lines.append(
@@ -902,6 +911,41 @@ def run(telegram: bool = True) -> int:
     return 0
 
 
+def m3_only(telegram: bool = True) -> int:
+    """M3 만 (재시도 예약 23:40 · 03:30 KST). 이번 달이 끝났으면 아무것도 하지 않는다."""
+    now = _kst_now()
+    if now.hour < 12:  # 자정 넘은 재시도(03:30)는 전날 밤(미국 같은 거래일)의 일이다
+        now -= timedelta(days=1)
+    today = now.strftime("%Y-%m-%d")
+    if not M3_ENABLED or now.weekday() >= 5 or not due(_load_m3(), today):
+        print("M3: 할 일 없음")
+        return 0
+    if not any(o.date == today for o in _load_m3().orders):
+        print("M3: 오늘 21:00 실행 전 — 재시도만 한다")
+        return 0
+    _m3_poll(today, telegram)
+    trader = _trader()
+    try:
+        day = Day(trader, now, dry=False)
+        lines = _m3_run(
+            day,
+            trader,
+            enabled=trader.credentials.trading_enabled,
+            halted=halted_reason(HALT),
+        )
+    except (AutoTradingError, TossApiError) as exc:
+        text = f"⚠ M3 재시도 실패\n{RULE}\n{exc}"
+        _notify(text, telegram)
+        print(text)
+        return 1
+    finally:
+        trader.close()
+    text = "\n".join([f"📈 M3 재시도 · {today} {now:%H:%M}", RULE, *lines])
+    _notify(text, telegram)
+    print(text)
+    return 0
+
+
 def preview() -> int:
     now = _kst_now()
     states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
@@ -1032,12 +1076,14 @@ def main(argv: list[str]) -> int:
         "start": start,
         "run": lambda: run(telegram),
         "fx": lambda: fx(telegram),
+        "m3": lambda: m3_only(telegram),
         "preview": preview,
         "status": status,
     }
     if len(args) != 1 or args[0] not in commands:
         raise SystemExit(
-            "usage: python -m scripts.toss_accumulate start|run|fx|preview|status [--no-telegram]"
+            "usage: python -m scripts.toss_accumulate start|run|fx|m3|preview|status"
+            " [--no-telegram]"
             " | harvest-plan [--other-gains 원]"
         )
     return commands[args[0]]()
