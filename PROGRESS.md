@@ -3,6 +3,13 @@
 최종 갱신: 2026-10-08 · 작성: Claude (146~170) · Codex (IDEAS 19~30 초안 인계).
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-08 — 172 JEV × Elliott 판정: **미채택** (사용자 승인 G0 시범 + G1 확인 1 회, 총 $0.59)
+
+- G0(개발 seed 12 묶음, $0.0145): 연결 · 형식 · 예산 장치 정상, 실측 토큰이 추정보다 25% 많아 추정만 보수적으로 고친 뒤 동결 커밋 `f358fa8`.
+- G1(예약 seed 20260927, 417 묶음, $0.574, 실패 0): 정답 1 등 **JEV 0.33% vs 기준 순위 규칙 23.0%** (−22.7%p, JEV 만 맞힘 0 · 기준선만 68). 묶음 안 정답 상대 순위 JEV 0.47 ≈ 무작위 0.5 · 기준선 0.15.
+- 결론: 숫자 꼭짓점 목록으로 파동 경계를 고르는 일에 JEV 는 정보를 못 뽑는다. G2 안 감. Elliott 기준 평가 `ranking.py` 유지 · 데모/운영 변화 없음. [172 §8](docs/research/172-jev-elliott-rerank-preregistration.md) · RESEARCH_HISTORY `JEV-EW`.
+- JEV 다음 후보(사용자에게 제안, 미착수): 글 판단 — 시장 브리핑 문장 ↔ 근거 대조, DART/SEC 공시 사건 분류.
+
 ## 2026-10-08 — 172 JEV × Elliott 재순위 Phase 0 감사 · 어댑터 · 사전 등록 초안 (유료 호출 0)
 
 - [문서 172](docs/research/172-jev-elliott-rerank-preregistration.md): 기존 `ew-scenario-set/1` → `ew-scenario-eval/1` 계약 재사용, 생성기 **EW-3e** · N = 50 · `ranking.py` `2dccbb0f…` 동결. 예약 seed **20260927 사용 흔적 없음**(코드 · 보고서 · data 확인, 보고서 6 개가 미사용 표시).
