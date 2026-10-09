@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 
@@ -84,6 +84,82 @@ class TelegramNotifier:
         if not response.is_success or not body.get("ok", False):
             desc = str(body.get("description", ""))[:200].replace(self._creds.bot_token, "***")
             raise NotifyError(f"텔레그램 전송 거부 {response.status_code}: {desc}")
+
+    # ------------------------------------------------------------ 버튼 · 고정 · 수정
+
+    def _call(self, method: str, payload: dict[str, Any], *, chat: bool = True) -> Any:
+        """봇 API 한 번 (결과 ``result`` 를 돌려준다). 오류 문구에 토큰을 싣지 않는다."""
+        url = f"{self.base_url}/bot{self._creds.bot_token}/{method}"
+        body_in = {"chat_id": self._creds.chat_id, **payload} if chat else dict(payload)
+        try:
+            response = self._client.post(url, json=body_in)
+        except httpx.HTTPError as exc:
+            raise NotifyError(f"텔레그램 {method} 실패 ({type(exc).__name__})") from None
+        try:
+            body = response.json()
+        except ValueError:
+            body = {}
+        if not response.is_success or not body.get("ok", False):
+            desc = str(body.get("description", ""))[:200].replace(self._creds.bot_token, "***")
+            raise NotifyError(f"텔레그램 {method} 거부 {response.status_code}: {desc}")
+        return body.get("result")
+
+    def send_message(
+        self,
+        text: str,
+        *,
+        buttons: list[list[dict[str, str]]] | None = None,
+        force_reply: bool = False,
+        reply_to: int = 0,
+    ) -> int:
+        """보내고 메시지 번호를 돌려준다.
+
+        ``buttons`` = 인라인 버튼 줄, ``force_reply`` = 답 입력칸을 바로 연다.
+        """
+        if len(text) > TELEGRAM_LIMIT:
+            text = text[: TELEGRAM_LIMIT - 20] + "\n…(잘림, 로컬 기록 참고)"
+        payload: dict[str, Any] = {"text": text}
+        if buttons:
+            payload["reply_markup"] = {"inline_keyboard": buttons}
+        elif force_reply:
+            payload["reply_markup"] = {
+                "force_reply": True,
+                "input_field_placeholder": "숫자만 (예: 2)",
+            }
+        if reply_to:
+            payload["reply_parameters"] = {
+                "message_id": reply_to,
+                "allow_sending_without_reply": True,
+            }
+        result = self._call("sendMessage", payload)
+        return int(result.get("message_id", 0)) if isinstance(result, dict) else 0
+
+    def edit(
+        self, message_id: int, text: str, *, buttons: list[list[dict[str, str]]] | None = None
+    ) -> None:
+        """글을 바꾼다 (알림은 울리지 않는다). ``buttons`` 가 None 이면 버튼을 없앤다."""
+        self._call(
+            "editMessageText",
+            {
+                "message_id": message_id,
+                "text": text[:TELEGRAM_LIMIT],
+                "reply_markup": {"inline_keyboard": buttons or []},
+            },
+        )
+
+    def pin(self, message_id: int) -> None:
+        self._call("pinChatMessage", {"message_id": message_id, "disable_notification": True})
+
+    def unpin(self, message_id: int) -> None:
+        self._call("unpinChatMessage", {"message_id": message_id})
+
+    def answer_callback(self, callback_id: str, text: str = "") -> None:
+        """버튼을 누른 쪽의 '불러오는 중' 표시를 끈다 (늦으면 텔레그램이 거부 — 무시해도 된다)."""
+        self._call(
+            "answerCallbackQuery",
+            {"callback_query_id": callback_id, "text": text[:180]},
+            chat=False,
+        )
 
     def close(self) -> None:
         self._client.close()

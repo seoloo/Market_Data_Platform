@@ -96,25 +96,16 @@ def _won(x: float) -> str:
     return f"{x:+,.0f}원" if x else "0원"
 
 
-def main(argv: list[str]) -> int:
-    year = argv[0] if argv else _today_kst()[:4]
-    key = read_env_file(REPO / ".env").get("ECOS_API_KEY", "")
-    if not key:
-        print("ECOS_API_KEY 가 .env 에 없다")
-        return 1
-    reader = TossReader(load_toss_credentials(REPO / ".env"), TossTokenCache(TOKEN))
-    try:
-        fills = reader.fills()
-        hold = {s: p for s, p in reader.holdings().items() if p.currency == "USD"}
-        fx_now = float(reader.usd_krw())
-    finally:
-        reader.close()
-    trades = trades_from(fills, _m3_ids())
+def compute(reader: TossReader, key: str, m3_ids: set[str], year: str) -> dict[str, Any]:
+    """토스 체결 · 보유 · ECOS 환율 → 그해 양도소득 추정 (조회만). 텔레그램 알림에서도 쓴다."""
+    fills = reader.fills()
+    hold = {s: p for s, p in reader.holdings().items() if p.currency == "USD"}
+    fx_now = float(reader.usd_krw())
+    trades = trades_from(fills, m3_ids)
     first = min([t.settle for t in trades] + [_today_kst()])
     rates = ecos_usd_krw(
         key, (datetime.fromisoformat(first) - timedelta(days=10)).date().isoformat(), _today_kst()
     )
-
     # 기록보다 많이 가진 주식 → 평균 단가로 어림 (가장 이른 환율)
     net: dict[str, float] = defaultdict(float)
     for t in trades:
@@ -125,14 +116,45 @@ def main(argv: list[str]) -> int:
         if float(p.qty) - net[s] > 1e-9
     ]
     book = build(trades, rates, openings)
-    s = year_summary(book, year)
-    tags = by_tag(book, year)
     per_sym: dict[str, float] = defaultdict(float)
     for r in book.realized:
         if r.settle[:4] == year:
             per_sym[r.symbol] += r.gain_krw
-    prices = {sym: float(p.last) for sym, p in hold.items()}
-    unreal = unrealized(book, prices, fx_now)
+    unreal = unrealized(book, {sym: float(p.last) for sym, p in hold.items()}, fx_now)
+    return {
+        "year": year,
+        "book": book,
+        "summary": year_summary(book, year),
+        "by_tag": by_tag(book, year),
+        "by_symbol": dict(per_sym),
+        "unrealized": unreal,
+        "unrealized_total": sum(u["gain_krw"] for u in unreal.values()),
+        "fx_now": fx_now,
+        "openings": openings,
+        "trades": trades,
+        "holdings": hold,
+    }
+
+
+def main(argv: list[str]) -> int:
+    year = argv[0] if argv else _today_kst()[:4]
+    key = read_env_file(REPO / ".env").get("ECOS_API_KEY", "")
+    if not key:
+        print("ECOS_API_KEY 가 .env 에 없다")
+        return 1
+    reader = TossReader(load_toss_credentials(REPO / ".env"), TossTokenCache(TOKEN))
+    try:
+        res = compute(reader, key, _m3_ids(), year)
+    finally:
+        reader.close()
+    book, s, tags, per_sym = res["book"], res["summary"], res["by_tag"], res["by_symbol"]
+    unreal, fx_now, openings, trades = (
+        res["unrealized"],
+        res["fx_now"],
+        res["openings"],
+        res["trades"],
+    )
+    hold = res["holdings"]
     # 토스 앱 평균 단가와 견주기 (달러) — 이동평균이 맞는지 대조용
     toss_avg = {sym: float(p.avg_price) for sym, p in hold.items()}
 

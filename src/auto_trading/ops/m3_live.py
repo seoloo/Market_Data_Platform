@@ -69,6 +69,12 @@ class M3State:
     tg_offset: int = 0
     brake: dict[str, Any] = field(default_factory=dict)
     """T 브레이크 상태 (``ops.m3_guard.Brake.to_dict``)."""
+    proposals: list[dict[str, Any]] = field(default_factory=list)
+    """텔레그램 제안 (``ops.m3_guard.Proposal.to_dict``): 12 월 공제 실현 · 배당 단계."""
+    div_steps: int = 0
+    """지난 배당 단계 수 (월 10 · 30 · 50 · 100 만 원)."""
+    lev_cap: float = LEV_MAX
+    """TQQQ 목표 상한 — 배당 단계에서 낮아진다 (처음 60%)."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -89,6 +95,9 @@ class M3State:
             ask_ts=int(d.get("ask_ts", 0)),
             tg_offset=int(d.get("tg_offset", 0)),
             brake=dict(d.get("brake") or {}),
+            proposals=list(d.get("proposals") or []),
+            div_steps=int(d.get("div_steps", 0)),
+            lev_cap=float(d.get("lev_cap", LEV_MAX)),
         )
 
 

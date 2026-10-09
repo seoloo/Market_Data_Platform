@@ -212,6 +212,10 @@ class Proposal:
     reminded: str = ""
     awaiting_qty: bool = False
     """[직접입력] 을 누른 뒤 주수를 기다리는 중."""
+    message_id: int = 0
+    """고정한 공지 메시지 번호 (0 = 보내지 못함)."""
+    phase: str = ""
+    """실행 단계: '' (대기) · selling (판 주문 접수) · buying (되사기 접수) · done."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -470,3 +474,47 @@ def typed(p: Proposal, text: str, today: str, hhmm: str) -> tuple[str, Buttons |
     if reply is not None:
         p.awaiting_qty = False
     return _with_cancel(p, answer(p, reply, today, hhmm), hhmm)
+
+
+# ------------------------------------------------------------------ 공제 실현 고르기 · 상태 줄
+
+
+def harvest_pick(
+    qty: Mapping[str, float],
+    cost_usd: Mapping[str, float],
+    prices: Mapping[str, float],
+    fx: float,
+    room_krw: float,
+) -> tuple[str, int, float] | None:
+    """세금 없이 실현할 이익(``room_krw``) 안에서 팔 (종목, 주수, 실현 이익 원) (순수).
+
+    실현 이익이 가장 큰 종목 하나를 고른다.
+
+    주당 이익 = (지금 값 − 평균 원가) × 환율. 원가는 Glide 장부 체결 금액(수수료 포함) 기준이다.
+    """
+    best: tuple[str, int, float] | None = None
+    for sym, q in qty.items():
+        whole = math.floor(q)
+        if whole < 1 or sym not in prices or cost_usd.get(sym, 0) <= 0:
+            continue
+        per = (prices[sym] - cost_usd[sym] / q) * fx
+        if per <= 0:
+            continue
+        n = min(whole, math.floor(room_krw / per))
+        if n >= 1 and (best is None or n * per > best[2]):
+            best = (sym, n, n * per)
+    return best
+
+
+def status_line(p: Proposal) -> str:
+    """고정 공지 맨 아래에 붙이는 지금 상태 한 줄."""
+    if p.status == "accepted":
+        word = {"selling": "매도 접수", "buying": "되사기 접수"}.get(p.phase, "예약")
+        return f"✅ {p.symbol} {p.qty}주 {word} ({p.answered})"
+    return {
+        "open": "⏳ 답을 기다리는 중",
+        "declined": "⏸ 이번엔 안 함",
+        "expired": "⌛ 마감 — 진행하지 않음",
+        "done": f"✅ 완료 — {p.symbol} {p.qty}주",
+        "canceled": "↩️ 취소함",
+    }.get(p.status, p.status)

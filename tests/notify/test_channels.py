@@ -103,3 +103,50 @@ class TestCredentials:
         env.write_text("TELEGRAM_BOT_TOKEN=file\nTELEGRAM_CHAT_ID=1\n", encoding="utf-8")
         creds = load_telegram_credentials(env, environ={"TELEGRAM_BOT_TOKEN": "env"})
         assert creds == TelegramCredentials("env", "1")
+
+
+class TestTelegramButtons:
+    def test_send_message_returns_id_with_buttons_and_reply(self) -> None:
+        import json as _json
+
+        bot, seen = telegram(
+            lambda r: httpx.Response(200, json={"ok": True, "result": {"message_id": 77}})
+        )
+        mid = bot.send_message(
+            "공지", buttons=[[{"text": "네", "callback_data": "p:all"}]], reply_to=5
+        )
+        body = _json.loads(seen[0].content)
+        assert mid == 77 and seen[0].url.path.endswith("/sendMessage")
+        assert body["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "p:all"
+        assert body["reply_parameters"]["message_id"] == 5 and body["chat_id"] == "987654321"
+
+    def test_force_reply_pin_edit_and_callback_answer(self) -> None:
+        import json as _json
+
+        bot, seen = telegram(lambda r: httpx.Response(200, json={"ok": True, "result": True}))
+        bot.send_message("몇 주?", force_reply=True)
+        bot.pin(9)
+        bot.edit(9, "바뀜")
+        bot.unpin(9)
+        bot.answer_callback("cb1", "접수")
+        paths = [r.url.path.rsplit("/", 1)[1] for r in seen]
+        assert paths == [
+            "sendMessage",
+            "pinChatMessage",
+            "editMessageText",
+            "unpinChatMessage",
+            "answerCallbackQuery",
+        ]
+        bodies = [_json.loads(r.content) for r in seen]
+        assert bodies[0]["reply_markup"]["force_reply"] is True
+        assert bodies[1]["disable_notification"] is True
+        assert bodies[2]["reply_markup"] == {"inline_keyboard": []}
+        assert "chat_id" not in bodies[4] and bodies[4]["callback_query_id"] == "cb1"
+
+    def test_button_call_rejection_hides_token(self) -> None:
+        bot, _ = telegram(
+            lambda r: httpx.Response(400, json={"ok": False, "description": f"bad {TOKEN}"})
+        )
+        with pytest.raises(NotifyError) as err:
+            bot.pin(1)
+        assert TOKEN not in str(err.value)
