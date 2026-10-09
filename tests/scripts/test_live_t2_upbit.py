@@ -102,7 +102,7 @@ def test_run_buys_with_limit_ioc_once_per_day(env: tuple[Any, FakeUpbit, list[st
     sides = {(c, s) for c, s, *_ in fake.sent}
     assert sides == {("BTC", "bid"), ("ETH", "bid"), ("SOL", "bid")}
     assert fake.krw > 0  # 원화 안에서만 샀다
-    assert sent and "T/v2 업비트 실거래" in sent[0]
+    assert sent and "Cruise" in sent[0]
     n = len(fake.sent)
     assert m.main(["run"]) == 0  # 같은 날 다시 → 주문 없음
     assert len(fake.sent) == n

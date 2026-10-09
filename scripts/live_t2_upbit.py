@@ -58,7 +58,8 @@ DAY_MS = 86_400_000
 FEE = Decimal("0.0005")
 LEVEL = 2
 """호가창 몇 번째 칸(0 부터) 가격으로 IOC 를 낼지."""
-TAG = "📊 [T/v2 업비트 실거래]"
+TAG = "🛫 [Cruise · T/v2 업비트]"
+"""2026-10-09 사용자: 업비트 T/v2 실거래 이름 = **Cruise** (Glide 처럼 보이는 이름만, 내부 파일 · 예약 이름은 그대로)."""
 
 
 def _client() -> UpbitClient:
