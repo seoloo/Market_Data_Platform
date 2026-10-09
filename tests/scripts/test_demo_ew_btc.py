@@ -288,3 +288,13 @@ def test_scenario_view_reads_big_trend() -> None:
     assert (v["trend_up"], v["trend_down"]) == (2, 1)  # 하락 조정 끝 2 → 상승 · 하락 충격파 끝 1
     assert v["best"]["label"] == "하락 지그재그 끝" and v["best"]["invalid"] == "90"
     assert scenario_view({"scenarios": []}, {})["top"] == 0
+
+
+def test_no_alert_when_no_entry_pattern(tmp_path: Path) -> None:
+    api = FakeApi()
+    r, notes = runner(tmp_path, api)
+    r.on_scan([(1_000, None, 0)])
+    n = len(notes)
+    info = {"pivot": "저점", "price": "80000", "top": 10, "up": 0, "down": 0}
+    r.on_scan([(1_000, None, 0), (2_000, None, 16, info)])
+    assert len(notes) == n

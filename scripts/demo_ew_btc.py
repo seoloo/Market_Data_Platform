@@ -164,6 +164,14 @@ def scan(minutes: list[Candle]) -> list[ScanRow]:
 # ---------------------------------------------------------------- 상태·알림
 
 
+def has_pattern(info: dict[str, Any]) -> bool:
+    """알림 조건: 상위 10 중 데모가 들어가는 패턴(충격파 5파 끝)이 하나라도 있다.
+
+    2026-10-09 사용자 "들어가는 패턴이 하나라도 있어야 알림을 보내야지" — 0 · 0 이면 보내지 않는다
+    (사건 기록 ``events.jsonl`` 에는 그대로 남긴다)."""
+    return bool(info) and int(info.get("up", 0)) + int(info.get("down", 0)) > 0
+
+
 def view_lines(info: dict[str, Any]) -> list[str]:
     """보조 지표 줄: 상위 10 시나리오가 큰 추세를 어느 쪽으로 읽나 + 1 등 해석 · 무효 가격."""
     view = info.get("view") or {}
@@ -531,7 +539,7 @@ class EwDemoRunner:
                 setup=None if setup is None else _setup_row(setup),
                 **info,
             )
-            if setup is None and info:
+            if setup is None and has_pattern(info):
                 self.notify(no_setup_message(info))
         setups = [row[1] for row in new if row[1] is not None]
         if not setups:
@@ -625,7 +633,8 @@ def alerts_only(client: httpx.Client, *, once: bool) -> int:
                     state["last_trigger_ms"] = rows[-1][0] if rows else now
                 else:
                     for row in [r for r in rows if r[0] > last]:
-                        notify(no_setup_message(row[3], ALERT_TAG, demo=False))
+                        if has_pattern(row[3]):
+                            notify(no_setup_message(row[3], ALERT_TAG, demo=False))
                         state["last_trigger_ms"] = row[0]
                 store.save(state)
             except (AutoTradingError, httpx.HTTPError) as exc:
