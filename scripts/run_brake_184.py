@@ -107,8 +107,13 @@ def simulate(
     early: Mapping[str, bool] | None = None,
     no_sell: frozenset[str] = frozenset(),
     monthly_krw: float = MONTHLY_KRW,
+    harvest: bool = False,
 ) -> dict[str, Any]:
-    """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ)."""
+    """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ).
+
+    ``harvest`` (195): 해마다 12-15 뒤 첫 거래일에 남은 250 만 원 공제만큼 이익을 실현하고
+    같은 날 되산다(양쪽 비용). 기본은 184 그대로.
+    """
     days, lev, div = data["days"], data["lev"], data["div"]
     vol, trend = data["vol"], data["trend"]
     px = {"L": lev, "D": div, "Q": qqq}
@@ -123,6 +128,9 @@ def simulate(
     ep: dict[str, Any] | None = None
     taxes: dict[str, float] = {}
     flows: list[tuple[str, float]] = []
+    div_vals: list[float] = []
+    vals: list[float] = []
+    harvested: dict[str, float] = {}
     i0 = next(i for i, d in enumerate(days) if d >= data["start"] and i > 0)
 
     def value(d: str) -> float:
@@ -217,10 +225,31 @@ def simulate(
                 bk.buy("D", cash * need_d / tot, div[d])
             else:
                 bk.buy("D", cash, div[d])
+        # 4) 195: 12 월 공제 실현 — 남은 공제만큼 이익을 팔고 같은 날 되산다
+        if harvest and d[5:7] == "12" and d[8:] >= "15" and y not in harvested and units > 0:
+            room = max(DEDUCTION - bk.gain.get(y, 0.0), 0.0)
+            done = 0.0
+            for s in ("L", "D"):
+                q = bk.q[s] - (res_qty if park == s else 0.0)
+                if room <= 0 or q <= 0:
+                    continue
+                per = px[s][d] * (1 - COST) - bk.cost[s] / bk.q[s]
+                if per <= 0:
+                    continue
+                n = min(q, room / per)
+                before = bk.gain.get(y, 0.0)
+                got = bk.sell(s, n, px[s][d], y)
+                bk.buy(s, got, px[s][d])
+                realized = bk.gain.get(y, 0.0) - before
+                room -= realized
+                done += realized
+            harvested[y] = done
         v = value(d)
         if units > 0:
             navs.append(v / units)
             nav_days.append(d)
+            div_vals.append(bk.q["D"] * div[d])
+            vals.append(v)
             l_max = max(l_max, lev[d])
     end = days[-1]
     last_y = end[:4]
@@ -240,6 +269,10 @@ def simulate(
         "sales": sales,
         "episodes": episodes,
         "all_sells": bk.sells,
+        "div_vals": div_vals,
+        "vals": vals,
+        "harvested": harvested,
+        "value_end": value(end),
     }
 
 
