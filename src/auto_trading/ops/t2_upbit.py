@@ -147,3 +147,92 @@ def books(orders: Sequence[Mapping[str, object]]) -> dict[str, CoinBook]:
             cost[coin] -= avg * sold
             qty[coin] -= sold
     return {c: CoinBook(qty[c], cost[c], realized[c]) for c in COINS}
+
+
+@dataclass(frozen=True, slots=True)
+class CoinSignal:
+    """알림용 판단 근거 (그날 마감 일봉 기준)."""
+
+    ups: int
+    """20 · 60 · 120 일 수익이 플러스인 개수."""
+    parts: tuple[Decimal, Decimal, Decimal]
+    vol: Decimal
+    raw: Decimal
+    """합 100% 축소 전 목표 비중."""
+    weight: Decimal
+    """최종 목표 비중."""
+    week: Decimal
+    """최근 7 일 가격 변화."""
+
+
+def signals(daily: Mapping[str, Sequence[Candle]], as_of_ms: int) -> dict[str, CoinSignal]:
+    """코인별 추세 · 변동성 · 목표 비중 (판단 불가 코인은 빠짐, 순수)."""
+    from auto_trading.features.tsmom import realized_vol_annual
+
+    final = targets(daily, as_of_ms)
+    out: dict[str, CoinSignal] = {}
+    for coin in COINS:
+        closes = [c.close for c in daily.get(coin, ()) if c.close_ms <= as_of_ms]
+        w = final.get(coin)
+        if w is None or len(closes) < 121:
+            continue
+        last = closes[-1]
+        parts = tuple(last / closes[-1 - k] - 1 for k in (20, 60, 120))
+        vol = realized_vol_annual(closes, 60) or _ZERO
+        cfg = SpotTrendConfig(symbols=(coin,))
+        raw = spot_trend_targets({coin: daily[coin]}, as_of_ms=as_of_ms, cfg=cfg)[coin].weight
+        out[coin] = CoinSignal(
+            ups=sum(1 for p in parts if p > 0),
+            parts=(parts[0], parts[1], parts[2]),
+            vol=vol,
+            raw=raw or _ZERO,
+            weight=w,
+            week=last / closes[-8] - 1,
+        )
+    return out
+
+
+def reason(
+    coin: str,
+    now: CoinSignal,
+    prev: Mapping[str, str] | None,
+    current_w: Decimal,
+    *,
+    flow: Decimal,
+) -> tuple[str, str]:
+    """(아이콘, 이유 한 줄) — 비중을 바꾼 까닭 (순수).
+
+    🟢 추세 켜짐 · 🔴 추세 꺼짐 · 🟡 추세 강도 · 변동성 변화 · ⚖️ 합 100% 축소 ·
+    💰 입금 · 출금 · 🔵 가격이 움직여 비중이 벗어남 · 🆕 첫 매수.
+    """
+    p = " · ".join(f"{d}일 {x:+.1%}" for d, x in zip((20, 60, 120), now.parts, strict=True))
+    if prev is None:
+        return "🆕", f"첫 매수: {p} (상승 {now.ups}/3) · 변동성 {now.vol:.0%}"
+    p_ups = int(prev.get("ups", "0"))
+    p_on, n_on = p_ups >= 2, now.ups >= 2
+    if p_on != n_on:
+        if n_on:
+            return "🟢", f"추세 켜짐: {p} (상승 {now.ups}/3)"
+        return "🔴", f"추세 꺼짐: {p} (상승 {now.ups}/3)"
+    if p_ups != now.ups:
+        return "🟡", f"추세 강도 변화: 상승 {p_ups}/3 → {now.ups}/3 ({p})"
+    p_vol = Decimal(prev.get("vol", "0"))
+    p_raw = Decimal(prev.get("raw", "0"))
+    if abs(now.raw - p_raw) >= Decimal("0.03") and p_vol > 0:
+        word = "커져 담는 양 줄임" if now.vol > p_vol else "작아져 담는 양 늘림"
+        return "🟡", f"변동성 {p_vol:.0%} → {now.vol:.0%} 로 {word}"
+    if now.weight < now.raw - Decimal("0.005"):
+        return (
+            "⚖️",
+            f"세 코인 목표 합이 100% 를 넘어 비율대로 줄임 ({now.raw:.1%} → {now.weight:.1%})",
+        )
+    if flow > 0:
+        return "💰", "입금으로 원화가 늘어 비중이 낮아짐 → 목표까지 채움"
+    if flow < 0:
+        return "💰", "출금으로 원화가 줄어 비중이 높아짐 → 목표로 맞춤"
+    gap = now.weight - current_w
+    return (
+        "🔵",
+        f"가격이 움직여 비중이 목표보다 {abs(gap):.1%}p"
+        f" {'낮아짐' if gap > 0 else '높아짐'} → 다시 맞춤",
+    )

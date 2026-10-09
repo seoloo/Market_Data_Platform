@@ -46,6 +46,8 @@ from auto_trading.ops.t2_upbit import (
     equity,
     nav_step,
     plan,
+    reason,
+    signals,
     targets,
 )
 
@@ -125,6 +127,7 @@ def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, An
     stopped = bool(st.get("stopped")) or (Decimal(st["units"]) > 0 and ns.dd >= DD_STOP)
     daily = {k: c.closed_daily(MARKETS[k], dms) for k in COINS}
     w = targets(daily, dms)
+    sig = signals(daily, dms)
     eq = equity(krw, hold, prices)
     intents = plan(w, hold, prices, eq, allow_buy=not stopped)
     return {
@@ -136,8 +139,16 @@ def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, An
         "nav": ns,
         "stopped": stopped,
         "weights": w,
+        "signals": sig,
         "intents": intents,
     }
+
+
+def kst_day(decision_day: str) -> str:
+    """결정일(UTC 마감 일봉) → 그 결정을 실행한 한국 날짜(다음 날 09:05)."""
+    from datetime import date, timedelta
+
+    return (date.fromisoformat(decision_day) + timedelta(days=1)).isoformat()
 
 
 def _fmt_w(w: dict[str, Decimal | None]) -> str:
@@ -201,6 +212,8 @@ def run_cmd() -> int:
     halted = halted_reason(HALT)
     c = _client()
     lines: list[str] = []
+    fill_lines: list[str] = []
+    adjust: list[str] = []
     try:
         p = _plan_today(c, st, now_ms)
         ns = p["nav"]
@@ -225,11 +238,14 @@ def run_cmd() -> int:
             intents = []
         else:
             intents = p["intents"]
+        fills: dict[str, Decimal] = {}
         for i in [x for x in intents if x.side.value == "SELL"]:
             ident = f"t2u-{p['day']}-{i.symbol}-S"
             o, line = _send(c, i.symbol, "ask", i.quantity, ident)
-            lines.append(line)
+            fill_lines.append(line)
             st["orders"].append({"id": ident, "line": line, **({} if o is None else asdict(o))})
+            if o is not None and o.executed_volume > 0:
+                fills[i.symbol] = -o.funds
         buys = [x for x in intents if x.side.value == "BUY"]
         if buys:
             krw, _, prices = _snapshot(c)
@@ -242,10 +258,13 @@ def run_cmd() -> int:
                     continue
                 ident = f"t2u-{p['day']}-{i.symbol}-B"
                 o, line = _send(c, i.symbol, "bid", qty, ident)
-                lines.append(line)
+                fill_lines.append(line)
                 st["orders"].append({"id": ident, "line": line, **({} if o is None else asdict(o))})
                 if o is not None:
                     cash -= o.funds + o.paid_fee
+                    if o.executed_volume > 0:
+                        fills[i.symbol] = o.funds
+        adjust = adjust_lines(st, p, fills, ns.flow)
         krw, hold, prices = _snapshot(c)
         eq = equity(krw, hold, prices)
         st["expected"] = {"KRW": str(krw), **{k: str(v) for k, v in hold.items()}}
@@ -273,18 +292,55 @@ def run_cmd() -> int:
     )
     text = "\n".join(
         [
-            f"{TAG} · {p['day']}",
+            f"{TAG} · {kst_day(p['day'])}",
             RULE,
-            f"목표 {_fmt_w(p['weights'])}",
             *lines,
+            *(["", "📋 오늘 비중 조절", *adjust] if adjust else []),
+            *(["", "🛒 체결", *[sub(x) for x in fill_lines]] if fill_lines else []),
             "",
             *pnl_lines(st, krw, hold, prices, eq, ns.dd),
         ]
     )
     print(text)
-    if lines:  # 주문 · 입출금 · 정지가 있던 날만 알린다
+    if lines or fill_lines:  # 주문 · 입출금 · 정지가 있던 날만 알린다
         _notify(text)
     return 0
+
+
+def _sig_row(sg: Any) -> dict[str, str]:
+    return {"ups": str(sg.ups), "vol": str(sg.vol), "raw": str(sg.raw), "weight": str(sg.weight)}
+
+
+def adjust_lines(
+    st: dict[str, Any], p: dict[str, Any], fills: dict[str, Decimal], flow: Decimal
+) -> list[str]:
+    """코인마다 '지금 비중 → 목표 · 산 · 판 금액 · 이유' (매매한 코인), 매매 안 한 코인은 ➖ 한 줄.
+
+    이유는 그 코인을 **마지막으로 사고판 날**의 판단과 오늘을 비교한다(밴드 때문에 며칠 쌓인 변화).
+    """
+    last = st.setdefault("last_trade_signals", {})
+    eq = p["equity"]
+    out: list[str] = []
+    for k in COINS:
+        sg = p["signals"].get(k)
+        cur = p["hold"][k] * p["prices"][k] / eq if eq > 0 else Decimal(0)
+        if sg is None:
+            continue
+        if k in fills:
+            icon, why = reason(k, sg, last.get(k), cur, flow=flow)
+            word = "매수" if fills[k] > 0 else "매도"
+            full = " (전량)" if sg.weight == 0 else ""
+            out.append(
+                f"{icon} {k} {cur:.1%} → {sg.weight:.1%} · {word}{full} {abs(fills[k]):,.0f}원"
+            )
+            out.append(sub(why))
+            last[k] = _sig_row(sg)
+        else:
+            out.append(
+                f"➖ {k} {cur:.1%} (목표 {sg.weight:.1%} · 차이 {abs(sg.weight - cur):.1%}p)"
+            )
+        last.setdefault(k, _sig_row(sg))
+    return out
 
 
 def pnl_lines(
@@ -314,6 +370,80 @@ def pnl_lines(
         *[sub(x) for x in out],
         sub(f"원화 {krw:,.0f} 원 · 낙폭 {dd:.1%}"),
     ]
+
+
+def weekly_cmd() -> int:
+    """토요일 주간 요약 (2026-10-09 사용자 "주간 요약 같은 건 토요일에"). 주문 없음."""
+    from datetime import date, timedelta
+
+    st = _load()
+    c = _client()
+    try:
+        now_ms = int(time.time() * 1000)
+        dms, day = _decision(now_ms)
+        krw, hold, prices = _snapshot(c)
+        sig = signals({k: c.closed_daily(MARKETS[k], dms) for k in COINS}, dms)
+    finally:
+        c.close()
+    eq = equity(krw, hold, prices)
+    end = date.fromisoformat(day)
+    start = end - timedelta(days=6)
+    label_start = date.fromisoformat(kst_day(start.isoformat()))
+    label_end = date.fromisoformat(kst_day(day))
+    hist = st.get("history", [])
+    units = Decimal(str(st.get("units") or "0"))
+    nav_now = eq / units if units > 0 else Decimal(1000)
+    before = [r for r in hist if r[0] < start.isoformat()]
+    nav_then = Decimal(str(before[-1][1])) if before else Decimal(1000)
+    week_ret = nav_now / nav_then - 1
+    dep = sum(
+        (Decimal(str(d[1])) for d in st.get("deposits", []) if d[0] >= start.isoformat()),
+        Decimal(0),
+    )
+    trades = [
+        o
+        for o in st.get("orders", [])
+        if str(o.get("id", ""))[4:14] >= start.isoformat()
+        and Decimal(str(o.get("executed_volume") or "0")) > 0
+    ]
+    trade_txt = " · ".join(
+        f"{kst_day(str(o['id'])[4:14])[5:].replace('-', '/')} {str(o['id']).split('-')[-2]}"
+        f" {'매수' if o.get('side') == 'bid' else '매도'}"
+        for o in trades
+    )
+    rows = []
+    for k in COINS:
+        sg = sig.get(k)
+        if sg is None:
+            continue
+        held_w = hold[k] * prices[k] / eq if eq > 0 else Decimal(0)
+        icon = "🟢" if sg.ups >= 2 else "🔴"
+        rows.append(
+            sub(
+                f"{icon} {k} 주간 {sg.week:+.1%} · 상승 {sg.ups}/3 · 목표 {sg.weight:.1%}"
+                f" · 보유 {held_w:.1%}"
+            )
+        )
+    peak = Decimal(str(st.get("peak") or "0"))
+    dd = max(Decimal(0), 1 - nav_now / peak) if peak > 0 else Decimal(0)
+    text = "\n".join(
+        [
+            f"📅 [Cruise 주간 요약] {label_start:%m/%d} ~ {label_end:%m/%d}",
+            RULE,
+            f"📈 이번 주 수익률 {week_ret:+.1%}"
+            f" (입출금 뺀 단위 가치 {nav_then:,.1f} → {nav_now:,.1f})",
+            f"💰 이번 주 입금 {dep:+,.0f} 원",
+            f"🛒 이번 주 매매 {len(trades)}건" + (f": {trade_txt}" if trades else ""),
+            "",
+            "코인별 (주간 가격 · 추세 · 목표 · 보유)",
+            *rows,
+            "",
+            *pnl_lines(st, krw, hold, prices, eq, dd),
+        ]
+    )
+    print(text)
+    _notify(text)
+    return 0
 
 
 def status_cmd() -> int:
@@ -351,9 +481,11 @@ def release_cmd(reason: str) -> int:
 def main(argv: list[str]) -> int:
     if argv[:1] == ["release-dd"] and len(argv) == 2:
         return release_cmd(argv[1])
-    cmds = {"plan": plan_cmd, "run": run_cmd, "status": status_cmd}
+    cmds = {"plan": plan_cmd, "run": run_cmd, "status": status_cmd, "weekly": weekly_cmd}
     if len(argv) != 1 or argv[0] not in cmds:
-        raise SystemExit("usage: python -m scripts.live_t2_upbit plan|run|status|release-dd 사유")
+        raise SystemExit(
+            "usage: python -m scripts.live_t2_upbit plan|run|status|weekly|release-dd 사유"
+        )
     return cmds[argv[0]]()
 
 

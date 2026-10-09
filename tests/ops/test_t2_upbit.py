@@ -116,3 +116,27 @@ def test_books_average_cost_and_realized() -> None:
     b = books(orders)["BTC"]
     assert b.qty == 1 and b.cost == 101 and b.realized == 150 - 1 - 101
     assert books(orders)["ETH"].cost == 0
+
+
+def test_reason_icons() -> None:
+    from auto_trading.ops.t2_upbit import CoinSignal, reason
+
+    def sg(ups: int, vol: str = "0.5", raw: str = "0.3", w: str = "0.3") -> CoinSignal:
+        parts = tuple(Decimal("0.05") if k < ups else Decimal("-0.05") for k in range(3))
+        return CoinSignal(ups, parts, Decimal(vol), Decimal(raw), Decimal(w), Decimal(0))  # type: ignore[arg-type]
+
+    prev = {"ups": "3", "vol": "0.5", "raw": "0.3", "weight": "0.3"}
+    assert reason("ETH", sg(1, w="0", raw="0"), prev, Decimal("0.3"), flow=Decimal(0))[0] == "🔴"
+    assert reason("ETH", sg(3), {**prev, "ups": "1"}, Decimal(0), flow=Decimal(0))[0] == "🟢"
+    assert (
+        reason("ETH", sg(2, raw="0.2", w="0.2"), prev, Decimal("0.3"), flow=Decimal(0))[0] == "🟡"
+    )
+    assert (
+        reason(
+            "ETH", sg(3, vol="0.8", raw="0.18", w="0.18"), prev, Decimal("0.3"), flow=Decimal(0)
+        )[0]
+        == "🟡"
+    )
+    assert reason("ETH", sg(3), prev, Decimal("0.2"), flow=Decimal(100))[0] == "💰"
+    assert reason("ETH", sg(3), prev, Decimal("0.2"), flow=Decimal(0))[0] == "🔵"
+    assert reason("ETH", sg(3), None, Decimal(0), flow=Decimal(0))[0] == "🆕"
