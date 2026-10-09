@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -202,11 +203,38 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
-def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
-    from auto_trading.ops.t2_upbit import books
+def _stored_coin_costs(orders: Iterable[Mapping[str, object]]) -> dict[str, Decimal]:
+    """저장 체결의 표시 원가만 읽는다. ops/전략을 import하거나 주문을 계산하지 않는다.
 
+    기존 t2_upbit.books의 수수료 포함 이동평균 원가와 동일한 장부 읽기 규칙.
+    실현 손익·목표 비중·실행 판단은 화면에서 계산하지 않는다.
+    """
+    qty = dict.fromkeys(CRUISE_COINS, Decimal(0))
+    cost = dict.fromkeys(CRUISE_COINS, Decimal(0))
+    for order in orders:
+        parts = str(order.get("identifier") or order.get("id") or "").split("-")
+        if len(parts) < 3 or parts[-2] not in CRUISE_COINS:
+            continue
+        coin = parts[-2]
+        volume = Decimal(str(order.get("executed_volume") or "0"))
+        if volume <= 0:
+            continue
+        if order.get("side") == "bid":
+            qty[coin] += volume
+            cost[coin] += Decimal(str(order.get("funds") or "0")) + Decimal(
+                str(order.get("paid_fee") or "0")
+            )
+        else:
+            average = cost[coin] / qty[coin] if qty[coin] > 0 else Decimal(0)
+            sold = min(volume, qty[coin])
+            cost[coin] -= average * sold
+            qty[coin] -= sold
+    return cost
+
+
+def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
     exp = state.get("expected") or {}
-    costs = books(state.get("orders") or [])
+    costs = _stored_coin_costs(state.get("orders") or [])
     sig = state.get("last_trade_signals") or {}
     holdings = []
     for coin in CRUISE_COINS:
@@ -221,7 +249,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
             Holding(
                 coin,
                 n,
-                float(costs[coin].cost),
+                float(costs[coin]),
                 None if price is None else n * price,
                 f"{trend} · 목표 {w:.0%}",
             )
@@ -338,11 +366,26 @@ def _pl(value: float, base: float) -> str:
     return f'<span class="{cls}">{diff:+,.0f} 원{pct}</span>'
 
 
-def _book_card(b: Book) -> str:
+def _priced(b: Book, q: Quotes) -> bool:
+    """표시 품질만 판단한다. 달러 현금의 환율 대체도 확정 평가로 표시하지 않는다."""
+    return b.priced and (b.key not in {"glide", "accumulate"} or q.fx is not None)
+
+
+def _book_card(b: Book, q: Quotes, index: int) -> str:
+    key = b.key if b.key in {"glide", "cruise", "accumulate"} else "other"
+    label, description, glyph = {
+        "glide": ("미국 주식 자동투자", "TQQQ · SCHD를 비중에 맞춰 투자합니다.", "G"),
+        "cruise": ("코인 자동투자", "BTC · ETH · SOL의 추세에 따라 비중을 조절합니다.", "C"),
+        "accumulate": ("주식 모으기", "저장된 적립 매수와 기존 보유를 확인합니다.", "+"),
+    }.get(key, ("투자 장부", "저장된 보유와 거래 기록을 확인합니다.", "·"))
+    priced = _priced(b, q)
+    stopped = any("낙폭 정지 중" in n for n in b.notes)
+    status = "매수 정지 기록" if stopped else "체결 확인 필요" if b.pending else "장부 확인"
+    state_class = "attention" if stopped or b.pending else "neutral"
     rows = "".join(
-        f"<tr><td><b>{escape(h.name)}</b>"
-        + (f'<small class="mute"> {escape(h.note)}</small>' if h.note else "")
-        + f'</td><td class="num">{h.qty:,.8g}</td>'
+        f'<tr><th scope="row"><b>{escape(h.name)}</b>'
+        + (f'<small class="mute">{escape(h.note)}</small>' if h.note else "")
+        + f'</th><td class="num">{h.qty:,.8g}</td>'
         f'<td class="num">{_won(h.value_krw if h.value_krw is not None else h.cost_krw)}'
         + ("" if h.value_krw is not None else '<small class="mute"> 원가</small>')
         + f'</td><td class="num">{_pl(h.value_krw, h.cost_krw) if h.value_krw is not None else "—"}'
@@ -350,20 +393,46 @@ def _book_card(b: Book) -> str:
         for h in b.holdings
     )
     rows += (
-        f'<tr><td class="mute">현금</td><td></td><td class="num">{_won(b.cash_krw)}</td>'
-        "<td></td></tr>"
+        f'<tr><th scope="row" class="mute">현금</th><td class="num">—</td>'
+        f'<td class="num">{_won(b.cash_krw)}</td><td class="num">—</td></tr>'
     )
     notes = "".join(f"<li>{escape(n)}</li>" for n in b.notes)
-    pending = "".join(f"<li>⏳ {escape(p)}</li>" for p in b.pending)
+    pending = "".join(f"<li>{escape(p)}</li>" for p in b.pending)
+    pnl = (
+        _pl(b.value_krw, b.deposits_krw)
+        if priced
+        else '<span class="mute">시세 확인 후 표시</span>'
+    )
+    base_label = "매입원가 기준" if key == "accumulate" else "입금 기준"
     return (
-        f'<section class="panel live-book live-{b.key}"><div class="row">'
-        f'<div><div class="eyebrow">{escape(b.venue)}</div><h2>{escape(b.title)}</h2></div>'
-        f'<div class="live-book-total"><strong>{_won(b.value_krw)}<small> 원</small></strong>'
-        f"<span>입금 {_won(b.deposits_krw)} · {_pl(b.value_krw, b.deposits_krw)}</span></div></div>"
-        "<table><tr><th>종목</th><th class='num'>수량</th><th class='num'>평가(원)</th>"
-        f"<th class='num'>손익</th></tr>{rows}</table>"
-        + (f'<ul class="live-pending">{pending}</ul>' if pending else "")
-        + (f'<ul class="live-notes">{notes}</ul>' if notes else "")
+        f'<section id="live-book-{index}" class="panel live-book live-{key}" '
+        f'aria-labelledby="live-book-title-{index}"><div class="live-book-heading">'
+        f'<span class="live-glyph" aria-hidden="true">{glyph}</span><div>'
+        f'<div class="eyebrow">{label}</div><h3 id="live-book-title-{index}">{escape(b.title)}</h3>'
+        f"<p>{escape(b.venue)}</p></div>"
+        f'<span class="live-state {state_class}">{status}</span></div>'
+        f'<p class="live-description">{description}</p>'
+        '<div class="live-book-value"><div>'
+        f"<span>{'평가액' if priced else '추정 평가액'}</span>"
+        f"<strong>{_won(b.value_krw)}<small> 원</small></strong></div>"
+        f'<div class="live-book-change"><span>장부 기준 차액</span>{pnl}</div></div>'
+        f'<div class="live-base">{base_label} {_won(b.deposits_krw)} 원 · 세금 전</div>'
+        '<div class="live-table-wrap" tabindex="0" role="region" aria-label="보유 종목 표">'
+        f'<table><caption class="sr-only">{escape(b.title)} 보유 종목과 현금</caption><thead><tr>'
+        "<th scope='col'>종목</th><th scope='col' class='num'>보유 수량</th>"
+        "<th scope='col' class='num'>평가액(원)</th><th scope='col' class='num'>평가 손익</th>"
+        f"</tr></thead><tbody>{rows}</tbody></table></div>"
+        + (
+            f'<div class="live-pending"><b>주문 접수 ≠ 체결 완료</b><ul>{pending}</ul></div>'
+            if pending
+            else ""
+        )
+        + (
+            '<details class="live-book-notes"><summary>장부 메모 보기</summary>'
+            f"<ul>{notes}</ul></details>"
+            if notes
+            else ""
+        )
         + "</section>"
     )
 
@@ -378,53 +447,152 @@ def _next_glide(now_ms: int) -> str:
 
 
 def render_live(books: list[Book], q: Quotes, now_ms: int) -> str:
+    guide = (
+        '<details class="live-guide"><summary>'
+        '<span class="live-guide-icon" aria-hidden="true">?</span>'
+        "<span><b>처음 사용하시나요?</b> 화면 읽는 법</span>"
+        '<span class="live-chevron" aria-hidden="true">＋</span></summary>'
+        '<div class="live-guide-grid"><div><b>01 · 자산부터 확인</b>'
+        "<p>평가액은 보유 자산과 현금의 합계입니다. "
+        "기준 금액은 총 입금과 적립 매입원가이며, "
+        "장부 기준 차액은 인출 가능한 확정 수익이 아닙니다.</p></div>"
+        "<div><b>02 · 전략별로 살펴보기</b><p>Glide는 미국 주식, "
+        "Cruise는 코인, 토스 적립은 주식 모으기입니다. "
+        "전략 카드의 보유 종목과 체결 대기를 확인하세요.</p></div>"
+        "<div><b>03 · 확인할 사항 읽기</b><p>시세 누락·매수 정지·미체결 기록을 먼저 확인하세요. "
+        "이 화면은 읽기 전용이며, 닫아도 별도로 실행되는 매매 프로그램은 종료되지 않습니다."
+        "</p></div></div></details>"
+    )
     if not books:
-        return '<section class="panel"><h2>실거래 장부 없음</h2></section>'
+        return (
+            '<div class="live-workspace"><section class="panel live-empty">'
+            '<span class="live-empty-mark" aria-hidden="true">↗</span>'
+            "<h2>아직 실거래 장부가 없습니다</h2>"
+            "<p>저장된 장부가 생기면 자산·보유 종목·최근 거래가 여기에 표시됩니다.</p>"
+            '<p class="mute">기록 없음은 잔고 0원이나 운영 중단을 뜻하지 않습니다. '
+            "이 화면에서 매매를 시작하지 않습니다.</p>"
+            '<a class="live-link-button" href="/running">실행 기록 확인하기 →</a></section>'
+            f"{guide}</div>"
+        )
     dep = sum(b.deposits_krw for b in books)
     val = sum(b.value_krw for b in books)
-    shares = "".join(
-        f'<span class="live-seg live-seg-{b.key}" style="width:{b.value_krw / val * 100:.2f}%"'
-        f' title="{escape(b.title)}"></span>'
-        for b in books
-        if val > 0
+    complete = all(_priced(b, q) for b in books)
+    stale = (
+        []
+        if complete
+        else ["일부 종목은 시세가 없어 원가로 셈 · 환율 미확인 시에도 추정 평가입니다"]
     )
-    legend = "".join(
-        f'<span><i class="live-dot live-seg-{b.key}"></i>{escape(b.title)} '
-        f"<b>{b.value_krw / val:.0%}</b></span>"
+    attention = [*q.errors, *stale]
+    attention += [
+        f"{b.title} · 체결 확인이 필요한 접수 기록 {len(b.pending)}건" for b in books if b.pending
+    ]
+    attention += [
+        f"{b.title} · 매수 정지 기록을 확인하세요"
         for b in books
-        if val > 0
-    )
-    stale = [] if all(b.priced for b in books) else ["일부 종목은 시세가 없어 원가로 셈"]
-    warn = "".join(f"<div class='banner info'>{escape(e)}</div>" for e in (*q.errors, *stale))
+        if any("낙폭 정지 중" in n for n in b.notes)
+    ]
+    pending_count = sum(len(b.pending) for b in books)
     fx = f"원/달러 {q.fx:,.1f}" if q.fx else "환율 없음"
     at = (datetime.fromtimestamp(q.at_ms / 1000, UTC) + _KST).strftime("%H:%M") if q.at_ms else "—"
+    quality_class = "neutral" if complete else "attention"
+    quality_label = "공개 시세 반영" if complete else "추정치 포함"
+    total_label = "내 자산 평가액" if complete else "내 자산 추정 평가액"
+    total_pnl = _pl(val, dep) if complete else "시세 확인 필요"
     hero = (
-        '<section class="panel live-hero"><div class="live-kpis">'
-        f"<div><span>총 입금</span><strong>{_won(dep)}<small> 원</small></strong></div>"
-        f"<div><span>지금 평가</span><strong>{_won(val)}<small> 원</small></strong></div>"
-        f"<div><span>평가 손익</span><strong>{_pl(val, dep)}</strong></div></div>"
-        f'<div class="live-bar">{shares}</div><div class="live-legend">{legend}</div>'
-        f'<div class="foot">공개 시세 기준 · {fx} · '
-        f"{at} KST · 세금 전</div></section>"
+        '<section class="panel live-hero" aria-labelledby="live-total-title">'
+        '<div class="live-hero-top">'
+        '<div class="eyebrow">MY PORTFOLIO / 실거래 장부</div>'
+        f'<span class="live-state {quality_class}">{quality_label}</span></div>'
+        f'<h2 id="live-total-title">{total_label}</h2>'
+        f'<div class="live-total">{_won(val)}<span>원</span></div>'
+        '<p class="live-hero-copy">투자별 장부를 한눈에. '
+        "실제 계좌 잔고와 차이가 있을 수 있습니다.</p>"
+        '<div class="live-kpis"><div><span>기준 금액</span>'
+        f"<strong>{_won(dep)}<small> 원</small></strong>"
+        "<small>총 입금 + 적립 매입원가</small></div>"
+        f"<div><span>장부 기준 차액</span><strong>{total_pnl}</strong>"
+        "<small>세금 전 · 확정 수익 아님</small></div>"
+        f"<div><span>체결 확인 대기</span><strong>{pending_count}<small> 건</small></strong>"
+        "<small>장부에 접수된 미체결 기록</small></div></div>"
+        f'<div class="live-source">공개 시세 조회 {at} KST · {fx} · '
+        "60초마다 화면 갱신</div></section>"
+    )
+    weights = [max(0.0, b.value_krw) for b in books]
+    total = sum(weights)
+    offset = 0.0
+    circles, legend = [], []
+    for i, (b, weight) in enumerate(zip(books, weights, strict=True)):
+        key = b.key if b.key in {"glide", "cruise", "accumulate"} else "other"
+        pct = weight / total * 100 if total else 0.0
+        circles.append(
+            f'<circle class="live-ring-{key}" cx="100" cy="100" r="78" pathLength="100" '
+            f'stroke-dasharray="{pct:.6f} {100 - pct:.6f}" stroke-dashoffset="{-offset:.6f}"/>'
+        )
+        offset += pct
+        legend.append(
+            f'<a href="#live-book-{i}" class="live-allocation-item"><span>'
+            f'<i class="live-dot live-seg-{key}" aria-hidden="true"></i>{escape(b.title)}</span>'
+            f"<b>{pct:.1f}%</b></a>"
+        )
+    allocation = (
+        '<section class="panel live-allocation" aria-labelledby="live-allocation-title">'
+        '<h2 id="live-allocation-title">자산 구성</h2><div class="live-donut">'
+        '<svg viewBox="0 0 200 200" role="img" '
+        'aria-label="전략별 양수 평가액 비중; 아래 목록에 수치 표시">'
+        '<circle class="live-ring-base" cx="100" cy="100" r="78"/>'
+        f'<g transform="rotate(-90 100 100)">{"".join(circles)}</g></svg>'
+        f"<div><strong>{len(books)}</strong><span>투자 장부</span></div></div>"
+        f'{"".join(legend)}<p class="live-small">'
+        f"{'평가액' if complete else '추정 평가액'} 기준 · 양수 금액 비중</p></section>"
+    )
+    attention_html = (
+        '<section class="panel live-attention"><div class="live-section-head"><h2>확인할 사항</h2>'
+        f'<span class="live-count">{len(attention)}</span></div>'
+        + (
+            "<ul>" + "".join(f"<li>{escape(a)}</li>" for a in attention) + "</ul>"
+            if attention
+            else "<p>표시된 장부에 체결 대기·시세 누락·매수 정지 기록이 없습니다.</p>"
+        )
+        + '<a class="text-link" href="/running">전체 실행 기록 보기 →</a>'
+        '<p class="live-small">장부만으로 프로그램의 현재 가동 여부를 확정하지 않습니다.'
+        "</p></section>"
     )
     schedule = (
-        '<section class="panel live-schedule"><h2>다음 일정</h2><ul class="timeline">'
+        '<section class="panel live-schedule"><h2>정기 일정</h2><ul class="live-timeline">'
         f"<li><time>{_next_glide(now_ms)}</time>"
-        "<b>Glide 월 매수 (전날 텔레그램으로 금액 묻기)</b></li>"
-        "<li><time>매일 09:05</time><b>Cruise 비중 결정 · 체결</b></li>"
-        "<li><time>토 09:30</time><b>Cruise 주간 요약</b></li>"
-        "<li><time>평일 밤</time><b>토스 $1 적립 (부족하면 환전 알림)</b></li></ul></section>"
+        "<div><b>Glide 월 투자</b><small>다음 달 첫 평일 참고일</small></div></li>"
+        "<li><time>매일 09:05</time><div><b>Cruise 비중 결정</b>"
+        "<small>코인 추세·보유 비중 확인</small></div></li>"
+        "<li><time>토 09:30</time><div><b>Cruise 주간 요약</b>"
+        "<small>한 주의 투자 기록 확인</small></div></li>"
+        "<li><time>평일 밤</time><div><b>토스 적립</b>"
+        "<small>종목별 저장 설정에 따라 매수</small></div></li></ul>"
+        '<p class="live-small">KST 기준 참고 일정입니다. 휴장·잔고·예약 상태에 따라 달라지며 '
+        "실행·체결을 보장하지 않습니다.</p></section>"
     )
     acts = sorted((a for b in books for a in b.activity), key=lambda a: a[0], reverse=True)[:10]
     activity = (
-        '<section class="panel"><h2>최근 기록</h2><ul class="timeline">'
-        + "".join(f"<li><time>{escape(d)}</time><b>{escape(t)}</b></li>" for d, t in acts)
-        + "</ul></section>"
+        '<section class="panel live-activity"><div class="live-section-head"><h2>최근 기록</h2>'
+        '<span class="live-small">최대 10건</span></div><ul class="live-timeline">'
+        + "".join(f"<li><time>{escape(d)}</time><div>{escape(t)}</div></li>" for d, t in acts)
+        + (
+            "</ul>"
+            if acts
+            else '</ul><p class="live-small">아직 거래·입금 기록이 없습니다. '
+            "기록이 생기면 표시됩니다.</p>"
+        )
+        + "</section>"
     )
-    cards = "".join(_book_card(b) for b in books)
+    cards = "".join(_book_card(b, q, i) for i, b in enumerate(books))
     return (
-        f"{warn}{hero}<div class='live-grid'><div>{cards}</div>"
-        f"<div>{schedule}{activity}</div></div>"
+        f'<div class="live-workspace">{guide}<div class="live-overview">{hero}{allocation}</div>'
+        '<div class="live-grid"><div><div class="live-section-head"><h2>내 투자</h2>'
+        '<span class="live-small">주식 · 코인 · 적립</span></div>'
+        f'{cards}{activity}</div><aside aria-label="확인할 사항과 일정">{attention_html}{schedule}'
+        '<section class="panel live-help"><h2>이 화면에서 할 수 있는 일</h2>'
+        "<p>자산·보유 종목·체결 기록을 확인합니다. 주문·입금·전략 변경은 하지 않습니다.</p>"
+        '<a class="text-link" href="/toss">주식 적립 상세 보기 →</a><br>'
+        '<a class="text-link" href="/">Paper 관찰은 주식 홈에서 →</a></section></aside></div></div>'
     )
 
 

@@ -150,8 +150,11 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
     group = _group(page)
     nav = _subnav(page, group)
     title = next(label for key, _, label in PAGES if key == page)
+    heading = "내 실거래" if page == "live" else "나의 투자 현황" if page == "overview" else title
     subtitle = (
-        "주식 운용을 중심으로, 관찰과 연구는 따로."
+        "내 자산과 투자 기록, 확인할 일을 한눈에."
+        if page == "live"
+        else "주식 운용을 중심으로, 관찰과 연구는 따로."
         if page == "overview"
         else "저장된 기록을 확인합니다."
     )
@@ -216,20 +219,21 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
             "데모(가짜 돈)·일일 점검 보고. PAPER·TESTNET·DEMO 자산은 합산하지 않는다."
         )
     return (
-        f'<!doctype html><html lang="ko" data-theme="{theme}"><head><meta charset="utf-8">'
+        f'<!doctype html><html lang="ko" data-theme="{theme}" data-page="{page}">'
+        '<head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="refresh" content="60">'
         '<link rel="icon" type="image/svg+xml" href="/assets/auto-trading.svg?v=2">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" sizes="any">'
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
-        '<div class="topbar"><a class="logo" href="/">'
+        f'<div class="topbar"><a class="logo" href="{"/live" if page == "live" else "/"}">'
         '<img src="/assets/auto-trading.svg" width="32" height="32" alt="">'
         "AUTO <b>TRADING</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout">{nav}<main>'
         f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
-        f"<h1>{'나의 투자 현황' if page == 'overview' else escape(title)}</h1>"
+        f"<h1>{escape(heading)}</h1>"
         f'<div class="mute">{subtitle}</div></div>'
         f'<div class="header-meta"><span class="date">{_kst(data.now_ms)} KST</span>'
         f'<div><span class="badge">읽기 전용</span>{trading_badge}</div></div></header>'

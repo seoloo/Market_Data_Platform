@@ -11,7 +11,7 @@ import pytest
 
 from auto_trading.ui import live_home
 from auto_trading.ui.data import load_dashboard
-from auto_trading.ui.live_home import Quotes, build_books, fetch_quotes, render_live
+from auto_trading.ui.live_home import Book, Quotes, build_books, fetch_quotes, render_live
 from auto_trading.ui.render import render_page
 
 _KST = timezone(timedelta(hours=9))
@@ -148,3 +148,137 @@ def test_live_page_in_nav_without_network(tmp_path: Path, monkeypatch: pytest.Mo
     html = render_page(load_dashboard(tmp_path, _NOW), "live")
     assert 'href="/live"' in html and "총 입금" in html and "Cruise" in html
     assert "11/02" in html  # 다음 Glide = 11 월 첫 평일
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_desktop_home_has_explanations_and_read_only_navigation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, theme: str
+) -> None:
+    _seed(tmp_path)
+    monkeypatch.setattr(live_home, "quote_source", lambda coins, tickers: _Q)
+    html = render_page(load_dashboard(tmp_path, _NOW), "live", theme=theme)
+    assert f'data-theme="{theme}" data-page="live"' in html
+    assert '<a class="logo" href="/live">' in html
+    for label in (
+        "내 실거래",
+        "처음 사용하시나요?",
+        "미국 주식 자동투자",
+        "코인 자동투자",
+        "주식 모으기",
+        "기준 금액",
+        "총 입금 + 적립 매입원가",
+        "확정 수익 아님",
+        "확인할 사항",
+        "주문 접수 ≠ 체결 완료",
+        "휴장·잔고·예약 상태",
+    ):
+        assert label in html
+    assert 'role="img" aria-label="전략별 양수 평가액 비중' in html
+    assert 'scope="row"' in html and "scope='col'" in html
+    assert 'tabindex="0" role="region"' in html
+    for i in range(3):
+        assert f'href="#live-book-{i}"' in html and f'id="live-book-{i}"' in html
+    assert "<script" not in html and "<form" not in html
+
+
+def test_missing_prices_hide_aggregate_profit_not_fabricate_a_return(tmp_path: Path) -> None:
+    _seed(tmp_path)
+    q = Quotes(errors=("업비트 시세 실패",))
+    html = render_live(build_books(tmp_path, q), q, _NOW)
+    hero = html.split('aria-labelledby="live-total-title"', 1)[1].split("</section>", 1)[0]
+    assert "내 자산 추정 평가액" in hero and "추정치 포함" in hero
+    assert "시세 확인 필요" in hero and 'class="neg"' not in hero and 'class="pos"' not in hero
+    assert "시세 확인 후 표시" in html
+
+
+def test_missing_fx_does_not_mark_dollar_cash_as_confirmed() -> None:
+    book = live_home.glide_book(
+        {"deposits": [["2026-10-09", 130_000.0, 100.0, 1300.0]], "cash_usd": 100.0},
+        Quotes(),
+    )
+    assert book.value_krw == 130_000.0  # 기존 환율 대체 계산은 유지
+    html = render_live([book], Quotes(), _NOW)
+    assert "추정 평가액" in html and "시세 확인 후 표시" in html
+
+
+def test_stopped_book_is_warning_not_live_health_status(tmp_path: Path) -> None:
+    _seed(tmp_path)
+    p = tmp_path / "data/upbit_t2/state.json"
+    state = json.loads(p.read_text(encoding="utf-8"))
+    state["stopped"] = True
+    _write(tmp_path, "data/upbit_t2/state.json", state)
+    html = render_live(build_books(tmp_path, _Q), _Q, _NOW)
+    assert "매수 정지 기록" in html and "매수 정지 기록을 확인하세요" in html
+    assert "프로그램의 현재 가동 여부를 확정하지 않습니다" in html
+
+
+@pytest.mark.parametrize("value", [0.0, -10.0])
+def test_nonpositive_values_do_not_break_allocation(value: float) -> None:
+    book = Book("glide", "Glide", "토스", 0.0, value, ())
+    html = render_live([book], _Q, _NOW)
+    assert "0.0%" in html and "nan" not in html.lower() and "inf" not in html.lower()
+
+
+def test_empty_state_explains_missing_data_without_zero_balance() -> None:
+    html = render_live([], Quotes(), _NOW)
+    assert "아직 실거래 장부가 없습니다" in html and "화면 읽는 법" in html
+    assert "기록 없음은 잔고 0원이나 운영 중단을 뜻하지 않습니다" in html
+    assert 'class="live-total"' not in html
+
+
+def test_dynamic_live_content_and_unknown_book_key_are_escaped() -> None:
+    bad = '<script>alert("test")</script>'
+    book = Book(bad, bad, bad, 100.0, 110.0, (), (bad,), (bad,), ((bad, bad),))
+    html = render_live([book], Quotes(errors=(bad,)), _NOW)
+    assert bad not in html and "&lt;script&gt;" in html
+    assert 'class="panel live-book live-other"' in html
+    assert "<script" not in html and "<form" not in html
+
+
+def test_read_only_cost_display_matches_existing_ledger_for_partial_sales() -> None:
+    from auto_trading.ops.t2_upbit import books
+
+    orders: list[dict[str, object]] = [
+        {
+            "identifier": "t2u-2026-10-01-BTC-B",
+            "side": "bid",
+            "executed_volume": "2",
+            "funds": "200",
+            "paid_fee": "2",
+        },
+        {
+            "identifier": "t2u-2026-10-02-BTC-B",
+            "side": "bid",
+            "executed_volume": "1",
+            "funds": "150",
+            "paid_fee": "1.5",
+        },
+        {
+            "identifier": "t2u-2026-10-03-BTC-S",
+            "side": "ask",
+            "executed_volume": "0.5",
+            "funds": "80",
+            "paid_fee": "0.8",
+        },
+        {
+            "id": "t2u-2026-10-04-ETH-B",
+            "side": "bid",
+            "executed_volume": "1",
+            "funds": "50",
+            "paid_fee": "0.05",
+        },
+        {
+            "identifier": "t2u-2026-10-05-ETH-S",
+            "side": "ask",
+            "executed_volume": "2",
+            "funds": "70",
+            "paid_fee": "0.07",
+        },
+        {"identifier": "external-BTC-B", "side": "bid", "executed_volume": "0"},
+        {"identifier": "unknown-OTHER-B", "side": "bid", "executed_volume": "1"},
+    ]
+    for end in range(len(orders) + 1):
+        expected = books(orders[:end])
+        assert live_home._stored_coin_costs(orders[:end]) == {
+            coin: record.cost for coin, record in expected.items()
+        }
