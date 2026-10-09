@@ -177,7 +177,9 @@ class TestRender:
         html = render_page(load_dashboard(root, P0 + 11 * D), page)
         assert html.startswith("<!doctype html>")
         assert "읽기 전용" in html
-        if page == "toss":
+        if page == "live":
+            assert "실거래 · 공개 시세" in html and "실거래 비활성</span>" not in html
+        elif page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
         elif page == "overview":
             assert "저장 기록 · 주문 없음" in html and "실거래 비활성</span>" not in html
@@ -193,7 +195,7 @@ class TestRender:
         for key, href, _ in PAGES:
             html = render_page(data, key)
             top = html.split("<main>", 1)[0]
-            if key in ("overview", "research"):
+            if key in ("overview", "research", "live"):
                 assert "<nav>" not in top  # 화면이 하나뿐인 탭
                 continue
             nav = top.split("<nav>", 1)[1].split("</nav>", 1)[0]

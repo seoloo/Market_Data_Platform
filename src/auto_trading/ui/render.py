@@ -25,6 +25,7 @@ from auto_trading.ui.data import (
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.leader_alert_render import leader_alert_page
+from auto_trading.ui.live_home import live_page
 from auto_trading.ui.lt_render import lt_paper_page
 from auto_trading.ui.overview import overview_attention
 from auto_trading.ui.qndx_render import toss_page
@@ -37,6 +38,7 @@ __all__ = ["ASSET_DIR", "PAGES", "render_page"]
 ASSET_DIR = Path(__file__).with_name("assets")
 
 PAGES: tuple[tuple[str, str, str], ...] = (
+    ("live", "/live", "실거래 홈"),
     ("overview", "/", "운영 개요"),
     ("running", "/running", "실행 현황"),
     ("compare", "/compare", "전략 비교"),
@@ -123,7 +125,7 @@ def _group(page: str) -> str:
         return "stocks"
     if page in {"running", "testnet", "risk", "demo"}:
         return "system"
-    if page in {"overview", "research"}:
+    if page in {"overview", "research", "live"}:
         return page
     return "coin"
 
@@ -157,6 +159,7 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         f'<a href="{href}" class="{"on" if key == group else ""}"'
         f"{' aria-current=page' if key == group else ''}>{label}</a>"
         for key, href, label in (
+            ("live", "/live", "실거래"),
             ("overview", "/", "주식 홈"),
             ("stocks", "/toss", "주식"),
             ("coin", "/compare", "코인"),
@@ -176,7 +179,9 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         else ""
     )
     trading_badge = (
-        '<span class="badge">저장된 적립 기록</span>'
+        '<span class="badge green">실거래 · 공개 시세</span>'
+        if page == "live"
+        else '<span class="badge">저장된 적립 기록</span>'
         if page == "toss"
         else '<span class="badge">저장된 Paper 기록 · 주문 없음</span>'
         if page in _PAPER_PAGES
@@ -184,7 +189,12 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         if page == "overview"
         else '<span class="badge red">실거래 비활성</span>'
     )
-    if page in _PAPER_PAGES:
+    if page == "live":
+        foot = (
+            "60초마다 장부와 공개 시세(업비트 · 야후, 키 없음)를 다시 읽는다 · "
+            "계좌를 조회하거나 주문하지 않는다. 실거래 장부만 더하고 Paper·데모는 넣지 않는다."
+        )
+    elif page in _PAPER_PAGES:
         foot = (
             "60초마다 저장된 Paper 보고서를 다시 읽는다 · "
             "이 화면은 KIS 계좌를 조회하거나 주문하지 않는다."
@@ -675,6 +685,7 @@ def _research(data: DashboardData) -> str:
 
 
 _RENDER = {
+    "live": live_page,
     "overview": _overview,
     "compare": _compare,
     "positions": _positions,
