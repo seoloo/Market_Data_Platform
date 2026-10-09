@@ -104,6 +104,7 @@ def simulate(
     ref: str | None,
     park: str = "cash",
     monthly: bool = False,
+    early: Mapping[str, bool] | None = None,
 ) -> dict[str, Any]:
     """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ)."""
     days, lev, div = data["days"], data["lev"], data["div"]
@@ -172,7 +173,8 @@ def simulate(
             t_on = trend.get(prev)
             if t_on is False:
                 off_seen = True
-            elif t_on and off_seen:
+            # 187: ``early`` 는 날짜 → 조기 재매수 신호 (없으면 184 그대로)
+            if (t_on and off_seen) or (early is not None and early.get(prev, False)):
                 if park == "cash":
                     cash, res_cash = res_cash, 0.0
                 else:
