@@ -108,15 +108,19 @@ def simulate(
     no_sell: frozenset[str] = frozenset(),
     monthly_krw: float = MONTHLY_KRW,
     harvest: bool = False,
+    ref_lev: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ).
 
     ``harvest`` (195): 해마다 12-15 뒤 첫 거래일에 남은 250 만 원 공제만큼 이익을 실현하고
     같은 날 되산다(양쪽 비용). 기본은 184 그대로.
+    ``ref_lev`` (196): T 브레이크 고점을 잴 가격(없으면 ``lev``). 원화 가격으로 돌릴 때
+    브레이크는 실거래처럼 달러 TQQQ 고점을 쓰게 한다.
     """
     days, lev, div = data["days"], data["lev"], data["div"]
     vol, trend = data["vol"], data["trend"]
     px = {"L": lev, "D": div, "Q": qqq}
+    rl = lev if ref_lev is None else ref_lev
     bk = Book()
     res_cash = res_qty = units = contrib = 0.0
     stage, off_seen = 0, False
@@ -160,7 +164,7 @@ def simulate(
                 base = max(contrib / units, max(window) if window else nav_prev)
                 dd = 1 - nav_prev / base
             else:
-                dd = 1 - lev[prev] / l_max if l_max > 0 else 0.0
+                dd = 1 - rl[prev] / l_max if l_max > 0 else 0.0
             sell = 0.0
             if dd >= STAGE2:
                 sell, stage = bk.q["L"], 2
@@ -194,7 +198,7 @@ def simulate(
                 ep.update(end=d, avg_sale=ep["usd"] / ep["qty"], rebuy=lev[d])
                 episodes.append(ep)
                 ep, stage = None, 0
-                win_start, l_max = len(navs), lev[d]
+                win_start, l_max = len(navs), rl[d]
         elif stage > 0 and monthly and trend.get(prev) is False:
             off_seen = True
         # 3) 매달 납입 + 다시 맞춤 (보관분 제외)
@@ -250,7 +254,7 @@ def simulate(
             nav_days.append(d)
             div_vals.append(bk.q["D"] * div[d])
             vals.append(v)
-            l_max = max(l_max, lev[d])
+            l_max = max(l_max, rl[d])
     end = days[-1]
     last_y = end[:4]
     taxes[last_y] = tax_of(bk.gain.get(last_y, 0.0))
