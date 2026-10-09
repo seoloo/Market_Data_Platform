@@ -105,6 +105,8 @@ def simulate(
     park: str = "cash",
     monthly: bool = False,
     early: Mapping[str, bool] | None = None,
+    no_sell: frozenset[str] = frozenset(),
+    monthly_krw: float = MONTHLY_KRW,
 ) -> dict[str, Any]:
     """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ)."""
     days, lev, div = data["days"], data["lev"], data["div"]
@@ -191,20 +193,21 @@ def simulate(
         if new_month:
             v_before = value(d)
             nav_now = v_before / units if units > 0 else 1.0
-            units += MONTHLY_KRW / nav_now
-            contrib += MONTHLY_KRW
-            flows.append((d, MONTHLY_KRW))
+            units += monthly_krw / nav_now
+            contrib += monthly_krw
+            flows.append((d, monthly_krw))
             d_active = bk.q["D"] - (res_qty if park == "D" else 0.0)
             act_l, act_d = bk.q["L"] * lev[d], d_active * div[d]
-            active = act_l + act_d + MONTHLY_KRW
+            active = act_l + act_d + monthly_krw
             v = vol.get(prev)
             share = LEV_MAX * (min(1.0, VOL_REF / v) if v and v > 0 else 1.0) * STAGE_B[stage]
             tgt_l = share * active
-            cash = MONTHLY_KRW
-            if act_l > tgt_l:
+            cash = monthly_krw
+            # 189: ``no_sell`` 종목은 매달 맞추기에서 팔지 않는다 (브레이크 매도는 그대로)
+            if act_l > tgt_l and "L" not in no_sell:
                 cash += bk.sell("L", (act_l - tgt_l) / lev[d], lev[d], y)
             tgt_d = active - tgt_l
-            if act_d > tgt_d:
+            if act_d > tgt_d and "D" not in no_sell:
                 cash += bk.sell("D", (act_d - tgt_d) / div[d], div[d], y)
             need_l = max(tgt_l - bk.q["L"] * lev[d], 0.0)
             need_d = max(tgt_d - (bk.q["D"] - (res_qty if park == "D" else 0.0)) * div[d], 0.0)
