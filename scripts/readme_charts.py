@@ -17,6 +17,7 @@ import re
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "docs" / "assets" / "readme"
@@ -345,7 +346,7 @@ def hero(stats: dict[str, str]) -> str:
         f'<text x="40" y="70" style="fill:#ffffff;font:800 38px {FONT}">Auto_Trading</text>',
         f'<text x="40" y="102" style="fill:#c9d1d9;font:500 16px {FONT}">결과를 보기 전에 규칙을 고정하고, 한 번만 판정하고, 통과한 것만 소액으로 돌린다</text>',
     ]
-    cx = 40
+    cx: float = 40
     for label, val in chips:
         wv = 30 + sum(13.5 if ord(ch) > 0x3000 else 7.8 for ch in f"{label} {val}")
         body.append(
@@ -362,7 +363,7 @@ def glide_curves() -> tuple[str, str]:
     import scripts.run_brake_184 as m
     from scripts.run_brake_183 import data_real, data_synth
 
-    def runs(data: dict, q: dict) -> dict[str, list[tuple[str, float]]]:
+    def runs(data: dict[str, Any], q: dict[str, float]) -> dict[str, list[tuple[str, float]]]:
         out = {}
         for k, kw in (("M0", {"ref": None}), ("T", {"ref": "T", "park": "cash"})):
             s = m.simulate(data, q, **kw)
