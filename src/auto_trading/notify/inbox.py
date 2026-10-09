@@ -23,6 +23,12 @@ class InboxMessage:
     date: int
     """유닉스 초."""
     text: str
+    data: str = ""
+    """인라인 버튼을 눌렀을 때의 callback_data (글이면 빈 값)."""
+    callback_id: str = ""
+    reply_to: int = 0
+    """답장한 원래 메시지 번호 (없으면 0)."""
+    message_id: int = 0
 
 
 class TelegramInbox:
@@ -55,11 +61,37 @@ class TelegramInbox:
         for upd in body.get("result") or []:
             uid = int(upd.get("update_id", 0))
             nxt = max(nxt, uid + 1)
+            cq = upd.get("callback_query")
+            if cq:
+                cmsg = cq.get("message") or {}
+                chat = str((cmsg.get("chat") or {}).get("id", ""))
+                data = cq.get("data")
+                if chat == str(self._creds.chat_id) and isinstance(data, str):
+                    out.append(
+                        InboxMessage(
+                            uid,
+                            int(cmsg.get("date", 0)),
+                            "",
+                            data=data,
+                            callback_id=str(cq.get("id", "")),
+                            message_id=int(cmsg.get("message_id", 0)),
+                        )
+                    )
+                continue
             msg = upd.get("message") or {}
             chat = str((msg.get("chat") or {}).get("id", ""))
             text = msg.get("text")
             if chat == str(self._creds.chat_id) and isinstance(text, str):
-                out.append(InboxMessage(uid, int(msg.get("date", 0)), text.strip()))
+                reply = msg.get("reply_to_message") or {}
+                out.append(
+                    InboxMessage(
+                        uid,
+                        int(msg.get("date", 0)),
+                        text.strip(),
+                        reply_to=int(reply.get("message_id", 0)),
+                        message_id=int(msg.get("message_id", 0)),
+                    )
+                )
         return out, nxt
 
 

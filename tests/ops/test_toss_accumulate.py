@@ -89,6 +89,7 @@ NOW_UTC = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
 def _mod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeToss) -> Any:
     import scripts.toss_accumulate as mod
 
+    monkeypatch.setattr(mod, "REPO", tmp_path)  # 실제 .env(ECOS · 텔레그램 키)를 읽지 않게
     monkeypatch.setattr(mod, "DATA", tmp_path / "data")
     monkeypatch.setattr(mod, "REPORTS", tmp_path / "reports")
     monkeypatch.setattr(mod, "HALT", tmp_path / "HALT")
@@ -395,7 +396,7 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     plan = [x for x in sent if "오늘(2026-10-06) 밤 매수 예정" in x and "비율 TQQQ" in x]
     assert plan, sent
     assert "이유: QQQ 20일 변동성" in plan[0] and "현재 보유 달러 $2,000.00 → 필요 달러" in plan[0]
-    assert "📦 현재 보유 (M3 몫)" in plan[0] and "💰 배당" in plan[0]
+    assert "📦 현재 보유 (Glide 몫)" in plan[0] and "💰 배당" in plan[0]
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["amounts"] == {"2026-10": 500_000.0}
     assert not state["deposits"] and not fake.sent  # 답장은 계산만 — 주문 · 납입 없음

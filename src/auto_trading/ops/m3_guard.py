@@ -26,6 +26,8 @@ from auto_trading.ops.mf_paper import LEV_MAX
 from auto_trading.ops.us_capital_gains import SETTLE_HOLIDAYS, tax_settle
 
 STAGE1, STAGE2 = 0.15, 0.30
+STAGE_SHARE = {0: 1.0, 1: 0.5, 2: 0.0}
+"""브레이크 단계별 매달 TQQQ 목표 배수 (183 · 184 와 같음)."""
 HIGH_DAYS = 252
 DIV_STEPS_KRW = (100_000.0, 300_000.0, 500_000.0, 1_000_000.0)
 STEP_CUT = 0.10
@@ -56,6 +58,10 @@ class Brake:
     """이번 보관 동안의 매도 {date, dd, qty, usd}."""
     sold_total_usd: float = 0.0
     """브레이크로 판 누적(처음부터)."""
+    last_day: str = ""
+    """고점에 반영한 마지막 종가 날짜."""
+    pending: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """접수한 브레이크 · 재매수 주문 {client_id: {kind, dd, prev_stage}} — 체결 확인 뒤 지운다."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -206,6 +212,10 @@ class Proposal:
     reminded: str = ""
     awaiting_qty: bool = False
     """[직접입력] 을 누른 뒤 주수를 기다리는 중."""
+    message_id: int = 0
+    """고정한 공지 메시지 번호 (0 = 보내지 못함)."""
+    phase: str = ""
+    """실행 단계: '' (대기) · selling (판 주문 접수) · buying (되사기 접수) · done."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -259,7 +269,7 @@ def answer(p: Proposal, reply: tuple[str, int | None] | None, today: str, hhmm: 
             )
         return (
             "취소할 주문이 없거나 이미 주문을 낸 뒤예요(21:00). "
-            "다음 M3 알림에서 결과를 알려 드릴게요."
+            "다음 Glide 알림에서 결과를 알려 드릴게요."
         )
     if p.status not in ("open", "accepted"):
         return "이 제안은 이미 끝났어요. 새 제안이 생기면 다시 여쭤볼게요."
@@ -291,7 +301,7 @@ def _ack_yes(p: Proposal, night: str, cancel: str) -> str:
             "체결을 확인한 다음 날 밤 같은 수량을 다시 사서 "
             "올해 공제를 쓰겠습니다."
         )
-    tail = "체결되면 다음 M3 알림에 결과를 적어 둘게요."
+    tail = "체결되면 다음 Glide 알림에 결과를 적어 둘게요."
     return "\n".join(x for x in (body, tail, sub(cancel) if cancel else "") if x)
 
 
@@ -358,7 +368,7 @@ def div_step_message(
 ) -> str:
     usd = sell * lev_px
     lines = [
-        f"💰 M3 · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
+        f"💰 Glide · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
         RULE,
         f"최근 12개월 SCHD 배당(세후)이 월 평균 {monthly_krw:,.0f}원이 됐어요.",
         "이제 공격 비중을 조금 줄여 배당을 키울 때예요.",
@@ -464,3 +474,47 @@ def typed(p: Proposal, text: str, today: str, hhmm: str) -> tuple[str, Buttons |
     if reply is not None:
         p.awaiting_qty = False
     return _with_cancel(p, answer(p, reply, today, hhmm), hhmm)
+
+
+# ------------------------------------------------------------------ 공제 실현 고르기 · 상태 줄
+
+
+def harvest_pick(
+    qty: Mapping[str, float],
+    cost_usd: Mapping[str, float],
+    prices: Mapping[str, float],
+    fx: float,
+    room_krw: float,
+) -> tuple[str, int, float] | None:
+    """세금 없이 실현할 이익(``room_krw``) 안에서 팔 (종목, 주수, 실현 이익 원) (순수).
+
+    실현 이익이 가장 큰 종목 하나를 고른다.
+
+    주당 이익 = (지금 값 − 평균 원가) × 환율. 원가는 Glide 장부 체결 금액(수수료 포함) 기준이다.
+    """
+    best: tuple[str, int, float] | None = None
+    for sym, q in qty.items():
+        whole = math.floor(q)
+        if whole < 1 or sym not in prices or cost_usd.get(sym, 0) <= 0:
+            continue
+        per = (prices[sym] - cost_usd[sym] / q) * fx
+        if per <= 0:
+            continue
+        n = min(whole, math.floor(room_krw / per))
+        if n >= 1 and (best is None or n * per > best[2]):
+            best = (sym, n, n * per)
+    return best
+
+
+def status_line(p: Proposal) -> str:
+    """고정 공지 맨 아래에 붙이는 지금 상태 한 줄."""
+    if p.status == "accepted":
+        word = {"selling": "매도 접수", "buying": "되사기 접수"}.get(p.phase, "예약")
+        return f"✅ {p.symbol} {p.qty}주 {word} ({p.answered})"
+    return {
+        "open": "⏳ 답을 기다리는 중",
+        "declined": "⏸ 이번엔 안 함",
+        "expired": "⌛ 마감 — 진행하지 않음",
+        "done": f"✅ 완료 — {p.symbol} {p.qty}주",
+        "canceled": "↩️ 취소함",
+    }.get(p.status, p.status)

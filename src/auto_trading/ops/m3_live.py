@@ -43,6 +43,10 @@ class M3Order:
     filled_qty: float = 0.0
     filled_usd: float = 0.0
     commission: float = 0.0
+    kind: str = ""
+    """'' (매달) · brake (브레이크 매도) · rebuy (보관금으로 되사기)."""
+    booked: bool = False
+    """브레이크 · 재매수 체결을 보관금에 반영했는지."""
 
 
 @dataclass(slots=True)
@@ -63,6 +67,14 @@ class M3State:
     ask_month: str = ""
     ask_ts: int = 0
     tg_offset: int = 0
+    brake: dict[str, Any] = field(default_factory=dict)
+    """T 브레이크 상태 (``ops.m3_guard.Brake.to_dict``)."""
+    proposals: list[dict[str, Any]] = field(default_factory=list)
+    """텔레그램 제안 (``ops.m3_guard.Proposal.to_dict``): 12 월 공제 실현 · 배당 단계."""
+    div_steps: int = 0
+    """지난 배당 단계 수 (월 10 · 30 · 50 · 100 만 원)."""
+    lev_cap: float = LEV_MAX
+    """TQQQ 목표 상한 — 배당 단계에서 낮아진다 (처음 60%)."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -82,6 +94,10 @@ class M3State:
             ask_month=d.get("ask_month", ""),
             ask_ts=int(d.get("ask_ts", 0)),
             tg_offset=int(d.get("tg_offset", 0)),
+            brake=dict(d.get("brake") or {}),
+            proposals=list(d.get("proposals") or []),
+            div_steps=int(d.get("div_steps", 0)),
+            lev_cap=float(d.get("lev_cap", LEV_MAX)),
         )
 
 
@@ -143,7 +159,7 @@ def plan_message(
     ``need_all`` = 오늘 밤 모든 매수(다른 적립 포함)에 필요한 달러(지정가 기준)."""
     from auto_trading.notify.style import RULE, sub
 
-    lines = [f"📈 M3 · 오늘({today}) 밤 매수 예정", RULE]
+    lines = [f"📈 Glide · 오늘({today}) 밤 매수 예정", RULE]
     if krw > 0:
         lines.append(f"이번 달 납입 {krw:,.0f}원 ({source}) ≈ ${krw / fx_rate:,.2f}")
     else:
@@ -186,7 +202,7 @@ def ask_message(today: str, default_krw: float) -> str:
 
     return "\n".join(
         [
-            f"📈 M3 · 오늘({today}) 밤 매수 예정",
+            f"📈 Glide · 오늘({today}) 밤 매수 예정",
             RULE,
             f"{today[:4]}년 {int(today[5:7])}월, 얼마를 매수하시겠습니까?",
             sub("예시 답: 30만원  (0 = 이번 달 쉬기)"),
@@ -213,11 +229,11 @@ def cost_basis(state: M3State) -> dict[str, float]:
 
 
 def holdings_lines(state: M3State, prices: Mapping[str, float]) -> list[str]:
-    """현재 보유(M3 몫): 종목마다 주수 · 평가액 · 평균 단가 대비 % (순수)."""
+    """현재 보유(Glide 몫): 종목마다 주수 · 평가액 · 평균 단가 대비 % (순수)."""
     from auto_trading.notify.style import arrow, sub
 
     cost = cost_basis(state)
-    lines = ["📦 현재 보유 (M3 몫)"]
+    lines = ["📦 현재 보유 (Glide 몫)"]
     value_all = cost_all = 0.0
     for sym in SYMBOLS:
         q = state.qty.get(sym, 0.0)

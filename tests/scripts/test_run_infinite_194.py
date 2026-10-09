@@ -20,9 +20,10 @@ def test_t_value_rounds_up_to_one_decimal() -> None:
 
 
 def test_cycle_buys_on_dips_and_takes_profit_at_ten_percent() -> None:
-    # 100 → 내려가며 평단 LOC 로 몇 번 산 뒤 → 고가가 평단 +10% 를 넘는 날 3/4 매도 + 종가 ≥ 별지점이면 1/4
-    closes = [100, 98, 97, 96, 99, 110, 111]
-    highs = [100, 98, 97, 96, 99, 115, 111]
+    # 100 → 내려가며 평단 LOC 로 몇 번 산 뒤
+    # → 고가가 평단 +10% 를 넘는 날 3/4 매도 + 종가 ≥ 별지점이면 1/4
+    closes = [100.0, 98.0, 97.0, 96.0, 99.0, 110.0, 111.0]
+    highs = [100.0, 98.0, 97.0, 96.0, 99.0, 115.0, 111.0]
     r = run_infinite(_bars(closes, highs), cost=0.0)
     assert len(r["cycles"]) == 1 and r["cycles"][0]["pnl"] > 0
     assert r["cycles"][0]["end"] == "2020-01-06"

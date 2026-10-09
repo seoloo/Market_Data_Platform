@@ -48,3 +48,55 @@ def test_fetch_only_registered_chat_and_advances_offset() -> None:
     msgs, nxt = inbox.fetch(5)
     assert [(m.update_id, m.text) for m in msgs] == [(5, "30만")]
     assert nxt == 8
+
+
+def test_fetch_reads_button_presses_and_replies() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "result": [
+                    {
+                        "update_id": 1,
+                        "callback_query": {
+                            "id": "cb9",
+                            "data": "h2026:all",
+                            "message": {"chat": {"id": 42}, "date": 5, "message_id": 30},
+                        },
+                    },
+                    {
+                        "update_id": 2,
+                        "callback_query": {
+                            "id": "x",
+                            "data": "h2026:all",
+                            "message": {"chat": {"id": 99}, "date": 5, "message_id": 31},
+                        },
+                    },
+                    {
+                        "update_id": 3,
+                        "message": {
+                            "chat": {"id": 42},
+                            "date": 6,
+                            "text": "2",
+                            "message_id": 40,
+                            "reply_to_message": {"message_id": 30},
+                        },
+                    },
+                ],
+            },
+        )
+
+    inbox = TelegramInbox(
+        TelegramCredentials("TOKEN", "42"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    msgs, nxt = inbox.fetch(1)
+    assert nxt == 4 and len(msgs) == 2
+    assert (msgs[0].data, msgs[0].callback_id, msgs[0].message_id, msgs[0].text) == (
+        "h2026:all",
+        "cb9",
+        30,
+        "",
+    )
+    assert (msgs[1].text, msgs[1].reply_to, msgs[1].data) == ("2", 30, "")

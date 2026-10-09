@@ -15,10 +15,15 @@ QS — QQQ 추세 꺼짐이면 QNDX 멈춤, 다시 켜지면 쌓인 적립금으
 ``TOSS_TRADING_ENABLED=true`` 일 때만 주문, ``data/HALT`` 면 멈춘다. 달러가 모자라 거절되면 알린다
 (QS 의 TQQQ 매수는 다음 날 다시, 그 밖의 거절은 다시 보내지 않음).
 상태 ``data/toss/``, 보고 ``reports/toss/<KST 날짜>.json``.
+
+M3 (문서 182) 는 매달 첫 거래일 TQQQ + SCHD, **T 브레이크**(문서 183 ~ 188)는 매일 21:00:
+TQQQ 고점 대비 −15% 절반 · −30% 전부 매도 → 달러 보관 → QQQ 추세가 꺼졌다 켜지면 되산다.
+브레이크 매도 · 재매수는 알리지 않고 ``reports/toss/M3_BRAKE/`` 와 매달 M3 알림 맨 아래에 적는다.
 """
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import math
@@ -32,7 +37,11 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from auto_trading.config.secrets import load_telegram_credentials, load_toss_credentials
+from auto_trading.config.secrets import (
+    load_telegram_credentials,
+    load_toss_credentials,
+    read_env_file,
+)
 from auto_trading.core.errors import AutoTradingError, OrderStateUnknownError
 from auto_trading.exchange.overseas import TradingDisabledError
 from auto_trading.exchange.toss import (
@@ -45,6 +54,35 @@ from auto_trading.exchange.toss import (
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.m3_guard import (
+    DIV_STEPS_KRW,
+    STAGE_SHARE,
+    STEP_CUT,
+    Brake,
+    Proposal,
+    added_monthly_krw,
+    brake_lines,
+    brake_sell,
+    div_step_message,
+    drawdown,
+    expire,
+    harvest_deadline,
+    harvest_message,
+    harvest_pick,
+    monthly_dividend_krw,
+    parse_callback,
+    parse_reply,
+    press,
+    proposal_buttons,
+    rebought,
+    rebuy_due,
+    remind_due,
+    shift_plan,
+    sold,
+    status_line,
+    step_due,
+    typed,
+)
 from auto_trading.ops.m3_live import (
     DIV,
     LEV,
@@ -54,6 +92,7 @@ from auto_trading.ops.m3_live import (
     apply_fill,
     ask_message,
     choose,
+    cost_basis,
     credit_dividends,
     deposit,
     deposited,
@@ -65,6 +104,7 @@ from auto_trading.ops.m3_live import (
     plan_message,
 )
 from auto_trading.ops.m3_live import SYMBOLS as M3_SYMBOLS
+from auto_trading.ops.mf_paper import LEV_MAX
 from auto_trading.ops.qndx_alert import (
     LIMIT_BUFFER,
     OPEN_ORDER,
@@ -91,6 +131,7 @@ from auto_trading.ops.qs_live import (
     update_signal,
 )
 from auto_trading.ops.qs_paper import trend_on
+from auto_trading.ops.us_capital_gains import tax_lines
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "toss"
@@ -132,6 +173,20 @@ M3_FILE = "M3.json"
 M3_MAX_QTY = {DIV: 40}
 """한 번에 SCHD 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
 M3_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
+M3_BRAKE = True
+"""T 브레이크 (문서 183 ~ 188, 사용자 2026-10-09 '처음부터'): TQQQ 고점 −15% 절반 · −30% 전부,
+판 돈은 달러 보관, QQQ 추세가 꺼졌다 켜지면 되산다. 매일 21:00 실행에서만 판단한다."""
+BRAKE_KINDS = frozenset({"brake", "rebuy"})
+KIND_WORDS = {
+    "brake": "브레이크 매도",
+    "rebuy": "재매수",
+    "harvest_sell": "공제 실현 매도",
+    "harvest_buy": "공제 실현 되사기",
+    "div_step_sell": "배당 단계 매도",
+    "div_step_buy": "배당 단계 SCHD 매수",
+}
+DIV_STEP_DAYS = 30
+"""배당 단계 질문은 30 일 동안 열어 두고, 답이 없으면 '이번엔 안 함' 으로 넘어간다."""
 M3_MAX_KRW = 5_000_000.0
 """텔레그램 금액 답의 상한 (오타 방지). 넘으면 다시 묻는다."""
 TOSS_FEE = 0.001
@@ -285,18 +340,20 @@ def _since(a: str, b: str) -> int:
     return (_date.fromisoformat(b) - _date.fromisoformat(a)).days
 
 
-def _m3_resolve(day: Day, m3: M3State) -> list[str]:
-    """지난 M3 주문을 주문 상세로 정리해 장부에 넣는다."""
-    notes = []
+def _m3_resolve(day: Day, m3: M3State) -> tuple[list[str], list[str]]:
+    """지난 M3 주문을 주문 상세로 정리해 장부에 넣는다. (알림 줄, 브레이크 주문 줄 — 알림 안 함)."""
+    notes: list[str] = []
+    quiet: list[str] = []
     for o in m3.orders:
         if o.date >= day.today:
             continue
         if o.status == "UNKNOWN":
             o.status = "EXPIRED"
             notes.append(
-                f"⚠ M3 {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
+                f"⚠ Glide {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
             )
             continue
+        out = quiet if o.kind else notes
         if o.status != "SENT":
             continue
         st = day.reader.order_status(o.order_id)
@@ -312,10 +369,151 @@ def _m3_resolve(day: Day, m3: M3State) -> list[str]:
         apply_fill(m3, o)
         word = "매수" if o.side == "BUY" else "매도"
         if o.filled_qty > 0:
-            notes.append(f"M3 {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
+            out.append(f"Glide {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
         else:
-            notes.append(f"M3 {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
-    return notes
+            out.append(f"Glide {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
+    return notes, quiet
+
+
+def _brake_of(m3: M3State) -> Brake:
+    return Brake.from_dict(m3.brake) if m3.brake else Brake(ref="T")
+
+
+def _m3_book(m3: M3State, b: Brake) -> list[str]:
+    """정리된 브레이크 · 재매수 주문을 보관금에 반영한다 (한 번만)."""
+    out: list[str] = []
+    for o in m3.orders:
+        if o.kind not in BRAKE_KINDS or o.booked or o.status not in ("FILLED", "EXPIRED"):
+            continue
+        info = b.pending.pop(o.client_id, {})
+        o.booked = True
+        if o.kind == "brake" and o.filled_qty > 0:
+            net = o.filled_usd - o.commission
+            m3.cash_usd -= net  # apply_fill 이 전략 현금에 넣은 판 돈을 보관금으로 옮긴다
+            sold(b, o.date, float(info.get("dd", 0.0)), o.filled_qty, net)
+            out.append(
+                f"브레이크 매도 체결 {o.date} TQQQ {o.filled_qty:g}주 ${net:,.2f}"
+                f" → 보관금 ${b.reserve_usd:,.2f}"
+            )
+        elif o.kind == "brake":
+            b.stage = int(info.get("prev_stage", b.stage))
+            out.append(f"브레이크 매도 {o.date} 미체결 — 단계 {b.stage} 로 되돌리고 다음 밤 다시")
+        elif o.filled_qty > 0:
+            m3.cash_usd += b.reserve_usd  # 남은 보관금은 전략 현금으로 (산 값은 apply_fill 이 뺐다)
+            px = o.filled_usd / o.filled_qty
+            rebought(b, o.date, 0.0, px)
+            b.last_day = o.date
+            out.append(
+                f"재매수 체결 {o.date} TQQQ {o.filled_qty:g}주 ${o.filled_usd:,.2f}"
+                f" — 브레이크 끝, 고점 ${px:.2f} 부터 다시"
+            )
+        else:
+            out.append(f"재매수 {o.date} 미체결 — 다음 밤 다시")
+    return out
+
+
+def _m3_send(
+    day: Day,
+    trader: TossTrader,
+    m3: M3State,
+    side: str,
+    qty: int,
+    limit: float,
+    kind: str,
+    symbol: str = LEV,
+) -> tuple[M3Order, str]:
+    """브레이크 · 재매수 · 공제 실현 · 배당 단계 주문 (장 마감 지정가). 보내기 전에 저장한다."""
+    cid = _client_id(f"M3{symbol}", day.today, len(m3.orders) + 1)
+    order = M3Order(day.today, symbol, side, qty, limit, cid, kind=kind)
+    m3.orders.append(order)
+    _save_m3(m3)
+    word = KIND_WORDS.get(kind, kind)
+    try:
+        res = trader.order(symbol, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
+    except OrderStateUnknownError as exc:
+        return order, f"⚠ Glide {symbol} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}"
+    except TradingDisabledError as exc:
+        order.status = "REJECTED"
+        return order, f"❌ Glide {symbol} {word} 안 보냄: {exc}"
+    if res.accepted:
+        order.status, order.order_id = "SENT", res.code
+        return order, f"🛑 Glide {symbol} {qty}주 {word} 접수 — 장 마감 지정가 {limit:.2f} USD"
+    order.status, order.code = "REJECTED", res.code
+    return order, f"❌ Glide {symbol} {word} 거절 {res.code}: {res.message}"
+
+
+def _m3_brake(
+    day: Day, trader: TossTrader, m3: M3State, *, enabled: bool, halted: str | None
+) -> tuple[list[str], list[str]]:
+    """T 브레이크 하루치 → (알림 줄 — 실패만, 보고 줄). 매도 · 재매수 성공은 알리지 않는다."""
+    alerts: list[str] = []
+    b = _brake_of(m3)
+    report = _m3_book(m3, b)
+    first = min(
+        (o.date for o in m3.orders if o.symbol == LEV and o.side == "BUY" and o.filled_qty > 0),
+        default=None,
+    )
+    if first is None:
+        m3.brake = b.to_dict()
+        return alerts, [*report, "TQQQ 산 적 없음 — 브레이크 대기"]
+    closes = [(d, float(px)) for d, px in day.reader.daily_closes(LEV, 40) if d < day.today]
+    for d, px in closes:
+        if d >= max(first, b.last_day) and (d > b.last_day or b.lev_peak == 0):
+            b.lev_peak = max(b.lev_peak, px)
+            b.last_day = d
+    if not closes:
+        m3.brake = b.to_dict()
+        return [*alerts, "⚠ Glide 브레이크: TQQQ 일봉 없음 — 오늘 판단 못 함"], report
+    last_d, last = closes[-1]
+    dd = drawdown(b, last)
+    report.append(
+        f"TQQQ {last_d} 종가 ${last:.2f} · 고점 ${b.lev_peak:.2f} · 낙폭 {dd or 0:.1%}"
+        f" · 단계 {b.stage} · 보관금 ${b.reserve_usd:,.2f}"
+    )
+    if b.pending:
+        m3.brake = b.to_dict()
+        return alerts, [*report, "접수한 브레이크 주문 체결 확인 전 — 오늘은 판단만"]
+    if not enabled or halted:
+        m3.brake = b.to_dict()
+        why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
+        return alerts, [*report, f"브레이크 주문 안 함 — {why}"]
+    prev = b.stage
+    n = brake_sell(b, dd, m3.qty.get(LEV, 0.0))
+    if n > 0:
+        o, line = _m3_send(
+            day, trader, m3, "SELL", n, limit_price(day.prices[LEV], "SELL"), "brake"
+        )
+        if o.status == "REJECTED":
+            b.stage, o.booked = prev, True
+            alerts.append(line)
+        else:
+            b.pending[o.client_id] = {"kind": "brake", "dd": dd, "prev_stage": prev}
+            (alerts if o.status == "UNKNOWN" else report).append(line)
+    elif b.stage > 0 and b.sales:
+        on: bool | None = None
+        try:
+            on, as_of, _ = qs_signal(day.reader, datetime.now(tz=UTC))
+            report.append(f"QQQ 추세 {'켜짐' if on else '꺼짐'} ({as_of} 종가)")
+        except AutoTradingError as exc:
+            alerts.append(f"⚠ Glide 브레이크 추세 확인 실패: {exc}")
+        if rebuy_due(b, on):
+            limit = limit_price(day.prices[LEV], "BUY")
+            qty = math.floor(b.reserve_usd / (limit * (1 + day.fee)))
+            if qty >= 1:
+                o, line = _m3_send(day, trader, m3, "BUY", qty, limit, "rebuy")
+                if o.status == "REJECTED":
+                    o.booked = True
+                    alerts.append(line)
+                else:
+                    b.pending[o.client_id] = {"kind": "rebuy"}
+                    (alerts if o.status == "UNKNOWN" else report).append(line)
+            else:
+                m3.cash_usd += b.reserve_usd
+                rebought(b, last_d, 0.0, last)
+                b.last_day = last_d
+                report.append("보관금이 1 주 값보다 적어 전략 현금으로 합침 — 브레이크 끝")
+    m3.brake = b.to_dict()
+    return alerts, report
 
 
 def _m3_plan(
@@ -324,6 +522,12 @@ def _m3_plan(
     """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
     closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
     vol, share = lev_share(closes, day.today)
+    share *= min(m3.lev_cap, LEV_MAX) / LEV_MAX  # 배당 단계로 낮아진 TQQQ 상한
+    if M3_BRAKE and m3.brake:
+        rebuying = any(
+            o.kind == "rebuy" and o.date == day.today and o.status == "SENT" for o in m3.orders
+        )
+        share *= 1.0 if rebuying else STAGE_SHARE[int(m3.brake.get("stage", 0))]
     events = _dividend_events() if events is None else events
     notes = credit_dividends(m3, events, day.today, _since)
     krw = m3.amounts.get(day.today[:7], M3_MONTHLY_KRW)
@@ -340,7 +544,8 @@ def _m3_plan(
         if o.status == "SENT" and o.date == day.today:
             sign = 1 if o.side == "BUY" else -1
             qty[o.symbol] = qty.get(o.symbol, 0.0) + sign * o.qty
-            cash -= sign * o.qty * o.limit * (1 + day.fee)
+            if o.kind not in BRAKE_KINDS:  # 브레이크 · 재매수 돈은 보관금이다
+                cash -= sign * o.qty * o.limit * (1 + day.fee)
     return choose(qty, cash, last, share, day.fee), vol, share, notes
 
 
@@ -362,8 +567,43 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
         return
     m3.tg_offset = nxt
     planned = False
+    bot = _bot()
+    hhmm = _kst_now().strftime("%H:%M")
+    props = _props(m3)
     for msg in msgs:
+        if msg.data:  # 버튼
+            cb = parse_callback(msg.data)
+            prop = next((x for x in props if cb and x.pid == cb[0]), None)
+            if bot is not None and msg.callback_id:
+                with contextlib.suppress(NotifyError):  # 늦으면 텔레그램이 거부 — 무시
+                    bot.answer_callback(msg.callback_id, "접수했어요")
+            if prop is not None and cb is not None:
+                text, buttons = press(prop, cb[1], today, hhmm)
+                _tg_send(
+                    bot,
+                    text,
+                    buttons=buttons,
+                    force_reply=prop.awaiting_qty,
+                    reply_to=prop.message_id,
+                )
+                _after_answer(m3, prop)
+                _refresh(bot, prop)
+            continue
         target = amount_target(m3, today)
+        live = [x for x in props if x.status in ("open", "accepted")]
+        prop = next((x for x in live if x.awaiting_qty), None) or next(
+            (x for x in live if msg.reply_to and x.message_id == msg.reply_to), None
+        )
+        if prop is None and target is None and parse_reply(msg.text) is not None:
+            prop = live[-1] if live else None
+        if prop is not None:
+            text, buttons = typed(prop, msg.text, today, hhmm)
+            _tg_send(
+                bot, text, buttons=buttons, force_reply=prop.awaiting_qty, reply_to=prop.message_id
+            )
+            _after_answer(m3, prop)
+            _refresh(bot, prop)
+            continue
         if target is None:
             continue
         if target == m3.ask_month and msg.date < m3.ask_ts:
@@ -379,13 +619,14 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
             m3.amounts[target] = krw
             planned = planned or target == today[:7]
             if not (reply and target == today[:7]):
-                _notify(f"📈 M3 {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
+                _notify(f"📈 Glide {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
+    _put(m3, props)
     _save_m3(m3)
     if planned and reply and due(m3, today):
         try:
             _notify(_m3_preview(_kst_now()), telegram)
         except (AutoTradingError, TossApiError) as exc:
-            _notify(f"📈 M3 금액은 정했지만 계획 계산 실패: {exc}", telegram)
+            _notify(f"📈 Glide 금액은 정했지만 계획 계산 실패: {exc}", telegram)
 
 
 def _m3_ask_today(today: str, telegram: bool) -> bool:
@@ -413,6 +654,7 @@ def _m3_preview(now: datetime, *, title: str = "") -> str:
         m3 = copy.deepcopy(before)
         events = _dividend_events()
         plan, vol, share, _ = _m3_plan(day, m3, events)
+        tax = _tax_summary(trader, before)
         states, qs = copy.deepcopy(states), copy.deepcopy(qs)
         if qs is not None:
             day.qs_prepare(qs, datetime.now(tz=UTC))
@@ -440,6 +682,8 @@ def _m3_preview(now: datetime, *, title: str = "") -> str:
         sections=[
             holdings_lines(before, {s: day.prices[s] for s in M3_SYMBOLS}),
             dividend_lines(before, events, credited, after),
+            *([b[2:]] if (b := brake_lines(_brake_of(before))) else []),
+            *([_tax_section(tax)] if tax else []),
         ],
     )
     return f"{title}\n{text}" if title else text
@@ -460,26 +704,50 @@ def _m3_needs(day: Day) -> list[dict[str, Any]]:
     ]
 
 
-def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) -> list[str]:
-    """M3 하루치. 이번 달 주문을 다 접수하면 그 달은 끝, 돈 · 시간 문제로 거절되면 다음 날 다시."""
+def _m3_run(
+    day: Day,
+    trader: TossTrader,
+    *,
+    enabled: bool,
+    halted: str | None,
+    brake: bool = True,
+    telegram: bool = False,
+) -> list[str]:
+    """M3 하루치. 이번 달 주문을 다 접수하면 그 달은 끝, 돈 · 시간 문제로 거절되면 다음 날 다시.
+
+    ``brake`` (21:00 실행만): 먼저 T 브레이크를 판단한다. 매도 · 재매수는 알리지 않고 보고에만.
+    """
     m3 = _load_m3()
-    notes = _m3_resolve(day, m3)
+    notes, quiet = _m3_resolve(day, m3)
+    alerts: list[str] = []
+    if brake and M3_BRAKE:
+        alerts, report = _m3_brake(day, trader, m3, enabled=enabled, halted=halted)
+        more_alerts, more = _glide_actions(
+            day, trader, m3, enabled=enabled, halted=halted, telegram=telegram
+        )
+        alerts += more_alerts
+        _save_m3(m3)
+        _write_report(
+            "M3_BRAKE",
+            day.today,
+            {"lines": [*quiet, *report, *more], "brake": m3.brake, "proposals": m3.proposals},
+        )
     if not due(m3, day.today):
         _save_m3(m3)
-        return [f"📈 M3 · {x}" for x in notes]
+        return [*(f"📈 Glide · {x}" for x in notes), *alerts]
     plan, vol, share, more = _m3_plan(day, m3)
     notes += more
     if not any(str(x[0]) == day.today[:7] for x in m3.months):
         m3.months.append([day.today[:7], vol, share])
     vol_txt = f"{vol:.1%}" if vol is not None else "모름"
     head = (
-        f"📈 M3 · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
+        f"📈 Glide · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
         f" (QQQ 20일 변동성 {vol_txt})"
     )
     if not enabled or halted:
         _save_m3(m3)
         why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
-        return [head, *notes, f"⏸ M3 주문 안 함 — {why} (다음 날 다시)"]
+        return [head, *notes, f"⏸ Glide 주문 안 함 — {why} (다음 날 다시)", *alerts]
     retry = False
     lines = []
     for sym, n in sorted(plan.items(), key=lambda kv: kv[1]):  # 파는 것 먼저
@@ -494,20 +762,20 @@ def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) 
         try:
             res = trader.order(sym, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
         except OrderStateUnknownError as exc:
-            lines.append(f"⚠ M3 {sym} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}")
+            lines.append(f"⚠ Glide {sym} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}")
             continue
         except TradingDisabledError as exc:
             order.status = "REJECTED"
-            lines.append(f"❌ M3 {sym} {word} 안 보냄: {exc}")
+            lines.append(f"❌ Glide {sym} {word} 안 보냄: {exc}")
             continue
         if res.accepted:
             order.status, order.order_id = "SENT", res.code
-            lines.append(f"🛒 M3 {sym} {qty}주 장 마감 지정가 {word} 접수 — {limit:.2f} USD")
+            lines.append(f"🛒 Glide {sym} {qty}주 장 마감 지정가 {word} 접수 — {limit:.2f} USD")
         else:
             order.status, order.code = "REJECTED", res.code
             if res.code in M3_RETRY:
                 retry = True
-            lines.append(f"❌ M3 {sym} {word} 거절 {res.code}: {res.message}")
+            lines.append(f"❌ Glide {sym} {word} 거절 {res.code}: {res.message}")
         _save_m3(m3)
     if not plan:
         lines.append("살 것 없음 (돈이 1 주 값보다 적음) — 다음 달로 이월")
@@ -522,7 +790,352 @@ def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) 
         f" · SCHD {m3.qty.get(DIV, 0):g}"
     )
     _save_m3(m3)
-    return [head, *notes, *lines]
+    return [head, *notes, *lines, *alerts]
+
+
+# ------------------------------------------------------------ Glide 제안 (공제 실현 · 배당 단계)
+
+
+def _bot() -> TelegramNotifier | None:
+    creds = load_telegram_credentials(REPO / ".env")
+    return TelegramNotifier(creds) if creds is not None else None
+
+
+def _props(m3: M3State) -> list[Proposal]:
+    return [Proposal.from_dict(d) for d in m3.proposals]
+
+
+def _put(m3: M3State, props: list[Proposal]) -> None:
+    m3.proposals = [x.to_dict() for x in props]
+
+
+def _tg_send(
+    bot: TelegramNotifier | None,
+    text: str,
+    *,
+    buttons: list[list[dict[str, str]]] | None = None,
+    force_reply: bool = False,
+    reply_to: int = 0,
+) -> int:
+    """버튼 · 입력칸 · 답장 알림. 텔레그램이 없거나 실패하면 출력만 하고 0."""
+    print(text)
+    if bot is None:
+        return 0
+    try:
+        return bot.send_message(text, buttons=buttons, force_reply=force_reply, reply_to=reply_to)
+    except NotifyError as exc:
+        print(f"텔레그램 실패: {exc}")
+        return 0
+
+
+def _refresh(bot: TelegramNotifier | None, p: Proposal) -> None:
+    """고정 공지 맨 아래 상태를 바꾸고(알림 없음), 끝난 제안은 고정을 푼다."""
+    if bot is None or not p.message_id:
+        return
+    try:
+        bot.edit(
+            p.message_id,
+            f"{p.plan.get('text', '')}\n\n{status_line(p)}",
+            buttons=proposal_buttons(p) if p.status == "open" else None,
+        )
+        if p.status in ("declined", "expired", "done", "canceled"):
+            bot.unpin(p.message_id)
+    except NotifyError as exc:
+        print(f"고정 공지 고치기 실패: {exc}")
+
+
+def _after_answer(m3: M3State, p: Proposal) -> None:
+    """배당 단계 답 → TQQQ 상한 · 단계 수.
+
+    '2주만' 이면 상한을 그만큼만 낮춘다. 취소하면 되돌린다.
+    """
+    if p.kind != "div_step":
+        return
+    pl = p.plan
+    step = int(pl.get("step", m3.div_steps))
+    if "prev_cap" not in pl:
+        pl["prev_cap"], pl["prev_steps"] = m3.lev_cap, m3.div_steps
+    prev_cap, prev_steps = float(pl["prev_cap"]), int(pl["prev_steps"])
+    if p.status == "accepted":
+        cap, new = float(pl["cap"]), float(pl["new_cap"])
+        m3.lev_cap = cap - (cap - new) * (p.qty / max(p.max_qty, 1))
+        m3.div_steps = max(prev_steps, step + 1)
+    elif p.status == "open":  # 취소 → 원래대로
+        m3.lev_cap, m3.div_steps = prev_cap, prev_steps
+    elif p.status in ("declined", "expired"):
+        m3.lev_cap, m3.div_steps = prev_cap, max(prev_steps, step + 1)
+
+
+def _tax_summary(reader: TossReader, m3: M3State) -> dict[str, Any] | None:
+    """올해 양도소득 추정 (토스 체결 · ECOS 환율).
+
+    키가 없거나 실패하면 None — 알림은 양도세 줄 없이 그대로 간다.
+    """
+    key = read_env_file(REPO / ".env").get("ECOS_API_KEY", "")
+    if not key:
+        return None
+    from scripts.us_tax import compute
+
+    try:
+        return compute(
+            reader, key, {o.order_id for o in m3.orders if o.order_id}, _kst_now().strftime("%Y")
+        )
+    except (AutoTradingError, TossApiError, RuntimeError, ValueError, KeyError) as exc:
+        print(f"양도세 계산 실패: {exc}")
+        return None
+
+
+def _tax_section(res: dict[str, Any]) -> list[str]:
+    s = res["summary"]
+    return tax_lines(
+        gain_krw=float(s["gain_krw"]),
+        glide_krw=float(res["by_tag"].get("M3", 0.0)),
+        tax_krw=float(s["tax_krw"]),
+        room_krw=float(s["tax_free_room_krw"]),
+        unreal_krw=float(res["unrealized_total"]),
+    )
+
+
+def _new_harvest(
+    m3: M3State, today: str, prices: dict[str, float], fx_rate: float, tax: dict[str, Any]
+) -> tuple[Proposal, str]:
+    """12 월 공제 실현 제안 (보낼 글과 함께). 실현할 이익이 없으면 끝난 기록만 남긴다."""
+    year = int(today[:4])
+    room = float(tax["summary"]["tax_free_room_krw"])
+    basis = cost_basis(m3)
+    pick = harvest_pick({s: m3.qty.get(s, 0.0) for s in M3_SYMBOLS}, basis, prices, fx_rate, room)
+    deadline = harvest_deadline(year)
+    if pick is None:
+        text = (
+            f"🧾 {year}년 해외주식 공제 — 올해는 실현할 이익이 없어요\n{RULE}\n"
+            f"세금 없이 더 실현할 수 있는 이익 {room:,.0f}원 · Glide 보유에 이익 난 종목이 없음"
+        )
+        return Proposal(
+            f"h{year}", "harvest", today, deadline, LEV, 0, {"text": text}, "expired"
+        ), text
+    sym, n, gain = pick
+    text = harvest_message(year=year, room_krw=room, picks=[pick], deadline=deadline)
+    return Proposal(
+        f"h{year}", "harvest", today, deadline, sym, n, {"text": text, "gain_krw": gain}
+    ), text
+
+
+def _new_div_step(
+    m3: M3State,
+    today: str,
+    prices: dict[str, float],
+    fx_rate: float,
+    events: list[tuple[str, str, float]],
+) -> tuple[Proposal | None, str | None]:
+    """배당 단계에 닿았으면 (제안, 글). 팔 TQQQ 가 없으면 상한만 낮추고 알림 글만."""
+    monthly = monthly_dividend_krw(m3.dividends, today, fx_rate)
+    k = step_due(m3.div_steps, monthly)
+    if k is None:
+        return None, None
+    cap = m3.lev_cap
+    new_cap = max(cap - STEP_CUT, 0.0)
+    total = m3.cash_usd + sum(m3.qty.get(s, 0.0) * prices[s] for s in M3_SYMBOLS)
+    sell, buy = shift_plan(m3.qty.get(LEV, 0.0), prices[LEV], prices[DIV], total, new_cap)
+    step_krw = DIV_STEPS_KRW[k]
+    if sell < 1:
+        m3.div_steps, m3.lev_cap = k + 1, new_cap
+        return None, (
+            f"💰 Glide · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)\n{RULE}\n"
+            f"TQQQ 비중이 이미 낮아 팔 것이 없어요. 앞으로 TQQQ 목표를 {new_cap:.0%}로 낮춰 둘게요."
+        )
+    since = (datetime.fromisoformat(today) - timedelta(days=365)).date().isoformat()
+    dps = sum(a for ex, sym, a in events if sym == DIV and ex >= since)
+    text = div_step_message(
+        monthly_krw=monthly,
+        step_krw=step_krw,
+        cap=cap,
+        new_cap=new_cap,
+        sell=sell,
+        lev_px=prices[LEV],
+        buy=buy,
+        fx=fx_rate,
+        added_krw=added_monthly_krw(buy, dps, fx_rate),
+        gain_krw=None,
+        room_krw=None,
+    )
+    deadline = (datetime.fromisoformat(today) + timedelta(days=DIV_STEP_DAYS)).date().isoformat()
+    nxt = DIV_STEPS_KRW[k + 1] if k + 1 < len(DIV_STEPS_KRW) else None
+    plan = {
+        "text": text,
+        "cap": cap,
+        "new_cap": new_cap,
+        "step": k,
+        "next_step_krw": nxt,
+        "lev_px": prices[LEV],
+        "div_px": prices[DIV],
+    }
+    return Proposal(f"d{k}-{today}", "div_step", today, deadline, LEV, sell, plan), text
+
+
+def _glide_morning(now: datetime, telegram: bool) -> None:
+    """아침 확인 (환전 알림 실행에서): 마감 · 다시 묻기 · 12 월 공제 공지 · 배당 단계 질문."""
+    if not M3_ENABLED:
+        return
+    today = now.strftime("%Y-%m-%d")
+    m3 = _load_m3()
+    props = _props(m3)
+    bot = _bot() if telegram else None
+    changed = False
+    for x in props:
+        if expire(x, today):
+            _after_answer(m3, x)
+            _refresh(bot, x)
+            changed = True
+        elif remind_due(x, today):
+            x.reminded = today
+            head = (x.plan.get("text", "") or "Glide 제안").splitlines()[0]
+            _tg_send(
+                bot,
+                f"⏰ 아직 답을 기다리고 있어요 — {x.deadline} 밤까지\n{head}",
+                buttons=proposal_buttons(x),
+                reply_to=x.message_id,
+            )
+            changed = True
+    year = now.year
+    want_harvest = (
+        now.month == 12
+        and not any(x.pid == f"h{year}" for x in props)
+        and today <= harvest_deadline(year)
+    )
+    want_div = m3.div_steps < len(DIV_STEPS_KRW) and not any(
+        x.kind == "div_step" and x.status in ("open", "accepted") and x.phase != "done"
+        for x in props
+    )
+    if want_harvest or want_div:
+        trader = _trader()
+        try:
+            prices = {s: float(v) for s, v in trader.prices(list(M3_SYMBOLS)).items()}
+            fx_rate = float(trader.usd_krw())
+            if want_harvest and (tax := _tax_summary(trader, m3)) is not None:
+                prop, text = _new_harvest(m3, today, prices, fx_rate, tax)
+                if prop.status == "open":
+                    prop.message_id = _tg_send(bot, text, buttons=proposal_buttons(prop))
+                    if bot is not None and prop.message_id:
+                        try:
+                            bot.pin(prop.message_id)
+                        except NotifyError as exc:
+                            print(f"공지 고정 실패: {exc}")
+                else:
+                    _tg_send(bot, text)
+                props.append(prop)
+                changed = True
+            if want_div:
+                dprop, dtext = _new_div_step(m3, today, prices, fx_rate, _dividend_events())
+                if dprop is not None and dtext is not None:
+                    dprop.message_id = _tg_send(bot, dtext, buttons=proposal_buttons(dprop))
+                    if bot is not None and dprop.message_id:
+                        try:
+                            bot.pin(dprop.message_id)
+                        except NotifyError as exc:
+                            print(f"공지 고정 실패: {exc}")
+                    props.append(dprop)
+                    changed = True
+                elif dtext is not None:
+                    _tg_send(bot, dtext)
+                    changed = True
+        finally:
+            trader.close()
+    if changed:
+        _put(m3, props)
+        _save_m3(m3)
+
+
+def _glide_actions(
+    day: Day,
+    trader: TossTrader,
+    m3: M3State,
+    *,
+    enabled: bool,
+    halted: str | None,
+    telegram: bool,
+) -> tuple[list[str], list[str]]:
+    """승인된 제안 실행 (21:00): 팔기 → 체결 다음 밤 되사기(공제) · SCHD 사기(배당 단계)."""
+    alerts: list[str] = []
+    report: list[str] = []
+    props = _props(m3)
+    if not any(x.status == "accepted" for x in props):
+        return alerts, report
+    if not enabled or halted:
+        return alerts, ["Glide 제안 주문 안 함 — 거래 꺼짐 · 정지"]
+    bot = _bot() if telegram else None
+    by_cid = {o.client_id: o for o in m3.orders}
+    for x in props:
+        if x.status != "accepted":
+            continue
+        if x.phase == "":
+            if due(m3, day.today):
+                report.append(f"{x.pid}: 오늘은 매달 매수일 — 내일 밤 진행")
+                continue
+            if x.kind == "harvest" and day.today > x.deadline:
+                x.status = "expired"
+                _refresh(bot, x)
+                alerts.append(f"⚠ Glide 공제 실현 {x.deadline} 마감을 넘겨 진행하지 않았어요")
+                continue
+            q = min(x.qty, math.floor(m3.qty.get(x.symbol, 0.0)))
+            if q < 1:
+                x.status = "expired"
+                _refresh(bot, x)
+                continue
+            o, line = _m3_send(
+                day,
+                trader,
+                m3,
+                "SELL",
+                q,
+                limit_price(day.prices[x.symbol], "SELL"),
+                f"{x.kind}_sell",
+                x.symbol,
+            )
+            if o.status == "REJECTED":
+                alerts.append(line)
+                continue
+            x.phase, x.plan["sell_cid"] = "selling", o.client_id
+            report.append(line)
+            _refresh(bot, x)
+        elif x.phase == "selling":
+            sold_o = by_cid.get(str(x.plan.get("sell_cid", "")))
+            if sold_o is None or sold_o.status in ("SENT", "UNKNOWN"):
+                continue
+            if sold_o.filled_qty <= 0:
+                x.phase = ""
+                report.append(f"{x.pid}: 매도 미체결 — 오늘 밤 다시")
+                continue
+            if x.kind == "harvest":
+                sym, n = x.symbol, math.floor(sold_o.filled_qty)
+            else:
+                sym = DIV
+                net = min(sold_o.filled_usd - sold_o.commission, m3.cash_usd)
+                n = math.floor(net / (limit_price(day.prices[DIV], "BUY") * (1 + day.fee)))
+            if n < 1:
+                x.status, x.phase = "done", "done"
+                _refresh(bot, x)
+                continue
+            o2, line = _m3_send(
+                day, trader, m3, "BUY", n, limit_price(day.prices[sym], "BUY"), f"{x.kind}_buy", sym
+            )
+            if o2.status == "REJECTED":
+                alerts.append(line)
+                continue
+            x.phase, x.plan["buy_cid"] = "buying", o2.client_id
+            report.append(line)
+            _refresh(bot, x)
+        elif x.phase == "buying":
+            got_o = by_cid.get(str(x.plan.get("buy_cid", "")))
+            if got_o is None or got_o.status in ("SENT", "UNKNOWN"):
+                continue
+            if got_o.filled_qty > 0:
+                x.status, x.phase = "done", "done"
+                report.append(f"{x.pid}: 끝 — {got_o.symbol} {got_o.filled_qty:g}주 되삼")
+                _refresh(bot, x)
+            else:
+                x.phase = "selling"  # 판 것은 체결됐으니 다음 실행에서 다시 산다
+    _put(m3, props)
+    return alerts, report
 
 
 # ---------------------------------------------------------------- 신호
@@ -699,6 +1312,10 @@ def fx(telegram: bool = True) -> int:
         return 2
     _m3_ask_today(now.strftime("%Y-%m-%d"), telegram)
     _m3_poll(now.strftime("%Y-%m-%d"), telegram, reply=True)
+    try:
+        _glide_morning(now, telegram)
+    except (AutoTradingError, TossApiError) as exc:
+        print(f"Glide 제안 확인 실패: {exc}")
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
@@ -922,7 +1539,7 @@ def run(telegram: bool = True) -> int:
             lines = head + ([SUB + qline] if qline else []) + ["", RULE] + lines
         if M3_ENABLED:
             _m3_poll(today, telegram)
-            m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted)
+            m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted, telegram=telegram)
             if m3_lines:
                 lines = [*m3_lines, *(["", RULE] if lines else []), *lines]
     except (AutoTradingError, TossApiError) as exc:
@@ -967,10 +1584,10 @@ def m3_only(telegram: bool = True) -> int:
         now -= timedelta(days=1)
     today = now.strftime("%Y-%m-%d")
     if not M3_ENABLED or now.weekday() >= 5 or not due(_load_m3(), today):
-        print("M3: 할 일 없음")
+        print("Glide: 할 일 없음")
         return 0
     if not any(o.date == today for o in _load_m3().orders):
-        print("M3: 오늘 21:00 실행 전 — 재시도만 한다")
+        print("Glide: 오늘 21:00 실행 전 — 재시도만 한다")
         return 0
     _m3_poll(today, telegram)
     trader = _trader()
@@ -981,15 +1598,16 @@ def m3_only(telegram: bool = True) -> int:
             trader,
             enabled=trader.credentials.trading_enabled,
             halted=halted_reason(HALT),
+            brake=False,
         )
     except (AutoTradingError, TossApiError) as exc:
-        text = f"⚠ M3 재시도 실패\n{RULE}\n{exc}"
+        text = f"⚠ Glide 재시도 실패\n{RULE}\n{exc}"
         _notify(text, telegram)
         print(text)
         return 1
     finally:
         trader.close()
-    text = "\n".join([f"📈 M3 재시도 · {today} {now:%H:%M}", RULE, *lines])
+    text = "\n".join([f"📈 Glide 재시도 · {today} {now:%H:%M}", RULE, *lines])
     _notify(text, telegram)
     print(text)
     return 0
@@ -1056,9 +1674,16 @@ def status() -> int:
     if M3_ENABLED:
         m3 = _load_m3()
         print(
-            f"M3: 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
+            f"Glide(M3): 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
             f" · 전략 현금 ${m3.cash_usd:,.2f} · TQQQ {m3.qty.get(LEV, 0):g}"
             f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {M3_MONTHLY_KRW:,.0f}원"
+        )
+        b = _brake_of(m3)
+        print(
+            f"Glide 브레이크({'켜짐' if M3_BRAKE else '꺼짐'}): 단계 {b.stage}"
+            f" · TQQQ 고점 ${b.lev_peak:.2f}"
+            f" ({b.last_day or '기록 전'}) · 보관금 ${b.reserve_usd:,.2f}"
+            f" · 누적 매도 ${b.sold_total_usd:,.2f}"
         )
     return 0
 
@@ -1120,16 +1745,15 @@ def m3_chat(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
     m3 = _load_m3()
-    if (
-        not M3_ENABLED
-        or now.weekday() >= 5
-        or not (9 <= now.hour < 21)
-        or not due(m3, today)
-        or m3.ask_month != today[:7]
-    ):
-        print("M3 대화: 할 일 없음")
+    asking = due(m3, today) and m3.ask_month == today[:7]
+    live = any(
+        x.status == "open" or x.awaiting_qty or (x.status == "accepted" and x.answered == today)
+        for x in _props(m3)
+    )
+    if not M3_ENABLED or now.weekday() >= 5 or not (9 <= now.hour < 21) or not (asking or live):
+        print("Glide 대화: 할 일 없음")
         return 0
-    _m3_poll(today, telegram, reply=True)
+    _m3_poll(today, telegram, reply=asking)
     return 0
 
 
