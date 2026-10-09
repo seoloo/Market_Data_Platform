@@ -223,18 +223,21 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         '<head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="refresh" content="60">'
-        '<link rel="icon" type="image/svg+xml" href="/assets/auto-trading.svg?v=2">'
-        '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" sizes="any">'
+        '<link rel="icon" type="image/png" href="/assets/obi.png?v=3" sizes="512x512">'
+        '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" sizes="any">'
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
         f'<div class="topbar"><a class="logo" href="{"/live" if page == "live" else "/"}">'
-        '<img src="/assets/auto-trading.svg" width="32" height="32" alt="">'
+        '<img src="/assets/obi.png?v=3" width="52" height="52" alt="">'
         "AUTO <b>TRADING</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout">{nav}<main>'
-        f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
+        '<header><div class="page-heading">'
+        '<img class="obi-mascot" src="/assets/obi.png?v=3" width="120" height="120" '
+        'alt="오비, 네온 궤도 속 우주 고양이" decoding="async">'
+        f'<div><div class="eyebrow">OBI / {escape(title)}</div>'
         f"<h1>{escape(heading)}</h1>"
-        f'<div class="mute">{subtitle}</div></div>'
+        f'<div class="mute">{subtitle}</div></div></div>'
         f'<div class="header-meta"><span class="date">{_kst(data.now_ms)} KST</span>'
         f'<div><span class="badge">읽기 전용</span>{trading_badge}</div></div></header>'
         f"{errors}{body}"

@@ -8,11 +8,13 @@ $shell = New-Object -ComObject WScript.Shell
 if (Test-Path -LiteralPath $link) {
     $old = $shell.CreateShortcut($link)
     if ($old.TargetPath -ne $exe) { throw "같은 이름의 다른 바로 가기가 있어 건드리지 않습니다: $link" }
+    & (Join-Path $PSScriptRoot 'style_dashboard_shortcut.ps1') -ShortcutPath $link
+    exit
 }
 $lnk = $shell.CreateShortcut($link)
 $lnk.TargetPath = $exe
 $lnk.WorkingDirectory = $repo
-$lnk.IconLocation = $exe + ',0'
+$lnk.IconLocation = (Join-Path $repo 'src\auto_trading\ui\assets\obi.ico') + ',0'
 $lnk.Description = 'Auto Trading - 실거래 홈 (읽기 전용, 주문 없음)'
 $lnk.Save()
 "shortcut: $link"

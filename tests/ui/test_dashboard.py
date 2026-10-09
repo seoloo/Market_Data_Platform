@@ -566,9 +566,11 @@ class TestRender:
     def test_brand_and_favicon_present_on_all_pages(self, root: Path) -> None:
         for page, _, _ in PAGES:
             html = render_page(load_dashboard(root, P0 + 11 * D), page)
-            assert 'src="/assets/auto-trading.svg"' in html
-            assert 'rel="icon" type="image/svg+xml"' in html
-            assert 'href="/favicon.ico?v=2"' in html
+            assert 'src="/assets/obi.png?v=3"' in html
+            assert 'rel="icon" type="image/png"' in html
+            assert 'href="/favicon.ico?v=3"' in html
+            assert "오비, 네온 궤도 속 우주 고양이" in html
+            assert "AUTO <b>TRADING</b>" in html
 
     @pytest.mark.parametrize("page", [key for key, _, _ in PAGES])
     @pytest.mark.parametrize("theme", ["light", "dark"])
@@ -667,6 +669,7 @@ class TestServer:
             ("/favicon.ico", "image/x-icon"),
             ("/assets/auto-trading.ico", "image/x-icon"),
             ("/assets/auto-trading.svg?v=2", "image/svg+xml"),
+            ("/assets/obi.png?v=3", "image/png"),
         ],
     )
     def test_brand_assets_do_not_load_account_data(
@@ -685,7 +688,12 @@ class TestServer:
             assert response.headers["X-Content-Type-Options"] == "nosniff"
             assert "default-src 'none'" in response.headers["Content-Security-Policy"]
             body = response.read()
-            assert body.startswith(b"<svg") if "svg" in mime else body[:4] == b"\x00\x00\x01\x00"
+            signature = {
+                "image/svg+xml": b"<svg",
+                "image/png": b"\x89PNG\r\n\x1a\n",
+                "image/x-icon": b"\x00\x00\x01\x00",
+            }[mime]
+            assert body.startswith(signature)
 
     @pytest.mark.parametrize(
         "path",

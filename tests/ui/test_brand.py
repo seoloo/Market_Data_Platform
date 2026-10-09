@@ -1,4 +1,4 @@
-"""아이콘은 외부 의존성 없는 SVG 원본과 다중 해상도 ICO를 함께 배포한다."""
+"""승인 오비 PNG·다중 해상도 ICO와 호환 SVG를 로컬 배포한다."""
 
 from __future__ import annotations
 
@@ -6,6 +6,14 @@ import struct
 from xml.etree import ElementTree
 
 from auto_trading.ui.render import ASSET_DIR
+
+
+def test_obi_png_is_square_and_local() -> None:
+    for name, size in (("obi-original.png", 1254), ("obi.png", 512)):
+        body = (ASSET_DIR / name).read_bytes()
+        assert body[:8] == b"\x89PNG\r\n\x1a\n"
+        assert struct.unpack_from(">II", body, 16) == (size, size)
+    assert (ASSET_DIR / "obi.ico").read_bytes() == (ASSET_DIR / "auto-trading.ico").read_bytes()
 
 
 def test_svg_is_a_self_contained_vector() -> None:

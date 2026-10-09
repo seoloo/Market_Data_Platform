@@ -37,6 +37,7 @@ _ASSETS = {
     "/favicon.ico": ("auto-trading.ico", "image/x-icon"),
     "/assets/auto-trading.ico": ("auto-trading.ico", "image/x-icon"),
     "/assets/auto-trading.svg": ("auto-trading.svg", "image/svg+xml"),
+    "/assets/obi.png": ("obi.png", "image/png"),
 }
 _HEADERS = {
     "Cache-Control": "no-store",

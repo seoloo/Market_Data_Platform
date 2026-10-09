@@ -7,14 +7,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $uiRepo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $uiExpectedTarget = Join-Path $uiRepo 'scripts\restart_dashboard.cmd'
-$uiIcon = Join-Path $uiRepo 'src\auto_trading\ui\assets\auto-trading.ico'
+$uiAppTarget = Join-Path $uiRepo 'dist\AutoTrading.exe'
+$uiIcon = Join-Path $uiRepo 'src\auto_trading\ui\assets\obi.ico'
 $uiResolvedLink = [IO.Path]::GetFullPath($ShortcutPath)
 if (-not (Test-Path -LiteralPath $uiResolvedLink -PathType Leaf)) { throw '바로가기가 없습니다.' }
 if ([IO.Path]::GetExtension($uiResolvedLink) -ne '.lnk') { throw '.lnk 파일만 허용합니다.' }
 if (-not (Test-Path -LiteralPath $uiIcon -PathType Leaf)) { throw '아이콘 파일이 없습니다.' }
 $uiShell = New-Object -ComObject WScript.Shell
 $uiLink = $uiShell.CreateShortcut($uiResolvedLink)
-if ($uiLink.TargetPath -ne $uiExpectedTarget) { throw '기존 실행 대상이 달라 수정하지 않습니다.' }
+if ($uiLink.TargetPath -notin @($uiExpectedTarget, $uiAppTarget)) { throw '기존 실행 대상이 달라 수정하지 않습니다.' }
 $uiBefore = @($uiLink.TargetPath, $uiLink.Arguments, $uiLink.WorkingDirectory, $uiLink.WindowStyle)
 if ($PSCmdlet.ShouldProcess($uiResolvedLink, '아이콘과 설명만 변경 (원본 백업)')) {
     $uiBackupDir = Join-Path $uiRepo 'reports\ui\shortcut-backups'
@@ -23,7 +24,7 @@ if ($PSCmdlet.ShouldProcess($uiResolvedLink, '아이콘과 설명만 변경 (원
     Copy-Item -LiteralPath $uiResolvedLink -Destination $uiBackup
     try {
         $uiLink.IconLocation = $uiIcon + ',0'
-        $uiLink.Description = 'Auto Trading · 운영 대시보드 다시 켜기 (매매 설정 변경 없음)'
+        $uiLink.Description = 'Auto Trading · 오비 우주 대시보드 (매매 설정 변경 없음)'
         $uiLink.Save()
         $uiAfterLink = $uiShell.CreateShortcut($uiResolvedLink)
         $uiAfter = @($uiAfterLink.TargetPath, $uiAfterLink.Arguments, $uiAfterLink.WorkingDirectory, $uiAfterLink.WindowStyle)

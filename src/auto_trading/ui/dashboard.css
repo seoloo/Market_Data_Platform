@@ -220,3 +220,81 @@ html[data-page=live] .tabs a.on{background:var(--info-bg)}
 @media(max-width:850px){.live-overview,.live-grid{grid-template-columns:1fr}.live-workspace .live-allocation{display:grid;grid-template-columns:150px minmax(0,1fr);gap:0 24px;align-items:center}.live-allocation>h2,.live-allocation>.live-small{grid-column:1/-1}.live-allocation>.live-donut{grid-row:2/span 3;width:130px;height:130px;margin:0 auto}.live-kpis strong{font-size:23px}.live-kpis strong .pos,.live-kpis strong .neg{font-size:18px}.live-guide-grid{grid-template-columns:1fr;gap:14px}.live-guide-grid p{margin-top:6px}}
 @media(max-width:600px){html[data-page=live] .topbar{gap:12px;flex-wrap:wrap;padding:14px 16px}html[data-page=live] .tabs{order:3;width:100%;gap:2px;overflow-x:auto}html[data-page=live] .tabs a{font-size:12px;padding:9px 11px}html[data-page=live] .theme{margin-left:auto}html[data-page=live] header{padding:24px 0 20px}html[data-page=live] h1{font-size:28px}.live-workspace .panel{border-radius:16px;padding:20px}.live-workspace .live-hero{padding:24px 20px}.live-total{font-size:37px}.live-total>span{font-size:18px}.live-kpis{grid-template-columns:1fr;gap:14px}.live-kpis>div{display:grid;grid-template-columns:1fr 1.2fr;gap:0 10px;align-items:center}.live-kpis strong{font-size:21px;margin:0;text-align:right}.live-kpis>div>small{grid-column:1/-1}.live-kpis strong .pos,.live-kpis strong .neg{font-size:16px}.live-book-heading{gap:10px;flex-wrap:wrap}.live-book-heading>.live-state{margin-left:56px}.live-book-value{flex-wrap:wrap}.live-book-change{text-align:left}.live-book-value strong{font-size:26px}.live-guide summary{padding:12px 15px;gap:8px}.live-guide summary b{display:block;margin:0}.live-guide-grid{padding:18px}.live-workspace .live-allocation{grid-template-columns:110px minmax(0,1fr);gap:0 10px}.live-allocation>.live-donut{width:105px;height:105px}.live-donut strong{font-size:27px}.live-allocation-item{font-size:11px}.live-timeline li{grid-template-columns:85px minmax(0,1fr)}.live-workspace .live-book{border-top-left-radius:0;border-bottom-left-radius:0}}
 @media(prefers-reduced-motion:reduce){.live-guide .live-chevron{transition:none}}
+
+/* 오비 우주 테마: 금액·상태 의미를 유지하는 정적 배경. 외부 자원/애니메이션 없음. */
+:root{
+--bg:#f2f4ff;--bg2:#e9edf9;--panel:#ffffff;--panel2:#f5f8ff;
+--line:#dce3f4;--line2:#bdcce5;--text:#192540;--mute:#52617d;--mute2:#586887;
+--accent:#15647c;--brand:#15647c;--info-bg:#e5f5f9;
+--radius:18px;--shadow:0 8px 28px rgba(50,65,120,.055);
+--nebula-a:rgba(124,99,235,.12);--nebula-b:rgba(22,192,202,.10);
+--star:rgba(74,106,153,.16)}
+html[data-theme=dark]{
+--bg:#080f23;--bg2:#151f3d;--panel:#101b32;--panel2:#14223d;
+--line:#28395b;--line2:#435c81;--text:#edf5ff;--mute:#b6c4dc;--mute2:#a4b6d1;
+--accent:#69efe0;--brand:#69efe0;--info-bg:#143447;
+--ok:#72e6bb;--warn:#f4cd87;--bad:#ff9ba9;
+--shadow:0 12px 32px rgba(0,0,0,.18);
+--nebula-a:rgba(112,68,210,.17);--nebula-b:rgba(15,180,198,.09);
+--star:rgba(148,183,225,.28)}
+body,html[data-page=live] body{
+background:
+radial-gradient(ellipse at 9% 2%,var(--nebula-a),transparent 48%),
+radial-gradient(ellipse at 97% 15%,var(--nebula-b),transparent 42%),
+var(--bg)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+background-image:radial-gradient(circle,var(--star) .8px,transparent 1px),
+radial-gradient(circle,var(--star) .65px,transparent 1px);
+background-size:147px 137px,233px 211px;background-position:19px 27px,81px 113px}
+.layout,.topbar{position:relative}
+.grid2>div,.grid2>aside{min-width:0}
+.topbar,html[data-page=live] .topbar{gap:32px;min-height:86px;background:var(--panel);
+border-bottom:1px solid var(--line);box-shadow:0 4px 28px rgba(42,80,125,.035)}
+.logo{gap:4px;font-size:15px;letter-spacing:.05em}
+.logo img{width:52px;height:52px;object-fit:contain;border-radius:16px;margin-right:9px;
+border:1px solid var(--line2);background:#000}
+.tabs{gap:8px}
+.tabs a,html[data-page=live] .tabs a{padding:9px 12px;border:1px solid transparent;border-radius:11px}
+.tabs a.on,html[data-page=live] .tabs a.on{background:var(--info-bg);border-color:var(--line);color:var(--brand)}
+.tabs a:hover{background:var(--panel2)}
+.theme{border-radius:12px}.theme a{border-radius:8px;padding:6px 11px}
+header,html[data-page=live] header{padding:28px 0;gap:20px}
+.page-heading{display:flex;align-items:center;gap:24px;min-width:0}
+.page-heading>div{min-width:0}.page-heading h1{letter-spacing:-.045em}
+.page-heading .eyebrow{color:var(--brand);letter-spacing:.14em;font-size:10px}
+.page-heading .mute{font-size:13px}
+.obi-mascot{display:block;object-fit:contain;width:120px;height:120px;flex-shrink:0;
+background:#000;border-radius:32px;border:1px solid var(--line2);
+box-shadow:0 0 0 6px var(--panel),0 12px 30px rgba(30,107,160,.12)}
+html[data-theme=dark] .obi-mascot{box-shadow:0 0 0 6px var(--panel),0 0 36px rgba(31,228,215,.13)}
+.badge{border-radius:8px;padding:4px 9px}.pills{border-radius:12px}
+.panel,.card,.savings-card,.live-workspace .panel{box-shadow:var(--shadow)}
+.panel h2,.live-workspace h2{letter-spacing:-.025em}
+.live-workspace .live-hero,.glide-hero{
+background:radial-gradient(ellipse at 100% 0%,var(--nebula-b),transparent 65%),
+linear-gradient(125deg,var(--panel),var(--panel2))}
+html[data-page=live]{--live-purple:#7a52c9;--live-teal:#117c79;--live-gold:#a76d17}
+html[data-page=live][data-theme=dark]{--live-purple:#c4acff;--live-teal:#69e2d4;--live-gold:#f0cb87}
+.live-workspace .live-book{border-top-left-radius:18px;border-bottom-left-radius:18px}
+.live-glyph,.ticker-icon,.asset-glyph{border-radius:14px}
+.live-guide-icon{background:var(--info-bg)}
+.savings-hero,html[data-theme=dark] .savings-hero{background:linear-gradient(120deg,#15244c,#173c52);
+border:1px solid #355779;box-shadow:var(--shadow)}
+.savings-hero::after{border-color:rgba(92,237,224,.075);transform:rotate(-25deg);width:400px;height:240px;top:-130px}
+.btn{background:#176b85}.btn:hover{background:#1a7894}
+@media(max-width:1100px){
+.topbar,html[data-page=live] .topbar{gap:16px}.tabs{gap:2px}
+.tabs a,html[data-page=live] .tabs a{padding:9px 10px}
+.obi-mascot{width:100px;height:100px;border-radius:26px}.page-heading{gap:20px}}
+@media(max-width:760px){
+.topbar,html[data-page=live] .topbar{padding:12px 16px;gap:12px;flex-wrap:wrap}
+.logo img{width:44px;height:44px;border-radius:13px}.logo{font-size:13px}
+.tabs,html[data-page=live] .tabs{order:3;width:100%;flex-basis:100%;gap:3px;overflow-x:auto;justify-content:space-between}
+.tabs a,html[data-page=live] .tabs a{font-size:12px;padding:8px 9px}
+header,html[data-page=live] header{flex-direction:column;align-items:stretch;padding:24px 0;gap:18px}
+.page-heading{gap:16px}.obi-mascot{width:76px;height:76px;border-radius:22px}
+.page-heading h1,html[data-page=live] .page-heading h1{font-size:26px;margin-bottom:6px}
+.page-heading .mute{font-size:12px}.header-meta{max-width:none;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.date{margin:0}.theme{margin-left:auto}.theme a{padding:5px 8px}
+.live-workspace .live-book{border-top-left-radius:16px;border-bottom-left-radius:16px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
