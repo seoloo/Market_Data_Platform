@@ -135,7 +135,12 @@ def kr_section(root: Path) -> dict[str, Any] | None:
     return {"market": "국장", "date": reps[-1]["date"], "history": len(reps) - 1, "new": items}
 
 
-LIST_NAME = {"주도주": "가격 주도주", "가격": "가격 주도주", "AI": "AI 테마 선정"}
+LIST_NAME = {
+    "주도주": "가격 주도주",
+    "가격": "가격 주도주",
+    "수급": "수급 주도주",
+    "AI": "AI 테마 선정",
+}
 TRI_ICON = {"돌파": "🚀", "형성 중": "📐", "아님": "▫️"}
 
 
