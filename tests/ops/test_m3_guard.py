@@ -14,7 +14,10 @@ from auto_trading.ops.m3_guard import (
     harvest_message,
     lev_cap,
     monthly_dividend_krw,
+    parse_callback,
     parse_reply,
+    press,
+    proposal_buttons,
     rebought,
     rebuy_due,
     record_close,
@@ -22,6 +25,7 @@ from auto_trading.ops.m3_guard import (
     shift_plan,
     sold,
     step_due,
+    typed,
 )
 
 
@@ -123,10 +127,33 @@ def test_reminders_expiry_and_harvest_deadline() -> None:
     d = Proposal("p", "div_step", "2026-10-01", "2026-12-31", "TQQQ", 4)
     assert not remind_due(d, "2026-10-07") and remind_due(d, "2026-10-08")
     h = Proposal("h", "harvest", "2026-12-14", "2026-12-29", "TQQQ", 2)
-    assert remind_due(h, "2026-12-15") and not remind_due(h, "2026-12-30")
+    assert not remind_due(h, "2026-12-15") and remind_due(h, "2026-12-27")  # 마감 2 일 전 한 번
+    h.reminded = "2026-12-27"
+    assert not remind_due(h, "2026-12-28") and not remind_due(h, "2026-12-30")
     assert expire(h, "2026-12-30") and h.status == "expired"
     assert harvest_deadline(2026) == "2026-12-28"
     msg = harvest_message(
         year=2026, room_krw=680_000, picks=[("TQQQ", 3, 650_000)], deadline="2026-12-29"
     )
     assert "공제 남은 680,000원" in msg and "TQQQ 3주" in msg and "2026-12-29 밤" in msg
+
+
+def test_buttons_direct_input_then_number_and_cancel_button() -> None:
+    p = Proposal("h26", "harvest", "2026-12-01", "2026-12-28", "TQQQ", 3)
+    row = proposal_buttons(p)[0]
+    assert [b["text"] for b in row] == ["전부 진행", "직접입력", "이번엔 안 함"]
+    assert parse_callback(row[1]["callback_data"]) == ("h26", "input")
+    assert parse_callback("h26:hack") is None
+    text, buttons = press(p, "input", "2026-12-10", "10:00")
+    assert "몇 주 팔까요" in text and "최대 3주" in text and buttons is None and p.awaiting_qty
+    text, buttons = typed(p, "2", "2026-12-10", "10:01")  # 숫자만
+    assert p.status == "accepted" and p.qty == 2 and "TQQQ 2주" in text
+    assert buttons and buttons[0][0]["callback_data"] == "h26:cancel"
+    text, buttons = press(p, "cancel", "2026-12-10", "20:30")
+    assert "취소했어요" in text and p.status == "open" and buttons is None
+    # 직접입력 대기가 아니면 숫자만은 못 알아듣는다
+    assert "이해하지 못했어요" in typed(p, "2", "2026-12-11", "09:00")[0]
+    text, _ = press(p, "all", "2026-12-11", "09:00")
+    assert p.qty == 3 and "TQQQ 3주" in text
+    q = Proposal("h27", "harvest", "2026-12-01", "2026-12-28", "TQQQ", 3)
+    assert "올해는 공제 실현을 하지 않겠습니다" in press(q, "no", "2026-12-02", "09:00")[0]

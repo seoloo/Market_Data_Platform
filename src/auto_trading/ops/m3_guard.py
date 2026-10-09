@@ -32,6 +32,8 @@ STEP_CUT = 0.10
 CANCEL_UNTIL = "20:50"
 """답한 날 이 시각(KST)까지 '취소' 를 받는다. 21:00 실행이 주문을 낸다."""
 REMIND_DAYS = 7
+HARVEST_REMIND_BEFORE = 2
+"""공제 실현은 답이 없을 때 마감 이 날수 전에 한 번만 다시 알린다."""
 
 
 # ------------------------------------------------------------------ 브레이크
@@ -202,6 +204,8 @@ class Proposal:
     answered: str = ""
     """답한 날 (KST)."""
     reminded: str = ""
+    awaiting_qty: bool = False
+    """[직접입력] 을 누른 뒤 주수를 기다리는 중."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -216,13 +220,16 @@ _NO = ("아니", "아뇨", "노", "안해", "안 해", "하지마", "no", "그�
 _ALL = ("다팔", "전부", "전량", "모두", "다 팔")
 
 
-def parse_reply(text: str) -> tuple[str, int | None] | None:
-    """답 → (yes · no · cancel · all · qty, 주수). 애매하면 None (실행하지 않고 되묻는다)."""
+def parse_reply(text: str, *, awaiting_qty: bool = False) -> tuple[str, int | None] | None:
+    """답 → (yes · no · cancel · all · qty, 주수). 애매하면 None (실행하지 않고 되묻는다).
+
+    ``awaiting_qty`` (직접입력 뒤)면 숫자만 보내도('2') 주수로 읽는다.
+    """
     t = text.strip().lower()
     compact = t.replace(" ", "")
     if "취소" in compact:
         return ("cancel", None)
-    m = re.search(r"(\d+)\s*주", t)
+    m = re.search(r"(\d+)\s*주", t) or (re.fullmatch(r"(\d+)", compact) if awaiting_qty else None)
     if m:
         n = int(m.group(1))
         return ("qty", n) if n > 0 else ("no", None)
@@ -302,12 +309,14 @@ def _ack_no(p: Proposal) -> str:
 
 
 def remind_due(p: Proposal, today: str) -> bool:
-    """열린 제안의 다시 묻기: 배당 단계는 7 일마다, 공제 실현은 매일(마감까지)."""
+    """열린 제안의 다시 묻기: 배당 단계는 7 일마다, 공제 실현은 마감 2 일 전 한 번만."""
     if p.status != "open" or today > p.deadline:
         return False
+    if p.kind == "harvest":
+        last_call = date.fromisoformat(p.deadline) - timedelta(days=HARVEST_REMIND_BEFORE)
+        return not p.reminded and today >= last_call.isoformat()
     last = p.reminded or p.created
-    gap = (date.fromisoformat(today) - date.fromisoformat(last)).days
-    return gap >= (REMIND_DAYS if p.kind == "div_step" else 1)
+    return (date.fromisoformat(today) - date.fromisoformat(last)).days >= REMIND_DAYS
 
 
 def expire(p: Proposal, today: str) -> bool:
@@ -386,8 +395,72 @@ def harvest_message(
     lines += [
         "",
         f"진행할까요? {deadline} 밤 주문까지 답을 받아요.",
-        sub('"네" · "아니요" · "2주만" 처럼 답해 주세요'),
-        sub(f'답하신 날 {CANCEL_UNTIL} 전까지는 "취소"로 되돌릴 수 있어요'),
-        sub("답이 없으면 매일 아침 한 번 더 여쭤요"),
+        sub('아래 버튼을 눌러 주세요 (글로 "2주만" 이라고 보내셔도 돼요)'),
+        sub(f"답하신 날 {CANCEL_UNTIL} 전까지는 [취소] 로 되돌릴 수 있어요"),
+        sub(f"답이 없으면 마감 {HARVEST_REMIND_BEFORE}일 전에 한 번만 더 알려 드려요"),
     ]
     return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ 버튼
+
+ACTIONS = ("all", "input", "no", "cancel")
+Buttons = list[list[dict[str, str]]]
+
+
+def proposal_buttons(p: Proposal) -> Buttons:
+    """텔레그램 인라인 버튼: [전부 진행] [직접입력] [이번엔 안 함]."""
+    return [
+        [
+            {"text": "전부 진행", "callback_data": f"{p.pid}:all"},
+            {"text": "직접입력", "callback_data": f"{p.pid}:input"},
+            {"text": "이번엔 안 함", "callback_data": f"{p.pid}:no"},
+        ]
+    ]
+
+
+def cancel_buttons(p: Proposal) -> Buttons:
+    return [[{"text": "취소", "callback_data": f"{p.pid}:cancel"}]]
+
+
+def parse_callback(data: str) -> tuple[str, str] | None:
+    """'pid:action' → (pid, action). 모르는 값이면 None."""
+    pid, _, action = data.rpartition(":")
+    return (pid, action) if pid and action in ACTIONS else None
+
+
+def ask_qty_message(p: Proposal) -> str:
+    """[직접입력] 을 누르면 다시 보내는 알림 — 입력칸이 바로 열리게(ForceReply) 보낸다."""
+    title = "공제 실현" if p.kind == "harvest" else "배당 단계"
+    return "\n".join(
+        [
+            f"✏️ {title} · 직접 입력",
+            RULE,
+            f"{p.symbol}를 몇 주 팔까요? 숫자만 입력해 주세요 (최대 {p.max_qty}주).",
+            sub("예: 2"),
+            sub('그만두려면 "취소"'),
+        ]
+    )
+
+
+def _with_cancel(p: Proposal, text: str, hhmm: str) -> tuple[str, Buttons | None]:
+    show = p.status == "accepted" and hhmm < CANCEL_UNTIL
+    return text, cancel_buttons(p) if show else None
+
+
+def press(p: Proposal, action: str, today: str, hhmm: str) -> tuple[str, Buttons | None]:
+    """버튼 → (봇 답장, 답장에 붙일 버튼). [직접입력] 은 주수를 묻고 기다린다 (순수)."""
+    if action == "input" and p.status in ("open", "accepted"):
+        p.awaiting_qty = True
+        return ask_qty_message(p), None
+    p.awaiting_qty = False
+    kind = "all" if action == "input" else action
+    return _with_cancel(p, answer(p, (kind, None), today, hhmm), hhmm)
+
+
+def typed(p: Proposal, text: str, today: str, hhmm: str) -> tuple[str, Buttons | None]:
+    """글 답 → (봇 답장, 버튼). 직접입력 대기 중이면 숫자만 보내도 된다 (순수)."""
+    reply = parse_reply(text, awaiting_qty=p.awaiting_qty)
+    if reply is not None:
+        p.awaiting_qty = False
+    return _with_cancel(p, answer(p, reply, today, hhmm), hhmm)
