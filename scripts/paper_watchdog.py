@@ -333,10 +333,15 @@ def main() -> int:
     (OUT / f"{date}.txt").write_text(text + "\n", encoding="utf-8", newline="\n")
     OutboxNotifier(OUT / "outbox.log").send(text)
 
-    if creds is not None and not args.no_send:
+    critical = [f for f in findings if f.level == "CRITICAL"]
+    if creds is not None and not args.no_send and critical:
+        # 2026-10-09 사용자: Paper 일일 보고는 텔레그램으로 보내지 않는다
+        # (대시보드 · 에이전트로 확인).
+        # 심각(CRITICAL)한 문제만 짧게 알린다.
         telegram = TelegramNotifier(creds)
         try:
-            telegram.send(text)
+            lines = [f"[{f.ledger}] {f.message}" for f in critical]
+            telegram.send(chr(10).join(["⚠ 일일 점검 — 심각한 문제", *lines]))
         except NotifyError as exc:
             note = f"텔레그램 전송 실패 — 로컬 기록만 남음: {exc}"
             OutboxNotifier(OUT / "outbox.log").send(note)
