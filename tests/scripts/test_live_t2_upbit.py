@@ -91,8 +91,8 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Any, FakeUpbit
     monkeypatch.setattr(mod, "HALT", tmp_path / "HALT")
     monkeypatch.setattr(mod, "_client", lambda: fake)
     monkeypatch.setattr(mod, "_notify", sent.append)
-    monkeypatch.setattr(mod.time, "sleep", lambda s: None)
-    monkeypatch.setattr(mod.time, "time", lambda: 300 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.live_t2_upbit.time.sleep", lambda s: None)
+    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 300 * DAY / 1000 + 3600)
     return mod, fake, sent
 
 
@@ -124,7 +124,7 @@ def test_deposit_detected_without_nav_jump(
     m, fake, sent = env
     m.main(["run"])
     fake.krw += Decimal(300_000)  # 다음 달 입금
-    monkeypatch.setattr(m.time, "time", lambda: 301 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
     m.main(["run"])
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     assert Decimal(st["last_nav"]) == pytest.approx(Decimal(1000), rel=Decimal("0.01"))
