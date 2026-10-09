@@ -83,6 +83,9 @@ LOOKBACK_DAYS = 150
 """EW-3e 시작 창 120 일 + 여유 (문서 58)."""
 H4 = Timeframe.H4.ms
 TAG = "[데모·선물 BTC 5x] 연구 56 Elliott+피보 2·4파 되돌림"
+NO_SETUP_ALERTS = False
+"""4h 꼭짓점 '진입 안 함' 알림. 2026-10-09 사용자 "4시간 단위 말고 1시간 단위로" → 끔.
+보조 지표 알림은 ``scripts/ew_indicator_1h.py`` 가 보낸다. 데모 예약 · 체결 · 청산 알림은 그대로."""
 
 
 def _fmt(x: Decimal | float) -> str:
@@ -130,13 +133,13 @@ ScanRow = tuple[int, EwSetup | None, int, dict[str, Any]]
 """(발동 시각, 셋업, 시나리오 수, 알림용 정보 — 꼭짓점 종류·가격·상위 10 합의 수)."""
 
 
-def scan(minutes: list[Candle]) -> list[ScanRow]:
-    """마지막 연속 구간의 모든 발동."""
+def scan(minutes: list[Candle], threshold: Decimal = EW0_THRESHOLD_PCT) -> list[ScanRow]:
+    """마지막 연속 구간의 모든 발동. ``threshold`` 는 꼭짓점 반전 크기(기본 2%)."""
     four = _aggregate(iter(minutes), H4)
     hours = _aggregate(iter(minutes), Timeframe.H1.ms)
     chunk = _chunks(four)[-1]
     (replay,) = replay_minute_groups_ladder(
-        chunk, _groups(iter(minutes), chunk), chunk[-1].close_ms, (EW0_THRESHOLD_PCT,)
+        chunk, _groups(iter(minutes), chunk), chunk[-1].close_ms, (threshold,)
     )
     ch_hours = [h for h in hours if chunk[0].open_ms <= h.open_ms <= chunk[-1].close_ms]
     triggers = causal_triggers(replay, ch_hours, chunk, all_new_pivots=True)  # EW-3e
@@ -193,7 +196,7 @@ def view_lines(info: dict[str, Any]) -> list[str]:
 
 
 def no_setup_message(
-    info: dict[str, Any], tag: str = "🌊 [데모·선물 Elliott]", *, demo: bool = True
+    info: dict[str, Any], tag: str = "🌊 [데모·선물 Elliott]", *, demo: bool = True, tf: str = "4h"
 ) -> str:
     """새 꼭짓점이 확정됐지만 들어가지 않은 이유 + 보조 지표 요약.
 
@@ -202,7 +205,7 @@ def no_setup_message(
     """
     return "\n".join(
         [
-            f"{tag} 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}",
+            f"{tag} {tf} {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}",
             RULE,
             *view_lines(info),
             *(
@@ -539,7 +542,7 @@ class EwDemoRunner:
                 setup=None if setup is None else _setup_row(setup),
                 **info,
             )
-            if setup is None and has_pattern(info):
+            if setup is None and NO_SETUP_ALERTS and has_pattern(info):
                 self.notify(no_setup_message(info))
         setups = [row[1] for row in new if row[1] is not None]
         if not setups:

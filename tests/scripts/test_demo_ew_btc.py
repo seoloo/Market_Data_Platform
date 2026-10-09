@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from scripts.demo_ew_btc import EwDemoRunner, Store
 
 from auto_trading.exchange.futures import (
@@ -17,6 +18,7 @@ from auto_trading.exchange.futures import (
     OrderStatus,
 )
 from auto_trading.research.elliott.demo_setup import EwSetup
+from scripts import demo_ew_btc
 
 SYM = "BTCUSDC"
 
@@ -228,7 +230,10 @@ def test_single_instance_lock_blocks_a_second_holder(tmp_path: Path) -> None:
     demo_ew_btc._LOCK_HANDLE = None
 
 
-def test_new_pivot_without_setup_explains_why_not(tmp_path: Path) -> None:
+def test_new_pivot_without_setup_explains_why_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(demo_ew_btc, "NO_SETUP_ALERTS", True)
     api = FakeApi()
     r, notes = runner(tmp_path, api)
     r.on_scan([(1_000, None, 0)])  # 첫 실행: 기록만
@@ -290,7 +295,8 @@ def test_scenario_view_reads_big_trend() -> None:
     assert scenario_view({"scenarios": []}, {})["top"] == 0
 
 
-def test_no_alert_when_no_entry_pattern(tmp_path: Path) -> None:
+def test_no_alert_when_no_entry_pattern(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(demo_ew_btc, "NO_SETUP_ALERTS", True)
     api = FakeApi()
     r, notes = runner(tmp_path, api)
     r.on_scan([(1_000, None, 0)])
