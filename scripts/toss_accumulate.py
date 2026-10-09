@@ -554,18 +554,20 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
 
     ``reply`` 면 이번 달(매수 당일) 금액이 정해질 때 오늘 밤 계획을 바로 답장한다 (21:00 전)."""
     from auto_trading.notify.channels import NotifyError
-    from auto_trading.notify.inbox import TelegramInbox, parse_krw
+    from auto_trading.notify.inbox import InboxQueue, TelegramInbox, is_command, parse_krw
 
     creds = load_telegram_credentials(REPO / ".env")
     if not M3_ENABLED or not telegram or creds is None:
         return
     m3 = _load_m3()
     try:
-        msgs, nxt = TelegramInbox(creds).fetch(m3.tg_offset)
+        # '현황' 같은 명령은 봇(scripts/telegram_bot.py) 몫으로 남기고 나머지만 가져온다
+        msgs = InboxQueue(REPO / "data" / "telegram" / "inbox.json", m3.tg_offset).take(
+            TelegramInbox(creds), lambda m: not is_command(m)
+        )
     except NotifyError as exc:
         print(f"텔레그램 받기 실패: {exc}")
         return
-    m3.tg_offset = nxt
     planned = False
     bot = _bot()
     hhmm = _kst_now().strftime("%H:%M")

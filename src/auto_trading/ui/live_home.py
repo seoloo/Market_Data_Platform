@@ -615,3 +615,55 @@ def live_page(data: DashboardData) -> str:
     coins, tickers = needed(data.root)
     q = quote_source(coins, tickers)
     return render_live(build_books(data.root, q), q, data.now_ms)
+
+
+# ---------------------------------------------------------------- 텔레그램 '현황' 답
+
+
+_ICON = {"glide": "📈", "cruise": "🛫", "accumulate": "💰"}
+
+
+def _pl_text(value: float, base: float) -> str:
+    diff = value - base
+    mark = "🔺" if diff > 0 else "🔻" if diff < 0 else "▫️"
+    pct = f" ({diff / base:+.2%})" if base > 0 else ""
+    return f"{mark} {diff:+,.0f}원{pct}"
+
+
+def summary_text(books: list[Book], q: Quotes, now_ms: int) -> str:
+    """실거래 홈을 휴대폰 한 통으로 (순수). 텔레그램 '현황' 명령의 답."""
+    from auto_trading.notify.style import RULE, sub
+
+    now = (datetime.fromtimestamp(now_ms / 1000, UTC) + _KST).strftime("%m/%d %H:%M")
+    if not books:
+        return f"📊 [실거래 현황] {now}\n실거래 장부가 없어요"
+    dep = sum(b.deposits_krw for b in books)
+    val = sum(b.value_krw for b in books)
+    lines = [
+        f"📊 [실거래 현황] {now}",
+        f"💼 총 입금 {dep:,.0f}원 → 평가 {val:,.0f}원",
+        sub(f"손익 {_pl_text(val, dep)}"),
+    ]
+    for b in books:
+        lines += [
+            "",
+            RULE,
+            f"{_ICON.get(b.key, '■')} {b.title} · {b.venue.split(' · ')[0]}",
+            f"{b.deposits_krw:,.0f}원 → {b.value_krw:,.0f}원"
+            f" · {_pl_text(b.value_krw, b.deposits_krw)}",
+        ]
+        for h in b.holdings:
+            trend = h.note[:1] + " " if h.note[:1] in ("🟢", "🔴") else ""
+            qty = f"{h.qty:g}주 " if b.key != "cruise" else ""
+            if h.value_krw is None:
+                lines.append(sub(f"{trend}{h.name} {qty}원가 {h.cost_krw:,.0f}원 (시세 없음)"))
+            else:
+                pct = f"{h.value_krw / h.cost_krw - 1:+.1%}" if h.cost_krw > 0 else "—"
+                lines.append(sub(f"{trend}{h.name} {qty}{h.value_krw:,.0f}원 · {pct}"))
+        if b.cash_krw:
+            lines.append(sub(f"현금 {b.cash_krw:,.0f}원"))
+        lines += [sub(f"⏳ {p}") for p in b.pending]
+    fx = f"원/달러 {q.fx:,.1f}" if q.fx else "환율 없음"
+    lines += ["", RULE, f"공개 시세 · {fx} · 세금 전"]
+    lines += [f"⚠ {e}" for e in q.errors]
+    return "\n".join(lines)

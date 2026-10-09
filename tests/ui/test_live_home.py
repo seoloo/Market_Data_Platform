@@ -282,3 +282,55 @@ def test_read_only_cost_display_matches_existing_ledger_for_partial_sales() -> N
         assert live_home._stored_coin_costs(orders[:end]) == {
             coin: record.cost for coin, record in expected.items()
         }
+
+
+def test_summary_text_for_phone(tmp_path: Path) -> None:
+    from auto_trading.ui.live_home import summary_text
+
+    _seed(tmp_path)
+    text = summary_text(build_books(tmp_path, _Q), _Q, _NOW)
+    assert text.startswith("📊 [실거래 현황] 10/09 22:00")
+    assert "📈 Glide · 토스" in text and "🛫 Cruise · 업비트" in text
+    assert "🟢 BTC" in text and "⏳ SCHD 3주" in text
+    assert "원/달러 1,300.0" in text
+
+
+def test_telegram_bot_replies_once_and_leaves_amounts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.telegram_bot as bot_mod
+
+    from auto_trading.notify.inbox import InboxMessage
+
+    _seed(tmp_path)
+    sent: list[str] = []
+    msgs = [InboxMessage(5, 0, "현황"), InboxMessage(6, 0, "수익"), InboxMessage(7, 0, "30만")]
+
+    class FakeInbox:
+        def __init__(self, creds: object) -> None:
+            pass
+
+        def fetch(self, offset: int) -> tuple[list[InboxMessage], int]:
+            out = list(msgs)
+            msgs.clear()
+            return out, 8 if out else offset
+
+    class FakeBot:
+        def __init__(self, creds: object) -> None:
+            pass
+
+        def send(self, text: str) -> None:
+            sent.append(text)
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(bot_mod, "load_telegram_credentials", lambda path: object())
+    monkeypatch.setattr(bot_mod, "TelegramInbox", FakeInbox)
+    monkeypatch.setattr(bot_mod, "TelegramNotifier", FakeBot)
+    monkeypatch.setattr(bot_mod, "fetch_quotes", lambda coins, tickers: _Q)
+    assert bot_mod.run(tmp_path) == 0
+    assert len(sent) == 1 and "실거래 현황" in sent[0]
+    queue = json.loads((tmp_path / "data/telegram/inbox.json").read_text(encoding="utf-8"))
+    assert [p["msg"]["text"] for p in queue["pending"]] == ["30만"]  # Glide 몫은 남는다
+    assert bot_mod.run(tmp_path) == 0 and len(sent) == 1  # 새 명령 없으면 조용
