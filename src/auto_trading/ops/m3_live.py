@@ -150,7 +150,7 @@ def plan_message(
     ``need_all`` = 오늘 밤 모든 매수(다른 적립 포함)에 필요한 달러(지정가 기준)."""
     from auto_trading.notify.style import RULE, sub
 
-    lines = [f"📈 M3 · 오늘({today}) 밤 매수 예정", RULE]
+    lines = [f"📈 Glide · 오늘({today}) 밤 매수 예정", RULE]
     if krw > 0:
         lines.append(f"이번 달 납입 {krw:,.0f}원 ({source}) ≈ ${krw / fx_rate:,.2f}")
     else:
@@ -193,7 +193,7 @@ def ask_message(today: str, default_krw: float) -> str:
 
     return "\n".join(
         [
-            f"📈 M3 · 오늘({today}) 밤 매수 예정",
+            f"📈 Glide · 오늘({today}) 밤 매수 예정",
             RULE,
             f"{today[:4]}년 {int(today[5:7])}월, 얼마를 매수하시겠습니까?",
             sub("예시 답: 30만원  (0 = 이번 달 쉬기)"),
@@ -220,11 +220,11 @@ def cost_basis(state: M3State) -> dict[str, float]:
 
 
 def holdings_lines(state: M3State, prices: Mapping[str, float]) -> list[str]:
-    """현재 보유(M3 몫): 종목마다 주수 · 평가액 · 평균 단가 대비 % (순수)."""
+    """현재 보유(Glide 몫): 종목마다 주수 · 평가액 · 평균 단가 대비 % (순수)."""
     from auto_trading.notify.style import arrow, sub
 
     cost = cost_basis(state)
-    lines = ["📦 현재 보유 (M3 몫)"]
+    lines = ["📦 현재 보유 (Glide 몫)"]
     value_all = cost_all = 0.0
     for sym in SYMBOLS:
         q = state.qty.get(sym, 0.0)

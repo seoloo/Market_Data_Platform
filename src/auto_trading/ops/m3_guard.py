@@ -265,7 +265,7 @@ def answer(p: Proposal, reply: tuple[str, int | None] | None, today: str, hhmm: 
             )
         return (
             "취소할 주문이 없거나 이미 주문을 낸 뒤예요(21:00). "
-            "다음 M3 알림에서 결과를 알려 드릴게요."
+            "다음 Glide 알림에서 결과를 알려 드릴게요."
         )
     if p.status not in ("open", "accepted"):
         return "이 제안은 이미 끝났어요. 새 제안이 생기면 다시 여쭤볼게요."
@@ -297,7 +297,7 @@ def _ack_yes(p: Proposal, night: str, cancel: str) -> str:
             "체결을 확인한 다음 날 밤 같은 수량을 다시 사서 "
             "올해 공제를 쓰겠습니다."
         )
-    tail = "체결되면 다음 M3 알림에 결과를 적어 둘게요."
+    tail = "체결되면 다음 Glide 알림에 결과를 적어 둘게요."
     return "\n".join(x for x in (body, tail, sub(cancel) if cancel else "") if x)
 
 
@@ -364,7 +364,7 @@ def div_step_message(
 ) -> str:
     usd = sell * lev_px
     lines = [
-        f"💰 M3 · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
+        f"💰 Glide · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
         RULE,
         f"최근 12개월 SCHD 배당(세후)이 월 평균 {monthly_krw:,.0f}원이 됐어요.",
         "이제 공격 비중을 조금 줄여 배당을 키울 때예요.",
