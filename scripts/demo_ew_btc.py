@@ -83,6 +83,9 @@ LOOKBACK_DAYS = 150
 """EW-3e 시작 창 120 일 + 여유 (문서 58)."""
 H4 = Timeframe.H4.ms
 TAG = "[데모·선물 BTC 5x] 연구 56 Elliott+피보 2·4파 되돌림"
+TELEGRAM = False
+"""2026-10-09 사용자 "엘리엇 파동 기각 되었으니 알림도 그만 보내도록" → 텔레그램 끔.
+데모 자체(가짜 돈)는 그대로 돌고, 알림 사본은 ``reports/demo_ew/outbox.log`` 에만 남는다."""
 NO_SETUP_ALERTS = False
 """4h 꼭짓점 '진입 안 함' 알림. 2026-10-09 사용자 "4시간 단위 말고 1시간 단위로" → 끔.
 보조 지표 알림은 ``scripts/ew_indicator_1h.py`` 가 보낸다. 데모 예약 · 체결 · 청산 알림은 그대로."""
@@ -671,7 +674,7 @@ def main(argv: list[str]) -> int:
     )
     store = Store(OUT)
     runner = EwDemoRunner(
-        api, store, Notify(OUT, telegram=True), clock=lambda: int(time.time() * 1000)
+        api, store, Notify(OUT, telegram=TELEGRAM), clock=lambda: int(time.time() * 1000)
     )
     runner.reconcile()
     next_scan = 0
