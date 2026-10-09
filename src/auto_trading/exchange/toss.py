@@ -263,8 +263,66 @@ class TossReader:
             commission=_dec(ex.get("commission")),
         )
 
+    def fills(self, *, start: str | None = None, end: str | None = None) -> list[TossFill]:
+        """끝난 주문(CLOSED) 중 체결이 있는 것 — 앱 주문 포함, 시간외 종가 주문 제외(공식 명세).
+
+        ``start`` · ``end`` = 주문일(KST, YYYY-MM-DD). 비우면 전체 기간. 100 개씩 커서로 넘긴다."""
+        params: dict[str, Any] = {"status": "CLOSED", "limit": 100}
+        if start:
+            params["from"] = start
+        if end:
+            params["to"] = end
+        out: list[TossFill] = []
+        for _ in range(500):  # 5 만 건 안전 상한
+            data = self._get("/api/v1/orders", params, account=True) or {}
+            for o in data.get("orders") or []:
+                ex = o.get("execution") or {}
+                qty = _dec(ex.get("filledQuantity")) or Decimal(0)
+                if qty <= 0:
+                    continue
+                out.append(
+                    TossFill(
+                        order_id=str(o.get("orderId") or ""),
+                        symbol=str(o.get("symbol") or "").upper(),
+                        side=str(o.get("side") or "").upper(),
+                        currency=str(o.get("currency") or ""),
+                        qty=qty,
+                        amount=_dec(ex.get("filledAmount"))
+                        or qty * (_dec(ex.get("averageFilledPrice")) or Decimal(0)),
+                        commission=_dec(ex.get("commission")) or Decimal(0),
+                        tax=_dec(ex.get("tax")) or Decimal(0),
+                        filled_at=str(ex.get("filledAt") or o.get("orderedAt") or ""),
+                        settle_date=str(ex.get("settlementDate") or "")[:10],
+                    )
+                )
+            cursor = data.get("nextCursor")
+            if not data.get("hasNext") or not cursor:
+                break
+            params["cursor"] = cursor
+        return out
+
     def close(self) -> None:
         self.client.close()
+
+
+@dataclass(frozen=True, slots=True)
+class TossFill:
+    """체결이 있는 끝난 주문 하나 (부분 체결 뒤 취소도 체결분만)."""
+
+    order_id: str
+    symbol: str
+    side: str
+    """BUY · SELL."""
+    currency: str
+    qty: Decimal
+    amount: Decimal
+    """체결 금액 (주문 통화)."""
+    commission: Decimal
+    tax: Decimal
+    """거래소 수수료 · 세금 (SEC fee 등)."""
+    filled_at: str
+    settle_date: str
+    """결제일 YYYY-MM-DD — 양도세 연도 · 환율 기준."""
 
 
 @dataclass(slots=True)
