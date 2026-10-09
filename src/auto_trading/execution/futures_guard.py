@@ -204,6 +204,54 @@ class FuturesSupervisor:
         self._shared = shared_account
         self._orphan_capped = orphan_close == "limit"
 
+    def protection_since_ms(self, symbol: str) -> int | None:
+        event = self._events.latest_scoped(
+            self._mode,
+            ("futures.PROTECTION_STARTED", "futures.PROTECTION_FINISHED"),
+            self._manager.tag,
+            symbol,
+        )
+        return event.ts_ms if event and event.kind == "futures.PROTECTION_STARTED" else None
+
+    def start_protection_window(self, symbol: str) -> None:
+        """잠재 체결 전 영속 선기록. 실제 첫 체결 시각을 모를 때의 보수적 시작점."""
+        if self.protection_since_ms(symbol) is None:
+            self._protection_event("PROTECTION_STARTED", symbol, "info")
+
+    def finish_protection_window(self, symbol: str) -> None:
+        if self.protection_since_ms(symbol) is not None:
+            self._protection_event("PROTECTION_FINISHED", symbol, "info")
+
+    def protection_halted(self) -> bool:
+        """보호 위반은 프로세스/날짜가 바뀌어도 자동 해제하지 않는다."""
+        return (
+            self._events.latest_scoped(
+                self._mode, ("futures.PROTECTION_HALTED",), self._manager.tag
+            )
+            is not None
+        )
+
+    def halt_protection(self, symbol: str, elapsed_ms: int) -> None:
+        if not self.protection_halted():
+            self._protection_event("PROTECTION_HALTED", symbol, "critical", elapsed_ms)
+
+    def _protection_event(
+        self, kind: str, symbol: str, severity: str, elapsed_ms: int | None = None
+    ) -> None:
+        self._events.insert(
+            RiskEvent(
+                self._clock(),
+                self._mode,
+                severity,
+                f"futures.{kind}",
+                {
+                    "strategy_tag": self._manager.tag,
+                    "symbol": symbol,
+                    "elapsed_upper_ms": elapsed_ms,
+                },
+            )
+        )
+
     def recover(self, decision_ms: int, stop_price_for: StopPriceFor) -> RecoveryReport:
         report = RecoveryReport("RUNNING", [], [])
         self._manager.recover()

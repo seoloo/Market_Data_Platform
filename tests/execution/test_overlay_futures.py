@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import sqlite3
+from collections.abc import Callable
 from dataclasses import replace
 from decimal import Decimal
 
@@ -25,7 +26,7 @@ from auto_trading.execution.overlay_futures import (
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
 from auto_trading.storage.repositories.futures_orders import FuturesOrderRepository
-from auto_trading.storage.repositories.risk_events import RiskEventRepository
+from auto_trading.storage.repositories.risk_events import RiskEvent, RiskEventRepository
 
 S = "BTCUSDT"
 FILTERS = {S: FuturesFilters(Decimal("0.001"), Decimal("0.001"), Decimal(100), Decimal("0.1"))}
@@ -62,12 +63,22 @@ class SpyExchange(FakeFuturesExchange):
 
 
 class Rig:
-    def __init__(self, **fake: object) -> None:
-        self.ex = SpyExchange(
-            wallet=Decimal(1_000_000),
-            prices={S: Decimal(50_000)},
-            symbol_filters=FILTERS,
-            **fake,  # type: ignore[arg-type]
+    def __init__(
+        self,
+        *,
+        exchange: SpyExchange | None = None,
+        clock: Callable[[], int] | None = None,
+        **fake: object,
+    ) -> None:
+        self.ex = (
+            exchange
+            if exchange is not None
+            else SpyExchange(
+                wallet=Decimal(1_000_000),
+                prices={S: Decimal(50_000)},
+                symbol_filters=FILTERS,
+                **fake,  # type: ignore[arg-type]
+            )
         )
         self.conn: sqlite3.Connection = connect(":memory:")
         apply_migrations(self.conn, now_ms=1)
@@ -79,7 +90,7 @@ class Rig:
             mode="paper",
             strategy_id="o2",
             strategy_tag="o2",
-            clock=lambda: next(ticks),
+            clock=clock if clock is not None else lambda: next(ticks),
         )
         sup = FuturesSupervisor(
             self.ex,
@@ -90,11 +101,16 @@ class Rig:
             symbols=[S],
             require_stop=True,
             orphan_policy="flatten",
-            clock=lambda: 0,
+            clock=clock if clock is not None else lambda: 0,
         )
         self.halt: str | None = None
         self.x = OverlayFuturesExecutor(
-            self.ex, self.m, self.store, sup, clock=lambda: 0, halted_reason=lambda: self.halt
+            self.ex,
+            self.m,
+            self.store,
+            sup,
+            clock=clock if clock is not None else lambda: 0,
+            halted_reason=lambda: self.halt,
         )
         self.day = 0
 
@@ -372,3 +388,277 @@ def test_rebalance_orders_are_capped_limits_and_only_emergency_close_is_market()
     e.run("0.1", "40000")
     kinds = {(o.purpose, o.order_type) for o in e.store.all() if o.purpose in {"OPEN", "CLOSE"}}
     assert kinds == {("OPEN", "LIMIT"), ("CLOSE", "MARKET")}
+
+
+class TimedExchange(SpyExchange):
+    """체결/스톱 수락 뒤 응답만 늦춘다. 실제 시간/네트워크를 쓰지 않는다."""
+
+    def __init__(self, *, delay_ms: int, stop_delay_ms: int = 0, ratio: str = "1") -> None:
+        super().__init__(
+            wallet=Decimal(1_000_000),
+            prices={S: Decimal(50_000)},
+            symbol_filters=FILTERS,
+            fill_ratio=Decimal(ratio),
+        )
+        self.now_ms = 0
+        self.delay_ms = delay_ms
+        self.stop_delay_ms = stop_delay_ms
+        self.unprotected_requotes = 0
+
+    def _record(self, result: FuturesOrderResult) -> FuturesOrderResult:
+        if result.order_type.value == "LIMIT" and result.side == "BUY":
+            self.now_ms += self.delay_ms
+        elif result.order_type.value == "STOP_MARKET":
+            self.now_ms += self.stop_delay_ms
+        return super()._record(result)
+
+    def mark_price(self, symbol: str) -> Decimal:
+        if self._qty.get(symbol, Decimal(0)) > 0 and not self.open_stops(symbol):
+            self.unprotected_requotes += 1
+        return super().mark_price(symbol)
+
+
+@pytest.mark.parametrize(
+    "delay_ms,expected", [(4999, "OK"), (5000, "OK"), (5001, "HALTED"), (6000, "HALTED")]
+)
+def test_entry_reply_deadline_boundary(delay_ms: int, expected: str) -> None:
+    ex = TimedExchange(delay_ms=delay_ms)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == expected
+    assert r.position() == (Decimal("0.1") if expected == "OK" else Decimal(0))
+    if expected == "HALTED":
+        assert any("보호" in n and n.startswith("HALTED") for n in rep.legs[0].notes)
+        assert not rep.increases_allowed
+
+
+def test_stop_ack_delay_is_not_reported_ok() -> None:
+    ex = TimedExchange(delay_ms=0, stop_delay_ms=6000)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "HALTED" and r.position() == 0
+
+
+def test_partial_fill_is_protected_before_requote() -> None:
+    ex = TimedExchange(delay_ms=100, ratio="0.5")
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    r.run("0.8", "40000")
+    assert ex.unprotected_requotes == 0
+    assert r.position() == Decimal("0.7")
+    assert r.stops() == [(True, Decimal(40000), Decimal(0))]
+
+
+def test_late_unknown_fill_is_closed_without_reentry() -> None:
+    ex = TimedExchange(delay_ms=6000)
+    ex.lose_response_after_accept = 1
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "HALTED" and r.position() == 0
+    assert len([o for o in r.store.all() if o.purpose == "OPEN"]) == 1
+
+
+def test_slow_zero_fill_does_not_invent_a_position_or_market_close() -> None:
+    ex = TimedExchange(delay_ms=6000, ratio="0")
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "DEGRADED" and r.position() == 0
+    assert not [o for o in r.store.all() if o.order_type == "MARKET"]
+
+
+def test_protection_halt_survives_new_executor_and_supervisor() -> None:
+    ex = TimedExchange(delay_ms=6000)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    assert r.run("0.1", "40000").state == "HALTED"
+    before = ex.placed_count
+    supervisor = FuturesSupervisor(
+        ex,
+        r.m,
+        r.store,
+        RiskEventRepository(r.conn),
+        mode="paper",
+        symbols=[S],
+        require_stop=True,
+        orphan_policy="flatten",
+        clock=lambda: ex.now_ms,
+    )
+    runner = OverlayFuturesExecutor(
+        ex, r.m, r.store, supervisor, clock=lambda: ex.now_ms, halted_reason=lambda: None
+    )
+    rep = runner.run(
+        T0 + DAY * 2, [FuturesLegTarget(S, Decimal("0.1"), Decimal(40000))], increases_allowed=True
+    )
+    assert rep.state == "HALTED" and not rep.increases_allowed
+    assert ex.placed_count == before and r.position() == 0
+
+
+def test_unfinished_protection_window_survives_restart() -> None:
+    ex = TimedExchange(delay_ms=0)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    events = RiskEventRepository(r.conn)
+    supervisor = FuturesSupervisor(
+        ex,
+        r.m,
+        r.store,
+        events,
+        mode="paper",
+        symbols=[S],
+        require_stop=True,
+        orphan_policy="flatten",
+        clock=lambda: ex.now_ms,
+    )
+    supervisor.start_protection_window(S)
+    r.m.submit_limit(
+        decision_ms=T0,
+        symbol=S,
+        side="BUY",
+        quantity=Decimal("0.1"),
+        price=Decimal(50100),
+        purpose="OPEN",
+    )
+    ex.now_ms = 6000
+    supervisor.start_protection_window(S)
+    assert supervisor.protection_since_ms(S) == 0, "재시작이 기존 시작 시각을 지우면 안 된다"
+    runner = OverlayFuturesExecutor(
+        ex,
+        r.m,
+        r.store,
+        supervisor,
+        clock=lambda: ex.now_ms,
+        halted_reason=lambda: None,
+    )
+    rep = runner.run(
+        T0 + DAY, [FuturesLegTarget(S, Decimal("0.1"), Decimal(40000))], increases_allowed=True
+    )
+    assert rep.state == "HALTED" and r.position() == 0
+    assert supervisor.protection_since_ms(S) is None and supervisor.protection_halted()
+
+
+def test_existing_close_position_stop_covers_slow_increase() -> None:
+    ex = TimedExchange(delay_ms=0)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    assert r.run("0.1", "40000").state == "OK"
+    ex.delay_ms = 6000
+    rep = r.run("0.2", "40000")
+    assert rep.state == "OK" and r.position() == Decimal("0.2")
+    assert rep.legs[0].protection_elapsed_upper_ms is None
+
+
+def test_persistent_halt_allows_reduction_but_not_increase() -> None:
+    ex = TimedExchange(delay_ms=0)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    r.run("0.1", "40000")
+    events = RiskEventRepository(r.conn)
+    events.insert(
+        RiskEvent(
+            1, "paper", "critical", "futures.PROTECTION_HALTED", {"strategy_tag": "o2", "symbol": S}
+        )
+    )
+    rep = r.run("0.05", "40000")
+    assert rep.state == "HALTED" and not rep.increases_allowed
+    assert r.position() == Decimal("0.05") and r.stops()
+    rep = r.run("0.2", "40000")
+    assert rep.state == "HALTED" and r.position() == Decimal("0.05")
+
+
+def test_scoped_events_keep_old_halt_and_ignore_other_modes_and_tags() -> None:
+    r = Rig()
+    events = RiskEventRepository(r.conn)
+    kind = "futures.PROTECTION_HALTED"
+    events.insert(RiskEvent(1, "paper", "critical", kind, {"strategy_tag": "o2", "symbol": S}))
+    for n in range(510):
+        events.insert(
+            RiskEvent(n + 2, "paper", "critical", kind, {"strategy_tag": "other", "symbol": S})
+        )
+    assert events.latest_scoped("paper", (kind,), "o2") is not None
+    assert events.latest_scoped("demo", (kind,), "o2") is None
+    assert events.latest_scoped("paper", (kind,), "o2", "ETHUSDT") is None
+
+
+class UnknownCloseExchange(TimedExchange):
+    def _record(self, result: FuturesOrderResult) -> FuturesOrderResult:
+        if result.order_type.value == "MARKET" and result.side == "SELL":
+            self.lose_response_after_accept = 1
+            self.fail_account = 1
+        return super()._record(result)
+
+
+def test_unknown_emergency_close_is_not_blindly_reissued() -> None:
+    ex = UnknownCloseExchange(delay_ms=6000, ratio="0.5")
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    first = r.run("0.1", "40000")
+    assert first.state == "HALTED" and r.position() > 0
+    assert any("완료로 보지 않음" in n for n in first.legs[0].notes)
+    ex.fail_lookups = 20
+    second = r.run("0.1", "40000")
+    assert second.state == "HALTED" and r.position() > 0
+    assert len([o for o in r.store.all() if o.purpose == "CLOSE"]) == 1
+    assert any("추정 재청산 금지" in n for n in second.legs[0].notes)
+
+
+class SlowConfirmationExchange(TimedExchange):
+    def open_stops(self, symbol: str) -> list[FuturesOrderResult]:
+        stops = super().open_stops(symbol)
+        if len(stops) == 1 and stops[0].close_position:
+            self.now_ms += 6000
+        return stops
+
+
+def test_remote_protection_confirmation_latency_is_included() -> None:
+    ex = SlowConfirmationExchange(delay_ms=0)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "HALTED" and r.position() == 0
+
+
+class UnconfirmedPositionExchange(TimedExchange):
+    def _record(self, result: FuturesOrderResult) -> FuturesOrderResult:
+        if result.order_type.value == "LIMIT" and result.side == "BUY":
+            self.fail_account = 100
+        return super()._record(result)
+
+
+def test_late_fill_with_unknown_position_halts_without_guessed_close() -> None:
+    ex = UnconfirmedPositionExchange(delay_ms=6000)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "HALTED" and not rep.increases_allowed
+    assert not [o for o in r.store.all() if o.purpose == "CLOSE"]
+    ex.fail_account = 0
+    assert r.run("0.1", "40000").state == "HALTED" and r.position() == 0
+
+
+def test_backwards_clock_during_unprotected_fill_is_fail_closed() -> None:
+    ex = TimedExchange(delay_ms=-1)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    rep = r.run("0.1", "40000")
+    assert rep.state == "HALTED" and r.position() == 0
+
+
+def test_failed_stop_halt_is_persistent_even_without_delayed_ack() -> None:
+    r = Rig()
+    r.ex.reject_stops = True
+    assert r.run("0.1", "40000").state == "HALTED"
+    before = r.ex.placed_count
+    r.ex.reject_stops = False
+    assert r.run("0.1", "40000").state == "HALTED"
+    assert r.position() == 0 and r.ex.placed_count == before
+
+
+def test_slow_unfilled_increase_does_not_close_existing_quantity_protected_position() -> None:
+    ex = TimedExchange(delay_ms=0)
+    r = Rig(exchange=ex, clock=lambda: ex.now_ms)
+    r.run("0.1", "40000")
+    close = next(s for s in r.m.working_stops() if s.close_position)
+    r.m.place_bridge_stop(
+        decision_ms=T0,
+        symbol=S,
+        side="SELL",
+        stop_price=Decimal(40000),
+        quantity=Decimal("0.1"),
+    )
+    r.m.cancel(close.client_order_id)
+    ex.delay_ms = 6000
+    ex.fill_ratio = Decimal(0)
+    rep = r.run("0.2", "40000")
+    assert rep.state == "DEGRADED" and r.position() == Decimal("0.1")
+    assert not [o for o in r.store.all() if o.order_type == "MARKET"]

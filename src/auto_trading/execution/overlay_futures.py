@@ -30,12 +30,14 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Literal
 
+from auto_trading.config.schema import RiskConfig
 from auto_trading.core.errors import ExchangeError, ReconciliationError
 from auto_trading.core.money import floor_to_step
 from auto_trading.exchange.futures import FuturesExchange, FuturesPosition
 from auto_trading.execution.futures_guard import FuturesSupervisor
 from auto_trading.execution.futures_orders import FuturesOrderManager, futures_client_order_id
 from auto_trading.storage.repositories.futures_orders import (
+    TERMINAL_STATES,
     FuturesOrderRecord,
     FuturesOrderRepository,
 )
@@ -78,6 +80,7 @@ class LegReport:
     orders: list[str] = field(default_factory=list)
     stop: str | None = None
     notes: list[str] = field(default_factory=list)
+    protection_elapsed_upper_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -113,6 +116,7 @@ class OverlayFuturesExecutor:
         self._attempts = protect_attempts
         self._window_ms = protect_window_ms
         self._settle = settle
+        self._max_unprotected_ms = RiskConfig().max_unprotected_ms
 
     # ------------------------------------------------------------ 하루 실행
 
@@ -134,25 +138,41 @@ class OverlayFuturesExecutor:
             if r.client_order_id in stops_before and r.state == "FILLED"
         ]
         halt = self._halted_reason()
-        allowed = increases_allowed and recovery.entries_allowed and halt is None
-        report = OverlayExecutionReport("OK", recovery.state, allowed, fired)
+        protection_halted = self._sup.protection_halted()
+        allowed = (
+            increases_allowed
+            and recovery.entries_allowed
+            and halt is None
+            and not protection_halted
+        )
+        report = OverlayExecutionReport(
+            "HALTED" if protection_halted else "OK", recovery.state, allowed, fired
+        )
+        if protection_halted:
+            report.notes.append("영속 보호 정지 — 신규 노출 금지, 축소/보호는 계속")
         if halt is not None:
             report.notes.append(f"긴급 정지 스위치 — 노출 증가 금지: {halt}")
         if not increases_allowed:
             report.notes.append("호출자가 노출 증가를 막음 (그날 손실 2% 등)")
         if recovery.state == "HALTED":
+            self._sup.halt_protection("*", 0)
             report.state = "HALTED"
+            report.increases_allowed = False
             report.notes.append("정합성 복구가 HALTED — 오늘 아무 주문도 보내지 않는다")
             return report
-        if recovery.state != "RUNNING" or halt is not None:
+        if (recovery.state != "RUNNING" or halt is not None) and report.state != "HALTED":
             report.state = "DEGRADED"  # 정지 스위치도 정상 운영이 아니다 — 점검에 드러나게
         for target in targets:
             leg = self._run_leg(decision_ms, target, allowed=allowed)
             report.legs.append(leg)
             if any(n.startswith("HALTED") for n in leg.notes):
                 report.state = "HALTED"
+                report.increases_allowed = False
+                allowed = False
             elif leg.notes and report.state == "OK":
                 report.state = "DEGRADED"
+                report.increases_allowed = False
+                allowed = False
         self._final_check(report)
         return report
 
@@ -166,10 +186,18 @@ class OverlayFuturesExecutor:
         try:
             current = self._position(t.symbol)
         except ExchangeError as exc:
-            return LegReport(
+            leg = LegReport(
                 t.symbol, _ZERO, notes=[f"계좌 조회 실패 — 이 종목은 오늘 건너뜀: {exc}"]
             )
+            since_ms = self._sup.protection_since_ms(t.symbol)
+            if since_ms is not None:
+                self._protection_expired(decision_ms, t, leg, since_ms)
+            return leg
         leg = LegReport(t.symbol, current)
+        if self._sup.protection_since_ms(t.symbol) is not None:
+            if not self._protect_trade_fill(decision_ms, t, leg):
+                return leg
+            current = leg.after
         f = self._ex.filters(t.symbol)
         desired = floor_to_step(max(t.quantity, _ZERO), f.step_size)
         if desired > current and not allowed:
@@ -177,7 +205,7 @@ class OverlayFuturesExecutor:
             desired = current
         delta = desired - current
         if abs(delta) >= f.step_size and delta:
-            self._trade(decision_ms, t.symbol, current, desired, delta, leg)
+            self._trade(decision_ms, t, current, desired, delta, leg)
         try:
             leg.after = self._position(t.symbol)
         except ExchangeError as exc:
@@ -190,12 +218,13 @@ class OverlayFuturesExecutor:
     def _trade(
         self,
         decision_ms: int,
-        symbol: str,
+        target: FuturesLegTarget,
         current: Decimal,
         desired: Decimal,
         delta: Decimal,
         leg: LegReport,
     ) -> None:
+        symbol = target.symbol
         if delta > 0:
             f = self._ex.filters(symbol)
             if delta * self._ex.mark_price(symbol) < f.min_notional:
@@ -213,6 +242,12 @@ class OverlayFuturesExecutor:
                 quantity=abs(delta),
                 purpose=purpose,
                 first_attempt=self._attempt(decision_ms, symbol, purpose, side),
+                before_attempt=(lambda: self._before_increase(target, desired, leg))
+                if delta > 0
+                else None,
+                after_attempt=(lambda r: self._protect_trade_fill(decision_ms, target, leg, r))
+                if delta > 0
+                else None,
             )
         except ReconciliationError as exc:
             leg.notes.append(f"{purpose} 거부 — {exc}")
@@ -227,6 +262,125 @@ class OverlayFuturesExecutor:
                 f"{purpose} 가 다 차지 않음 ({result.filled}/{abs(delta)}, {result.stop_reason})"
                 " — 남은 수량은 다음 실행이 이어 가고, 결과를 모르는 주문은 복구가 조회로 해소"
             )
+
+    def _covered(self, symbol: str, quantity: Decimal) -> bool:
+        """거래소 보호 확인. 수량 스톱은 필요한 수량을 모두 덮어야 한다."""
+        stops = self._ex.open_stops(symbol)
+        return any(
+            s.side == "SELL" and s.stop_price > 0 and (s.close_position or s.orig_qty >= quantity)
+            for s in stops
+        )
+
+    def _before_increase(self, target: FuturesLegTarget, desired: Decimal, leg: LegReport) -> bool:
+        if self._sup.protection_halted():
+            return False
+        try:
+            if not self._covered(target.symbol, desired):
+                self._sup.start_protection_window(target.symbol)
+        except ExchangeError as exc:
+            leg.notes.append(f"보호 조회 실패 — 노출 증가 금지: {exc}")
+            return False
+        return True
+
+    def _protect_trade_fill(
+        self,
+        decision_ms: int,
+        target: FuturesLegTarget,
+        leg: LegReport,
+        record: FuturesOrderRecord | None = None,
+    ) -> bool:
+        """매 IOC 직후 확인·보호. 이후의 IOC로 보호 공백을 늘리지 않는다."""
+        since_ms = self._sup.protection_since_ms(target.symbol)
+        try:
+            leg.after = self._position(target.symbol)
+        except ExchangeError as exc:
+            leg.notes.append(f"체결 후 포지션 미확인 — 추가 주문 금지: {exc}")
+            elapsed_ms = None if since_ms is None else self._clock() - since_ms
+            if elapsed_ms is not None and not 0 <= elapsed_ms <= self._max_unprotected_ms:
+                self._sup.halt_protection(target.symbol, elapsed_ms)
+                leg.notes.append(
+                    "HALTED: 보호 시간 초과·포지션 미확인 — 추정 청산 금지, 계속 대조 필요"
+                )
+            return False
+        if leg.after == 0 and not self._m.blocked():
+            self._sup.finish_protection_window(target.symbol)
+            return True
+        if record is not None and record.state in TERMINAL_STATES and record.filled_qty == 0:
+            try:
+                if self._covered(target.symbol, leg.after):
+                    # 증가분이 실제로 미체결이고 기존 수량이 보호됨: 새로운 공백이 아니다.
+                    self._sup.finish_protection_window(target.symbol)
+                    since_ms = None
+            except ExchangeError as exc:
+                leg.notes.append(f"미체결 뒤 기존 보호 미확인: {exc}")
+                return False
+        if since_ms is not None and self._protection_expired(decision_ms, target, leg, since_ms):
+            return False
+        self._maintain_stop(decision_ms, target, leg)
+        if since_ms is not None and self._protection_expired(decision_ms, target, leg, since_ms):
+            return False
+        if any(n.startswith("HALTED") for n in leg.notes):
+            self._sup.halt_protection(
+                target.symbol, 0 if since_ms is None else self._clock() - since_ms
+            )
+            return False
+        try:
+            covered = leg.after > 0 and self._covered(target.symbol, leg.after)
+            if since_ms is not None and self._protection_expired(
+                decision_ms, target, leg, since_ms
+            ):
+                return False
+            if covered:
+                self._sup.finish_protection_window(target.symbol)
+            elif leg.after > 0:
+                leg.notes.append("거래소 보호 미확인 — 추가 IOC 금지")
+                return False
+        except ExchangeError as exc:
+            leg.notes.append(f"거래소 보호 미확인 — 추가 IOC 금지: {exc}")
+            if since_ms is not None:
+                self._protection_expired(decision_ms, target, leg, since_ms)
+            return False
+        return not self._m.blocked()
+
+    def _protection_expired(
+        self, decision_ms: int, target: FuturesLegTarget, leg: LegReport, since_ms: int
+    ) -> bool:
+        elapsed_ms = self._clock() - since_ms
+        leg.protection_elapsed_upper_ms = elapsed_ms
+        if 0 <= elapsed_ms <= self._max_unprotected_ms:
+            return False
+        self._sup.halt_protection(target.symbol, elapsed_ms)
+        leg.notes.append(f"HALTED: 보호 확인 시간 상한 초과 ({elapsed_ms}ms) — 비상 정리")
+        if leg.after > 0:
+            if any(
+                r.symbol == target.symbol and r.purpose == "CLOSE" and r.needs_reconcile
+                for r in self._store.all()
+            ):
+                leg.notes.append(
+                    "HALTED: 미확정 청산 주문이 있어 추정 재청산 금지 — 계속 대조 필요"
+                )
+                self._maintain_stop(decision_ms, target, leg)
+                return True
+            close = self._m.submit_market(
+                decision_ms=decision_ms,
+                symbol=target.symbol,
+                side="SELL",
+                quantity=leg.after,
+                purpose="CLOSE",
+                attempt=self._attempt(decision_ms, target.symbol, "CLOSE", "SELL"),
+            )
+            leg.orders.append(f"보호 시간 초과 비상 청산 {leg.after} → {close.state}")
+            try:
+                leg.after = self._position(target.symbol)
+            except ExchangeError as exc:
+                leg.notes.append(f"HALTED: 비상 청산 뒤 포지션 미확인 — 완료로 보지 않음: {exc}")
+                return True
+            if leg.after == 0 and close.state == "FILLED":
+                self._maintain_stop(decision_ms, target, leg)
+                self._sup.finish_protection_window(target.symbol)
+            else:
+                leg.notes.append(f"HALTED: 청산 미완료 ({close.state}) — 계속 대조 필요")
+        return True
 
     # ------------------------------------------------------------ 보호 스톱
 

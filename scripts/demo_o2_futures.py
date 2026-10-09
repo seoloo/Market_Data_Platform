@@ -236,6 +236,7 @@ def _summary(rep: OverlayExecutionReport) -> dict[str, Any]:
                 "orders": g.orders,
                 "stop": g.stop,
                 "notes": g.notes,
+                "protection_elapsed_upper_ms": g.protection_elapsed_upper_ms,
             }
             for g in rep.legs
         ],
