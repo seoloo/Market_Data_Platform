@@ -158,10 +158,11 @@ def test_message_uses_real_titles_and_our_facts() -> None:
     facts = {"267260": {"trend": True, "ret_3m": 0.123, "in_lists": ["가격 주도주"]}}
     diff = {"new_themes": ["전력기기"], "gone_themes": [], "new_picks": [], "gone_picks": []}
     text = format_market("kr", judged, heads["kr"], facts, diff, "2026-10-10")
-    assert "근거 [K2] 전력기기 수출 사상 최대 - 한경" in text
-    now, emerging = text.index("■ 지금 주도하는 테마"), text.index("■ 떠오르는 테마 (아직 초기)")
-    assert now < text.index("전력기기 (확신 70%)") < emerging < text.index("원전 수출 (확신 40%)")
-    assert "[추세 위 · 3 달 +12.3% · 가격 주도주]" in text
+    assert "📰 한경 · 전력기기 수출 사상 최대 [K2]" in text
+    now, emerging = text.index("🔥 지금 주도하는 테마"), text.index("🌱 떠오르는 테마 (아직 초기)")
+    assert now < text.index("1️⃣ 전력기기") < emerging < text.index("1️⃣ 원전 수출")
+    assert "확신 🟩🟩🟩🟩⬜ 70%" in text and "확신 🟩🟩⬜⬜⬜ 40%" in text
+    assert "📊 추세 위 · 3 달 +12.3% · 가격 주도주" in text
     assert "🔄 지난주 대비" in text and "🆕 새 테마 전력기기" in text
     assert "검증된 매매 신호 아님" in text
 

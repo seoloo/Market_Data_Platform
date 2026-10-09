@@ -247,8 +247,13 @@ class FuturesOrderManager:
         first_attempt: int = 0,
         cap: Decimal = DEFAULT_CAP,
         tries: int = DEFAULT_TRIES,
+        before_attempt: Callable[[], bool] | None = None,
+        after_attempt: Callable[[FuturesOrderRecord], bool] | None = None,
     ) -> CappedResult:
         """mark ± ``cap`` 지정가 IOC 를 최대 ``tries`` 번(매번 mark 를 다시 읽고 새 ID) 보낸다.
+
+        안전 콜백은 각 전송 전/응답 후 실행된다. False면 후속 IOC를 중단한다.
+        미체결뿐 아니라 부분체결·응답 미상에도 after_attempt를 실행해 즉시 보호할 수 있다.
 
         결과를 모르거나 걸린 채 남은 주문이 생기면 더 보내지 않는다 — 복구가 조회로 해소한다.
         """
@@ -260,6 +265,9 @@ class FuturesOrderManager:
         records: list[FuturesOrderRecord] = []
         reason = "tries_exhausted"
         for k in range(tries):
+            if before_attempt is not None and not before_attempt():
+                reason = "safety_veto"
+                break
             if remaining < f.min_qty or remaining <= 0:
                 reason = "remainder_below_min" if filled else "below_min"
                 break
@@ -281,6 +289,9 @@ class FuturesOrderManager:
             records.append(r)
             filled += r.filled_qty
             remaining = floor_to_step(remaining - r.filled_qty, f.step_size)
+            if after_attempt is not None and not after_attempt(r):
+                reason = "safety_veto"
+                break
             if r.state == "FILLED":
                 reason = "filled"
                 break

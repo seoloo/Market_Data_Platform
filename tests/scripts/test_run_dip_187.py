@@ -15,7 +15,8 @@ from scripts.run_dip_187 import (
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2000, 1, 3)
+    out: list[str] = []
+    d = date(2000, 1, 3)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())
@@ -23,7 +24,7 @@ def _days(n: int) -> list[str]:
     return out
 
 
-def _nd(c: list[float]) -> dict[str, list]:
+def _nd(c: list[float]) -> dict[str, list[str] | list[float]]:
     days = _days(len(c))
     return {"days": days, "o": c, "h": [x * 1.01 for x in c], "l": [x * 0.99 for x in c], "c": c}
 

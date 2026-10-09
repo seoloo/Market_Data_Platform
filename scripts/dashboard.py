@@ -40,7 +40,7 @@ def export(folder: Path) -> int:
     folder.mkdir(parents=True, exist_ok=True)
     assets = folder / "assets"
     assets.mkdir(exist_ok=True)
-    for name in ("auto-trading.svg", "auto-trading.ico"):
+    for name in ("auto-trading.svg", "auto-trading.ico", "obi.png"):
         shutil.copyfile(ASSET_DIR / name, assets / name)
     for theme in ("light", "dark"):
         suffix = "" if theme == "light" else "-dark"
@@ -48,7 +48,7 @@ def export(folder: Path) -> int:
             stem = "index" if href == "/" else href.strip("/")
             html = render_page(data, key, theme=theme)
             html = html.replace('"/assets/', '"assets/').replace(
-                '"/favicon.ico?v=2"', '"assets/auto-trading.ico?v=2"'
+                '"/favicon.ico?v=3"', '"assets/auto-trading.ico?v=3"'
             )
             for _, other_href, _ in PAGES:  # 파일끼리 이동되게 링크를 바꾼다
                 target = "index" if other_href == "/" else other_href.strip("/")

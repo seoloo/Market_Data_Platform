@@ -177,8 +177,12 @@ class TestRender:
         html = render_page(load_dashboard(root, P0 + 11 * D), page)
         assert html.startswith("<!doctype html>")
         assert "읽기 전용" in html
-        if page == "toss":
+        if page == "live":
+            assert "실거래 · 공개 시세" in html and "실거래 비활성</span>" not in html
+        elif page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
+        elif page == "overview":
+            assert "저장 기록 · 주문 없음" in html and "실거래 비활성</span>" not in html
         elif page in ("lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
@@ -191,7 +195,7 @@ class TestRender:
         for key, href, _ in PAGES:
             html = render_page(data, key)
             top = html.split("<main>", 1)[0]
-            if key in ("overview", "research"):
+            if key in ("overview", "research", "live"):
                 assert "<nav>" not in top  # 화면이 하나뿐인 탭
                 continue
             nav = top.split("<nav>", 1)[1].split("</nav>", 1)[0]
@@ -503,7 +507,15 @@ class TestRender:
         for section in ("전략별 자산 변화", "시스템 상태", "테스트넷 검증", "포지션 · 보호 상태"):
             assert section in html
         assert "합산하지 않는다" in html
-        for section in ("오늘의 운영", "확인할 일", "다가오는 일정", "해외 주식 적립"):
+        for section in (
+            "나의 투자 현황",
+            "확인할 일",
+            "다가오는 일정",
+            "토스 적립 현황",
+            "Glide",
+            "수익률 추이",
+            "주식 Paper 비교",
+        ):
             assert section in html
 
     def test_toss_initial_cards_do_not_fabricate_account_values(self, root: Path) -> None:
@@ -554,9 +566,11 @@ class TestRender:
     def test_brand_and_favicon_present_on_all_pages(self, root: Path) -> None:
         for page, _, _ in PAGES:
             html = render_page(load_dashboard(root, P0 + 11 * D), page)
-            assert 'src="/assets/auto-trading.svg"' in html
-            assert 'rel="icon" type="image/svg+xml"' in html
-            assert 'href="/favicon.ico?v=2"' in html
+            assert 'src="/assets/obi.png?v=3"' in html
+            assert 'rel="icon" type="image/png"' in html
+            assert 'href="/favicon.ico?v=3"' in html
+            assert "오비, 네온 궤도 속 우주 고양이" in html
+            assert "AUTO <b>TRADING</b>" in html
 
     @pytest.mark.parametrize("page", [key for key, _, _ in PAGES])
     @pytest.mark.parametrize("theme", ["light", "dark"])
@@ -655,6 +669,7 @@ class TestServer:
             ("/favicon.ico", "image/x-icon"),
             ("/assets/auto-trading.ico", "image/x-icon"),
             ("/assets/auto-trading.svg?v=2", "image/svg+xml"),
+            ("/assets/obi.png?v=3", "image/png"),
         ],
     )
     def test_brand_assets_do_not_load_account_data(
@@ -673,7 +688,12 @@ class TestServer:
             assert response.headers["X-Content-Type-Options"] == "nosniff"
             assert "default-src 'none'" in response.headers["Content-Security-Policy"]
             body = response.read()
-            assert body.startswith(b"<svg") if "svg" in mime else body[:4] == b"\x00\x00\x01\x00"
+            signature = {
+                "image/svg+xml": b"<svg",
+                "image/png": b"\x89PNG\r\n\x1a\n",
+                "image/x-icon": b"\x00\x00\x01\x00",
+            }[mime]
+            assert body.startswith(signature)
 
     @pytest.mark.parametrize(
         "path",

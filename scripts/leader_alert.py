@@ -135,36 +135,45 @@ def kr_section(root: Path) -> dict[str, Any] | None:
     return {"market": "국장", "date": reps[-1]["date"], "history": len(reps) - 1, "new": items}
 
 
+LIST_NAME = {
+    "주도주": "가격 주도주",
+    "가격": "가격 주도주",
+    "수급": "수급 주도주",
+    "AI": "AI 테마 선정",
+}
+TRI_ICON = {"돌파": "🚀", "형성 중": "📐", "아님": "▫️"}
+
+
 def render(sections: Sequence[dict[str, Any]]) -> str:
-    lines = ["🌟 주도주 처음 잡힘", "최근 20 번 기록에 없던 종목 · 매매 아님, 정보"]
+    """2026-10-09 사용자 "주도주 알림도 좀 꾸며주면" — 종목마다 목록 · 삼각형 아이콘 한 줄."""
+    lines = ["🌟 [주도주 새로 잡힘]", sub("최근 20 번 기록에 없던 종목 · 정보용, 매매 아님")]
     flag = {"미국": "🇺🇸", "국장": "🇰🇷"}
-    mark = {"돌파": "🚀", "형성 중": "📐"}
     for sec in sections:
+        day = str(sec["date"])[5:].replace("-", "/")
         lines += [
             "",
             RULE,
-            f"{flag.get(sec['market'], '■')} {sec['market']} {sec['date']} 종가"
+            f"{flag.get(sec['market'], '■')} {sec['market']} {day} 종가"
             f" · 새 종목 {len(sec['new'])}",
         ]
         if sec["history"] < FEW:
             lines.append(sub(f"비교할 과거 기록 {sec['history']} 번 — 처음엔 거의 모두 새로 보임"))
         for it in sec["new"]:
             t = it["triangle"]
-            gap = (
-                f" · 저항선 {t['gap_to_resistance']:+.1%}"
-                if t.get("gap_to_resistance") is not None
-                else ""
-            )
             label = f"{it['name']}" + (f" ({it['code']})" if it["name"] != it["code"] else "")
-            lines.append(f"{mark.get(t['status'], '•')} {label}  [{it['list']}]")
-            lines.append(sub(f"삼각형: {t['status']}{gap}"))
-    rule, _, caveat = TRIANGLE_RULE.partition(". 참고 규칙 — ")
-    lines += ["", RULE, "📐 삼각형 판정 (참고)"]
-    lines += [f"• {part}" for part in rule.split(" · ")]
-    if caveat:
-        lines.append(f"⚠️ {caveat}")
+            lines.append(f"🆕 {label} · {LIST_NAME.get(it['list'], it['list'])}")
+            gap = t.get("gap_to_resistance")
+            where = f" · 저항선까지 {gap:+.1%}" if gap is not None else ""
+            lines.append(sub(f"{TRI_ICON.get(t['status'], '❔')} 삼각형 {t['status']}{where}"))
+    lines += [
+        "",
+        RULE,
+        "📐 삼각형 = 60 거래일 최고가(저항선)를 2 번 이상 두드리며 저점이 높아지는 모양",
+        sub("🚀 돌파 = 오늘 종가가 저항선 위 · 📐 형성 중 · ▫️ 아님"),
+        "⚠️ 돌파 진입은 국장 검증(문서 146)에서 무작위 시점보다 나빴다(가짜 돌파 66%) — 참고만",
+    ]
     if sections and any(s["market"] == "국장" for s in sections):
-        lines.append("• 국장은 종가만 있어 종가 기준으로 판정.")
+        lines.append(sub("국장은 종가 기준으로 판정"))
     return "\n".join(lines)
 
 

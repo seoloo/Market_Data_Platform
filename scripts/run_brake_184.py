@@ -105,8 +105,15 @@ def simulate(
     park: str = "cash",
     monthly: bool = False,
     early: Mapping[str, bool] | None = None,
+    no_sell: frozenset[str] = frozenset(),
+    monthly_krw: float = MONTHLY_KRW,
+    harvest: bool = False,
 ) -> dict[str, Any]:
-    """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ)."""
+    """일간 모의 계좌 (순수). 기호: L(TQQQ) · D(SCHD) · Q(QQQ).
+
+    ``harvest`` (195): 해마다 12-15 뒤 첫 거래일에 남은 250 만 원 공제만큼 이익을 실현하고
+    같은 날 되산다(양쪽 비용). 기본은 184 그대로.
+    """
     days, lev, div = data["days"], data["lev"], data["div"]
     vol, trend = data["vol"], data["trend"]
     px = {"L": lev, "D": div, "Q": qqq}
@@ -121,6 +128,9 @@ def simulate(
     ep: dict[str, Any] | None = None
     taxes: dict[str, float] = {}
     flows: list[tuple[str, float]] = []
+    div_vals: list[float] = []
+    vals: list[float] = []
+    harvested: dict[str, float] = {}
     i0 = next(i for i, d in enumerate(days) if d >= data["start"] and i > 0)
 
     def value(d: str) -> float:
@@ -191,20 +201,21 @@ def simulate(
         if new_month:
             v_before = value(d)
             nav_now = v_before / units if units > 0 else 1.0
-            units += MONTHLY_KRW / nav_now
-            contrib += MONTHLY_KRW
-            flows.append((d, MONTHLY_KRW))
+            units += monthly_krw / nav_now
+            contrib += monthly_krw
+            flows.append((d, monthly_krw))
             d_active = bk.q["D"] - (res_qty if park == "D" else 0.0)
             act_l, act_d = bk.q["L"] * lev[d], d_active * div[d]
-            active = act_l + act_d + MONTHLY_KRW
+            active = act_l + act_d + monthly_krw
             v = vol.get(prev)
             share = LEV_MAX * (min(1.0, VOL_REF / v) if v and v > 0 else 1.0) * STAGE_B[stage]
             tgt_l = share * active
-            cash = MONTHLY_KRW
-            if act_l > tgt_l:
+            cash = monthly_krw
+            # 189: ``no_sell`` 종목은 매달 맞추기에서 팔지 않는다 (브레이크 매도는 그대로)
+            if act_l > tgt_l and "L" not in no_sell:
                 cash += bk.sell("L", (act_l - tgt_l) / lev[d], lev[d], y)
             tgt_d = active - tgt_l
-            if act_d > tgt_d:
+            if act_d > tgt_d and "D" not in no_sell:
                 cash += bk.sell("D", (act_d - tgt_d) / div[d], div[d], y)
             need_l = max(tgt_l - bk.q["L"] * lev[d], 0.0)
             need_d = max(tgt_d - (bk.q["D"] - (res_qty if park == "D" else 0.0)) * div[d], 0.0)
@@ -214,10 +225,31 @@ def simulate(
                 bk.buy("D", cash * need_d / tot, div[d])
             else:
                 bk.buy("D", cash, div[d])
+        # 4) 195: 12 월 공제 실현 — 남은 공제만큼 이익을 팔고 같은 날 되산다
+        if harvest and d[5:7] == "12" and d[8:] >= "15" and y not in harvested and units > 0:
+            room = max(DEDUCTION - bk.gain.get(y, 0.0), 0.0)
+            done = 0.0
+            for s in ("L", "D"):
+                q = bk.q[s] - (res_qty if park == s else 0.0)
+                if room <= 0 or q <= 0:
+                    continue
+                per = px[s][d] * (1 - COST) - bk.cost[s] / bk.q[s]
+                if per <= 0:
+                    continue
+                n = min(q, room / per)
+                before = bk.gain.get(y, 0.0)
+                got = bk.sell(s, n, px[s][d], y)
+                bk.buy(s, got, px[s][d])
+                realized = bk.gain.get(y, 0.0) - before
+                room -= realized
+                done += realized
+            harvested[y] = done
         v = value(d)
         if units > 0:
             navs.append(v / units)
             nav_days.append(d)
+            div_vals.append(bk.q["D"] * div[d])
+            vals.append(v)
             l_max = max(l_max, lev[d])
     end = days[-1]
     last_y = end[:4]
@@ -237,6 +269,10 @@ def simulate(
         "sales": sales,
         "episodes": episodes,
         "all_sells": bk.sells,
+        "div_vals": div_vals,
+        "vals": vals,
+        "harvested": harvested,
+        "value_end": value(end),
     }
 
 

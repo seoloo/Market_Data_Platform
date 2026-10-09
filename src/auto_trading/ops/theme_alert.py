@@ -12,7 +12,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from auto_trading.notify.style import RULE, SUB, arrow, sub
+from auto_trading.notify.style import RULE, sub
 
 __all__ = [
     "MARKETS",
@@ -196,6 +196,25 @@ def _pct(x: float | None) -> str:
     return "—" if x is None else f"{x * 100:+.1f}%"
 
 
+FLAGS = {"kr": "🇰🇷", "us": "🇺🇸"}
+STAGE_ICON = {"now": "🔥", "emerging": "🌱"}
+NUM = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣")
+
+
+def _bar(conf: float) -> str:
+    """확신 막대 (5 칸)."""
+    n = max(0, min(5, round(conf * 5)))
+    return "🟩" * n + "⬜" * (5 - n)
+
+
+def _headline(raw: str) -> str:
+    """'제목 - 매체' → '매체 · 제목' (매체가 없으면 제목만)."""
+    title, sep, source = raw.rpartition(" - ")
+    if not sep or not source or len(source) > 30:
+        return raw[:80]
+    return f"{source} · {title[:70]}"
+
+
 def format_market(
     market: str,
     judged: Mapping[str, Any],
@@ -204,10 +223,17 @@ def format_market(
     diff: Mapping[str, Sequence[str]] | None,
     week: str,
 ) -> str:
-    """텔레그램 한 통(시장 하나). 근거는 실제 뉴스 제목, 사실은 우리 자료."""
+    """텔레그램 한 통(시장 하나). 근거는 실제 뉴스 제목, 사실은 우리 자료.
+
+    2026-10-09 사용자 "테마랑 주도주 알림도 좀 꾸며주면 좋겠어" — Cruise 알림처럼 단계 아이콘 ·
+    확신 막대 · 매체 먼저인 근거 · 종목 한 줄 요약."""
     title_of = {h["id"]: h["title"] for h in headlines}
     part = judged.get(market) or {}
-    lines = [f"🔭 {MARKETS[market]} · 미래 주도 테마", f"{week} 주간", RULE]
+    lines = [
+        f"🔭 [주도 테마 · {FLAGS.get(market, '')} {MARKETS[market]}]"
+        f" {week[5:].replace('-', '/')} 주간",
+        RULE,
+    ]
     if not part.get("themes") and not part.get("picks"):
         lines.append("이번 주는 근거가 붙은 판단이 없다.")
     first = True
@@ -216,39 +242,37 @@ def format_market(
         picks = [p for p in part.get("picks", []) if p.get("stage") == stage]
         if not themes and not picks:
             continue
-        lines += ([] if first else ["", RULE]) + [f"■ {label}"]
+        lines += ([] if first else ["", RULE]) + [f"{STAGE_ICON[stage]} {label}"]
         first = False
-        for i, t in enumerate(themes, 1):
-            lines += ["", f"{i}. {t['name']} (확신 {t['confidence']:.0%})"]
-            lines.append(f"{SUB}왜: {t['why']}")
+        for i, t in enumerate(themes):
+            num = NUM[i] if i < len(NUM) else f"{i + 1}."
+            conf = float(t["confidence"])
+            lines += ["", f"{num} {t['name']}", sub(f"확신 {_bar(conf)} {conf:.0%}")]
+            lines.append(sub(f"💡 {t['why']}"))
             for e in t["evidence"]:
-                lines.append(sub(f"근거 [{e}] {title_of.get(e, '')[:90]}"))
+                lines.append(sub(f"📰 {_headline(title_of.get(e, ''))} [{e}]"))
         if picks:
-            lines += ["", "⭐ 주목 종목 — [ ] 안은 우리 자료(AI 아님)"]
+            lines += ["", "⭐ 주목 종목 (끝 줄 = 우리 자료, AI 아님)"]
         for p in picks:
             f = facts.get(p["symbol"], {})
             t_up = f.get("trend")
             trend = "추세 위" if t_up is True else "추세 아래" if t_up is False else "추세 ?"
             tags = [trend, f"3 달 {_pct(f.get('ret_3m'))}"]
             tags += [str(x) for x in f.get("in_lists", [])]
-            icon = arrow(1.0 if t_up is True else -1.0 if t_up is False else None)
+            icon = "🟢" if t_up is True else "🔴" if t_up is False else "⚪"
             name = p["name"] if p["name"] == p["symbol"] else f"{p['name']} ({p['symbol']})"
-            lines.append(f"{icon} {name} — {p['theme']}")
-            lines.append(f"{SUB}{p['why']}")
-            lines.append(sub(f"[{' · '.join(tags)}]"))
+            lines.append(f"{icon} {name} · {p['theme']}")
+            lines.append(sub(p["why"]))
+            lines.append(sub(f"📊 {' · '.join(tags)}"))
     if part.get("risks"):
         lines += ["", RULE, "⚠️ 위험"] + [f"• {r}" for r in part["risks"]]
     if diff and any(diff.values()):
-        lines += ["", RULE, "🔄 지난주 대비"]
+        lines += ["", "🔄 지난주 대비"]
         if diff.get("new_themes"):
-            lines.append("🆕 새 테마 " + ", ".join(diff["new_themes"]))
+            lines.append(sub("🆕 새 테마 " + ", ".join(diff["new_themes"])))
         if diff.get("gone_themes"):
-            lines.append("➖ 빠진 테마 " + ", ".join(diff["gone_themes"]))
+            lines.append(sub("➖ 빠진 테마 " + ", ".join(diff["gone_themes"])))
         if diff.get("new_picks"):
-            lines.append("🆕 새 종목 " + ", ".join(diff["new_picks"]))
-    lines += [
-        "",
-        "※ 참고용 정보 — 검증된 매매 신호 아님",
-        sub("AI 판단의 성적은 문서 147 장부로 기록 중"),
-    ]
+            lines.append(sub("🆕 새 종목 " + ", ".join(diff["new_picks"])))
+    lines += ["", "💬 참고용 AI 판단 — 검증된 매매 신호 아님 (성적 기록: 문서 147)"]
     return "\n".join(lines)

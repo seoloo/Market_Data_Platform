@@ -21,7 +21,14 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-__all__ = ["ENTRY_RETRACE", "TARGET_EXTENSION", "EwSetup", "agreement", "setup_from_set"]
+__all__ = [
+    "ENTRY_RETRACE",
+    "TARGET_EXTENSION",
+    "EwSetup",
+    "agreement",
+    "scenario_view",
+    "setup_from_set",
+]
 
 ENTRY_RETRACE = Decimal("0.5")
 TARGET_EXTENSION = Decimal("1.618")
@@ -96,3 +103,59 @@ def agreement(
     ranked = sorted(scenarios, key=lambda s: baseline_rank[s["scenario_id"]])[:top_n]
     ends = [s["direction"] for s in ranked if s["current_state"] == IMPULSE_END]
     return len(ranked), ends.count(1), ends.count(-1)
+
+
+PATTERN_KO = {
+    "IMPULSE": "충격파",
+    "ENDING_DIAGONAL": "끝 대각선",
+    "ZIGZAG": "지그재그",
+    "FLAT": "플랫",
+    "TRIANGLE": "삼각형",
+}
+MOTIVE = frozenset({"IMPULSE", "ENDING_DIAGONAL"})
+
+
+def scenario_view(
+    scenario_set: Mapping[str, Any], baseline_rank: Mapping[str, int], *, top_n: int = 10
+) -> dict[str, Any]:
+    """보조 지표 알림용 요약 (순수). 상위 ``top_n`` 시나리오가 '더 큰 추세' 를 어느 쪽으로 읽나.
+
+    모든 시나리오는 방금 확정된 꼭짓점에서 끝나는 패턴이다.
+    * 충격파가 끝났다(방향 d) → 큰 추세는 d (지금부터는 반대 방향 조정 예상).
+    * 조정(지그재그 · 플랫 · 삼각형)이 끝났다(방향 d) → 큰 추세는 −d (원래 추세 재개 예상).
+    """
+    scenarios: Sequence[Mapping[str, Any]] = scenario_set.get("scenarios") or []
+    ranked = sorted(scenarios, key=lambda s: baseline_rank[s["scenario_id"]])[:top_n]
+    trend_up = trend_down = 0
+    kinds: dict[str, int] = {}
+    for s in ranked:
+        pat = str(s.get("pattern", "")).upper()
+        d = int(s["direction"])
+        big = d if pat in MOTIVE else -d
+        if big > 0:
+            trend_up += 1
+        else:
+            trend_down += 1
+        key = f"{'상승' if d > 0 else '하락'} {PATTERN_KO.get(pat, pat)} 끝"
+        kinds[key] = kinds.get(key, 0) + 1
+    best: dict[str, Any] | None = None
+    if ranked:
+        b = ranked[0]
+        pat = str(b.get("pattern", "")).upper()
+        d = int(b["direction"])
+        levels = b.get("invalidation_levels") or []
+        # '끝났다' 주장이 깨지는 가격(끝점을 다시 넘음) — 앞으로 볼 무효선
+        end = next((x for x in levels if x.get("rule_id") == "END_REEXTENDED"), None)
+        best = {
+            "label": f"{'상승' if d > 0 else '하락'} {PATTERN_KO.get(pat, pat)} 끝",
+            "start": str(b["anchors"][0]["price"]) if b.get("anchors") else None,
+            "invalid": str(end["price"]) if end else None,
+            "invalid_cmp": str(end["comparator"]) if end else None,
+        }
+    return {
+        "top": len(ranked),
+        "trend_up": trend_up,
+        "trend_down": trend_down,
+        "kinds": dict(sorted(kinds.items(), key=lambda kv: -kv[1])),
+        "best": best,
+    }

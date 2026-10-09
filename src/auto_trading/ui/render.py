@@ -25,17 +25,20 @@ from auto_trading.ui.data import (
 from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.leader_alert_render import leader_alert_page
+from auto_trading.ui.live_home import live_page
 from auto_trading.ui.lt_render import lt_paper_page
-from auto_trading.ui.overview import overview_attention, overview_stocks, overview_summary
+from auto_trading.ui.overview import overview_attention
 from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
+from auto_trading.ui.stock_home import glide_card, paper_links, stock_performance, stock_settings
 
 __all__ = ["ASSET_DIR", "PAGES", "render_page"]
 
 ASSET_DIR = Path(__file__).with_name("assets")
 
 PAGES: tuple[tuple[str, str, str], ...] = (
+    ("live", "/live", "실거래 홈"),
     ("overview", "/", "운영 개요"),
     ("running", "/running", "실행 현황"),
     ("compare", "/compare", "전략 비교"),
@@ -122,7 +125,7 @@ def _group(page: str) -> str:
         return "stocks"
     if page in {"running", "testnet", "risk", "demo"}:
         return "system"
-    if page in {"overview", "research"}:
+    if page in {"overview", "research", "live"}:
         return page
     return "coin"
 
@@ -147,14 +150,22 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
     group = _group(page)
     nav = _subnav(page, group)
     title = next(label for key, _, label in PAGES if key == page)
-    subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
+    heading = "내 실거래" if page == "live" else "나의 투자 현황" if page == "overview" else title
+    subtitle = (
+        "내 자산과 투자 기록, 확인할 일을 한눈에."
+        if page == "live"
+        else "주식 운용을 중심으로, 관찰과 연구는 따로."
+        if page == "overview"
+        else "저장된 기록을 확인합니다."
+    )
     tabs = "".join(
         f'<a href="{href}" class="{"on" if key == group else ""}"'
         f"{' aria-current=page' if key == group else ''}>{label}</a>"
         for key, href, label in (
-            ("overview", "/", "요약"),
-            ("coin", "/compare", "코인"),
+            ("live", "/live", "실거래"),
+            ("overview", "/", "주식 홈"),
             ("stocks", "/toss", "주식"),
+            ("coin", "/compare", "코인"),
             ("research", "/research", "연구"),
             ("system", "/running", "시스템"),
         )
@@ -171,13 +182,22 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         else ""
     )
     trading_badge = (
-        '<span class="badge">저장된 적립 기록</span>'
+        '<span class="badge green">실거래 · 공개 시세</span>'
+        if page == "live"
+        else '<span class="badge">저장된 적립 기록</span>'
         if page == "toss"
         else '<span class="badge">저장된 Paper 기록 · 주문 없음</span>'
         if page in _PAPER_PAGES
+        else '<span class="badge">저장 기록 · 주문 없음</span>'
+        if page == "overview"
         else '<span class="badge red">실거래 비활성</span>'
     )
-    if page in _PAPER_PAGES:
+    if page == "live":
+        foot = (
+            "60초마다 장부와 공개 시세(업비트 · 야후, 키 없음)를 다시 읽는다 · "
+            "계좌를 조회하거나 주문하지 않는다. 실거래 장부만 더하고 Paper·데모는 넣지 않는다."
+        )
+    elif page in _PAPER_PAGES:
         foot = (
             "60초마다 저장된 Paper 보고서를 다시 읽는다 · "
             "이 화면은 KIS 계좌를 조회하거나 주문하지 않는다."
@@ -187,27 +207,37 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
             "60초마다 저장된 적립 보고서를 다시 읽는다 · "
             "이 화면은 토스 계좌를 실시간 조회하거나 주문하지 않는다."
         )
+    elif page == "overview":
+        foot = (
+            "60초마다 저장 기록을 다시 읽는다 · "
+            "이 화면은 계좌를 실시간 조회하거나 주문하지 않는다. "
+            "실거래·Paper·Testnet은 분리하며 자산을 합산하지 않는다."
+        )
     else:
         foot = (
             "60초마다 새로 읽는다 · 데이터: Paper 원장(가상 체결)·테스트넷 기록·"
             "데모(가짜 돈)·일일 점검 보고. PAPER·TESTNET·DEMO 자산은 합산하지 않는다."
         )
     return (
-        f'<!doctype html><html lang="ko" data-theme="{theme}"><head><meta charset="utf-8">'
+        f'<!doctype html><html lang="ko" data-theme="{theme}" data-page="{page}">'
+        '<head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="refresh" content="60">'
-        '<link rel="icon" type="image/svg+xml" href="/assets/auto-trading.svg?v=2">'
-        '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" sizes="any">'
+        '<link rel="icon" type="image/png" href="/assets/obi.png?v=3" sizes="512x512">'
+        '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" sizes="any">'
         f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
-        '<div class="topbar"><a class="logo" href="/">'
-        '<img src="/assets/auto-trading.svg" width="32" height="32" alt="">'
+        f'<div class="topbar"><a class="logo" href="{"/live" if page == "live" else "/"}">'
+        '<img src="/assets/obi.png?v=3" width="52" height="52" alt="">'
         "AUTO <b>TRADING</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout">{nav}<main>'
-        f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
-        f"<h1>{'오늘의 운영' if page == 'overview' else escape(title)}</h1>"
-        f'<div class="mute">{subtitle}</div></div>'
+        '<header><div class="page-heading">'
+        '<img class="obi-mascot" src="/assets/obi.png?v=3" width="120" height="120" '
+        'alt="오비, 네온 궤도 속 우주 고양이" decoding="async">'
+        f'<div><div class="eyebrow">OBI / {escape(title)}</div>'
+        f"<h1>{escape(heading)}</h1>"
+        f'<div class="mute">{subtitle}</div></div></div>'
         f'<div class="header-meta"><span class="date">{_kst(data.now_ms)} KST</span>'
         f'<div><span class="badge">읽기 전용</span>{trading_badge}</div></div></header>'
         f"{errors}{body}"
@@ -444,11 +474,19 @@ def _overview(data: DashboardData) -> str:
         + note
     )
     return (
-        f"{banner}{overview_summary(data)}"
-        f'<div class="grid2"><div>{_chart_panel(data)}{overview_stocks(data)}</div>'
+        f'<div class="stock-home-grid"><div>{glide_card(data)}</div>'
         f"<div>{overview_attention(data)}</div></div>"
+        f'{stock_performance(data)}<div class="stock-home-grid">'
+        f"<div>{stock_settings(data)}</div><div>{paper_links()}</div></div>"
+        '<div class="home-secondary"><a class="panel" href="/compare"><h2>코인 관찰</h2>'
+        '<p class="mute">BTC · ETH / 현물·선물 별도 Paper 원장</p></a>'
+        '<a class="panel" href="/research"><h2>시장 브리핑 · JEV</h2>'
+        '<p class="mute">Shadow 검산 기록 · 주문·사이징에 영향 없음</p></a>'
+        '<a class="panel" href="/research"><h2>연구 기록</h2>'
+        '<p class="mute">판정·자료 부족·관찰을 구분해 확인</p></a></div>'
         f'{_events(data)}<details class="detail-panel">'
-        "<summary>원장 · 보호 · 테스트넷 상세</summary>"
+        "<summary>코인 원장 · 보호 · 테스트넷 상세</summary>"
+        f"{banner}{_chart_panel(data)}"
         f'<div class="cards">{cards}</div><div class="grid2"><div>{_positions_table(data)}</div>'
         f"<div>{_system_panel(data)}{_stream_checklist(data)}</div></div></details>"
     )
@@ -654,6 +692,7 @@ def _research(data: DashboardData) -> str:
 
 
 _RENDER = {
+    "live": live_page,
     "overview": _overview,
     "compare": _compare,
     "positions": _positions,

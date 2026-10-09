@@ -68,3 +68,28 @@ class RiskEventRepository:
             RiskEvent(int(r[0]), str(r[1]), str(r[2]), str(r[3]), json.loads(r[4]), r[5])
             for r in rows
         ]
+
+    def latest_scoped(
+        self, mode: str, kinds: tuple[str, ...], strategy_tag: str, symbol: str | None = None
+    ) -> RiskEvent | None:
+        """전략별 영속 안전 상태. 조회 개수 제한으로 오래된 정지가 사라지지 않는다."""
+        marks = ",".join("?" * len(kinds))
+        symbol_clause = " AND json_extract(detail_json, '$.symbol') = ?" if symbol else ""
+        params: tuple[object, ...] = (mode, *kinds, strategy_tag)
+        if symbol:
+            params = (*params, symbol)
+        row = self._conn.execute(
+            "SELECT ts_ms, mode, severity, kind, detail_json, action_taken FROM risk_events"
+            f" WHERE mode = ? AND kind IN ({marks})"
+            " AND json_extract(detail_json, '$.strategy_tag') = ?"
+            + symbol_clause
+            + " ORDER BY id DESC LIMIT 1",
+            params,
+        ).fetchone()
+        return (
+            None
+            if row is None
+            else RiskEvent(
+                int(row[0]), str(row[1]), str(row[2]), str(row[3]), json.loads(row[4]), row[5]
+            )
+        )

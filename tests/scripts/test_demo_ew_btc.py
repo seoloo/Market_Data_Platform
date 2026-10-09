@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from scripts.demo_ew_btc import EwDemoRunner, Store
 
 from auto_trading.exchange.futures import (
@@ -17,6 +18,7 @@ from auto_trading.exchange.futures import (
     OrderStatus,
 )
 from auto_trading.research.elliott.demo_setup import EwSetup
+from scripts import demo_ew_btc
 
 SYM = "BTCUSDC"
 
@@ -228,14 +230,31 @@ def test_single_instance_lock_blocks_a_second_holder(tmp_path: Path) -> None:
     demo_ew_btc._LOCK_HANDLE = None
 
 
-def test_new_pivot_without_setup_explains_why_not(tmp_path: Path) -> None:
+def test_new_pivot_without_setup_explains_why_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(demo_ew_btc, "NO_SETUP_ALERTS", True)
     api = FakeApi()
     r, notes = runner(tmp_path, api)
     r.on_scan([(1_000, None, 0)])  # 첫 실행: 기록만
-    info = {"pivot": "고점", "price": "84000", "top": 10, "up": 3, "down": 1}
+    view = {
+        "top": 10,
+        "trend_up": 4,
+        "trend_down": 6,
+        "kinds": {"상승 지그재그 끝": 6, "상승 충격파 끝": 4},
+        "best": {
+            "label": "상승 지그재그 끝",
+            "start": "80000",
+            "invalid": "84000",
+            "invalid_cmp": ">=",
+        },
+    }
+    info = {"pivot": "고점", "price": "84000", "top": 10, "up": 3, "down": 1, "view": view}
     r.on_scan([(1_000, None, 0), (2_000, None, 12, info)])
-    assert "4h 고점 확정 @84,000.0 — 진입 안 함" in notes[-1]
-    assert "상승 3 · 🔻 하락 1 (같은 방향 6개 이상 필요)" in notes[-1]
+    assert "4h 고점 확정 @84,000.0" in notes[-1]
+    assert "🔺 상승 4 · 🔻 하락 6" in notes[-1]
+    assert "84,000.0 위로 다시 가면 이 해석 무효" in notes[-1]
+    assert "상승 3 · 하락 1 → 진입 안 함" in notes[-1]
     assert not any(c.startswith("limit:") for c in api.calls)
 
 
@@ -252,3 +271,36 @@ def test_agreement_counts_top10_impulse_ends() -> None:
     ]
     ranks = {str(s["scenario_id"]): i for i, s in enumerate(scen)}
     assert agreement({"scenarios": scen}, ranks) == (10, 3, 1)
+
+
+def test_scenario_view_reads_big_trend() -> None:
+    from auto_trading.research.elliott.demo_setup import scenario_view
+
+    def sc(i: int, pattern: str, d: int) -> dict[str, object]:
+        return {
+            "scenario_id": f"s{i}",
+            "pattern": pattern,
+            "direction": d,
+            "anchors": [{"price": "100"}],
+            "invalidation_levels": [
+                {"rule_id": "B_BEYOND_A_START", "price": "100", "comparator": "<="},
+                {"rule_id": "END_REEXTENDED", "price": "90", "comparator": "<="},
+            ],
+        }
+
+    scen = [sc(0, "ZIGZAG", -1), sc(1, "IMPULSE", -1), sc(2, "FLAT", -1)]
+    v = scenario_view({"scenarios": scen}, {"s0": 1, "s1": 2, "s2": 3})
+    assert (v["trend_up"], v["trend_down"]) == (2, 1)  # 하락 조정 끝 2 → 상승 · 하락 충격파 끝 1
+    assert v["best"]["label"] == "하락 지그재그 끝" and v["best"]["invalid"] == "90"
+    assert scenario_view({"scenarios": []}, {})["top"] == 0
+
+
+def test_no_alert_when_no_entry_pattern(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(demo_ew_btc, "NO_SETUP_ALERTS", True)
+    api = FakeApi()
+    r, notes = runner(tmp_path, api)
+    r.on_scan([(1_000, None, 0)])
+    n = len(notes)
+    info = {"pivot": "저점", "price": "80000", "top": 10, "up": 0, "down": 0}
+    r.on_scan([(1_000, None, 0), (2_000, None, 16, info)])
+    assert len(notes) == n

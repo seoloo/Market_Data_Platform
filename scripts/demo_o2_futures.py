@@ -190,9 +190,14 @@ def state_message(rep: OverlayExecutionReport) -> str:
     )
 
 
+TELEGRAM = False
+"""2026-10-09 사용자 "이제 지금 paper 테스트 중인 것들 알림을 보내지 않아도 돼" → 텔레그램 끔.
+기록(``outbox.log`` · DB · 보고서)은 그대로 남는다 — 대시보드 · 에이전트에게 물어서 본다."""
+
+
 class Notify:
     def __init__(self) -> None:
-        creds = load_telegram_credentials(REPO_ROOT / ".env")
+        creds = load_telegram_credentials(REPO_ROOT / ".env") if TELEGRAM else None
         self._telegram = TelegramNotifier(creds) if creds else None
         self._outbox = OutboxNotifier(OUT / "outbox.log")
 
@@ -231,6 +236,7 @@ def _summary(rep: OverlayExecutionReport) -> dict[str, Any]:
                 "orders": g.orders,
                 "stop": g.stop,
                 "notes": g.notes,
+                "protection_elapsed_upper_ms": g.protection_elapsed_upper_ms,
             }
             for g in rep.legs
         ],
