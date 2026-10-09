@@ -7,7 +7,8 @@ from scripts.run_brake_186 import ma_above, macd_above, rsi_wilder, simulate, ve
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2000, 1, 1)
+    out: list[str] = []
+    d = date(2000, 1, 1)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())

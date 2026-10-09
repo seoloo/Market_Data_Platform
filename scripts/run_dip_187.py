@@ -274,10 +274,19 @@ def bottom_events(nd: Mapping[str, Any]) -> dict[str, set[int]]:
         "S4": set(div_events(bars(nd))),
     }
     for i in range(1, len(c)):
-        if r[i - 1] is not None and r[i] is not None and r[i - 1] <= 30 < r[i]:
+        r0, r1 = r[i - 1], r[i]
+        if r0 is not None and r1 is not None and r0 <= 30 < r1:
             out["S1"].add(i)
         a0, s0, a1, s1 = line[i - 1], sig[i - 1], line[i], sig[i]
-        if None not in (a0, s0, a1, s1) and a1 < 0 and a0 <= s0 and a1 > s1:
+        if (
+            a0 is not None
+            and s0 is not None
+            and a1 is not None
+            and s1 is not None
+            and a1 < 0
+            and a0 <= s0
+            and a1 > s1
+        ):
             out["S2"].add(i)
         if i >= 20:
             w0 = c[i - 20 : i]

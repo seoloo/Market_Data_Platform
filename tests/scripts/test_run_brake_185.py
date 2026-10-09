@@ -6,7 +6,8 @@ from scripts.run_brake_185 import simulate, verdict
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2000, 1, 1)
+    out: list[str] = []
+    d = date(2000, 1, 1)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())

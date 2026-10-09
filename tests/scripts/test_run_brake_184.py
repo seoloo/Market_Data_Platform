@@ -7,7 +7,8 @@ from scripts.run_brake_184 import Book, irr, simulate, tax_of
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2020, 1, 1)
+    out: list[str] = []
+    d = date(2020, 1, 1)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())

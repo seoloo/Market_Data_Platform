@@ -7,7 +7,8 @@ from scripts.run_lookback_188 import L120, trend_map, verdict
 
 
 def _days(n: int) -> list[str]:
-    out, d = [], date(2000, 1, 3)
+    out: list[str] = []
+    d = date(2000, 1, 3)
     while len(out) < n:
         if d.weekday() < 5:
             out.append(d.isoformat())
