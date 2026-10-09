@@ -85,3 +85,34 @@ def test_nav_step_deposit_does_not_move_nav() -> None:
         prices=half,
     )
     assert s2.flow == 0 and s2.dd == pytest.approx(Decimal("0.25"))
+
+
+def test_books_average_cost_and_realized() -> None:
+    from auto_trading.ops.t2_upbit import books
+
+    orders = [
+        {
+            "identifier": "t2u-2026-10-08-BTC-B",
+            "side": "bid",
+            "executed_volume": "2",
+            "funds": "200",
+            "paid_fee": "2",
+        },
+        {
+            "identifier": "t2u-2026-10-09-BTC-S",
+            "side": "ask",
+            "executed_volume": "1",
+            "funds": "150",
+            "paid_fee": "1",
+        },
+        {
+            "identifier": "t2u-2026-10-09-ETH-B",
+            "side": "bid",
+            "executed_volume": "0",
+            "funds": "0",
+            "paid_fee": "0",
+        },
+    ]
+    b = books(orders)["BTC"]
+    assert b.qty == 1 and b.cost == 101 and b.realized == 150 - 1 - 101
+    assert books(orders)["ETH"].cost == 0

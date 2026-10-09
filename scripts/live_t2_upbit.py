@@ -42,6 +42,7 @@ from auto_trading.ops.t2_upbit import (
     MARKETS,
     MIN_KRW,
     STEP,
+    books,
     equity,
     nav_step,
     plan,
@@ -200,8 +201,13 @@ def run_cmd() -> int:
     try:
         p = _plan_today(c, st, now_ms)
         ns = p["nav"]
-        if ns.flow and Decimal(st["units"]) > 0 and abs(ns.flow) >= 1:
-            lines.append(f"💰 입금 · 출금 감지 {ns.flow:+,.0f} 원 → 적립으로 반영")
+        deposits = st.setdefault("deposits", [])
+        if Decimal(st["units"]) <= 0 and not deposits:
+            deposits.append([p["day"], str(p["equity"])])  # 첫 실행: 그때 평가액 = 첫 입금
+        elif ns.flow and abs(ns.flow) >= 1:
+            deposits.append([p["day"], str(ns.flow)])
+            word = "입금" if ns.flow > 0 else "출금"
+            lines.append(f"💰 {word} 감지 {ns.flow:+,.0f} 원 → 총 입금에 반영")
         if p["stopped"] and not st.get("stopped"):
             lines.append(f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤 (해제는 사람이)")
         st.update(
@@ -262,20 +268,49 @@ def run_cmd() -> int:
     (REPORTS / f"{p['day']}.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    held = " · ".join(f"{k} {hold[k] * prices[k]:,.0f}" for k in COINS)
     text = "\n".join(
         [
             f"{TAG} · {p['day']}",
             RULE,
             f"목표 {_fmt_w(p['weights'])}",
             *lines,
-            sub(f"평가액 {eq:,.0f} 원 (원화 {krw:,.0f} · {held}) · 낙폭 {ns.dd:.1%}"),
+            "",
+            *pnl_lines(st, krw, hold, prices, eq, ns.dd),
         ]
     )
     print(text)
     if lines:  # 주문 · 입출금 · 정지가 있던 날만 알린다
         _notify(text)
     return 0
+
+
+def pnl_lines(
+    st: dict[str, Any],
+    krw: Decimal,
+    hold: dict[str, Decimal],
+    prices: dict[str, Decimal],
+    eq: Decimal,
+    dd: Decimal,
+) -> list[str]:
+    """총 입금 · 코인별 평가 손익 · 총 손익 (2026-10-09 사용자 요청)."""
+    paid = sum((Decimal(str(d[1])) for d in st.get("deposits", [])), Decimal(0))
+    bk = books(st.get("orders", []))
+    out = []
+    for k in COINS:
+        value = hold[k] * prices[k]
+        b = bk[k]
+        if value <= 0 and b.cost <= 0:
+            continue
+        gain = value - b.cost
+        pct = f" ({gain / b.cost:+.1%})" if b.cost > 0 else ""
+        out.append(f"{k} {value:,.0f} 원 · 원가 {b.cost:,.0f} · {gain:+,.0f}{pct}")
+    total = eq - paid
+    pct = f" ({total / paid:+.1%})" if paid > 0 else ""
+    return [
+        f"💼 총 입금 {paid:,.0f} 원 → 평가 {eq:,.0f} 원 · 손익 {total:+,.0f}{pct}",
+        *[sub(x) for x in out],
+        sub(f"원화 {krw:,.0f} 원 · 낙폭 {dd:.1%}"),
+    ]
 
 
 def status_cmd() -> int:
@@ -287,6 +322,16 @@ def status_cmd() -> int:
     )
     for row in st.get("history", [])[-10:]:
         print("  ", row)
+    c = _client()
+    try:
+        krw, hold, prices = _snapshot(c)
+    finally:
+        c.close()
+    eq = equity(krw, hold, prices)
+    peak = Decimal(str(st.get("peak") or "0"))
+    units = Decimal(str(st.get("units") or "0"))
+    dd = 1 - (eq / units) / peak if units > 0 and peak > 0 else Decimal(0)
+    print("\n".join(pnl_lines(st, krw, hold, prices, eq, max(dd, Decimal(0)))))
     return 0
 
 

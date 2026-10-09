@@ -129,3 +129,10 @@ def test_deposit_detected_without_nav_jump(
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     assert Decimal(st["last_nav"]) == pytest.approx(Decimal(1000), rel=Decimal("0.01"))
     assert any("입금" in x for x in sent)
+
+
+def test_alert_has_deposit_and_pnl(env: tuple[Any, FakeUpbit, list[str]]) -> None:
+    m, _fake, sent = env
+    m.main(["run"])
+    assert "총 입금 300,000 원" in sent[0]
+    assert "원가" in sent[0]

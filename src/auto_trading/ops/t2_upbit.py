@@ -110,3 +110,40 @@ def nav_step(
     peak = max(peak, nav)
     dd = 1 - nav / peak if peak > 0 else _ZERO
     return NavStep(units, nav, peak, dd, flow)
+
+
+@dataclass(frozen=True, slots=True)
+class CoinBook:
+    qty: Decimal
+    cost: Decimal
+    """지금 들고 있는 수량의 매입 원가(수수료 포함, 이동평균)."""
+    realized: Decimal
+    """판 것의 실현 손익 누계(수수료 뺌)."""
+
+
+def books(orders: Sequence[Mapping[str, object]]) -> dict[str, CoinBook]:
+    """체결 기록(``t2u-<날짜>-<코인>-<B|S>``) → 코인별 원가 · 실현 손익 (이동평균, 순수)."""
+    qty = dict.fromkeys(COINS, _ZERO)
+    cost = dict.fromkeys(COINS, _ZERO)
+    realized = dict.fromkeys(COINS, _ZERO)
+    for o in orders:
+        ident = str(o.get("identifier") or o.get("id") or "")
+        parts = ident.split("-")
+        if len(parts) < 3 or parts[-2] not in COINS:
+            continue
+        coin = parts[-2]
+        vol = Decimal(str(o.get("executed_volume") or "0"))
+        if vol <= 0:
+            continue
+        funds = Decimal(str(o.get("funds") or "0"))
+        fee = Decimal(str(o.get("paid_fee") or "0"))
+        if o.get("side") == "bid":
+            qty[coin] += vol
+            cost[coin] += funds + fee
+        else:
+            avg = cost[coin] / qty[coin] if qty[coin] > 0 else _ZERO
+            sold = min(vol, qty[coin])
+            realized[coin] += funds - fee - avg * sold
+            cost[coin] -= avg * sold
+            qty[coin] -= sold
+    return {c: CoinBook(qty[c], cost[c], realized[c]) for c in COINS}
