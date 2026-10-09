@@ -355,7 +355,7 @@ def test_m3_insufficient_usd_retries_next_day(
     assert len(state["deposits"]) == 1
 
 
-def test_m3_telegram_amount_sets_month_and_asks_day_before(
+def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     from auto_trading.notify import inbox as inbox_mod
@@ -368,32 +368,52 @@ def test_m3_telegram_amount_sets_month_and_asks_day_before(
     monkeypatch.setattr(mod, "M3_ENABLED", True)
     monkeypatch.setattr(mod, "M3_START", "2026-10-06")
     monkeypatch.setattr(mod, "load_telegram_credentials", lambda path: object())
+    inbox: list[InboxMessage] = []
 
     class FakeInbox:
         def __init__(self, creds: object) -> None:
             pass
 
         def fetch(self, offset: int) -> tuple[list[InboxMessage], int]:
-            return [InboxMessage(offset, 9_999_999_999, "50만")], offset + 1
+            out = list(inbox)
+            inbox.clear()
+            return out, offset + len(out)
 
     monkeypatch.setattr(inbox_mod, "TelegramInbox", FakeInbox)
     _seed(mod)
-    assert mod.run(telegram=True) == 0
+    # 매수 당일(10-06) 아침 09:00 환전 알림 실행: 금액을 묻는다
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 0, tzinfo=UTC))
+    assert mod.fx(telegram=True) == 0
+    assert any("얼마를 매수하시겠습니까" in x and "예시 답: 30만원" in x for x in sent)
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert state["ask_month"] == "2026-10"
+    # 답 "50만" → 5 분 대화 실행이 금액을 정하고 오늘 밤 계획 · 보유 · 배당을 답장
+    sent.clear()
+    inbox.append(InboxMessage(1, 9_999_999_999, "50만"))
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 5, tzinfo=UTC))
+    assert mod.m3_chat(telegram=True) == 0
+    plan = [x for x in sent if "오늘(2026-10-06) 밤 매수 예정" in x and "비율 TQQQ" in x]
+    assert plan, sent
+    assert "이유: QQQ 20일 변동성" in plan[0] and "현재 보유 달러 $2,000.00 → 필요 달러" in plan[0]
+    assert "📦 현재 보유 (M3 몫)" in plan[0] and "💰 배당" in plan[0]
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["amounts"] == {"2026-10": 500_000.0}
+    assert not state["deposits"] and not fake.sent  # 답장은 계산만 — 주문 · 납입 없음
+    # 밤 21:00 실행이 그 금액으로 산다
+    monkeypatch.setattr(mod, "_kst_now", lambda: NOW_KST)
+    assert mod.run(telegram=True) == 0
+    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["deposits"][0][1] == 500_000.0
-    assert any("50" in x and "정했어요" in x for x in sent)
-    # 10-30(금) 밤: 다음 평일 11-02 → 묻기
-    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 30, 21, 0, tzinfo=UTC))
+    # 같은 달은 다시 묻지 않는다 · 대화 실행도 할 일 없음
+    sent.clear()
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 9, 0, tzinfo=UTC))
     for k in range(1, len(fake.sent) + 1):
         fake.statuses.setdefault(
             f"OID-{k}", TossOrderStatus("FILLED", Decimal(1), Decimal(1), Decimal(1), Decimal(0))
         )
-    sent.clear()
-    assert mod.run(telegram=True) == 0
-    assert any("얼마 매수하시겠습니까" in x for x in sent)
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
-    assert state["ask_month"] == "2026-11"
+    assert mod.fx(telegram=True) == 0
+    assert not any("얼마를 매수하시겠습니까" in x for x in sent)
+    assert mod.m3_chat(telegram=True) == 0
 
 
 def test_m3_retry_command_buys_after_funds_arrive(
@@ -418,3 +438,18 @@ def test_m3_retry_command_buys_after_funds_arrive(
     n = len(fake.sent)
     assert mod.m3_only(telegram=False) == 0
     assert len(fake.sent) == n
+
+
+def test_m3_no_ask_when_amount_already_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    sent: list[str] = []
+    fake = FakeToss(usd="2000")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
+    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    _seed(mod)
+    m3 = mod._load_m3()
+    m3.amounts["2026-10"] = 300_000.0
+    mod._save_m3(m3)
+    assert mod._m3_ask_today("2026-10-06", True) is False
+    assert not sent

@@ -52,13 +52,17 @@ from auto_trading.ops.m3_live import (
     M3State,
     amount_target,
     apply_fill,
+    ask_message,
     choose,
     credit_dividends,
     deposit,
+    deposited,
+    dividend_lines,
     due,
+    holdings_lines,
     lev_share,
     limit_price,
-    next_weekday,
+    plan_message,
 )
 from auto_trading.ops.m3_live import SYMBOLS as M3_SYMBOLS
 from auto_trading.ops.qndx_alert import (
@@ -314,11 +318,14 @@ def _m3_resolve(day: Day, m3: M3State) -> list[str]:
     return notes
 
 
-def _m3_plan(day: Day, m3: M3State) -> tuple[dict[str, int], float | None, float, list[str]]:
+def _m3_plan(
+    day: Day, m3: M3State, events: list[tuple[str, str, float]] | None = None
+) -> tuple[dict[str, int], float | None, float, list[str]]:
     """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
     closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
     vol, share = lev_share(closes, day.today)
-    notes = credit_dividends(m3, _dividend_events(), day.today, _since)
+    events = _dividend_events() if events is None else events
+    notes = credit_dividends(m3, events, day.today, _since)
     krw = m3.amounts.get(day.today[:7], M3_MONTHLY_KRW)
     usd = deposit(m3, day.today, krw, day.fx)
     if usd:
@@ -337,8 +344,10 @@ def _m3_plan(day: Day, m3: M3State) -> tuple[dict[str, int], float | None, float
     return choose(qty, cash, last, share, day.fee), vol, share, notes
 
 
-def _m3_poll(today: str, telegram: bool) -> None:
-    """텔레그램 답으로 이번(또는 물어본 다음) 달 M3 금액을 정한다. 등록 채팅의 글만 읽는다."""
+def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
+    """텔레그램 답으로 이번(또는 물어본 다음) 달 M3 금액을 정한다. 등록 채팅의 글만 읽는다.
+
+    ``reply`` 면 이번 달(매수 당일) 금액이 정해질 때 오늘 밤 계획을 바로 답장한다 (21:00 전)."""
     from auto_trading.notify.channels import NotifyError
     from auto_trading.notify.inbox import TelegramInbox, parse_krw
 
@@ -352,6 +361,7 @@ def _m3_poll(today: str, telegram: bool) -> None:
         print(f"텔레그램 받기 실패: {exc}")
         return
     m3.tg_offset = nxt
+    planned = False
     for msg in msgs:
         target = amount_target(m3, today)
         if target is None:
@@ -367,33 +377,72 @@ def _m3_poll(today: str, telegram: bool) -> None:
             )
         else:
             m3.amounts[target] = krw
-            _notify(f"📈 M3 {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
+            planned = planned or target == today[:7]
+            if not (reply and target == today[:7]):
+                _notify(f"📈 M3 {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
     _save_m3(m3)
+    if planned and reply and due(m3, today):
+        try:
+            _notify(_m3_preview(_kst_now()), telegram)
+        except (AutoTradingError, TossApiError) as exc:
+            _notify(f"📈 M3 금액은 정했지만 계획 계산 실패: {exc}", telegram)
 
 
-def _m3_maybe_ask(today: str, telegram: bool) -> None:
-    """다음 평일이 새 달이면(= 내일이 그 달 첫 거래일) 금액을 묻는다. 달마다 한 번."""
+def _m3_ask_today(today: str, telegram: bool) -> bool:
+    """매수 당일(이번 달 아직 안 산 평일) 아침에 금액을 묻는다. 달마다 한 번. 물었으면 True."""
     if not M3_ENABLED:
-        return
+        return False
     m3 = _load_m3()
-    nxt = next_weekday(today)
-    if nxt[:7] == today[:7] or m3.ask_month == nxt[:7]:
-        return
-    m3.ask_month, m3.ask_ts = nxt[:7], int(time.time())
+    month = today[:7]
+    if not due(m3, today) or deposited(m3, month) or month in (m3.ask_month, *m3.amounts):
+        return False  # 이미 물었거나 이번 달 금액을 미리 정해 두었다
+    m3.ask_month, m3.ask_ts = today[:7], int(time.time())
     _save_m3(m3)
-    _notify(
-        "\n".join(
-            [
-                f"📈 M3 · {nxt} 밤 매수 예정",
-                RULE,
-                f"{nxt[:7]} 은 얼마 매수하시겠습니까?",
-                sub("예: 30만 · 500000 · 0(이번 달 쉬기)"),
-                sub(f"답이 없으면 {M3_MONTHLY_KRW:,.0f}원"),
-                sub("내일 아침 환전 알림에 반영돼요"),
-            ]
-        ),
-        telegram,
+    _notify(ask_message(today, M3_MONTHLY_KRW), telegram)
+    return True
+
+
+def _m3_preview(now: datetime, *, title: str = "") -> str:
+    """오늘 밤 M3 계획 · 보유 · 배당 (상태는 복사본으로만 계산, 주문 없음)."""
+    states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
+    qs = _live_qs()
+    trader = _trader()
+    try:
+        day = Day(trader, now, dry=True)
+        before = _load_m3()
+        m3 = copy.deepcopy(before)
+        events = _dividend_events()
+        plan, vol, share, _ = _m3_plan(day, m3, events)
+        states, qs = copy.deepcopy(states), copy.deepcopy(qs)
+        if qs is not None:
+            day.qs_prepare(qs, datetime.now(tz=UTC))
+        needs = _needs(day, states, qs)
+    finally:
+        trader.close()
+    krw = before.amounts.get(day.today[:7], M3_MONTHLY_KRW)
+    source = "텔레그램 답" if day.today[:7] in before.amounts else "기본"
+    if deposited(before, day.today[:7]):
+        krw, source = 0.0, "이미 넣음"
+    credited = [d for d in m3.dividends if d not in before.dividends]
+    after = {s: m3.qty.get(s, 0.0) + max(plan.get(s, 0), 0) for s in M3_SYMBOLS}
+    text = plan_message(
+        today=day.today,
+        krw=krw,
+        source=source,
+        fx_rate=day.fx,
+        vol=vol,
+        share=share,
+        plan=plan,
+        prices={s: day.prices[s] for s in M3_SYMBOLS},
+        fee=day.fee,
+        usd_now=day.usd,
+        need_all=sum(n["qty"] * n["limit"] * (1 + day.fee) for n in needs),
+        sections=[
+            holdings_lines(before, {s: day.prices[s] for s in M3_SYMBOLS}),
+            dividend_lines(before, events, credited, after),
+        ],
     )
+    return f"{title}\n{text}" if title else text
 
 
 def _m3_needs(day: Day) -> list[dict[str, Any]]:
@@ -648,7 +697,8 @@ def fx(telegram: bool = True) -> int:
     if not states:
         print("아직 시작 전 (start)")
         return 2
-    _m3_poll(now.strftime("%Y-%m-%d"), telegram)
+    _m3_ask_today(now.strftime("%Y-%m-%d"), telegram)
+    _m3_poll(now.strftime("%Y-%m-%d"), telegram, reply=True)
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
@@ -907,7 +957,6 @@ def run(telegram: bool = True) -> int:
     if not QUIET_ROUTINE or any(mark in text for mark in ALERT_MARKS):
         _notify(text, telegram)
     print(text)
-    _m3_maybe_ask(today, telegram)
     return 0
 
 
@@ -1066,6 +1115,38 @@ def harvest_plan(other_gains_krw: float) -> int:
     return 0
 
 
+def m3_chat(telegram: bool = True) -> int:
+    """매수 당일 09:00 ~ 20:59 에만 텔레그램 답을 읽어 계획을 답장한다 (5 분마다 예약용)."""
+    now = _kst_now()
+    today = now.strftime("%Y-%m-%d")
+    m3 = _load_m3()
+    if (
+        not M3_ENABLED
+        or now.weekday() >= 5
+        or not (9 <= now.hour < 21)
+        or not due(m3, today)
+        or m3.ask_month != today[:7]
+    ):
+        print("M3 대화: 할 일 없음")
+        return 0
+    _m3_poll(today, telegram, reply=True)
+    return 0
+
+
+def m3_test(telegram: bool = True) -> int:
+    """테스트: 묻기 · 계획 답장 두 통을 지금 상태로 보낸다 (상태 · 주문 바꾸지 않음)."""
+    now = _kst_now()
+    today = now.strftime("%Y-%m-%d")
+    mark = "🧪 테스트 — 실제 묻기 · 주문 아님"
+    ask = f"{mark}\n{ask_message(today, M3_MONTHLY_KRW)}"
+    _notify(ask, telegram)
+    print(ask)
+    plan = _m3_preview(now, title=f"{mark} (답 30만원이라고 가정)")
+    _notify(plan, telegram)
+    print(plan)
+    return 0
+
+
 def main(argv: list[str]) -> int:
     telegram = "--no-telegram" not in argv
     args = [a for a in argv if a != "--no-telegram"]
@@ -1077,12 +1158,15 @@ def main(argv: list[str]) -> int:
         "run": lambda: run(telegram),
         "fx": lambda: fx(telegram),
         "m3": lambda: m3_only(telegram),
+        "m3-chat": lambda: m3_chat(telegram),
+        "m3-test": lambda: m3_test(telegram),
         "preview": preview,
         "status": status,
     }
     if len(args) != 1 or args[0] not in commands:
         raise SystemExit(
-            "usage: python -m scripts.toss_accumulate start|run|fx|m3|preview|status"
+            "usage: python -m scripts.toss_accumulate"
+            " start|run|fx|m3|m3-chat|m3-test|preview|status"
             " [--no-telegram]"
             " | harvest-plan [--other-gains 원]"
         )

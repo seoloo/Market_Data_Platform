@@ -70,3 +70,33 @@ def test_amount_target_and_next_weekday() -> None:
     assert amount_target(st, "2026-11-02") == "2026-11"  # 그 달 매수 전
     deposit(st, "2026-11-02", 500_000, 1350)
     assert amount_target(st, "2026-11-02") is None
+
+
+def test_holdings_dividends_and_reason_lines() -> None:
+    from auto_trading.ops.m3_live import (
+        M3Order,
+        M3State,
+        dividend_lines,
+        holdings_lines,
+        share_reason,
+    )
+
+    st = M3State("2026-10-01", cash_usd=12.4)
+    st.qty = {"TQQQ": 2.0, "SCHD": 3.0}
+    st.orders = [
+        M3Order(
+            "2026-10-01", "TQQQ", "BUY", 2, 80, "a", filled_qty=2, filled_usd=160, commission=0.2
+        ),
+        M3Order(
+            "2026-10-01", "SCHD", "BUY", 3, 33, "b", filled_qty=3, filled_usd=99, commission=0.1
+        ),
+    ]
+    text = "\n".join(holdings_lines(st, {"TQQQ": 90.0, "SCHD": 32.0}))
+    assert "🔺 TQQQ 2주 · $180.00 (+12.4%)" in text  # 180 ÷ 160.2 − 1
+    assert "🔻 SCHD 3주 · $96.00 (-3.1%)" in text and "이월 현금 $12.40" in text
+    st.dividends = [["2026-09-24", "SCHD", 3.0, 0.26, 0.663]]
+    lines = "\n".join(dividend_lines(st, [("2026-09-24", "SCHD", 0.26)], [], {"SCHD": 6.0}))
+    assert "받은 배당 누적 $0.66" in lines and "다음 예상 SCHD: 2026-12" in lines
+    assert "6주 × 직전 주당 $0.2600" in lines
+    assert "최대 60%" in share_reason(0.15, 0.6)
+    assert "= 44% 로 줄임" in share_reason(0.27, 0.6 * 0.20 / 0.27)
