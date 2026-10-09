@@ -227,17 +227,33 @@ def _yahoo(sym: str) -> list[Bar]:
 def _bithumb(sym: str) -> list[Bar]:
     import httpx
 
-    body = httpx.get(
-        f"https://api.bithumb.com/public/candlestick/{sym}_KRW/24h", timeout=60.0
-    ).json()
-    out = []
-    for row in body["data"]:
-        ts, o, c, h, lo = int(row[0]), float(row[1]), float(row[2]), float(row[3]), float(row[4])
-        d = (
-            datetime(1970, 1, 1, tzinfo=UTC) + timedelta(milliseconds=ts) + timedelta(hours=9)
-        ).strftime("%Y-%m-%d")
-        out.append(Bar(d, o, h, lo, c))
-    return out
+    """빗썸 v1 일봉(00:00 KST 시작)을 200 개씩 거슬러 받는다 (공개 API, 키 없음)."""
+    seen: dict[str, Bar] = {}
+    to = ""
+    for _ in range(100):
+        params: dict[str, str | int] = {"market": f"KRW-{sym}", "count": 200}
+        if to:
+            params["to"] = to
+        rows = httpx.get(
+            "https://api.bithumb.com/v1/candles/days", params=params, timeout=60.0
+        ).json()
+        if not rows:
+            break
+        for r in rows:
+            d = str(r["candle_date_time_kst"])[:10]
+            seen[d] = Bar(
+                d,
+                float(r["opening_price"]),
+                float(r["high_price"]),
+                float(r["low_price"]),
+                float(r["trade_price"]),
+            )
+        oldest = min(str(r["candle_date_time_kst"]) for r in rows)
+        to = oldest.replace("T", " ")
+        if len(rows) < 200:
+            break
+        time.sleep(0.15)
+    return [seen[d] for d in sorted(seen)]
 
 
 def _write(name: str, bars: Sequence[Bar]) -> None:
