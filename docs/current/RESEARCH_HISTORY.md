@@ -1028,6 +1028,14 @@ Learned: 기간을 조금 바꿔도 매도 · 재매수 사슬이 바뀌어 세�
 Do not retry: 다른 기간 조합(10 · 30 · 60 등)을 같은 자료로 시험.
 근거: [188 사전등록 · §4 판정](../research/188-t-brake-rebuy-lookback-20-50-100-preregistration.md).
 
+## M3-REBAL — F(양쪽 사고팔기) 유지 (2026-10-09, SCHD 안 팔기 비교)
+
+요약: M3 + T 브레이크에서 매달 비율 맞추기를 양쪽 사고팔기(F) vs SCHD 안 팔기(N) vs 둘 다 안 팔기(N2), 월 30 만 · 100 만 원.
+판정 (1 회): N 세후 실제 30.9 → 25.9%, 합성 20.4 → 17.7% → F 유지.
+Learned: SCHD 를 팔아 떨어진 TQQQ 를 사는 맞추기가 수익의 큰 몫이다. N2 는 수익 ↑ 대신 낙폭 56 · 81%(TQQQ 비중이 불어남). 월 금액은 결과를 거의 안 바꿈(−0.3%p).
+Do not retry: 매도 문턱 · 부분 매도 비율로 같은 자료 재판정.
+근거: [189 사전등록 · §4 판정](../research/189-m3-rebalance-schd-no-sell-preregistration.md).
+
 ## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
 - 하락 브리핑 정보 도구(IDEAS 29, Codex 초안, 수익 연구 아님): 2026-10-08 Phase 0 감사 → 사용자 결정(미국 먼저 · SEC 연락처 · SPY/QQQ 상위 10 · 텔레그램) → 미국 첫판 구현 · 첫 전송. 정확성 검산(앞으로 30 개) 전, 한국은 그 뒤. [감사](../research/BRIEFING_PHASE0_AUDIT.md).
 - **관찰 바구니(171, 2026-10-08 ~, 돈 없음)**: 160-23 ETF 순유입 LONG(W1) · PANIC-KQ(W2) 를 원 규칙 그대로 2026-09 이후 자료로 그림자 기록. W1 30 건 · W2 5 번에 판단(앞으로 평균 > 0 · 합친 2.24 SE 하한 > 0 → 소액 검토 자격). 원 판정(REJECT)은 그대로. [171](../research/171-watchlist-shadow-registration.md).
