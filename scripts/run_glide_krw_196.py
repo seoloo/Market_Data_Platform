@@ -78,13 +78,10 @@ def run_set(
             s["day"] for s in u["sales"]
         ]
     out["period"] = [days[0], days[-1]]
-    fx_y = {}
+    fx_y: dict[str, float] = {}
     for d in k_data["days"]:
-        fx_y.setdefault(d[:4], [None, None])
-        if fx_y[d[:4]][0] is None:
-            fx_y[d[:4]][0] = k_data["lev"][d] / data["lev"][d]
-        fx_y[d[:4]][1] = k_data["lev"][d] / data["lev"][d]
-    out["fx_year_end"] = {y: round(v[1], 1) for y, v in fx_y.items()}
+        fx_y[d[:4]] = round(k_data["lev"][d] / data["lev"][d], 1)
+    out["fx_year_end"] = fx_y
     return out
 
 
