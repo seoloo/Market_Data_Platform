@@ -26,10 +26,11 @@ from auto_trading.ui.demo_render import demo_card, demo_page
 from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.leader_alert_render import leader_alert_page
 from auto_trading.ui.lt_render import lt_paper_page
-from auto_trading.ui.overview import overview_attention, overview_stocks, overview_summary
+from auto_trading.ui.overview import overview_attention
 from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
+from auto_trading.ui.stock_home import glide_card, paper_links, stock_performance, stock_settings
 
 __all__ = ["ASSET_DIR", "PAGES", "render_page"]
 
@@ -147,14 +148,18 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
     group = _group(page)
     nav = _subnav(page, group)
     title = next(label for key, _, label in PAGES if key == page)
-    subtitle = "운용과 관찰을 한눈에." if page == "overview" else "저장된 기록을 확인합니다."
+    subtitle = (
+        "주식 운용을 중심으로, 관찰과 연구는 따로."
+        if page == "overview"
+        else "저장된 기록을 확인합니다."
+    )
     tabs = "".join(
         f'<a href="{href}" class="{"on" if key == group else ""}"'
         f"{' aria-current=page' if key == group else ''}>{label}</a>"
         for key, href, label in (
-            ("overview", "/", "요약"),
-            ("coin", "/compare", "코인"),
+            ("overview", "/", "주식 홈"),
             ("stocks", "/toss", "주식"),
+            ("coin", "/compare", "코인"),
             ("research", "/research", "연구"),
             ("system", "/running", "시스템"),
         )
@@ -175,6 +180,8 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         if page == "toss"
         else '<span class="badge">저장된 Paper 기록 · 주문 없음</span>'
         if page in _PAPER_PAGES
+        else '<span class="badge">저장 기록 · 주문 없음</span>'
+        if page == "overview"
         else '<span class="badge red">실거래 비활성</span>'
     )
     if page in _PAPER_PAGES:
@@ -186,6 +193,12 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         foot = (
             "60초마다 저장된 적립 보고서를 다시 읽는다 · "
             "이 화면은 토스 계좌를 실시간 조회하거나 주문하지 않는다."
+        )
+    elif page == "overview":
+        foot = (
+            "60초마다 저장 기록을 다시 읽는다 · "
+            "이 화면은 계좌를 실시간 조회하거나 주문하지 않는다. "
+            "실거래·Paper·Testnet은 분리하며 자산을 합산하지 않는다."
         )
     else:
         foot = (
@@ -206,7 +219,7 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout">{nav}<main>'
         f'<header><div><div class="eyebrow">OPERATIONS / {escape(title)}</div>'
-        f"<h1>{'오늘의 운영' if page == 'overview' else escape(title)}</h1>"
+        f"<h1>{'나의 투자 현황' if page == 'overview' else escape(title)}</h1>"
         f'<div class="mute">{subtitle}</div></div>'
         f'<div class="header-meta"><span class="date">{_kst(data.now_ms)} KST</span>'
         f'<div><span class="badge">읽기 전용</span>{trading_badge}</div></div></header>'
@@ -444,11 +457,19 @@ def _overview(data: DashboardData) -> str:
         + note
     )
     return (
-        f"{banner}{overview_summary(data)}"
-        f'<div class="grid2"><div>{_chart_panel(data)}{overview_stocks(data)}</div>'
+        f'<div class="stock-home-grid"><div>{glide_card(data)}</div>'
         f"<div>{overview_attention(data)}</div></div>"
+        f'{stock_performance(data)}<div class="stock-home-grid">'
+        f"<div>{stock_settings(data)}</div><div>{paper_links()}</div></div>"
+        '<div class="home-secondary"><a class="panel" href="/compare"><h2>코인 관찰</h2>'
+        '<p class="mute">BTC · ETH / 현물·선물 별도 Paper 원장</p></a>'
+        '<a class="panel" href="/research"><h2>시장 브리핑 · JEV</h2>'
+        '<p class="mute">Shadow 검산 기록 · 주문·사이징에 영향 없음</p></a>'
+        '<a class="panel" href="/research"><h2>연구 기록</h2>'
+        '<p class="mute">판정·자료 부족·관찰을 구분해 확인</p></a></div>'
         f'{_events(data)}<details class="detail-panel">'
-        "<summary>원장 · 보호 · 테스트넷 상세</summary>"
+        "<summary>코인 원장 · 보호 · 테스트넷 상세</summary>"
+        f"{banner}{_chart_panel(data)}"
         f'<div class="cards">{cards}</div><div class="grid2"><div>{_positions_table(data)}</div>'
         f"<div>{_system_panel(data)}{_stream_checklist(data)}</div></div></details>"
     )

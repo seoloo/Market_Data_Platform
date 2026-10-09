@@ -179,6 +179,8 @@ class TestRender:
         assert "읽기 전용" in html
         if page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
+        elif page == "overview":
+            assert "저장 기록 · 주문 없음" in html and "실거래 비활성</span>" not in html
         elif page in ("lt_paper", "qs_paper", "ag_paper", "kr_shadow", "leader_alert"):
             assert "저장된 Paper 기록" in html and "실거래 비활성</span>" not in html
         else:
@@ -503,7 +505,15 @@ class TestRender:
         for section in ("전략별 자산 변화", "시스템 상태", "테스트넷 검증", "포지션 · 보호 상태"):
             assert section in html
         assert "합산하지 않는다" in html
-        for section in ("오늘의 운영", "확인할 일", "다가오는 일정", "해외 주식 적립"):
+        for section in (
+            "나의 투자 현황",
+            "확인할 일",
+            "다가오는 일정",
+            "토스 적립 현황",
+            "Glide",
+            "수익률 추이",
+            "주식 Paper 비교",
+        ):
             assert section in html
 
     def test_toss_initial_cards_do_not_fabricate_account_values(self, root: Path) -> None:
