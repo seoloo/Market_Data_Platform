@@ -26,6 +26,8 @@ from auto_trading.ops.mf_paper import LEV_MAX
 from auto_trading.ops.us_capital_gains import SETTLE_HOLIDAYS, tax_settle
 
 STAGE1, STAGE2 = 0.15, 0.30
+STAGE_SHARE = {0: 1.0, 1: 0.5, 2: 0.0}
+"""브레이크 단계별 매달 TQQQ 목표 배수 (183 · 184 와 같음)."""
 HIGH_DAYS = 252
 DIV_STEPS_KRW = (100_000.0, 300_000.0, 500_000.0, 1_000_000.0)
 STEP_CUT = 0.10
@@ -56,6 +58,10 @@ class Brake:
     """이번 보관 동안의 매도 {date, dd, qty, usd}."""
     sold_total_usd: float = 0.0
     """브레이크로 판 누적(처음부터)."""
+    last_day: str = ""
+    """고점에 반영한 마지막 종가 날짜."""
+    pending: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """접수한 브레이크 · 재매수 주문 {client_id: {kind, dd, prev_stage}} — 체결 확인 뒤 지운다."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

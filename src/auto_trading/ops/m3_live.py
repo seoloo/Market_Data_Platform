@@ -43,6 +43,10 @@ class M3Order:
     filled_qty: float = 0.0
     filled_usd: float = 0.0
     commission: float = 0.0
+    kind: str = ""
+    """'' (매달) · brake (브레이크 매도) · rebuy (보관금으로 되사기)."""
+    booked: bool = False
+    """브레이크 · 재매수 체결을 보관금에 반영했는지."""
 
 
 @dataclass(slots=True)
@@ -63,6 +67,8 @@ class M3State:
     ask_month: str = ""
     ask_ts: int = 0
     tg_offset: int = 0
+    brake: dict[str, Any] = field(default_factory=dict)
+    """T 브레이크 상태 (``ops.m3_guard.Brake.to_dict``)."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -82,6 +88,7 @@ class M3State:
             ask_month=d.get("ask_month", ""),
             ask_ts=int(d.get("ask_ts", 0)),
             tg_offset=int(d.get("tg_offset", 0)),
+            brake=dict(d.get("brake") or {}),
         )
 
 

@@ -15,6 +15,10 @@ QS — QQQ 추세 꺼짐이면 QNDX 멈춤, 다시 켜지면 쌓인 적립금으
 ``TOSS_TRADING_ENABLED=true`` 일 때만 주문, ``data/HALT`` 면 멈춘다. 달러가 모자라 거절되면 알린다
 (QS 의 TQQQ 매수는 다음 날 다시, 그 밖의 거절은 다시 보내지 않음).
 상태 ``data/toss/``, 보고 ``reports/toss/<KST 날짜>.json``.
+
+M3 (문서 182) 는 매달 첫 거래일 TQQQ + SCHD, **T 브레이크**(문서 183 ~ 188)는 매일 21:00:
+TQQQ 고점 대비 −15% 절반 · −30% 전부 매도 → 달러 보관 → QQQ 추세가 꺼졌다 켜지면 되산다.
+브레이크 매도 · 재매수는 알리지 않고 ``reports/toss/M3_BRAKE/`` 와 매달 M3 알림 맨 아래에 적는다.
 """
 
 from __future__ import annotations
@@ -45,6 +49,16 @@ from auto_trading.exchange.toss import (
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.m3_guard import (
+    STAGE_SHARE,
+    Brake,
+    brake_lines,
+    brake_sell,
+    drawdown,
+    rebought,
+    rebuy_due,
+    sold,
+)
 from auto_trading.ops.m3_live import (
     DIV,
     LEV,
@@ -132,6 +146,9 @@ M3_FILE = "M3.json"
 M3_MAX_QTY = {DIV: 40}
 """한 번에 SCHD 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
 M3_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
+M3_BRAKE = True
+"""T 브레이크 (문서 183 ~ 188, 사용자 2026-10-09 '처음부터'): TQQQ 고점 −15% 절반 · −30% 전부,
+판 돈은 달러 보관, QQQ 추세가 꺼졌다 켜지면 되산다. 매일 21:00 실행에서만 판단한다."""
 M3_MAX_KRW = 5_000_000.0
 """텔레그램 금액 답의 상한 (오타 방지). 넘으면 다시 묻는다."""
 TOSS_FEE = 0.001
@@ -285,9 +302,10 @@ def _since(a: str, b: str) -> int:
     return (_date.fromisoformat(b) - _date.fromisoformat(a)).days
 
 
-def _m3_resolve(day: Day, m3: M3State) -> list[str]:
-    """지난 M3 주문을 주문 상세로 정리해 장부에 넣는다."""
-    notes = []
+def _m3_resolve(day: Day, m3: M3State) -> tuple[list[str], list[str]]:
+    """지난 M3 주문을 주문 상세로 정리해 장부에 넣는다. (알림 줄, 브레이크 주문 줄 — 알림 안 함)."""
+    notes: list[str] = []
+    quiet: list[str] = []
     for o in m3.orders:
         if o.date >= day.today:
             continue
@@ -297,6 +315,7 @@ def _m3_resolve(day: Day, m3: M3State) -> list[str]:
                 f"⚠ M3 {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
             )
             continue
+        out = quiet if o.kind else notes
         if o.status != "SENT":
             continue
         st = day.reader.order_status(o.order_id)
@@ -312,10 +331,144 @@ def _m3_resolve(day: Day, m3: M3State) -> list[str]:
         apply_fill(m3, o)
         word = "매수" if o.side == "BUY" else "매도"
         if o.filled_qty > 0:
-            notes.append(f"M3 {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
+            out.append(f"M3 {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
         else:
-            notes.append(f"M3 {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
-    return notes
+            out.append(f"M3 {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
+    return notes, quiet
+
+
+def _brake_of(m3: M3State) -> Brake:
+    return Brake.from_dict(m3.brake) if m3.brake else Brake(ref="T")
+
+
+def _m3_book(m3: M3State, b: Brake) -> list[str]:
+    """정리된 브레이크 · 재매수 주문을 보관금에 반영한다 (한 번만)."""
+    out: list[str] = []
+    for o in m3.orders:
+        if not o.kind or o.booked or o.status not in ("FILLED", "EXPIRED"):
+            continue
+        info = b.pending.pop(o.client_id, {})
+        o.booked = True
+        if o.kind == "brake" and o.filled_qty > 0:
+            net = o.filled_usd - o.commission
+            m3.cash_usd -= net  # apply_fill 이 전략 현금에 넣은 판 돈을 보관금으로 옮긴다
+            sold(b, o.date, float(info.get("dd", 0.0)), o.filled_qty, net)
+            out.append(
+                f"브레이크 매도 체결 {o.date} TQQQ {o.filled_qty:g}주 ${net:,.2f}"
+                f" → 보관금 ${b.reserve_usd:,.2f}"
+            )
+        elif o.kind == "brake":
+            b.stage = int(info.get("prev_stage", b.stage))
+            out.append(f"브레이크 매도 {o.date} 미체결 — 단계 {b.stage} 로 되돌리고 다음 밤 다시")
+        elif o.filled_qty > 0:
+            m3.cash_usd += b.reserve_usd  # 남은 보관금은 전략 현금으로 (산 값은 apply_fill 이 뺐다)
+            px = o.filled_usd / o.filled_qty
+            rebought(b, o.date, 0.0, px)
+            b.last_day = o.date
+            out.append(
+                f"재매수 체결 {o.date} TQQQ {o.filled_qty:g}주 ${o.filled_usd:,.2f}"
+                f" — 브레이크 끝, 고점 ${px:.2f} 부터 다시"
+            )
+        else:
+            out.append(f"재매수 {o.date} 미체결 — 다음 밤 다시")
+    return out
+
+
+def _m3_send(
+    day: Day, trader: TossTrader, m3: M3State, side: str, qty: int, limit: float, kind: str
+) -> tuple[M3Order, str]:
+    """브레이크 · 재매수 주문 (TQQQ, 장 마감 지정가). 보내기 전에 저장한다."""
+    cid = _client_id(f"M3{LEV}", day.today, len(m3.orders) + 1)
+    order = M3Order(day.today, LEV, side, qty, limit, cid, kind=kind)
+    m3.orders.append(order)
+    _save_m3(m3)
+    word = "브레이크 매도" if kind == "brake" else "재매수"
+    try:
+        res = trader.order(LEV, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
+    except OrderStateUnknownError as exc:
+        return order, f"⚠ M3 TQQQ {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}"
+    except TradingDisabledError as exc:
+        order.status = "REJECTED"
+        return order, f"❌ M3 TQQQ {word} 안 보냄: {exc}"
+    if res.accepted:
+        order.status, order.order_id = "SENT", res.code
+        return order, f"🛑 M3 TQQQ {qty}주 {word} 접수 — 장 마감 지정가 {limit:.2f} USD"
+    order.status, order.code = "REJECTED", res.code
+    return order, f"❌ M3 TQQQ {word} 거절 {res.code}: {res.message}"
+
+
+def _m3_brake(
+    day: Day, trader: TossTrader, m3: M3State, *, enabled: bool, halted: str | None
+) -> tuple[list[str], list[str]]:
+    """T 브레이크 하루치 → (알림 줄 — 실패만, 보고 줄). 매도 · 재매수 성공은 알리지 않는다."""
+    alerts: list[str] = []
+    b = _brake_of(m3)
+    report = _m3_book(m3, b)
+    first = min(
+        (o.date for o in m3.orders if o.symbol == LEV and o.side == "BUY" and o.filled_qty > 0),
+        default=None,
+    )
+    if first is None:
+        m3.brake = b.to_dict()
+        return alerts, [*report, "TQQQ 산 적 없음 — 브레이크 대기"]
+    closes = [(d, float(px)) for d, px in day.reader.daily_closes(LEV, 40) if d < day.today]
+    for d, px in closes:
+        if d >= max(first, b.last_day) and (d > b.last_day or b.lev_peak == 0):
+            b.lev_peak = max(b.lev_peak, px)
+            b.last_day = d
+    if not closes:
+        m3.brake = b.to_dict()
+        return [*alerts, "⚠ M3 브레이크: TQQQ 일봉 없음 — 오늘 판단 못 함"], report
+    last_d, last = closes[-1]
+    dd = drawdown(b, last)
+    report.append(
+        f"TQQQ {last_d} 종가 ${last:.2f} · 고점 ${b.lev_peak:.2f} · 낙폭 {dd or 0:.1%}"
+        f" · 단계 {b.stage} · 보관금 ${b.reserve_usd:,.2f}"
+    )
+    if b.pending:
+        m3.brake = b.to_dict()
+        return alerts, [*report, "접수한 브레이크 주문 체결 확인 전 — 오늘은 판단만"]
+    if not enabled or halted:
+        m3.brake = b.to_dict()
+        why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
+        return alerts, [*report, f"브레이크 주문 안 함 — {why}"]
+    prev = b.stage
+    n = brake_sell(b, dd, m3.qty.get(LEV, 0.0))
+    if n > 0:
+        o, line = _m3_send(
+            day, trader, m3, "SELL", n, limit_price(day.prices[LEV], "SELL"), "brake"
+        )
+        if o.status == "REJECTED":
+            b.stage, o.booked = prev, True
+            alerts.append(line)
+        else:
+            b.pending[o.client_id] = {"kind": "brake", "dd": dd, "prev_stage": prev}
+            (alerts if o.status == "UNKNOWN" else report).append(line)
+    elif b.stage > 0 and b.sales:
+        on: bool | None = None
+        try:
+            on, as_of, _ = qs_signal(day.reader, datetime.now(tz=UTC))
+            report.append(f"QQQ 추세 {'켜짐' if on else '꺼짐'} ({as_of} 종가)")
+        except AutoTradingError as exc:
+            alerts.append(f"⚠ M3 브레이크 추세 확인 실패: {exc}")
+        if rebuy_due(b, on):
+            limit = limit_price(day.prices[LEV], "BUY")
+            qty = math.floor(b.reserve_usd / (limit * (1 + day.fee)))
+            if qty >= 1:
+                o, line = _m3_send(day, trader, m3, "BUY", qty, limit, "rebuy")
+                if o.status == "REJECTED":
+                    o.booked = True
+                    alerts.append(line)
+                else:
+                    b.pending[o.client_id] = {"kind": "rebuy"}
+                    (alerts if o.status == "UNKNOWN" else report).append(line)
+            else:
+                m3.cash_usd += b.reserve_usd
+                rebought(b, last_d, 0.0, last)
+                b.last_day = last_d
+                report.append("보관금이 1 주 값보다 적어 전략 현금으로 합침 — 브레이크 끝")
+    m3.brake = b.to_dict()
+    return alerts, report
 
 
 def _m3_plan(
@@ -324,6 +477,11 @@ def _m3_plan(
     """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
     closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
     vol, share = lev_share(closes, day.today)
+    if M3_BRAKE and m3.brake:
+        rebuying = any(
+            o.kind == "rebuy" and o.date == day.today and o.status == "SENT" for o in m3.orders
+        )
+        share *= 1.0 if rebuying else STAGE_SHARE[int(m3.brake.get("stage", 0))]
     events = _dividend_events() if events is None else events
     notes = credit_dividends(m3, events, day.today, _since)
     krw = m3.amounts.get(day.today[:7], M3_MONTHLY_KRW)
@@ -340,7 +498,8 @@ def _m3_plan(
         if o.status == "SENT" and o.date == day.today:
             sign = 1 if o.side == "BUY" else -1
             qty[o.symbol] = qty.get(o.symbol, 0.0) + sign * o.qty
-            cash -= sign * o.qty * o.limit * (1 + day.fee)
+            if not o.kind:  # 브레이크 · 재매수 돈은 보관금이다
+                cash -= sign * o.qty * o.limit * (1 + day.fee)
     return choose(qty, cash, last, share, day.fee), vol, share, notes
 
 
@@ -440,6 +599,7 @@ def _m3_preview(now: datetime, *, title: str = "") -> str:
         sections=[
             holdings_lines(before, {s: day.prices[s] for s in M3_SYMBOLS}),
             dividend_lines(before, events, credited, after),
+            *([b[2:]] if (b := brake_lines(_brake_of(before))) else []),
         ],
     )
     return f"{title}\n{text}" if title else text
@@ -460,13 +620,23 @@ def _m3_needs(day: Day) -> list[dict[str, Any]]:
     ]
 
 
-def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) -> list[str]:
-    """M3 하루치. 이번 달 주문을 다 접수하면 그 달은 끝, 돈 · 시간 문제로 거절되면 다음 날 다시."""
+def _m3_run(
+    day: Day, trader: TossTrader, *, enabled: bool, halted: str | None, brake: bool = True
+) -> list[str]:
+    """M3 하루치. 이번 달 주문을 다 접수하면 그 달은 끝, 돈 · 시간 문제로 거절되면 다음 날 다시.
+
+    ``brake`` (21:00 실행만): 먼저 T 브레이크를 판단한다. 매도 · 재매수는 알리지 않고 보고에만.
+    """
     m3 = _load_m3()
-    notes = _m3_resolve(day, m3)
+    notes, quiet = _m3_resolve(day, m3)
+    alerts: list[str] = []
+    if brake and M3_BRAKE:
+        alerts, report = _m3_brake(day, trader, m3, enabled=enabled, halted=halted)
+        _save_m3(m3)
+        _write_report("M3_BRAKE", day.today, {"lines": [*quiet, *report], "brake": m3.brake})
     if not due(m3, day.today):
         _save_m3(m3)
-        return [f"📈 M3 · {x}" for x in notes]
+        return [*(f"📈 M3 · {x}" for x in notes), *alerts]
     plan, vol, share, more = _m3_plan(day, m3)
     notes += more
     if not any(str(x[0]) == day.today[:7] for x in m3.months):
@@ -479,7 +649,7 @@ def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) 
     if not enabled or halted:
         _save_m3(m3)
         why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
-        return [head, *notes, f"⏸ M3 주문 안 함 — {why} (다음 날 다시)"]
+        return [head, *notes, f"⏸ M3 주문 안 함 — {why} (다음 날 다시)", *alerts]
     retry = False
     lines = []
     for sym, n in sorted(plan.items(), key=lambda kv: kv[1]):  # 파는 것 먼저
@@ -522,7 +692,7 @@ def _m3_run(day: Day, trader: TossTrader, *, enabled: bool, halted: str | None) 
         f" · SCHD {m3.qty.get(DIV, 0):g}"
     )
     _save_m3(m3)
-    return [head, *notes, *lines]
+    return [head, *notes, *lines, *alerts]
 
 
 # ---------------------------------------------------------------- 신호
@@ -981,6 +1151,7 @@ def m3_only(telegram: bool = True) -> int:
             trader,
             enabled=trader.credentials.trading_enabled,
             halted=halted_reason(HALT),
+            brake=False,
         )
     except (AutoTradingError, TossApiError) as exc:
         text = f"⚠ M3 재시도 실패\n{RULE}\n{exc}"
@@ -1059,6 +1230,13 @@ def status() -> int:
             f"M3: 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
             f" · 전략 현금 ${m3.cash_usd:,.2f} · TQQQ {m3.qty.get(LEV, 0):g}"
             f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {M3_MONTHLY_KRW:,.0f}원"
+        )
+        b = _brake_of(m3)
+        print(
+            f"M3 브레이크({'켜짐' if M3_BRAKE else '꺼짐'}): 단계 {b.stage}"
+            f" · TQQQ 고점 ${b.lev_peak:.2f}"
+            f" ({b.last_day or '기록 전'}) · 보관금 ${b.reserve_usd:,.2f}"
+            f" · 누적 매도 ${b.sold_total_usd:,.2f}"
         )
     return 0
 
