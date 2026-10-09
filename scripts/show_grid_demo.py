@@ -61,7 +61,6 @@ def simulate(sym: str) -> dict[str, Any]:
     daily: list[dict[str, Any]] = []
     day_real = 0.0
     last_close = 0.0
-    below = 0
 
     def px(k: int) -> float:
         return base * math.exp(g * k)
