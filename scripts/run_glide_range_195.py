@@ -59,13 +59,22 @@ def returns(
 
 
 def biz_days(n: int) -> list[str]:
+    """가상 거래일 — 해마다 평일 중 고르게 몇 날을 빼서 252 일로 맞춘다.
+
+    평일만 쓰면 한 해가 261 일이라 252 일 수익 30 해치가 29.9 해에 끝난다(첫 실행이 30 년 칸에서 멈춘 까닭).
+    """
     out: list[str] = []
-    d = date(2000, 1, 3)
+    year = 2000
     while len(out) < n:
-        if d.weekday() < 5:
-            out.append(d.isoformat())
-        d += timedelta(days=1)
-    return out
+        wk = [
+            d
+            for d in (date(year, 1, 1) + timedelta(days=i) for i in range(366))
+            if d.year == year and d.weekday() < 5
+        ]
+        drop = {round((k + 0.5) * len(wk) / (len(wk) - 252)) for k in range(len(wk) - 252)}
+        out.extend(d.isoformat() for i, d in enumerate(wk) if i not in drop)
+        year += 1
+    return out[:n]
 
 
 def make_path(
