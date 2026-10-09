@@ -53,6 +53,7 @@ from auto_trading.notify.style import RULE, arrow, sub  # noqa: E402
 from auto_trading.research.elliott.demo_setup import (  # noqa: E402
     EwSetup,
     agreement,
+    scenario_view,
     setup_from_set,
 )
 from auto_trading.research.elliott.minute_path import replay_minute_groups_ladder  # noqa: E402
@@ -154,6 +155,7 @@ def scan(minutes: list[Candle]) -> list[ScanRow]:
             "top": top,
             "up": up,
             "down": down,
+            "view": scenario_view(data, ranks),
         }
         out.append((trig.close_ms, setup_from_set(data, ranks), len(data["scenarios"]), info))
     return out
@@ -162,15 +164,50 @@ def scan(minutes: list[Candle]) -> list[ScanRow]:
 # ---------------------------------------------------------------- 상태·알림
 
 
-def no_setup_message(info: dict[str, Any]) -> str:
-    """새 꼭짓점이 확정됐지만 들어가지 않은 이유 한 줄."""
+def view_lines(info: dict[str, Any]) -> list[str]:
+    """보조 지표 줄: 상위 10 시나리오가 큰 추세를 어느 쪽으로 읽나 + 1 등 해석 · 무효 가격."""
+    view = info.get("view") or {}
+    if not view.get("top"):
+        return ["읽히는 시나리오 없음 (규칙에 맞는 파동 해석이 없다)"]
+    lines = [
+        f"상위 {view['top']}개 시나리오의 큰 추세 해석",
+        f"🔺 상승 {view['trend_up']} · 🔻 하락 {view['trend_down']}",
+        sub(" · ".join(f"{k} {n}" for k, n in view["kinds"].items())),
+    ]
+    best = view.get("best")
+    if best:
+        line = f"1등 해석: {best['label']}"
+        if best.get("invalid"):
+            word = "아래로" if best.get("invalid_cmp") == "<=" else "위로"
+            line += f" · {_fmt(Decimal(best['invalid']))} {word} 다시 가면 이 해석 무효"
+        lines.append(sub(line))
+    return lines
+
+
+def no_setup_message(
+    info: dict[str, Any], tag: str = "🌊 [데모·선물 Elliott]", *, demo: bool = True
+) -> str:
+    """새 꼭짓점이 확정됐지만 들어가지 않은 이유 + 보조 지표 요약.
+
+    2026-10-09 사용자: 상위 10 시나리오를 '내가 판단할 보조 지표' 로 — 상승 몇 개 · 하락 몇 개.
+    합의 0 · 0 이어도 알림이 가는 이유: **새 4h 꼭짓점이 확정될 때마다** 보낸다(진입 여부와 무관).
+    """
     return "\n".join(
         [
-            f"🌊 [데모·선물 Elliott] 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}"
-            " — 진입 안 함",
+            f"{tag} 4h {info['pivot']} 확정 @{_fmt(Decimal(info['price']))}",
             RULE,
-            f"상위 {info['top']}개 시나리오 중 '충격파 5파 종료' 합의",
-            f"🔺 상승 {info['up']} · 🔻 하락 {info['down']} (같은 방향 6개 이상 필요)",
+            *view_lines(info),
+            *(
+                [
+                    "",
+                    sub(
+                        f"데모 진입 조건(충격파 5파 끝 같은 방향 6개 이상): "
+                        f"상승 {info['up']} · 하락 {info['down']} → 진입 안 함"
+                    ),
+                ]
+                if demo
+                else [sub("참고용 — 엘리엇 매매 규칙은 연구에서 기각됐다")]
+            ),
         ]
     )
 
@@ -562,12 +599,53 @@ def _lock(root: Path) -> bool:
     return True
 
 
+ALERT_OUT = REPO_ROOT / "reports" / "ew_indicator"
+ALERT_TAG = "🌊 [엘리엇 보조지표 · BTC]"
+
+
+def alerts_only(client: httpx.Client, *, once: bool) -> int:
+    """주문 없이 4h 꼭짓점마다 보조 지표 알림만 (데모가 끝난 뒤용, 2026-10-09 사용자).
+
+    엘리엇 매매 규칙은 연구에서 기각됐다 — 이 알림은 사람이 흐름을 볼 때 쓰는 참고 자료다.
+    """
+    if not once and not _lock(ALERT_OUT):
+        print("보조 지표 알림이 이미 돌고 있다 — 끝낸다")
+        return 0
+    store = Store(ALERT_OUT)
+    notify = Notify(ALERT_OUT, telegram=True)
+    next_scan = 0
+    while True:
+        now = int(time.time() * 1000)
+        if now >= next_scan:
+            try:
+                rows = scan(fetch_minutes(client, now))
+                state = store.load()
+                last = int(state.get("last_trigger_ms", 0))
+                if not last:
+                    state["last_trigger_ms"] = rows[-1][0] if rows else now
+                else:
+                    for row in [r for r in rows if r[0] > last]:
+                        notify(no_setup_message(row[3], ALERT_TAG, demo=False))
+                        state["last_trigger_ms"] = row[0]
+                store.save(state)
+            except (AutoTradingError, httpx.HTTPError) as exc:
+                store.event("error", error=str(exc))
+                print(f"오류 (다음 점검에서 다시): {exc}", flush=True)
+            next_scan = now - now % H4 + H4 + SCAN_DELAY_MS
+        if once:
+            return 0
+        time.sleep(30)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--scan-only", action="store_true")
+    parser.add_argument("--alerts-only", action="store_true")
     args = parser.parse_args(argv)
     client = httpx.Client(timeout=20)
+    if args.alerts_only:
+        return alerts_only(client, once=args.once)
     if args.scan_only:
         for close_ms, s, n, info in scan(fetch_minutes(client, int(time.time() * 1000)))[-10:]:
             print(_date(close_ms), n, info, None if s is None else _setup_row(s))
