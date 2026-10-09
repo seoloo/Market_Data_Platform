@@ -30,8 +30,8 @@ from auto_trading.ops.us_capital_gains import (
     Trade,
     build,
     by_tag,
+    tax_settle,
     unrealized,
-    us_settle,
     year_summary,
 )
 
@@ -84,7 +84,7 @@ def trades_from(fills: list[TossFill], m3_ids: set[str]) -> list[Trade]:
                 float(f.qty),
                 float(f.amount),
                 float(f.commission + f.tax),
-                f.settle_date or us_settle(f.filled_at),
+                tax_settle(f.filled_at),
                 f.filled_at,
                 "M3" if f.order_id in m3_ids else "",
             )

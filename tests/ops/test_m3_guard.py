@@ -125,7 +125,7 @@ def test_reminders_expiry_and_harvest_deadline() -> None:
     h = Proposal("h", "harvest", "2026-12-14", "2026-12-29", "TQQQ", 2)
     assert remind_due(h, "2026-12-15") and not remind_due(h, "2026-12-30")
     assert expire(h, "2026-12-30") and h.status == "expired"
-    assert harvest_deadline(2026) == "2026-12-29"
+    assert harvest_deadline(2026) == "2026-12-28"
     msg = harvest_message(
         year=2026, room_krw=680_000, picks=[("TQQQ", 3, 650_000)], deadline="2026-12-29"
     )

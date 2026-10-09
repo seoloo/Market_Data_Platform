@@ -36,14 +36,19 @@ _HOLIDAYS = (
 SETTLE_HOLIDAYS = frozenset(_HOLIDAYS.split())
 
 
-def us_settle(filled_at: str) -> str:
-    """체결 시각(ISO, 시간대 포함) → 미국 결제일 (뉴욕 거래일 + 1 결제 영업일, T+1).
+def tax_settle(filled_at: str) -> str:
+    """체결 시각(ISO, 시간대 포함) → 양도세 결제일 (뉴욕 거래일 + 2 영업일).
 
-    토스 주문 목록의 ``settlementDate`` 가 비어 와서 직접 센다. 휴일표 밖의 해는 주말만 건너뛴다.
+    토스 양도세 화면 설명: "구매 · 판매 후 2 영업일 뒤인 결제일의 기준 환율". 2026 실제 계좌에서
+    이 기준이 토스 숫자와 1.1% 안으로 맞았다(미국 T+1 결제일로는 6.6% 차이). 토스 주문 목록의
+    ``settlementDate`` 가 비어 와서 직접 센다. 휴일표 밖의 해는 주말만 건너뛴다.
     """
-    day = datetime.fromisoformat(filled_at).astimezone(NY).date() + timedelta(days=1)
-    while day.weekday() >= 5 or day.isoformat() in SETTLE_HOLIDAYS:
+    day = datetime.fromisoformat(filled_at).astimezone(NY).date()
+    left = 2
+    while left:
         day += timedelta(days=1)
+        if day.weekday() < 5 and day.isoformat() not in SETTLE_HOLIDAYS:
+            left -= 1
     return day.isoformat()
 
 

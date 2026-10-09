@@ -23,7 +23,7 @@ from typing import Any
 
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops.mf_paper import LEV_MAX
-from auto_trading.ops.us_capital_gains import SETTLE_HOLIDAYS, us_settle
+from auto_trading.ops.us_capital_gains import SETTLE_HOLIDAYS, tax_settle
 
 STAGE1, STAGE2 = 0.15, 0.30
 HIGH_DAYS = 252
@@ -327,7 +327,7 @@ def harvest_deadline(year: int) -> str:
     while d.month == 12 and len(days) < 2:
         iso = d.isoformat()
         trading = d.weekday() < 5 and iso not in SETTLE_HOLIDAYS
-        if trading and us_settle(f"{iso}T16:00:00-05:00")[:4] == str(year):
+        if trading and tax_settle(f"{iso}T16:00:00-05:00")[:4] == str(year):
             days.append(iso)
         d -= timedelta(days=1)
     return days[-1]

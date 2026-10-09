@@ -6,22 +6,22 @@ from auto_trading.ops.us_capital_gains import (
     build,
     by_tag,
     fx_on,
+    tax_settle,
     unrealized,
-    us_settle,
     year_summary,
 )
 
 RATES = {"2026-01-05": 1300.0, "2026-03-03": 1400.0, "2026-06-01": 1350.0}
 
 
-def test_us_settle_is_new_york_trade_date_plus_one_settlement_day() -> None:
-    # KST 10-08 05:00 = 뉴욕 10-07 16:00 → 10-08
-    assert us_settle("2026-10-08T05:00:02.332+09:00") == "2026-10-08"
-    # 금요일 체결 → 월요일, 10-12(콜럼버스) 는 결제 휴일 → 10-13
-    assert us_settle("2026-10-10T05:00:00+09:00") == "2026-10-13"
-    # 12-30(수) 체결 → 12-31, 12-31(목) 체결 → 다음 해 01-04
-    assert us_settle("2026-12-31T06:00:00+09:00") == "2026-12-31"
-    assert us_settle("2027-01-01T06:00:00+09:00") == "2027-01-04"
+def test_tax_settle_is_new_york_trade_date_plus_two_business_days() -> None:
+    # KST 10-08 05:00 = 뉴욕 10-07(수) 16:00 → 10-09
+    assert tax_settle("2026-10-08T05:00:02.332+09:00") == "2026-10-09"
+    # 금요일 체결 → 10-12(콜럼버스) 는 결제 휴일 → 10-13 · 10-14
+    assert tax_settle("2026-10-10T05:00:00+09:00") == "2026-10-14"
+    # 12-29(화) 체결 → 12-31, 12-30(수) 체결 → 다음 해 01-04
+    assert tax_settle("2026-12-30T06:00:00+09:00") == "2026-12-31"
+    assert tax_settle("2026-12-31T06:00:00+09:00") == "2027-01-04"
 
 
 def test_fx_on_uses_previous_business_day() -> None:
