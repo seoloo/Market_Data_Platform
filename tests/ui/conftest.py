@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_trading.ops import task_setup
+from auto_trading.ops import phone_link, task_setup
 
 
 @pytest.fixture(autouse=True)
@@ -15,3 +15,4 @@ def _no_real_powershell(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("시험에서 예약을 바꾸려 함")
 
     monkeypatch.setattr(task_setup, "_powershell", fake)
+    monkeypatch.setattr(phone_link, "find_exe", lambda: None)  # 진짜 tailscale 도 부르지 않게

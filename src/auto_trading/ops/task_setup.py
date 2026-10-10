@@ -12,11 +12,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from html import escape
 from pathlib import Path
 
 __all__ = [
@@ -64,6 +66,12 @@ TASKS: tuple[TaskDef, ...] = (
     TaskDef("AutoTrading_Info_Bot", "info", "정보 봇 (종목 뉴스 답)", "1분마다"),
     TaskDef("AutoTrading_Theme_Alert", "info", "주간 테마", "토 09:00"),
     TaskDef("AutoTrading_Market_Brief", "info", "시장 브리핑", "화 ~ 토 07:30"),
+    TaskDef(
+        "AutoTrading_Dashboard",
+        "phone",
+        "휴대폰으로 보기 화면 서버 (읽기 전용)",
+        "로그인하면 켜져 계속",
+    ),
 )
 
 GROUPS: tuple[tuple[str, str, str], ...] = (
@@ -74,6 +82,7 @@ GROUPS: tuple[tuple[str, str, str], ...] = (
     ("common", "공통 (텔레그램 봇 · 기록 · 보고)", "텔레그램 봇 토큰 필요"),
     ("extra", "이 PC 관리 (백업 · 매일 점검)", "백업은 F: 디스크가 있어야 해요"),
     ("info", "정보 봇 (뉴스 · 테마 · 브리핑)", "정보 봇 토큰 · Gemini 키 필요"),
+    ("phone", "휴대폰으로 보기 (화면 서버)", "'휴대폰' 메뉴의 Tailscale 연결과 함께 써요"),
 )
 _NEEDS = {"glide": ("toss",)}
 """Glide 를 고르면 함께 켜야 하는 묶음 (토스 매수 실행기가 Glide 월 매수도 한다)."""
@@ -93,9 +102,17 @@ def tasks_for(groups: Sequence[str]) -> list[TaskDef]:
     return [t for t in TASKS if t.group in picked]
 
 
-def render_xml(template: str, repo: Path) -> str:
-    """틀 → 이 PC 용 XML (순수). ``{REPO}`` 를 저장소 경로로."""
-    return template.replace("{REPO}", str(repo))
+def _this_user() -> str:
+    dom, user = os.environ.get("USERDOMAIN", ""), os.environ.get("USERNAME", "")
+    return f"{dom}\\{user}" if dom and user else user
+
+
+def render_xml(template: str, repo: Path, user: str | None = None) -> str:
+    """틀 → 이 PC 용 XML (순수). ``{REPO}`` 를 저장소 경로로, ``{USER}`` 를 지금 Windows 사용자로
+    (로그인 때 켜는 예약은 '누가 로그인할 때' 가 있어야 관리자 권한 없이 등록된다)."""
+    return template.replace("{REPO}", str(repo)).replace(
+        "{USER}", escape(user if user is not None else _this_user())
+    )
 
 
 def normalize_export(xml: str, repo: Path) -> str:
@@ -244,3 +261,8 @@ def enable(
             runner(f"Enable-ScheduledTask -TaskName {_quote(t.name)} | Out-Null")
             done.append(t.name)
     return done
+
+
+def start(name: str, runner: Runner = _powershell) -> None:
+    """예약 하나를 지금 실행 (휴대폰 화면 서버처럼 로그인 때 켜지는 것을 바로 켤 때)."""
+    runner(f"Start-ScheduledTask -TaskName {_quote(name)}")

@@ -119,5 +119,11 @@ def test_templates_are_clean() -> None:
     root = Path(__file__).resolve().parents[2]
     for t in task_setup.TASKS:
         xml = (root / task_setup.TEMPLATE_DIR / f"{t.name}.xml").read_text(encoding="utf-8")
-        assert "{REPO}" in xml and "<UserId>" not in xml and "S4U" not in xml, t.name
+        bare = xml.replace("<UserId>{USER}</UserId>", "")  # 로그인 예약은 등록할 때 지금 사용자로
+        assert "{REPO}" in xml and "<UserId>" not in bare and "S4U" not in xml, t.name
         assert "seolh" not in xml.lower(), t.name
+
+
+def test_render_xml_fills_user() -> None:
+    out = task_setup.render_xml("<U>{USER}</U><R>{REPO}</R>", Path("C:/r"), user=r"PC\me&you")
+    assert out == r"<U>PC\me&amp;you</U><R>" + str(Path("C:/r")) + "</R>"

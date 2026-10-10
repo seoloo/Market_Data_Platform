@@ -13,9 +13,10 @@ from html import escape
 from typing import Any
 
 from auto_trading.ops.env_keys import KEYS, SERVICES, TOSS_SWITCH
+from auto_trading.ops.phone_link import PhoneState
 from auto_trading.ops.task_setup import GROUPS, TASKS, TaskState
 
-__all__ = ["EXTRA_CSS", "keys_tab", "tasks_tab"]
+__all__ = ["EXTRA_CSS", "keys_tab", "phone_tab", "tasks_tab"]
 
 EXTRA_CSS = """
 .set-svc{border-bottom:1px solid var(--line);padding:14px 0}
@@ -52,6 +53,16 @@ border-radius:12px;cursor:pointer}
 .set-tasks th{text-align:left;font-weight:600;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
 .set-tasks td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
 .set-tasks td small{display:block;color:var(--muted)}
+.set-steps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column}
+.set-steps li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;align-items:start;
+padding:14px 0;border-bottom:1px solid var(--line)}
+.set-steps li:last-child{border-bottom:0}
+.set-steps .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--soft);
+color:var(--blue);font-weight:800;font-size:14px}
+.set-steps li>span>b{display:block;font-size:15px}.set-steps small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.set-steps a{color:var(--blue);font-weight:700}
+.set-url{display:block;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+font-weight:800;font-size:14px;word-break:break-all;user-select:all;background:var(--soft)}
 @media(max-width:760px){.set-key{grid-template-columns:1fr}.set-groups{grid-template-columns:1fr}
 .set-tasks th:nth-child(3),.set-tasks td:nth-child(3){display:none}}
 """
@@ -230,3 +241,82 @@ def tasks_tab(
         f'<form id="tasks-f" method="post" action="/settings/tasks">{_hidden_token(token)}</form>'
     )
     return tab, forms
+
+
+def _badge(ok: bool, yes: str, no: str, *, warn: bool = False) -> str:
+    cls = "on" if ok else ("warn" if warn else "off")
+    return f'<span class="set-state {cls}">{escape(yes if ok else no)}</span>'
+
+
+def phone_tab(
+    ph: PhoneState,
+    server: TaskState | None,
+    *,
+    token: str,
+    note: str = "",
+    error: str = "",
+) -> tuple[str, str]:
+    """'휴대폰' 쪽 — Tailscale 로 내 기기에서만 보기 (설치 · 로그인은 사람이, 연결 켜기는 버튼)."""
+    msg = ""
+    if note:
+        msg = f'<div class="set-note ok" role="status">{escape(note)}</div>'
+    if error:
+        msg = f'<div class="set-note bad" role="alert">{escape(error)}</div>'
+    pc_ok = ph.installed and ph.running
+    pc_word = "로그인 필요" if ph.installed else "설치 안 됨"
+    phone_ok = bool(ph.phones)
+    srv_ok = server is not None and server.state != "Disabled"
+    serve_ok = ph.serving
+    addr = (
+        f'<span class="set-url">{escape(ph.url)}</span>'
+        "<small>아이폰 Safari 에 이 주소를 넣고 → 공유 버튼 → <b>홈 화면에 추가</b> 하면 앱처럼 열려요.</small>"
+        if ph.url
+        else "<small>Tailscale 에 로그인하면 이 PC 의 주소가 여기에 보여요.</small>"
+    )
+    steps = (
+        '<ol class="set-steps">'
+        '<li><span class="n">1</span><span><b>이 PC 에 Tailscale 설치 · 로그인</b>'
+        '<small><a href="https://tailscale.com/download/windows" target="_blank" rel="noopener noreferrer">'
+        "tailscale.com/download</a> 에서 Windows 용을 설치하고 Google · Apple 계정 등으로 로그인해요 (개인 무료).</small></span>"
+        f"{_badge(pc_ok, '연결됨', pc_word)}</li>"
+        '<li><span class="n">2</span><span><b>아이폰에 Tailscale 앱 · 같은 계정으로 로그인</b>'
+        "<small>App Store 에서 Tailscale 을 받아 1번과 <b>같은 계정</b>으로 로그인하고 연결을 켜요.</small></span>"
+        f"{_badge(phone_ok, '휴대폰 ' + str(len(ph.phones)) + '대', '안 보임')}</li>"
+        '<li><span class="n">3</span><span><b>휴대폰 연결 켜기</b>'
+        "<small>이 PC 에 화면 서버(읽기 전용)를 예약해 켜고, Tailscale 이 <b>내 기기에서 온 요청만</b> "
+        "그 화면으로 넘기게 해요. 공유기 포트를 열지 않아요. 처음 한 번은 Tailscale 이 HTTPS 허용 링크를 "
+        "보여 줄 수 있어요 — 열어서 허용한 뒤 다시 눌러요.</small></span>"
+        f"{_badge(srv_ok and serve_ok, '켜짐', '꺼짐')}</li>"
+        f'<li><span class="n">4</span><span><b>아이폰에서 열기</b>{addr}</span>'
+        f"{_badge(bool(ph.url) and serve_ok, '준비됨', '대기')}</li>"
+        "</ol>"
+    )
+    disabled = "" if pc_ok else " disabled"
+    tab = (
+        '<section class="set-card"><h2>휴대폰으로 보기</h2>'
+        '<p class="set-sub">아이폰에서 이 PC 의 오르빗 화면을 볼 수 있어요. Tailscale 이 내 기기끼리만 '
+        "이어 줘서 인터넷에 주소가 공개되지 않아요. <b>휴대폰에서는 보기만</b> 되고, 설정 · 키 · 자동 실행 · "
+        "비상 정지는 이 PC 에서만 바뀌어요. PC 가 켜져 있고 로그인돼 있어야 보여요.</p>"
+        f"{msg}{steps}"
+        '<div class="set-actions">'
+        f'<button type="submit" class="set-del" form="phone-f" name="action" value="off"{disabled}>연결 끄기</button>'
+        f'<button type="submit" class="set-primary" form="phone-f" name="action" value="on"{disabled}>휴대폰 연결 켜기</button>'
+        "</div></section>"
+    )
+    forms = (
+        f'<form id="phone-f" method="post" action="/settings/phone">{_hidden_token(token)}</form>'
+    )
+    return tab, forms
+
+
+def remote_settings_page() -> str:
+    """휴대폰(Tailscale)에서 연 설정 — 보기 전용 안내 한 장."""
+    return (
+        '<div class="set-wrap"><div class="set-head"><h1>설정</h1>'
+        "<p>휴대폰에서는 보기만 돼요. 설정 · 키 · 자동 실행 · 비상 정지는 <b>PC 의 오르빗</b>에서 바꿔 주세요.</p>"
+        '</div><section class="set-card"><h2>왜 막아 두었나요</h2>'
+        '<p class="set-sub">휴대폰을 잃어버리거나 누가 잠깐 만져도 매매 설정 · API 키가 바뀌지 않게 하려고요. '
+        "텔레그램 봇의 알림 · 현황은 휴대폰에서도 그대로 써요.</p>"
+        '<p><a class="set-primary" style="display:inline-flex;align-items:center;text-decoration:none" '
+        'href="/live">홈으로</a></p></section></div>'
+    )

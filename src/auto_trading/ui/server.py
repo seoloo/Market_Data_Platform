@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 import time
 from collections.abc import Callable
@@ -32,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from auto_trading.ops import env_keys, task_setup, user_settings
+from auto_trading.ops import env_keys, phone_link, task_setup, user_settings
 from auto_trading.ops.conn_test import run_test
 from auto_trading.ops.kr_accumulate import read_universe
 from auto_trading.ui.catchup import CatchupRunner
@@ -40,8 +41,8 @@ from auto_trading.ui.data import DashboardData, load_dashboard
 from auto_trading.ui.orbit_home import layout as orbit_layout
 from auto_trading.ui.orbit_icons import ICON_ASSETS
 from auto_trading.ui.render import PAGES, render_page
-from auto_trading.ui.settings_extra import keys_tab, tasks_tab
-from auto_trading.ui.settings_page import render_review, render_settings
+from auto_trading.ui.settings_extra import keys_tab, phone_tab, tasks_tab
+from auto_trading.ui.settings_page import render_remote, render_review, render_settings
 
 __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
 
@@ -60,7 +61,32 @@ _ASSETS = {
     "/assets/orbit-space-dark.png": ("orbit-space-dark.png", "image/png"),
     "/assets/orbit-space-light.png": ("orbit-space-light.png", "image/png"),
     "/assets/orbit-live.js": ("orbit-live.js", "text/javascript; charset=utf-8"),
+    # 아이폰 '홈 화면에 추가' 아이콘 (Safari 는 /apple-touch-icon.png 도 찾아본다)
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/assets/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/assets/orbit-app-192.png": ("orbit-app-192.png", "image/png"),
+    "/assets/orbit-app-512.png": ("orbit-app-512.png", "image/png"),
 }
+_MANIFEST = json.dumps(
+    {
+        "name": "오르빗",
+        "short_name": "오르빗",
+        "start_url": "/live",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0c1630",
+        "theme_color": "#0c1630",
+        "lang": "ko",
+        "icons": [
+            {"src": "/assets/orbit-app-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/assets/orbit-app-512.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    },
+    ensure_ascii=False,
+).encode("utf-8")
+"""휴대폰 홈 화면 앱(PWA) 정보 — 오프라인 저장 없이 열 때마다 PC 에서 새로 읽는다."""
+_TS_SUFFIX = ".ts.net"
+"""휴대폰은 Tailscale 이름(``<PC>.<tailnet>.ts.net``)으로만 들어온다 (ops/phone_link.py)."""
 _ASSETS.update(
     {
         f"/assets/icons/{name}": (
@@ -80,7 +106,7 @@ _HEADERS = {
     "Referrer-Policy": "same-origin",
     # 인라인 스타일만 쓴다. 스크립트·외부 자원 없음. 폼은 자기 자신(/catchup)으로만.
     "Content-Security-Policy": (
-        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; "
+        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; "
         "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     ),
 }
@@ -114,6 +140,9 @@ class DashboardServer(ThreadingHTTPServer):
         self.task_runner: task_setup.Runner | None = None
         """시험에서 PowerShell 대신 끼운다."""
         self._task_cache: tuple[float, dict[str, task_setup.TaskState] | None] = (0.0, None)
+        self.phone_runner: phone_link.Runner | None = None
+        """시험에서 tailscale 대신 끼운다."""
+        self.phone_note: tuple[str, str] = ("", "")
         super().__init__(address, _Handler)
 
     def task_states(self, *, fresh: bool = False) -> dict[str, task_setup.TaskState] | None:
@@ -128,6 +157,11 @@ class DashboardServer(ThreadingHTTPServer):
         self._task_cache = (time.monotonic(), got)
         return got
 
+    def host_ok(self, host: str | None) -> bool:
+        """이 PC(127.0.0.1 · localhost) 또는 Tailscale 이름만 — 다른 이름은 DNS 바꿔치기로 본다."""
+        name = (host or "").rsplit(":", 1)[0].lower()
+        return name in ALLOWED_HOSTS or (name.endswith(_TS_SUFFIX) and len(name) > len(_TS_SUFFIX))
+
     def same_origin(self, origin: str | None, host: str | None) -> bool:
         port = self.server_address[1]
         allowed = {f"{h}:{port}" for h in ALLOWED_HOSTS}
@@ -139,14 +173,32 @@ class _Handler(BaseHTTPRequestHandler):
     server_version = "AutoTradingDashboard"
     sys_version = ""
 
+    def _remote(self) -> bool:
+        """휴대폰(Tailscale serve 너머)에서 온 요청 — 보기만 된다."""
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].lower()
+        return (
+            host not in ALLOWED_HOSTS
+            or self.headers.get("X-Forwarded-For") is not None
+            or self.headers.get("Tailscale-User-Login") is not None
+        )
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if not self.server.host_ok(self.headers.get("Host")):
+            self._send(403, "<!doctype html><meta charset='utf-8'><p>이 주소로는 열 수 없어요</p>")
+            return
+        if path == "/manifest.webmanifest":
+            self._send_bytes(200, _MANIFEST, "application/manifest+json")
+            return
         if path == "/theme":  # 오르빗 테마 버튼이 화면을 다시 불러오지 않고 기억만 남긴다
             pick = (parse_qs(self.path.partition("?")[2]).get("set") or [""])[0]
             if pick not in {"light", "dark"}:
                 self._send(400, "<!doctype html><meta charset='utf-8'><p>light · dark 만</p>")
                 return
             self._send_bytes(204, b"", "text/plain; charset=utf-8", theme=pick)
+            return
+        if path == "/settings" and self.server.root is not None and self._remote():
+            self._send(200, orbit_layout(render_remote(), self._theme(), "settings"))
             return
         if path == "/settings" and self.server.root is not None:
             query = parse_qs(self.path.partition("?")[2])
@@ -287,6 +339,13 @@ class _Handler(BaseHTTPRequestHandler):
                     errors=key_errors,
                     tests=self.server.key_tests,
                 ),
+                "phone": phone_tab(
+                    phone_link.state(self.server.phone_runner),
+                    (states or {}).get("AutoTrading_Dashboard"),
+                    token=self.server.settings_token,
+                    note=self.server.phone_note[0],
+                    error=self.server.phone_note[1],
+                ),
                 "tasks": tasks_tab(
                     states,
                     token=self.server.settings_token,
@@ -336,6 +395,34 @@ class _Handler(BaseHTTPRequestHandler):
             service = form.get("service", "")
             self.server.key_tests[service] = run_test(root, service)
             self._redirect("/settings#set-keys")
+            return
+        if self.path == "/settings/phone":
+            prun = self.server.phone_runner
+            try:
+                if form.get("action") == "on":
+                    trun = self.server.task_runner or task_setup._powershell
+                    now = self.server.task_states(fresh=True)
+                    if now is None:
+                        raise RuntimeError("이 PC 의 Windows 예약을 읽지 못했어요")
+                    made, _ = task_setup.register_missing(root, ["phone"], now, trun)
+                    srv = now.get("AutoTrading_Dashboard")
+                    if made or srv is None or srv.state != "Running":
+                        task_setup.start("AutoTrading_Dashboard", trun)
+                    phone_link.serve_on(prun)
+                    self.server.phone_note = (
+                        "휴대폰 연결을 켰어요 — 아래 주소를 아이폰에서 열어요",
+                        "",
+                    )
+                elif form.get("action") == "off":
+                    phone_link.serve_off(prun)
+                    self.server.phone_note = (
+                        "휴대폰 연결을 껐어요 (화면 서버는 이 PC 안에서만 계속)",
+                        "",
+                    )
+            except Exception as exc:  # tailscale 안내 문구(HTTPS 허용 링크 등)를 그대로 보여 준다
+                self.server.phone_note = ("", f"연결 실패: {str(exc)[:300]}")
+            self.server.task_states(fresh=True)
+            self._redirect("/settings#set-phone")
             return
         if self.path == "/settings/tasks":
             groups = [g for g, _, _ in task_setup.GROUPS if form.get(f"g_{g}") == "on"]
@@ -408,7 +495,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        """놓친 작업 다시 실행 버튼 · 설정 화면(확인 → 저장)만 받는다."""
+        """놓친 작업 다시 실행 · 설정 화면(확인 → 저장)만 받는다. 휴대폰에서는 안 받는다."""
+        if self._remote():
+            self._send(403, "<!doctype html><meta charset='utf-8'><p>휴대폰에서는 보기만 돼요</p>")
+            return
         if self.path in (
             "/settings/review",
             "/settings/save",
@@ -417,6 +507,7 @@ class _Handler(BaseHTTPRequestHandler):
             "/settings/keys",
             "/settings/test",
             "/settings/tasks",
+            "/settings/phone",
         ):
             self._settings_post()
             return

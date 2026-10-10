@@ -12,7 +12,7 @@ from html import escape
 from typing import Any
 
 from auto_trading.ops.user_settings import ACC_SYMBOLS, MAX_ITEMS, Change, show
-from auto_trading.ui.settings_extra import EXTRA_CSS
+from auto_trading.ui.settings_extra import EXTRA_CSS, remote_settings_page
 
 _CSS = """
 .set-wrap{max-width:1180px;margin:0 auto;padding:8px 0 40px}
@@ -119,6 +119,7 @@ top:0;border-radius:0 0 16px 16px;box-shadow:0 4px 14px rgba(16,27,73,.12)}
 SECTIONS = (
     ("keys", "연결 · 키"),
     ("tasks", "자동 실행"),
+    ("phone", "휴대폰"),
     ("goal", "목표 · 보고"),
     ("glide", "Glide"),
     ("cruise", "Cruise"),
@@ -611,3 +612,8 @@ def render_review(changes: Sequence[Change], form: Mapping[str, str], *, token: 
         '<a href="/settings">돌아가서 고치기</a><button type="submit">저장</button></div></div>'
         "</form></div>"
     )
+
+
+def render_remote() -> str:
+    """휴대폰(Tailscale 너머)에서 연 설정 화면 — 입력 칸 없이 안내만."""
+    return f"<style>{_CSS}{EXTRA_CSS}</style>" + remote_settings_page()

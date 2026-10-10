@@ -228,6 +228,13 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         '<meta http-equiv="refresh" content="60">'
         '<link rel="icon" type="image/png" href="/assets/obi.png?v=3" sizes="512x512">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" sizes="any">'
+        # 휴대폰 '홈 화면에 추가' (2026-10-11)
+        '<link rel="manifest" href="/manifest.webmanifest">'
+        '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+        '<meta name="mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-title" content="오르빗">'
+        '<meta name="theme-color" content="#0c1630">'
         f"<title>{escape(title)} · 오르빗</title><style>{_CSS}</style></head><body>"
         f'<div class="topbar"><a class="logo" href="{"/live" if page == "live" else "/"}">'
         '<img src="/assets/obi.png?v=3" width="52" height="52" alt="">'

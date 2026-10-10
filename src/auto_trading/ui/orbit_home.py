@@ -193,6 +193,13 @@ def layout(body: str, theme: str, active: str = "live") -> str:
         + f"<title>오르빗 · {'설정' if active == 'settings' else '내 자산'}</title>"
         '<link rel="icon" type="image/png" href="/assets/obi.png?v=3">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">'
+        # 휴대폰 '홈 화면에 추가' (2026-10-11)
+        '<link rel="manifest" href="/manifest.webmanifest">'
+        '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+        '<meta name="mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-title" content="오르빗">'
+        '<meta name="theme-color" content="#0c1630">'
         f"<style>{_CSS}</style>"
         + ('<script src="/assets/orbit-live.js" defer></script>' if active == "live" else "")
         + '</head><body><div class="topbar">'
