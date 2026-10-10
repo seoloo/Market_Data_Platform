@@ -207,3 +207,11 @@ def test_sleepy_eyes_and_instant_theme_toggle() -> None:
     assert 'class="ico-to-dark"' in shell and 'class="ico-to-light"' in shell
     js = (Path(__file__).parents[2] / "src/auto_trading/ui/assets/orbit-live.js").read_text("utf-8")
     assert "a.orbit-theme-toggle" in js and '"/theme?set="' in js
+
+
+def test_obi_float_moves_picture_and_layer_together() -> None:
+    from auto_trading.ui.orbit_home import _CSS
+
+    assert ".orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{transform-origin:67.7% 45.9%" in _CSS
+    assert "@keyframes obi-float" in _CSS and "@keyframes obi-breathe" in _CSS
+    assert "@keyframes obi-sleepy{0%,79%,100%{opacity:0}81%,97%{opacity:1}}" in _CSS
