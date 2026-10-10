@@ -517,10 +517,7 @@ def _trades_panel(trades: Sequence[Trade], hide: bool) -> str:
         + _popup(
             "orbit-all-trades",
             "거래 내역",
-            filt + f'<ul class="orbit-trades-list" data-live="trades-all">{rows}</ul>'
-            "<p class='orbit-detail-foot'>체결 = 거래소가 체결을 돌려준 기록 · "
-            "접수 = 주문은 들어갔고 체결 확인 대기 · "
-            "체결 없음 = 즉시 체결 주문이 체결되지 않음</p>",
+            filt + f'<ul class="orbit-trades-list" data-live="trades-all">{rows}</ul>',
         )
         + "</div>"
         f'<ul data-live="trades-recent">{recent}</ul></section>'

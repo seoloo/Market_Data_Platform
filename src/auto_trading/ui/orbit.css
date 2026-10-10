@@ -194,6 +194,8 @@ summary::-webkit-details-marker{display:none}
 /* 거래 내역 창: 필터를 바꿔도 크기 고정, 넘치면 창 안에서 스크롤 (사용자 2026-10-10) */
 #orbit-all-trades{height:min(640px,calc(100dvh - 32px))}
 #orbit-all-trades .orbit-popover-body{flex:1;overflow-y:auto}
-#orbit-all-trades .orbit-trade-filter{position:sticky;top:0;z-index:1;background:var(--surface);margin:0 -4px 6px;padding:10px 4px 8px}
+#orbit-all-trades .orbit-popover-body{padding-top:0}
+#orbit-all-trades .orbit-trade-filter{position:sticky;top:0;z-index:1;background:#fff;margin:0 -24px 6px;padding:12px 24px 10px;box-shadow:0 1px 0 var(--line)}
+[data-theme=dark] #orbit-all-trades .orbit-trade-filter{background:#101e3b}
 .orbit-trade-filter:has(#tf-all:checked)+.orbit-trades-list>.orbit-trade-empty{display:none}
 .orbit-trade-empty{color:var(--muted);justify-content:center}
