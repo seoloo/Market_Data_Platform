@@ -16,6 +16,7 @@
 * 매도 먼저, 매수는 가진 원화 안에서. 원화 계좌 전체를 이 전략의 현금으로 본다
   (다른 용도의 원화는 업비트에 두지 않는다). BTC · ETH · SOL 외 코인은 건드리지 않는다.
 * 긴급 정지 ``data/HALT`` 면 주문하지 않는다. 계좌 낙폭(NAV) 30% 면 새 매수를 멈춘다.
+  정지 30 일째부터 30 일마다 텔레그램으로 다시 알린다(풀기는 사람이, 문서 199 · 사용자 2026-10-10).
 * 상태 ``data/upbit_t2/state.json`` · 보고 ``reports/upbit_t2/<날짜>.json`` · 알림 텔레그램.
 """
 
@@ -48,6 +49,7 @@ from auto_trading.ops.t2_upbit import (
     plan,
     reason,
     signals,
+    stop_reminder,
     targets,
 )
 
@@ -226,6 +228,7 @@ def run_cmd() -> int:
             lines.append(f"💰 {word} 감지 {ns.flow:+,.0f} 원 → 총 입금에 반영")
         if p["stopped"] and not st.get("stopped"):
             lines.append(f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤 (해제는 사람이)")
+            st["stopped_since"], st["stop_reminded"] = p["day"], []
         st.update(
             units=str(ns.units), peak=str(ns.peak), stopped=p["stopped"], last_nav=str(ns.nav)
         )
@@ -233,6 +236,12 @@ def run_cmd() -> int:
             _save(st)
             print(f"{p['day']} 이미 실행함")
             return 0
+        if p["stopped"]:
+            since = st.setdefault("stopped_since", p["day"])
+            due = stop_reminder(since, p["day"], st.setdefault("stop_reminded", []))
+            if due:
+                st["stop_reminded"].append(due)
+                lines.extend(stop_remind_lines(due))
         if halted:
             lines.append(f"⏸ 긴급 정지 중 — 주문 안 함 ({halted})")
             intents = []
@@ -452,6 +461,7 @@ def status_cmd() -> int:
         f"마지막 실행 {st.get('last_decision')} · 단위 가치 {st.get('last_nav')}"
         f" · 고점 {st.get('peak')}"
         f" · 매수 정지 {st.get('stopped')}"
+        + (f" (시작 {st['stopped_since']})" if st.get("stopped") and "stopped_since" in st else "")
     )
     for row in st.get("history", [])[-10:]:
         print("  ", row)
@@ -468,9 +478,20 @@ def status_cmd() -> int:
     return 0
 
 
+def stop_remind_lines(days: int) -> list[str]:
+    """정지 N 일째 다시 알림 (문서 199)."""
+    return [
+        f"⏰ 새 매수 정지 {days}일째 — 이제 푸는 편이 낫습니다",
+        sub("문서 199: 풀기만 하면 언제 풀든 10 년 차이 1% 안, 안 풀면 −15 ~ −53%"),
+        sub('풀기: python -m scripts.live_t2_upbit release-dd "사유"'),
+    ]
+
+
 def release_cmd(reason: str) -> int:
     st = _load()
     st["stopped"] = False
+    st.pop("stopped_since", None)
+    st.pop("stop_reminded", None)
     st["peak"] = st.get("last_nav", st.get("peak", "0"))
     st.setdefault("releases", []).append([datetime.now(UTC).isoformat(), reason])
     _save(st)

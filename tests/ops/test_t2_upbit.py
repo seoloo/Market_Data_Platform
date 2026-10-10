@@ -140,3 +140,12 @@ def test_reason_icons() -> None:
     assert reason("ETH", sg(3), prev, Decimal("0.2"), flow=Decimal(100))[0] == "💰"
     assert reason("ETH", sg(3), prev, Decimal("0.2"), flow=Decimal(0))[0] == "🔵"
     assert reason("ETH", sg(3), None, Decimal(0), flow=Decimal(0))[0] == "🆕"
+
+
+def test_stop_reminder_every_30_days_once() -> None:
+    from auto_trading.ops.t2_upbit import stop_reminder
+
+    assert stop_reminder("2026-10-01", "2026-10-30", []) is None  # 29 일째
+    assert stop_reminder("2026-10-01", "2026-10-31", []) == 30
+    assert stop_reminder("2026-10-01", "2026-11-02", [30]) is None  # 이미 알림
+    assert stop_reminder("2026-10-01", "2026-12-01", [30]) == 60  # 하루 걸렀어도 그 단계 한 번

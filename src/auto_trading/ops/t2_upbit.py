@@ -6,12 +6,14 @@
 * 적립식: 사용자가 원화를 넣고 뺀다. 그래서 낙폭은 '단위 가치(NAV)' 로 잰다 — 우리 주문으로 설명되지
   않는 잔고 변화(입금 · 출금 · 직접 매매)는 그날 가치로 단위를 늘리거나 줄인다.
 * 계좌 낙폭 30% 면 새 매수를 멈춘다(추세 매도는 그대로). 자동 해제 없음.
+  정지 30 일째부터 30 일마다 다시 알린다(문서 199: 풀기만 하면 언제 풀든 비슷, 안 풀면 크게 손해).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from auto_trading.config.schema import SpotTrendConfig
@@ -28,6 +30,7 @@ MARKETS = {c: f"KRW-{c}" for c in COINS}
 STEP = Decimal("0.00000001")
 MIN_KRW = Decimal(5000)
 DD_STOP = Decimal("0.30")
+STOP_REMIND_DAYS = 30
 _ZERO = Decimal(0)
 
 
@@ -65,6 +68,17 @@ def plan(
         min_notional=dict.fromkeys(COINS, MIN_KRW),
     )
     return [i for i in intents if allow_buy or i.side.value == "SELL"]
+
+
+def stop_reminder(since: str, today: str, reminded: Sequence[int]) -> int | None:
+    """정지 시작일 ``since`` 부터 30 · 60 · 90 … 일째에 한 번씩 다시 알릴 날수, 아니면 None (순수).
+
+    하루 이틀 실행을 거른 날이 있어도 다음 실행 때 그 단계를 한 번 알린다(문서 199)."""
+    days = (date.fromisoformat(today) - date.fromisoformat(since)).days
+    due = days // STOP_REMIND_DAYS * STOP_REMIND_DAYS
+    if due >= STOP_REMIND_DAYS and due not in reminded:
+        return due
+    return None
 
 
 def equity(krw: Decimal, holdings: Mapping[str, Decimal], prices: Mapping[str, Decimal]) -> Decimal:

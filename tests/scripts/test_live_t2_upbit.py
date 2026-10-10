@@ -136,3 +136,23 @@ def test_alert_has_deposit_and_pnl(env: tuple[Any, FakeUpbit, list[str]]) -> Non
     m.main(["run"])
     assert "총 입금 300,000 원" in sent[0]
     assert "원가" in sent[0]
+
+
+def test_stop_reminds_at_30_days_and_release_clears(
+    env: tuple[Any, FakeUpbit, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m, _fake, sent = env
+    m.main(["run"])
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    day0 = st["last_decision"]
+    st.update(stopped=True, stopped_since=day0, stop_reminded=[])
+    m.STATE.write_text(json.dumps(st), encoding="utf-8")
+    sent.clear()
+    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 330 * DAY / 1000 + 3600)
+    m.main(["run"])
+    assert any("정지 30일째" in x for x in sent)
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert st["stop_reminded"] == [30]
+    m.main(["release-dd", "시험"])
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert not st["stopped"] and "stopped_since" not in st
