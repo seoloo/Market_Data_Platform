@@ -31,6 +31,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from auto_trading.config.secrets import load_telegram_credentials, read_env_file
 from auto_trading.core.errors import AutoTradingError, ExchangeError, OrderStateUnknownError
 from auto_trading.exchange.upbit import UpbitClient, UpbitOrder
@@ -443,6 +445,7 @@ def weekly_cmd() -> int:
             f" (입출금 뺀 단위 가치 {nav_then:,.1f} → {nav_now:,.1f})",
             f"💰 이번 주 입금 {dep:+,.0f} 원",
             f"🛒 이번 주 매매 {len(trades)}건" + (f": {trade_txt}" if trades else ""),
+            kimp_line(prices["BTC"]),
             "",
             "코인별 (주간 가격 · 추세 · 목표 · 보유)",
             *rows,
@@ -476,6 +479,35 @@ def status_cmd() -> int:
     dd = 1 - (eq / units) / peak if units > 0 and peak > 0 else Decimal(0)
     print("\n".join(pnl_lines(st, krw, hold, prices, eq, max(dd, Decimal(0)))))
     return 0
+
+
+def _get_json(url: str) -> Any:
+    # 야후는 User-Agent 가 없으면 429 를 준다
+    with httpx.Client(timeout=10.0, headers={"User-Agent": "Mozilla/5.0"}) as h:
+        r = h.get(url)
+        r.raise_for_status()
+        return r.json()
+
+
+def kimp_line(upbit_btc: Decimal, get: Any = _get_json) -> str:
+    """주간 요약 김프 한 줄 (문서 200, 사용자 2026-10-10).
+
+    업비트 BTC ÷ (바이낸스 BTCUSDT × 야후 원/달러) − 1."""
+    try:
+        usd = Decimal(
+            str(get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")["price"])
+        )
+        fx = Decimal(
+            str(
+                get("https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?range=1d&interval=1d")[
+                    "chart"
+                ]["result"][0]["meta"]["regularMarketPrice"]
+            )
+        )
+        k = upbit_btc / (usd * fx) - 1
+    except Exception as exc:  # 공개 시세 실패는 요약을 막지 않는다
+        return f"🇰🇷 김프 확인 실패 ({type(exc).__name__})"
+    return f"🇰🇷 김프 BTC {k:+.1%} (평소 +1% 안팎 · 과열 때 +5% 넘음 — 문서 200)"
 
 
 def stop_remind_lines(days: int) -> list[str]:

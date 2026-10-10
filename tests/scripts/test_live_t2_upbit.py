@@ -156,3 +156,17 @@ def test_stop_reminds_at_30_days_and_release_clears(
     m.main(["release-dd", "시험"])
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     assert not st["stopped"] and "stopped_since" not in st
+
+
+def test_kimp_line_and_failure_does_not_block() -> None:
+    def get(url: str) -> Any:
+        if "binance" in url:
+            return {"price": "100000"}
+        return {"chart": {"result": [{"meta": {"regularMarketPrice": 1400}}]}}
+
+    assert mod.kimp_line(Decimal(142_240_000), get).startswith("🇰🇷 김프 BTC +1.6%")
+
+    def bad(url: str) -> Any:
+        raise OSError("down")
+
+    assert "확인 실패" in mod.kimp_line(Decimal(1), bad)
