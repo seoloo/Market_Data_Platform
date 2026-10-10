@@ -258,6 +258,8 @@ def validate(
     new["_extras"] = meta
     errors: dict[str, str] = {}
     for f in fields(meta):
+        if f.key == "safety.halt":
+            continue  # 비상 정지는 전용 버튼 · 확인 창으로만 (큰 폼 저장이 끄지 못하게)
         if f.kind == "bool":
             new[f.key] = _parse(f, form.get(f.key))
             continue

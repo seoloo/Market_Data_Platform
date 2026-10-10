@@ -242,6 +242,7 @@ class _Handler(BaseHTTPRequestHandler):
             errors=errors,
             notice=notice,
             log=user_settings.read_log(self.server.root),
+            halt_note=_halt_note(self.server.root),
         )
         self._send(
             200 if not errors else 400,
@@ -268,6 +269,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(403, "<!doctype html><meta charset='utf-8'><p>화면을 새로 고친 뒤 다시</p>")
             return
         current = user_settings.load(root)
+        if self.path == "/settings/halt":  # 비상 정지는 확인 창을 거친 이 길로만 켜고 끈다
+            want = form.get("action")
+            if want not in ("on", "off") or (want == "on") == bool(current["safety.halt"]):
+                self._send(409, "<!doctype html><meta charset='utf-8'><p>이미 그 상태예요</p>")
+                return
+            new = {**current, "safety.halt": want == "on"}
+            changes = user_settings.diff(current, new)
+            user_settings.apply(root, changes, datetime.now(UTC), new=new)
+            self._redirect(f"/settings?saved={len(changes)}#set-safety")
+            return
         if self.path == "/settings/delete":  # '정말 삭제하시겠습니까?' 창에서 이미 확인함
             flag = f"{form.get('key', '')}.removed"
             if flag not in current or current[flag]:
@@ -301,7 +312,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """놓친 작업 다시 실행 버튼 · 설정 화면(확인 → 저장)만 받는다."""
-        if self.path in ("/settings/review", "/settings/save", "/settings/delete"):
+        if self.path in (
+            "/settings/review",
+            "/settings/save",
+            "/settings/delete",
+            "/settings/halt",
+        ):
             self._settings_post()
             return
         if self.path != "/catchup" or self.server.catchup is None:
@@ -374,6 +390,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:
         return  # 접속 기록을 남기지 않는다 (콘솔 잡음)
+
+
+def _halt_note(root: Path) -> str:
+    try:
+        return (root / "data" / "HALT").read_text(encoding="utf-8").strip()[:120]
+    except OSError:
+        return ""
 
 
 def make_server(

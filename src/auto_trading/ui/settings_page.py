@@ -79,6 +79,7 @@ background:var(--surface);color:var(--ink);box-shadow:0 18px 48px rgba(16,27,73,
 .set-modal button{min-height:46px;padding:0 20px;border-radius:12px;font:inherit;font-weight:800;
 cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 .set-modal button.set-danger-btn{border:0;background:#c23a4f;color:#fff}
+.set-halt-btn{min-height:48px;padding:0 22px;font-size:15px;margin-top:4px}
 .set-add{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 0;
 border-bottom:1px solid var(--line)}
 .set-add .set-input{min-height:46px}
@@ -183,7 +184,9 @@ def render_settings(
     notice: str = "",
     log: Sequence[Mapping[str, str]] = (),
     holdings: Mapping[str, str] | None = None,
+    halt_note: str = "",
 ) -> str:
+    """``halt_note``: 비상 정지 파일에 적힌 이유(켜져 있을 때 보여 준다)."""
     errors = errors or {}
     holdings = holdings or {}
     menu = "".join(f'<a href="#set-{k}">{escape(t)}</a>' for k, t in SECTIONS)
@@ -454,16 +457,36 @@ def render_settings(
         )
         or '<p class="set-help">아직 바꾼 기록이 없어요</p>'
     )
+    halted = bool(v["safety.halt"])
+    if halted:
+        state = (
+            '<p class="set-note bad" role="status">⛔ 비상 정지 중 — 새 주문이 나가지 않아요'
+            f"{' · ' + escape(halt_note) if halt_note else ''}</p>"
+        )
+        ask_t, ask_p, btn = (
+            "정말 비상 정지를 푸시겠습니까?",
+            "풀면 다음 실행부터 Glide · Cruise · 토스 적립 주문이 다시 나가요.",
+            "비상 정지 풀기",
+        )
+    else:
+        state = '<p class="set-note ok" role="status">✅ 정상 운영 중</p>'
+        ask_t, ask_p, btn = (
+            "정말 비상 정지를 켜시겠습니까?",
+            "Glide · Cruise · 토스 적립의 새 주문을 모두 멈춰요. 이미 낸 주문과 보유는 "
+            "그대로예요. 다시 풀 때도 이 창으로 확인해요.",
+            "비상 정지 켜기",
+        )
     safety = (
         '<section class="set-card set-danger" id="set-safety"><h2>비상 정지</h2>'
-        + _toggle(
-            "safety.halt",
-            "새 주문 모두 멈추기",
-            "Glide · Cruise · 토스 적립의 새 주문을 멈춰요. 이미 낸 주문과 보유는 그대로예요.",
-            v["safety.halt"],
-            danger=True,
-        )
-        + "</section>"
+        f"{state}"
+        '<button type="button" class="set-del set-halt-btn" popovertarget="halt-ask">'
+        f"{btn}</button>"
+        '<div popover id="halt-ask" class="set-modal" role="alertdialog" '
+        f'aria-labelledby="halt-ask-t"><h3 id="halt-ask-t">{ask_t}</h3><p>{ask_p}</p>'
+        '<div><button type="button" popovertarget="halt-ask" popovertargetaction="hide">취소'
+        '</button><button type="submit" form="halt-f" class="set-danger-btn">'
+        f"{'풀기' if halted else '켜기'}</button></div></div>"
+        "</section>"
         '<section class="set-card"><h2>변경 기록</h2>'
         f'<div class="set-log">{log_rows}</div></section>'
     )
@@ -483,7 +506,9 @@ def render_settings(
         '<button type="submit">저장…</button></div></div>'
         "</div></div></form>"
         + "".join(del_forms)  # 삭제 폼은 큰 폼 밖에 (폼 안에 폼을 둘 수 없다)
-        + "</div>"
+        + '<form id="halt-f" method="post" action="/settings/halt">'
+        f'<input type="hidden" name="token" value="{escape(token)}">'
+        f'<input type="hidden" name="action" value="{"off" if halted else "on"}"></form>' + "</div>"
     )
 
 

@@ -58,28 +58,45 @@ def test_validate_ranges_and_order(tmp_path: Path) -> None:
     assert not err and new["acc.QS.on"] is False
 
 
-def test_apply_logs_halt_and_acc_history(tmp_path: Path) -> None:
+def test_apply_logs_and_acc_history(tmp_path: Path) -> None:
     v = us.load(tmp_path)
     form = _form(v, **{"acc.WQTM.usd": "2"})
     form.pop("acc.QS.on")
-    form["safety.halt"] = "on"
     new, _ = us.validate(form, v)
     changes = us.diff(v, new)
-    assert {c.key for c in changes} == {"acc.WQTM.usd", "acc.QS.on", "safety.halt"}
+    assert {c.key for c in changes} == {"acc.WQTM.usd", "acc.QS.on"}
     us.apply(tmp_path, changes, NOW)
-    assert (tmp_path / "data" / "HALT").exists()
-    assert us.load(tmp_path)["safety.halt"] is True
     assert us.acc_history(tmp_path, "WQTM") == [("2026-10-11", 2.0)]  # 내일부터
     assert us.acc_history(tmp_path, "QS") == [("2026-10-11", 0.0)]  # 끈 기간은 0
     log = us.read_log(tmp_path)
-    assert {r["what"] for r in log} >= {"WQTM 하루 금액 $1 → $2", "비상 정지 꺼짐 → 켜짐"}
-    # 다시 켜면 파일을 지운다
-    v2 = us.load(tmp_path)
-    form2 = _form(v2)
-    form2.pop("safety.halt")
-    new2, _ = us.validate(form2, v2)
-    us.apply(tmp_path, us.diff(v2, new2), NOW)
-    assert not (tmp_path / "data" / "HALT").exists()
+    assert {r["what"] for r in log} >= {"WQTM 하루 금액 $1 → $2"}
+
+
+def test_big_form_never_touches_halt(tmp_path: Path) -> None:
+    """비상 정지는 전용 확인 창으로만 — 켜진 채로 다른 값을 저장해도 꺼지지 않는다."""
+    halt = tmp_path / "data" / "HALT"
+    halt.parent.mkdir(parents=True)
+    halt.write_text("시험", encoding="utf-8")
+    v = us.load(tmp_path)
+    form = _form(v, **{"fire.target_krw": "200,000,000"})
+    form.pop("safety.halt", None)
+    new, _ = us.validate(form, v)
+    us.apply(tmp_path, us.diff(v, new), NOW, new=new)
+    assert halt.exists()
+    new2, _ = us.validate({**_form(us.load(tmp_path)), "safety.halt": "on"}, us.load(tmp_path))
+    assert not any(c.key == "safety.halt" for c in us.diff(us.load(tmp_path), new2))
+
+
+def test_halt_buttons_and_modal() -> None:
+    off = render_settings(us.load(Path("__nope__")), token="T")
+    assert "✅ 정상 운영 중" in off and "정말 비상 정지를 켜시겠습니까?" in off
+    assert '<form id="halt-f" method="post" action="/settings/halt">' in off
+    assert 'name="action" value="on"' in off and 'name="safety.halt"' not in off
+    on = render_settings(
+        {**us.load(Path("__nope__")), "safety.halt": True}, token="T", halt_note="설정 화면에서 켬"
+    )
+    assert "⛔ 비상 정지 중" in on and "설정 화면에서 켬" in on
+    assert "정말 비상 정지를 푸시겠습니까?" in on and 'name="action" value="off"' in on
 
 
 def test_toss_plans_follow_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,3 +208,26 @@ def test_theme_button_on_settings_page(tmp_path: Path) -> None:
 def test_side_menu_is_sticky() -> None:
     html = render_settings(us.load(Path("__nope__")), token="T")
     assert "position:sticky;top:16px" in html
+
+
+def test_halt_route_on_then_off(tmp_path: Path) -> None:
+    server = make_server(tmp_path, port=0, catchup=None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/settings") as r:
+            token = re.search(r'name="token" value="([^"]+)"', r.read().decode())
+        assert token
+        halt = tmp_path / "data" / "HALT"
+        post = TestServer._post
+        assert post(base, "/settings/halt", {"token": token.group(1), "action": "on"})[0] == 303
+        assert halt.exists()
+        assert post(base, "/settings/halt", {"token": token.group(1), "action": "on"})[0] == 409
+        assert post(base, "/settings/halt", {"token": "x", "action": "off"})[0] == 403
+        assert post(base, "/settings/halt", {"token": token.group(1), "action": "off"})[0] == 303
+        assert not halt.exists()
+        log = [r["what"] for r in us.read_log(tmp_path)]
+        assert log[:2] == ["비상 정지 켜짐 → 꺼짐", "비상 정지 꺼짐 → 켜짐"]
+    finally:
+        server.shutdown()
+        server.server_close()
