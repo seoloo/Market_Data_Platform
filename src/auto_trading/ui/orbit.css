@@ -260,3 +260,5 @@ summary::-webkit-details-marker{display:none}
 .orbit-cards-tools{display:flex;justify-content:flex-end;margin:0;padding:0}
 .orbit-help-card{margin-right:calc(-1 * var(--hero-indent,0px))}
 .orbit-cards-tools{margin:-12px 0 12px}
+/* 타일 숫자 글색: 테마 파랑 (상태 초록·노랑은 그대로) (2026-10-10) */
+.orbit-dt-tile b:not(.ok):not(.warn){color:var(--blue)}
