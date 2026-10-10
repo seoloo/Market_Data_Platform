@@ -120,9 +120,16 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/settings" and self.server.root is not None:
-            saved_n = (parse_qs(self.path.partition("?")[2]).get("saved") or [""])[0]
+            query = parse_qs(self.path.partition("?")[2])
+            saved_n = (query.get("saved") or [""])[0]
             notice = f"저장했어요 · 바뀐 값 {saved_n}개" if saved_n.isdigit() else ""
-            self._settings_page(user_settings.load(self.server.root), {}, notice)
+            pick = (query.get("theme") or [""])[0]
+            self._settings_page(
+                user_settings.load(self.server.root),
+                {},
+                notice,
+                theme=pick if pick in {"light", "dark"} else None,
+            )
             return
         asset = _ASSETS.get(path)
         if asset is not None:
@@ -219,8 +226,14 @@ class _Handler(BaseHTTPRequestHandler):
         return pref if pref in {"light", "dark"} else "light"
 
     def _settings_page(
-        self, values: dict[str, object], errors: dict[str, str], notice: str = ""
+        self,
+        values: dict[str, object],
+        errors: dict[str, str],
+        notice: str = "",
+        *,
+        theme: str | None = None,
     ) -> None:
+        """``theme``: 해 · 달 버튼(?theme=)으로 고른 값 — 화면에 쓰고 쿠키로 기억한다."""
         assert self.server.root is not None
         body = render_settings(
             values,
@@ -229,7 +242,11 @@ class _Handler(BaseHTTPRequestHandler):
             notice=notice,
             log=user_settings.read_log(self.server.root),
         )
-        self._send(200 if not errors else 400, orbit_layout(body, self._theme(), "settings"))
+        self._send(
+            200 if not errors else 400,
+            orbit_layout(body, theme or self._theme(), "settings"),
+            theme=theme,
+        )
 
     def _settings_post(self) -> None:
         """설정 화면 두 단계: review(확인 화면) → save(저장). 둘 다 값을 다시 검사한다."""

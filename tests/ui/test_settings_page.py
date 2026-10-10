@@ -170,3 +170,24 @@ class TestServer:
         code, page = self._post(base, "/settings/save", form)
         assert code == 400 and "숫자로 적어 주세요" in page
         assert not (tmp_path / "data" / "settings").exists()
+
+
+def test_theme_button_on_settings_page(tmp_path: Path) -> None:
+    server = make_server(tmp_path, port=0, catchup=None)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/settings?theme=dark") as r:
+            html = r.read().decode()
+            cookie = r.headers.get("Set-Cookie", "")
+        assert 'data-theme="dark"' in html and "dashboard_theme=dark" in cookie
+        assert 'href="/settings?theme=light"' in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_side_menu_is_sticky() -> None:
+    html = render_settings(us.load(Path("__nope__")), token="T")
+    assert "position:sticky;top:16px" in html

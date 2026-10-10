@@ -19,13 +19,14 @@ _CSS = """
 .set-head p{margin:0 0 18px;color:var(--muted)}
 .set-row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start}
 .set-menu{flex:1 1 200px;max-width:240px;display:flex;flex-direction:column;gap:4px;
+position:sticky;top:16px;z-index:1;
 background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:10px}
 .set-menu a{display:flex;align-items:center;min-height:46px;padding:0 14px;border-radius:14px;
 color:var(--ink);text-decoration:none;font-weight:600}
 .set-menu a:hover{background:var(--soft);color:var(--blue)}
 .set-body{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
 .set-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;
-padding:20px 22px;scroll-margin-top:90px}
+padding:20px 22px;scroll-margin-top:16px}
 .set-card h2{margin:0 0 4px;font-size:19px}
 .set-card>p.set-sub{margin:0 0 14px;color:var(--muted);font-size:14px}
 .set-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -84,7 +85,9 @@ font-weight:800;display:inline-flex;align-items:center;text-decoration:none;curs
 .set-ch .set-was{color:var(--muted);text-decoration:line-through}
 .set-ch .set-now{color:var(--blue);font-weight:800}
 .set-ch small{display:block;color:var(--muted);margin-top:4px;font-size:13px}
-@media(max-width:760px){.set-menu{max-width:none;flex-direction:row;overflow-x:auto;flex-basis:100%}
+@media(max-width:760px){.set-menu{max-width:none;flex-direction:row;overflow-x:auto;flex-basis:100%;
+top:0;border-radius:0 0 16px 16px;box-shadow:0 4px 14px rgba(16,27,73,.12)}
+.set-card{scroll-margin-top:76px}
 .set-menu a{white-space:nowrap}.set-grid{grid-template-columns:1fr}.set-acc .set-input{width:110px}}
 """
 
