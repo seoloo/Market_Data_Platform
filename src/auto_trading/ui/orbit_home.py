@@ -501,6 +501,12 @@ def _trades_panel(trades: Sequence[Trade], hide: bool) -> str:
         + "</div>"
     )
     rows = _trade_rows(trades, hide) or "<li>아직 거래 기록이 없습니다.</li>"
+    # 필터에 해당 기록이 없으면 빈 칸 대신 한 줄 (전체에서는 숨김)
+    rows += "".join(
+        f'<li class="kind-{k} orbit-trade-empty">{w} 기록이 아직 없습니다.</li>'
+        for k, w in (("buy", "매수"), ("sell", "매도"), ("deposit", "입금"))
+        if trades and not any(t.kind == k for t in trades)
+    )
     recent = _trade_rows(trades[:5], hide) or "<li>아직 거래·입금 기록이 없습니다.</li>"
     return (
         '<section class="orbit-panel orbit-recent" id="orbit-recent">'

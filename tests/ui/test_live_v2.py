@@ -96,6 +96,10 @@ def test_trades_have_details_status_and_filter() -> None:
     assert "체결가 200원" in pop and "수수료 1원 미만" in pop and "state-wait" in pop
     assert "접수 · 체결 확인 대기" in pop and "입금 기록" in pop
     assert "가격 $34.00" in pop  # 접수만 된 주문은 '체결가' 가 아니다
+    # 매도 기록이 없으면 매도 필터에 빈 칸 대신 한 줄 (매수 · 입금은 있으니 없음)
+    assert "매도 기록이 아직 없습니다" in pop and "매수 기록이 아직" not in pop
+    css = Path("src/auto_trading/ui/orbit.css").read_text(encoding="utf-8")
+    assert "#orbit-all-trades{height:" in css  # 필터를 바꿔도 창 크기 고정
 
 
 def test_accounts_show_last_success_missing_and_stale() -> None:
