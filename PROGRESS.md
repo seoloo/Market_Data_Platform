@@ -1,7 +1,15 @@
 # 작업 현황
 
-최종 갱신: 2026-10-09 · 작성: Claude (146~175) · Codex (IDEAS 19~30 초안 인계).
+최종 갱신: 2026-10-10 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-10-10 — 오르빗 투명 아이콘·최신 UI 자동 시작 (Codex)
+
+- 사용자 새 PNG로 앱 아이콘 교체/검은 배경 제거/삭제한 다시 켜기 복구/앱 자체 자동 시작 요청. 원본은 이미 RGBA/모서리 alpha0, 바이트 동일 사본·웹 PNG·7프레임 ICO에 alpha 유지. 이미지 재생성/크롭 없음, 승인 배치·매매 불변.
+- 원인: 구형 8787 HTTP200을 최신으로 재사용, 해당 서버 종료는 권한 거부. 앱마다 최신 소스 UI 서버를 127.0.0.1 OS 할당 빈 포트에 새로 시작, ready/nonce 확인 후 `/live`를 연다. 구형 서버 재사용/종료·UAC·매매/Paper/예약 재시작 없음. 정상 닫기 신호와 강제 종료 부모 핸들 감시로 자기 서버만 정리.
+- Windows venv redirector PID와 실제 interpreter PID 차이를 실제 시험에서 발견해 nonce로 확인한다. 신규 회귀 10건(다중 창·다른 서버 보존·강제 부모 종료·시작 실패/timeout·wait 실패 정리·아이콘 RGBA·restart 비종료) 통과. 전체 pytest **3,091통과(201.19초)**, leakage **90통과**, mypy **537파일 오류0**, ruff/format **797파일**, import **5/5**. 실제 새 세션의 최신 오르빗 HTML/SOL/새 favicon 동일 바이트 확인 후 자기 서버 종료. exe PE 아이콘 7프레임 ICO와 동일, RGBA/모서리 alpha0, 자동 시작 함수·오르빗 제목 내장 확인.
+- 기존 exe `build/orbit-backup/AutoTrading-before-autostart.exe` 보관, 설치된 도구로 exe 재빌드(SHA256 b852d1c8a2c9be670ff1f68c9d5e9c1c21db2a7b4d62ad451a13b5e9ba060231). 새 바로가기 아이콘 경로 orbit-transparent.ico, 삭제된 다시 켜기는 같은 exe 시작 경로로 복구. Windows PowerShell5.1의 UTF8 한글 이름 오독을 발견해 두 helper의 한글 파일명을 Unicode codepoint로 작성(ASCII 소스), 실제 PS5.1 실행/두 LNK의 대상·인수·아이콘 경로 확인. 네이티브 창/Windows 아이콘 캐시 최종 시각 확인은 사용자에게 인계한다.
+- 다음 Phase6: 기존 앱을 닫고 오르빗 실행으로 실제 창 확인. 구형 8787 브라우저 북마크는 별도 보존이며 최신 화면 보장은 새 exe 창이다. 전략/장부/위험/운영 Phase/C11~13 불변.
 
 ## 2026-10-10 — 오르빗 승인 시안 실거래 UI (Codex)
 

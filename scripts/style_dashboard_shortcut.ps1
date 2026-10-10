@@ -1,35 +1,35 @@
 ﻿# Cosmetic-only update. Existing target, arguments, working directory and window style are preserved.
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$ShortcutPath = (Join-Path ([Environment]::GetFolderPath('Desktop')) '대시보드 다시 켜기.lnk')
+    [string]$ShortcutPath = (Join-Path ([Environment]::GetFolderPath('Desktop')) ((-join ([char[]]@(0xB300, 0xC2DC, 0xBCF4, 0xB4DC, 0x20, 0xB2E4, 0xC2DC, 0x20, 0xCF1C, 0xAE30))) + '.lnk'))
 )
 
 $ErrorActionPreference = 'Stop'
 $uiRepo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $uiExpectedTarget = Join-Path $uiRepo 'scripts\restart_dashboard.cmd'
 $uiAppTarget = Join-Path $uiRepo 'dist\AutoTrading.exe'
-$uiIcon = Join-Path $uiRepo 'src\auto_trading\ui\assets\obi.ico'
+$uiIcon = Join-Path $uiRepo 'src\auto_trading\ui\assets\orbit-transparent.ico'
 $uiResolvedLink = [IO.Path]::GetFullPath($ShortcutPath)
-if (-not (Test-Path -LiteralPath $uiResolvedLink -PathType Leaf)) { throw '바로가기가 없습니다.' }
-if ([IO.Path]::GetExtension($uiResolvedLink) -ne '.lnk') { throw '.lnk 파일만 허용합니다.' }
-if (-not (Test-Path -LiteralPath $uiIcon -PathType Leaf)) { throw '아이콘 파일이 없습니다.' }
+if (-not (Test-Path -LiteralPath $uiResolvedLink -PathType Leaf)) { throw 'Shortcut missing.' }
+if ([IO.Path]::GetExtension($uiResolvedLink) -ne '.lnk') { throw 'Only .lnk files are allowed.' }
+if (-not (Test-Path -LiteralPath $uiIcon -PathType Leaf)) { throw 'Icon missing.' }
 $uiShell = New-Object -ComObject WScript.Shell
 $uiLink = $uiShell.CreateShortcut($uiResolvedLink)
-if ($uiLink.TargetPath -notin @($uiExpectedTarget, $uiAppTarget)) { throw '기존 실행 대상이 달라 수정하지 않습니다.' }
+if ($uiLink.TargetPath -notin @($uiExpectedTarget, $uiAppTarget)) { throw 'Unexpected shortcut target.' }
 $uiBefore = @($uiLink.TargetPath, $uiLink.Arguments, $uiLink.WorkingDirectory, $uiLink.WindowStyle)
-if ($PSCmdlet.ShouldProcess($uiResolvedLink, '아이콘과 설명만 변경 (원본 백업)')) {
+if ($PSCmdlet.ShouldProcess($uiResolvedLink, 'Change icon/description only (with backup)')) {
     $uiBackupDir = Join-Path $uiRepo 'reports\ui\shortcut-backups'
     New-Item -ItemType Directory -Path $uiBackupDir -Force | Out-Null
     $uiBackup = Join-Path $uiBackupDir ('dashboard-restart-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fffffff') + '.lnk')
     Copy-Item -LiteralPath $uiResolvedLink -Destination $uiBackup
     try {
         $uiLink.IconLocation = $uiIcon + ',0'
-        $uiLink.Description = '오르빗 · 오비 우주 대시보드 (매매 설정 변경 없음)'
+        $uiLink.Description = (-join ([char[]]@(0xC624, 0xB974, 0xBE57))) + ' - latest UI, no trading settings changed'
         $uiLink.Save()
         $uiAfterLink = $uiShell.CreateShortcut($uiResolvedLink)
         $uiAfter = @($uiAfterLink.TargetPath, $uiAfterLink.Arguments, $uiAfterLink.WorkingDirectory, $uiAfterLink.WindowStyle)
         if (Compare-Object -ReferenceObject $uiBefore -DifferenceObject $uiAfter) {
-            throw '실행 정보가 달라져 원본으로 되돌립니다.'
+            throw 'Execution fields changed; restoring the original.'
         }
     } catch {
         Copy-Item -LiteralPath $uiBackup -Destination $uiResolvedLink -Force

@@ -1,14 +1,16 @@
-# Desktop shortcut "오르빗.lnk" -> dist\AutoTrading.exe. Existing execution fields are preserved.
+# Desktop Orbit shortcut -> dist\AutoTrading.exe. ASCII source supports Windows PowerShell 5.1.
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $exe = Join-Path $repo 'dist\AutoTrading.exe'
-if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "exe 가 없습니다: $exe" }
-$link = Join-Path ([Environment]::GetFolderPath('Desktop')) '오르빗.lnk'
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Executable missing: $exe" }
+$orbitName = -join ([char[]]@(0xC624, 0xB974, 0xBE57))
+$restartName = -join ([char[]]@(0xB300, 0xC2DC, 0xBCF4, 0xB4DC, 0x20, 0xB2E4, 0xC2DC, 0x20, 0xCF1C, 0xAE30))
+$link = Join-Path ([Environment]::GetFolderPath('Desktop')) ($orbitName + '.lnk')
 $legacyLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Auto Trading.lnk'
 $shell = New-Object -ComObject WScript.Shell
 if (-not (Test-Path -LiteralPath $link) -and (Test-Path -LiteralPath $legacyLink)) {
     $legacy = $shell.CreateShortcut($legacyLink)
-    if ($legacy.TargetPath -ne $exe) { throw '기존 다른 앱 바로가기는 변경하지 않습니다.' }
+    if ($legacy.TargetPath -ne $exe) { throw 'Refusing to change a different application.' }
     $backupDir = Join-Path $repo 'reports\ui\shortcut-backups'
     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
     $backup = Join-Path $backupDir ('before-orbit-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fffffff') + '.lnk')
@@ -18,14 +20,32 @@ if (-not (Test-Path -LiteralPath $link) -and (Test-Path -LiteralPath $legacyLink
 }
 if (Test-Path -LiteralPath $link) {
     $old = $shell.CreateShortcut($link)
-    if ($old.TargetPath -ne $exe) { throw "같은 이름의 다른 바로 가기가 있어 건드리지 않습니다: $link" }
+    if ($old.TargetPath -ne $exe) { throw "Refusing to change a different shortcut: $link" }
     & (Join-Path $PSScriptRoot 'style_dashboard_shortcut.ps1') -ShortcutPath $link
-    exit
+} else {
+    $lnk = $shell.CreateShortcut($link)
+    $lnk.TargetPath = $exe
+    $lnk.WorkingDirectory = $repo
+    $lnk.IconLocation = (Join-Path $repo 'src\auto_trading\ui\assets\orbit-transparent.ico') + ',0'
+    $lnk.Description = $orbitName + ' - latest dashboard auto-start (no orders)'
+    $lnk.Save()
 }
-$lnk = $shell.CreateShortcut($link)
-$lnk.TargetPath = $exe
-$lnk.WorkingDirectory = $repo
-$lnk.IconLocation = (Join-Path $repo 'src\auto_trading\ui\assets\obi.ico') + ',0'
-$lnk.Description = '오르빗 - 실거래 홈 (읽기 전용, 주문 없음)'
-$lnk.Save()
+# User requested restoring this shortcut. It starts the same fresh, unprivileged UI path.
+$restartLink = Join-Path ([Environment]::GetFolderPath('Desktop')) ($restartName + '.lnk')
+$restart = $shell.CreateShortcut($restartLink)
+if (Test-Path -LiteralPath $restartLink) {
+    if ($restart.TargetPath -notin @($exe, (Join-Path $repo 'scripts\restart_dashboard.cmd'))) {
+        throw 'Refusing to change a different restart shortcut.'
+    }
+    $backupDir = Join-Path $repo 'reports\ui\shortcut-backups'
+    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+    Copy-Item -LiteralPath $restartLink -Destination (Join-Path $backupDir ('restart-before-auto-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fffffff') + '.lnk'))
+}
+$restart.TargetPath = $exe
+$restart.Arguments = '--restart-dashboard'
+$restart.WorkingDirectory = $repo
+$restart.IconLocation = (Join-Path $repo 'src\auto_trading\ui\assets\orbit-transparent.ico') + ',0'
+$restart.Description = $orbitName + ' - latest UI (also automatic in app; no trading restart)'
+$restart.Save()
 "shortcut: $link"
+"shortcut: $restartLink"

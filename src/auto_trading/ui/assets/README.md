@@ -1,5 +1,18 @@
 # 오비 브랜드 자산
 
+## 투명 데스크톱 아이콘 교체 (2026-10-10 후속, 아래 생성 이력보다 우선)
+
+사용자 첨부 `ChatGPT 이미지 2026년 10월 10일 오후 01_42_29.png`는 이미 RGBA이며
+바깥 모서리 alpha=0이다. 이미지 뷰어의 검은 표시가 실제 검은 배경이 아니다.
+`orbit-icon-source.png`는 바이트 동일 보존 사본(1254×1254), SHA256
+`ec3815f2b9abe62cdf103731473a80cf73ed9f58b0d7a4e38337f72351795932`.
+생성형 편집/배경 제거/크롭 없이 설치된 Pillow로 포맷 변환·축소만 한다.
+`obi.png`·`auto-trading.ico`·`obi.ico`를 RGBA로 교체하고, 바로가기 캐시 분리를 위해
+동일 ICO의 새 경로 `orbit-transparent.ico`를 사용한다. ICO 7프레임도 alpha 유지.
+exe PE 아이콘을 새 투명 ICO로 재빌드한다. `obi-original.png`와 승인 화면 배경은 보존.
+10/09 검은 배경 자산은 Git 이력에 있고 이전 exe는 build/orbit-backup에 보관한다.
+이번 후속은 새 이미지 생성이 아니므로 imagegen 호출/프롬프트/API 사용이 없다.
+
 - 사용자 승인 원본: `네온 궤도 속 우주 고양이.png` (2026-10-09).
 - `obi-original.png`: 제공 PNG의 바이트 동일 보존 사본(1254×1254 RGB).
   SHA256: `234578d170f91336fb193692bf9d8ac3ef39f96cf5b1f4a58916a68c1bbd40bd`.
