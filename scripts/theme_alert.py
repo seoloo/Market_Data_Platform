@@ -155,17 +155,26 @@ def weekly(telegram: bool = True) -> dict[str, Any]:
     us_uni, us_facts = _us_side()
     universes = {"kr": kr_uni, "us": us_uni}
     messages = build_messages(week, headlines, universes)
-    answer = _ask(messages)
-    if "error" in answer:
-        _send(
-            [f"🔭 주간 테마 알림 실패: {answer.get('error')} {answer.get('message', '')}"], telegram
-        )
-        return {"error": answer.get("error"), "message": answer.get("message")}
-    try:
-        judged = parse_weekly(str(answer["text"]), universes, headlines)
-    except ValueError as exc:
-        _send([f"🔭 주간 테마 알림 실패: 답 형식 오류 ({exc})"], telegram)
-        return {"error": f"답 형식 오류: {exc}"}
+    # AI 가 JSON 모드에서도 가끔 깨진 답을 준다(2026-10-10) — 한 번 더 묻고, 깨진 답은 남긴다
+    for attempt in (1, 2):
+        answer = _ask(messages)
+        if "error" in answer:
+            _send(
+                [f"🔭 주간 테마 알림 실패: {answer.get('error')} {answer.get('message', '')}"],
+                telegram,
+            )
+            return {"error": answer.get("error"), "message": answer.get("message")}
+        try:
+            judged = parse_weekly(str(answer["text"]), universes, headlines)
+            break
+        except ValueError as exc:
+            REPORTS.mkdir(parents=True, exist_ok=True)
+            (REPORTS / f"bad-answer-{week}-{attempt}.txt").write_text(
+                str(answer["text"]), encoding="utf-8"
+            )
+            if attempt == 2:
+                _send([f"🔭 주간 테마 알림 실패: 답 형식 오류 2 번 ({exc})"], telegram)
+                return {"error": f"답 형식 오류: {exc}"}
     last = _read(REPORTS / "latest.json").get("judged")
     facts = {"kr": kr_facts, "us": us_facts}
     diffs = {m: diff_weeks(judged, last, m) if last else None for m in ("kr", "us")}
