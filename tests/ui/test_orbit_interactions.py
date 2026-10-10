@@ -8,7 +8,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from auto_trading.ui.live_home import Book, Quotes
+from auto_trading.ui.live_home import Book, Holding, Quotes
 from auto_trading.ui.orbit_home import layout, render_live
 from auto_trading.ui.orbit_icons import ICON_ASSETS, ICON_NOTICES, icon, symbol_icon
 from auto_trading.ui.server import _ASSETS
@@ -152,3 +152,26 @@ def test_dark_hero_does_not_change_live_records_or_light_art() -> None:
 def test_unknown_instrument_never_becomes_asset_path() -> None:
     assert "<img" not in symbol_icon('../../.env" onerror="bad')
     assert icon("fund") == symbol_icon("unknown")
+
+
+@pytest.mark.parametrize(
+    "key,symbols",
+    [
+        ("glide", ("TQQQ", "SCHD")),
+        ("cruise", ("BTC", "ETH", "SOL")),
+        ("accumulate", ("BTQ", "QNDX")),
+    ],
+)
+def test_header_badges_removed_but_actual_holdings_kept(key: str, symbols: tuple[str, ...]) -> None:
+    book = Book(key, key, "장부", 100, 10, tuple(Holding(s, 1, 10, 20) for s in symbols))
+    html = render_live([book], Quotes(), 0)
+    heading = html.split('class="orbit-card-heading"', 1)[1].split('class="orbit-card-summary"', 1)[
+        0
+    ]
+    assert 'class="orbit-card-pills"' not in html
+    for text in ("미국 ETF에 자동으로", "주요 코인에 자동으로", "자동으로 차곡차곡"):
+        assert text not in heading
+    for symbol in symbols:
+        assert f"<b>{symbol}</b>" in html
+    assert f"보유 종목 ({len(symbols)}개)" in html
+    assert "20원" in html and "보유 상세" in html

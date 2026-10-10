@@ -317,7 +317,7 @@ def test_orbit_keeps_sol_and_actual_holding_value(tmp_path: Path) -> None:
     quotes = Quotes({"BTC": 110_000_000.0, "SOL": 180_000.0}, _Q.usd, _Q.fx, _NOW)
     html = render_live(build_books(tmp_path, quotes), quotes, _NOW)
     assert "솔라나" in html and "360,000원" in html
-    assert "<span>SOL</span>" in html
+    assert "<b>SOL</b>" in html  # 헤더 배지는 제거해도 실제 보유 목록은 유지한다.
     assert "coin-sol" in html and "보유 종목 (2개)" in html
 
 

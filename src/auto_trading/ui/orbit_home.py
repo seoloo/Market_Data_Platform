@@ -110,15 +110,11 @@ def layout(body: str, theme: str) -> str:
 
 def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> str:
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
-    category, subtitle, description, glyph = {
-        "glide": ("미국 주식", "Glide", "미국 ETF에 자동으로", "chart"),
-        "cruise": ("코인", "Cruise", "주요 코인에 자동으로", "coins"),
-        "accumulate": ("자동 적립", "자동 적립", "자동으로 차곡차곡", "leaf"),
-    }.get(key, ("투자 장부", book.title, "저장된 기록", "wallet"))
-    symbols = {"glide": ("TQQQ", "SCHD"), "cruise": ("BTC", "ETH", "SOL")}.get(
-        key, tuple(h.name for h in book.holdings)
-    )
-    pills = "".join(f"<span>{escape(s)}</span>" for s in symbols)
+    category, subtitle, glyph = {
+        "glide": ("미국 주식", "Glide", "chart"),
+        "cruise": ("코인", "Cruise", "coins"),
+        "accumulate": ("자동 적립", "자동 적립", "leaf"),
+    }.get(key, ("투자 장부", book.title, "wallet"))
     change = (
         _change(book.value_krw, book.deposits_krw)
         if _priced(book, quotes)
@@ -152,7 +148,7 @@ def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> s
         '<div class="orbit-card-heading">'
         f'<span class="orbit-category-icon">{icon(glyph)}</span>'
         f"<div><h2>{category}</h2><span>{escape(subtitle)}</span></div>"
-        f'<div class="orbit-card-pills"><small>{description}</small><div>{pills}</div></div></div>'
+        "</div>"
         '<div class="orbit-card-summary"><div>'
         f"<strong>{amount}</strong><p>{change}</p></div>"
         '<div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div>'

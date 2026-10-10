@@ -24,7 +24,7 @@ h1,h2,p{margin:0}h2{font-size:23px;line-height:1.3}small{font-size:13px}ul{list-
 .orbit-popover p{margin:14px 0;color:var(--muted);overflow-wrap:anywhere}
 .orbit-themes{display:flex;gap:12px;margin-top:16px}.orbit-themes a{padding:10px 24px;border:1px solid var(--line);border-radius:14px}.orbit-themes [aria-current=true]{background:var(--soft);color:var(--blue)}
 .orbit-main{max-width:1680px;margin:auto;padding:0 clamp(14px,1.7vw,28px) 24px}
-.orbit-hero{min-height:320px;position:relative;padding:24px;display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:22px;align-items:end;isolation:isolate}
+.orbit-hero{--hero-indent:24px;min-height:320px;position:relative;padding:24px var(--hero-indent);display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:22px;align-items:end;isolation:isolate}
 .orbit-hero::before{content:"";position:absolute;inset:0;z-index:-3;pointer-events:none;background:radial-gradient(ellipse at 75% 15%,#98d8ff50,transparent 65%)}
 .orbit-hero-art{position:absolute;inset:0 calc(-1 * clamp(14px,1.7vw,28px));z-index:-2;overflow:hidden;pointer-events:none;border-radius:0 0 28px 28px}
 .orbit-hero-art img{position:absolute;right:0;top:-162px;width:1050px;height:700px;object-fit:contain;max-width:none;mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,#000 78%,transparent);mask-composite:intersect}
@@ -32,7 +32,7 @@ html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 30% 85%
 .orbit-greeting{grid-column:1;align-self:start}.orbit-greeting>span{font-size:clamp(16px,1.4vw,21px);color:var(--muted)}
 .orbit-greeting h1{font-size:clamp(28px,2.8vw,44px);letter-spacing:-1.5px;line-height:1.35}.orbit-greeting h1 span{font-size:.9em}
 .orbit-greeting p{color:var(--muted);font-size:clamp(13px,1.2vw,18px);margin-top:4px}
-.orbit-networth{grid-column:1;display:grid;grid-template-columns:1.55fr .9fr 1fr;align-items:center;min-width:0;min-height:142px;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(15px,1.5vw,25px)}
+.orbit-networth{grid-column:1;margin-left:calc(-1 * var(--hero-indent));display:grid;grid-template-columns:1.55fr .9fr 1fr;align-items:center;min-width:0;min-height:142px;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(15px,1.5vw,25px)}
 .orbit-networth>div{min-width:0}.orbit-networth>div+div{border-left:1px solid var(--line);padding-left:clamp(12px,1.3vw,25px)}
 .orbit-networth h2{font-size:20px;display:flex;gap:20px;align-items:center}.orbit-networth h2 svg{width:22px;color:var(--muted)}
 .orbit-total{display:block;font-size:clamp(28px,3.2vw,53px);font-weight:800;letter-spacing:-1.5px;overflow-wrap:anywhere}.orbit-total small{font-size:.6em;margin-left:3px}
@@ -55,8 +55,6 @@ html[data-theme=dark] .orbit-alert{background:#34213ce8;border-color:#714064;col
 .orbit-card-heading{display:flex;align-items:center;gap:12px}.orbit-category-icon{display:grid;place-items:center;flex-shrink:0;height:52px;width:52px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#57baff,#067eff)}
 .orbit-category-icon svg{height:29px;width:29px;stroke-width:1.8}.orbit-cruise .orbit-category-icon{background:linear-gradient(135deg,#a799ff,#6753ff)}.orbit-accumulate .orbit-category-icon{background:linear-gradient(135deg,#61d5b3,#079980)}
 .orbit-card h2{font-size:clamp(19px,1.5vw,23px)}.orbit-card-heading>div>span{font-size:16px;color:var(--muted)}
-.orbit-card-pills{margin-left:auto;text-align:right;color:var(--muted);font-size:12px;min-width:0}.orbit-card-pills>div{display:flex;justify-content:flex-end;gap:5px;margin-top:5px;flex-wrap:wrap}
-.orbit-card-pills span{padding:2px 8px;background:var(--soft);border-radius:20px;color:var(--ink);font-size:11px}
 .orbit-card-summary{display:flex;align-items:center;gap:10px;margin:15px 0;min-height:78px}.orbit-card-summary>div:first-child{min-width:0;flex:1}
 .orbit-card-summary strong{font-size:clamp(30px,9cqw,45px);letter-spacing:-1.5px;overflow-wrap:anywhere}.orbit-card-summary strong>span{font-size:.6em;letter-spacing:0;margin-left:3px}
 .orbit-card-summary p{font-size:15px;font-weight:600}.orbit-card-summary p small{display:inline;margin-left:8px;font-size:14px}
@@ -91,14 +89,14 @@ html[data-theme=dark] .orbit-alert{background:#34213ce8;border-color:#714064;col
 .orbit-trade-state{background:#e1f7ee;color:#127861;padding:5px 10px;border-radius:20px;font-size:12px;white-space:nowrap}html[data-theme=dark] .orbit-trade-state{background:#174d43;color:#73e9c9}
 .orbit-recent>ul{max-height:180px;overflow:auto;scrollbar-width:thin}.orbit-all-trades{font-size:13px;color:var(--blue);white-space:nowrap;padding:8px 0}
 summary::-webkit-details-marker{display:none}
-@container(max-width:360px){.orbit-spark-empty,.orbit-card-pills small{display:none}.orbit-holding-name small{max-width:115px}.orbit-card-summary strong{font-size:34px}}
+@container(max-width:360px){.orbit-spark-empty{display:none}.orbit-holding-name small{max-width:115px}.orbit-card-summary strong{font-size:34px}}
 @media(max-width:1100px){
  .orbit-nav{gap:3px}.orbit-nav>a,.orbit-nav>button{padding:10px}.orbit-nav>a>span,.orbit-nav>button>span{display:none}
- .orbit-hero{grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);padding:24px 0}
+ .orbit-hero{--hero-indent:0px;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);padding:24px 0}
  .orbit-help-card{width:170px;padding:14px}.orbit-help-card b{font-size:14px}
  .orbit-hero-art img{right:-120px}
  .orbit-networth{grid-template-columns:1.5fr 1fr 1fr}.orbit-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
- .orbit-card:last-child{grid-column:1/-1}.orbit-card-pills small{display:none}.orbit-alert-copy{display:none}.orbit-bottom{grid-template-columns:1fr 1fr}
+ .orbit-card:last-child{grid-column:1/-1}.orbit-alert-copy{display:none}.orbit-bottom{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
  .orbit-hero{min-height:335px;grid-template-columns:1fr;gap:16px}
@@ -106,7 +104,7 @@ summary::-webkit-details-marker{display:none}
  .orbit-hero-art img{width:640px;height:427px;right:-30px;top:-70px}
  html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 31% 39% at 82% 20%,#000 60%,transparent 100%)}
  .orbit-networth{grid-column:1}.orbit-total{font-size:35px}.orbit-cards,.orbit-bottom{grid-template-columns:1fr}.orbit-card:last-child{grid-column:auto}
- .orbit-card-pills small{display:block}.orbit-card-summary strong{font-size:clamp(32px,8cqw,43px)}
+ .orbit-card-summary strong{font-size:clamp(32px,8cqw,43px)}
 }
 @media(max-width:520px){
  .topbar{flex-wrap:wrap;gap:5px}.logo{font-size:24px}.logo img{height:38px;width:38px}.orbit-tools{margin-left:auto}
@@ -117,7 +115,7 @@ summary::-webkit-details-marker{display:none}
  .orbit-networth{grid-template-columns:1fr 1fr;gap:9px;padding:15px 18px}.orbit-networth>div:first-child{grid-column:1/-1}
  .orbit-networth>div:nth-child(2){border:0;padding:0}.orbit-networth>div:nth-child(3){padding-left:12px}.orbit-networth h2{font-size:18px}
  .orbit-total{font-size:38px}.orbit-networth>div>span{font-size:12px}.orbit-alert summary{gap:8px;padding:11px 12px}
- .orbit-alert b{flex-shrink:1;font-size:12px}.orbit-alert-mark{height:27px;width:27px;font-size:20px}.orbit-card-pills small{display:none}
+ .orbit-alert b{flex-shrink:1;font-size:12px}.orbit-alert-mark{height:27px;width:27px;font-size:20px}
  .orbit-card h2{font-size:21px}.orbit-card-summary strong{font-size:35px}.orbit-holding-name small{max-width:110px}
  .orbit-holding-value b{font-size:14px}.orbit-holding-value small b{font-size:11px}.orbit-panel{padding:16px}
  .orbit-periods{width:100%;justify-content:space-between}.orbit-periods span{padding:6px 11px}.orbit-trade-state{font-size:10px;padding:5px 8px}
