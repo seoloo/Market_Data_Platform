@@ -27,6 +27,7 @@ from auto_trading.ui.kr_shadow_render import kr_shadow_page
 from auto_trading.ui.leader_alert_render import leader_alert_page
 from auto_trading.ui.live_home import live_page
 from auto_trading.ui.lt_render import lt_paper_page
+from auto_trading.ui.orbit_home import layout as orbit_layout
 from auto_trading.ui.overview import overview_attention
 from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
@@ -147,6 +148,8 @@ def _subnav(page: str, group: str) -> str:
 
 
 def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
+    if page == "live":
+        return orbit_layout(body, theme)
     group = _group(page)
     nav = _subnav(page, group)
     title = next(label for key, _, label in PAGES if key == page)
@@ -225,10 +228,10 @@ def _layout(data: DashboardData, page: str, body: str, theme: str) -> str:
         '<meta http-equiv="refresh" content="60">'
         '<link rel="icon" type="image/png" href="/assets/obi.png?v=3" sizes="512x512">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" sizes="any">'
-        f"<title>{escape(title)} · Auto Trading</title><style>{_CSS}</style></head><body>"
+        f"<title>{escape(title)} · 오르빗</title><style>{_CSS}</style></head><body>"
         f'<div class="topbar"><a class="logo" href="{"/live" if page == "live" else "/"}">'
         '<img src="/assets/obi.png?v=3" width="52" height="52" alt="">'
-        "AUTO <b>TRADING</b></a>"
+        "<b>오르빗</b></a>"
         f'<div class="tabs" aria-label="주 메뉴">{tabs}</div>'
         f'<div class="theme" aria-label="화면 테마">{themes}</div></div>'
         f'<div class="layout">{nav}<main>'

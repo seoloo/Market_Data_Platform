@@ -178,7 +178,7 @@ class TestRender:
         assert html.startswith("<!doctype html>")
         assert "읽기 전용" in html
         if page == "live":
-            assert "실거래 · 공개 시세" in html and "실거래 비활성</span>" not in html
+            assert "실거래 장부만 표시" in html and "실거래 비활성</span>" not in html
         elif page == "toss":
             assert "저장된 적립 기록" in html and "실거래 비활성</span>" not in html
         elif page == "overview":
@@ -566,11 +566,12 @@ class TestRender:
     def test_brand_and_favicon_present_on_all_pages(self, root: Path) -> None:
         for page, _, _ in PAGES:
             html = render_page(load_dashboard(root, P0 + 11 * D), page)
-            assert 'src="/assets/obi.png?v=3"' in html
+            brand = "orbit-obi.png" if page == "live" else "obi.png?v=3"
+            assert f'src="/assets/{brand}"' in html
             assert 'rel="icon" type="image/png"' in html
             assert 'href="/favicon.ico?v=3"' in html
             assert "오비, 네온 궤도 속 우주 고양이" in html
-            assert "AUTO <b>TRADING</b>" in html
+            assert "<b>오르빗</b>" in html
 
     @pytest.mark.parametrize("page", [key for key, _, _ in PAGES])
     @pytest.mark.parametrize("theme", ["light", "dark"])
@@ -670,6 +671,9 @@ class TestServer:
             ("/assets/auto-trading.ico", "image/x-icon"),
             ("/assets/auto-trading.svg?v=2", "image/svg+xml"),
             ("/assets/obi.png?v=3", "image/png"),
+            ("/assets/orbit-obi.png", "image/png"),
+            ("/assets/orbit-hero-light.png", "image/png"),
+            ("/assets/orbit-space-dark.png", "image/png"),
         ],
     )
     def test_brand_assets_do_not_load_account_data(

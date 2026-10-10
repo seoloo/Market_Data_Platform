@@ -88,7 +88,7 @@ def ensure_server(repo: Path) -> str | None:
 def _error_page(msg: str) -> str:
     return (
         "<html><body style='font-family:sans-serif;padding:40px'>"
-        f"<h2>Auto Trading</h2><p>{msg}</p>"
+        f"<h2>오르빗</h2><p>{msg}</p>"
         "<p>저장소의 scripts\\open_dashboard.cmd 로 직접 켜 보세요.</p></body></html>"
     )
 
@@ -100,7 +100,7 @@ def main() -> int:
     problem = "저장소 위치를 찾지 못했습니다." if repo is None else ensure_server(repo)
     kwargs = {"html": _error_page(problem)} if problem else {"url": START}
     webview.create_window(
-        "Auto Trading", width=1440, height=960, min_size=(420, 600), text_select=True, **kwargs
+        "오르빗", width=1536, height=1080, min_size=(420, 600), text_select=True, **kwargs
     )
     storage = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AutoTradingApp"
     webview.start(gui="edgechromium", private_mode=False, storage_path=str(storage))

@@ -38,6 +38,9 @@ _ASSETS = {
     "/assets/auto-trading.ico": ("auto-trading.ico", "image/x-icon"),
     "/assets/auto-trading.svg": ("auto-trading.svg", "image/svg+xml"),
     "/assets/obi.png": ("obi.png", "image/png"),
+    "/assets/orbit-obi.png": ("orbit-obi.png", "image/png"),
+    "/assets/orbit-hero-light.png": ("orbit-hero-light.png", "image/png"),
+    "/assets/orbit-space-dark.png": ("orbit-space-dark.png", "image/png"),
 }
 _HEADERS = {
     "Cache-Control": "no-store",

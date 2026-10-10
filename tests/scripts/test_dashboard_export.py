@@ -35,7 +35,9 @@ def test_export_both_themes_without_broken_internal_links(
         html = path.read_text(encoding="utf-8")
         theme = "dark" if path.stem.endswith("-dark") else "light"
         assert f'data-theme="{theme}"' in html
-        assert 'src="assets/obi.png?v=3"' in html
+        brand = "orbit-obi.png" if path.stem.startswith("live") else "obi.png?v=3"
+        assert f'src="assets/{brand}"' in html
+        assert "url('/assets/" not in html
         assert 'href="assets/auto-trading.ico?v=3"' in html
         links = _Links()
         links.feed(html)

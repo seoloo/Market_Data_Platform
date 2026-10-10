@@ -24,7 +24,7 @@ if ($PSCmdlet.ShouldProcess($uiResolvedLink, '아이콘과 설명만 변경 (원
     Copy-Item -LiteralPath $uiResolvedLink -Destination $uiBackup
     try {
         $uiLink.IconLocation = $uiIcon + ',0'
-        $uiLink.Description = 'Auto Trading · 오비 우주 대시보드 (매매 설정 변경 없음)'
+        $uiLink.Description = '오르빗 · 오비 우주 대시보드 (매매 설정 변경 없음)'
         $uiLink.Save()
         $uiAfterLink = $uiShell.CreateShortcut($uiResolvedLink)
         $uiAfter = @($uiAfterLink.TargetPath, $uiAfterLink.Arguments, $uiAfterLink.WorkingDirectory, $uiAfterLink.WindowStyle)

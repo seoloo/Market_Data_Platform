@@ -147,7 +147,7 @@ def test_live_page_in_nav_without_network(tmp_path: Path, monkeypatch: pytest.Mo
     monkeypatch.setattr(live_home, "quote_source", lambda coins, tickers: _Q)
     html = render_page(load_dashboard(tmp_path, _NOW), "live")
     assert 'href="/live"' in html and "총 입금" in html and "Cruise" in html
-    assert "11/02" in html  # 다음 Glide = 11 월 첫 평일
+    assert "오르빗" in html and "SOL" in html
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
@@ -160,24 +160,27 @@ def test_desktop_home_has_explanations_and_read_only_navigation(
     assert f'data-theme="{theme}" data-page="live"' in html
     assert '<a class="logo" href="/live">' in html
     for label in (
-        "내 실거래",
-        "처음 사용하시나요?",
-        "미국 주식 자동투자",
-        "코인 자동투자",
+        "오늘도 오비와 함께",
+        "화면 읽는 법",
+        "미국 주식",
+        "코인",
         "주식 모으기",
         "기준 금액",
         "총 입금 + 적립 매입원가",
         "확정 수익 아님",
         "확인할 사항",
         "주문 접수 ≠ 체결 완료",
-        "휴장·잔고·예약 상태",
+        "자산 변화",
+        "평가 기록 대기",
+        "자동 적립",
+        "연결 계좌",
     ):
         assert label in html
-    assert 'role="img" aria-label="전략별 양수 평가액 비중' in html
-    assert 'scope="row"' in html and "scope='col'" in html
-    assert 'tabindex="0" role="region"' in html
+    assert 'class="orbit-holdings"' in html and 'class="orbit-book-detail"' in html
     for i in range(3):
-        assert f'href="#live-book-{i}"' in html and f'id="live-book-{i}"' in html
+        assert f'id="live-book-{i}"' in html
+    for excluded in ('href="/research"', 'href="/compare"', 'href="/running"', "토스 적립"):
+        assert excluded not in html
     assert "<script" not in html and "<form" not in html
 
 
@@ -186,7 +189,7 @@ def test_missing_prices_hide_aggregate_profit_not_fabricate_a_return(tmp_path: P
     q = Quotes(errors=("업비트 시세 실패",))
     html = render_live(build_books(tmp_path, q), q, _NOW)
     hero = html.split('aria-labelledby="live-total-title"', 1)[1].split("</section>", 1)[0]
-    assert "내 자산 추정 평가액" in hero and "추정치 포함" in hero
+    assert "내 자산" in hero and "추정치 포함" in hero
     assert "시세 확인 필요" in hero and 'class="neg"' not in hero and 'class="pos"' not in hero
     assert "시세 확인 후 표시" in html
 
@@ -213,17 +216,19 @@ def test_stopped_book_is_warning_not_live_health_status(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("value", [0.0, -10.0])
-def test_nonpositive_values_do_not_break_allocation(value: float) -> None:
+def test_nonpositive_values_do_not_break_display(value: float) -> None:
     book = Book("glide", "Glide", "토스", 0.0, value, ())
     html = render_live([book], _Q, _NOW)
-    assert "0.0%" in html and "nan" not in html.lower() and "inf" not in html.lower()
+    assert "nan" not in html.lower() and "inf" not in html.lower()
+    assert f"{value:,.0f}" in html
 
 
 def test_empty_state_explains_missing_data_without_zero_balance() -> None:
     html = render_live([], Quotes(), _NOW)
     assert "아직 실거래 장부가 없습니다" in html and "화면 읽는 법" in html
     assert "기록 없음은 잔고 0원이나 운영 중단을 뜻하지 않습니다" in html
-    assert 'class="live-total"' not in html
+    assert 'class="orbit-total">—' in html
+    assert "<strong>0<span>원</span>" not in html
 
 
 def test_dynamic_live_content_and_unknown_book_key_are_escaped() -> None:
@@ -231,7 +236,7 @@ def test_dynamic_live_content_and_unknown_book_key_are_escaped() -> None:
     book = Book(bad, bad, bad, 100.0, 110.0, (), (bad,), (bad,), ((bad, bad),))
     html = render_live([book], Quotes(errors=(bad,)), _NOW)
     assert bad not in html and "&lt;script&gt;" in html
-    assert 'class="panel live-book live-other"' in html
+    assert bad not in html.split('<div class="orbit-cards">')[1].split("</div>", 1)[0]
     assert "<script" not in html and "<form" not in html
 
 
@@ -293,6 +298,51 @@ def test_summary_text_for_phone(tmp_path: Path) -> None:
     assert "📈 Glide · 토스" in text and "🛫 Cruise · 업비트" in text
     assert "🟢 BTC" in text and "⏳ SCHD 3주" in text
     assert "원/달러 1,300.0" in text
+
+
+def test_orbit_keeps_sol_and_actual_holding_value(tmp_path: Path) -> None:
+    _seed(tmp_path)
+    state = json.loads((tmp_path / "data/upbit_t2/state.json").read_text(encoding="utf-8"))
+    state["expected"]["SOL"] = "2"
+    state["orders"].append(
+        {
+            "identifier": "t2u-2026-10-09-SOL-B",
+            "side": "bid",
+            "executed_volume": "2",
+            "funds": "300000",
+            "paid_fee": "150",
+        }
+    )
+    _write(tmp_path, "data/upbit_t2/state.json", state)
+    quotes = Quotes({"BTC": 110_000_000.0, "SOL": 180_000.0}, _Q.usd, _Q.fx, _NOW)
+    html = render_live(build_books(tmp_path, quotes), quotes, _NOW)
+    assert "솔라나" in html and "360,000원" in html
+    assert "<span>SOL</span>" in html
+    assert "coin-sol" in html and "보유 종목 (2개)" in html
+
+
+def test_orbit_does_not_invent_history_or_account_status(tmp_path: Path) -> None:
+    _seed(tmp_path)
+    html = render_live(build_books(tmp_path, _Q), _Q, _NOW)
+    assert "평가 기록 대기" in html
+    assert "계좌가 정상적으로 연결" not in html
+    assert "2,034,000" not in html  # 승인 PNG의 예시 금액을 복제하지 않는다
+    assert '<path d="M' not in html.split('class="orbit-chart-empty"', 1)[1].split("</div>", 1)[0]
+    assert 'name="orbit-range"' in html
+
+
+def test_orbit_render_preserves_stored_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    _seed(tmp_path)
+    paths = tuple((tmp_path / "data").rglob("*.json"))
+    before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+    monkeypatch.setattr(live_home, "quote_source", lambda coins, tickers: _Q)
+    for theme in ("light", "dark"):
+        render_page(load_dashboard(tmp_path, _NOW), "live", theme=theme)
+    assert {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths} == before
 
 
 def test_telegram_bot_replies_once_and_leaves_amounts(
