@@ -222,3 +222,75 @@ class TestLiveServer:
             assert 'href="/live?amounts=show"' in html and "처음 오셨나요" not in html
         with browser.open(base + "/live?amounts=bogus") as r:
             assert 'href="/live?amounts=show"' in r.read().decode()  # 이상한 값은 무시
+
+
+def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
+    cruise = Book(
+        "cruise",
+        "Cruise",
+        "업비트",
+        300.0,
+        100.0,
+        (
+            Holding("BTC", 0.001, 120.0, 150.0, target=0.41),
+            Holding("ETH", 0.01, 40.0, 50.0, target=0.0),
+        ),
+        info={
+            "buying": 1,
+            "coins": 3,
+            "dd": 0.006,
+            "stopped": False,
+            "last_decision": "2026-10-09",
+        },
+    )
+    html = render_live([cruise], Quotes(at_ms=_NOW), _NOW)
+    dt = html.split('data-live="card-cruise-detail"', 1)[1].split("</details>", 1)[0]
+    for text in (
+        "현금",
+        "남은 돈",
+        "사는 중인 코인",
+        "1 / 3개",
+        "최고점 기준",
+        "−0.6%",
+        "−30%면 매수 멈춤",
+        "하는 중",
+        "지금 구성",
+        "비중 / 목표",
+        "매일 09:05 판단 · 마지막 10/09",
+        "장부 기준 · 세금 전 · 평가액",
+    ):
+        assert text in dt, text
+    assert "50 / 41%" in dt  # BTC 150 / 300
+    assert 'class="warn">17 / 0%' in dt  # 목표에서 10%p 넘게 벗어나면 노랑
+    glide = Book(
+        "glide",
+        "Glide",
+        "토스",
+        300_000.0,
+        57_057.0,
+        (Holding("TQQQ", 1, 109_000.0, 108_988.0, target=0.6, avg_usd=81.28),),
+        info={
+            "cash_usd": 42.55,
+            "month": "2026-10",
+            "month_amount": 300_000.0,
+            "lev_target": 0.6,
+            "brake_stage": 1,
+        },
+    )
+    g = render_live([glide], Quotes(usd={"TQQQ": 80.98}, at_ms=_NOW), _NOW)
+    gd = g.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
+    for text in (
+        "남은 달러 $42.55",
+        "10월 첫 거래일",
+        "TQQQ 목표 비중",
+        "60%",
+        "절반 팖",
+        "$81.28",
+        "$80.98",
+        "다음 매수 11월 첫 거래일",
+    ):
+        assert text in gd, text
+    assert "시장이 잔잔해" not in gd
+    hidden = render_live([glide], Quotes(usd={"TQQQ": 80.98}), _NOW, hide=True)
+    hd = hidden.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
+    assert "57,057" not in hd and "300,000" not in hd and "42.55" not in hd and "60%" in hd

@@ -199,3 +199,29 @@ summary::-webkit-details-marker{display:none}
 [data-theme=dark] #orbit-all-trades .orbit-trade-filter{background:#101e3b}
 .orbit-trade-filter:has(#tf-all:checked)+.orbit-trades-list>.orbit-trade-empty{display:none}
 .orbit-trade-empty{color:var(--muted);justify-content:center}
+/* 보유 상세 (2026-10-10 사용자 승인 시안: 상태 타일 · 구성 막대 · 종목 표) */
+.orbit-dt{display:block}
+.orbit-dt-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin-top:6px}
+.orbit-dt-tile{background:var(--soft);border-radius:12px;padding:10px 6px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px}
+.orbit-dt-tile span{font-size:11px;color:var(--muted)}
+.orbit-dt-tile b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.orbit-dt-tile small{font-size:11px;color:var(--muted);line-height:1.35}
+.orbit-dt-tile b.ok{color:#16a37f}.orbit-dt-tile b.warn{color:#c47a00}
+[data-theme=dark] .orbit-dt-tile b.ok{color:#57dfc0}[data-theme=dark] .orbit-dt-tile b.warn{color:#ffc46b}
+.orbit-dt-sec{font-size:12px;color:var(--muted);margin:14px 0 6px}
+.orbit-dt-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--soft)}
+.orbit-dt-legend{display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:6px;justify-content:flex-end}
+.orbit-dt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.orbit-dt-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;font-variant-numeric:tabular-nums}
+.orbit-dt-table th{font-weight:400;color:var(--muted);text-align:right;padding:5px 0;border-bottom:1px solid var(--line)}
+.orbit-dt-table td{text-align:right;padding:8px 0;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orbit-dt-table th:first-child,.orbit-dt-table td:first-child{text-align:left;font-weight:600}
+.orbit-dt-wt{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-left:8px}
+.orbit-dt-gauge{position:relative;flex:1;max-width:80px;height:6px;background:var(--soft);border-radius:3px}
+.orbit-dt-gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.orbit-dt-gauge u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.orbit-dt-wt em{font-style:normal;width:58px;text-align:right}.orbit-dt-wt em.warn{color:#c47a00}
+[data-theme=dark] .orbit-dt-wt em.warn{color:#ffc46b}
+.orbit-dt-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.orbit-dt-chip{font-size:12px;background:var(--soft);border-radius:10px;padding:4px 9px;color:var(--muted)}
+.orbit-dt-foot{font-size:11px;color:var(--muted);margin-left:auto}

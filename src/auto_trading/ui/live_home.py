@@ -105,6 +105,10 @@ class Holding:
     value_krw: float | None
     """None 이면 시세 없음 (평가는 원가로 셈)."""
     note: str = ""
+    target: float | None = None
+    """장부가 정한 목표 비중 (0 ~ 1). 없으면 None (보유 상세 막대에 목표선 없음)."""
+    avg_usd: float | None = None
+    """달러 평균 매입단가 (미국 종목, 장부에서 셀 수 있을 때만)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +146,8 @@ class Book:
     trades: tuple[Trade, ...] = ()
     updated_ms: int = 0
     """장부 파일을 마지막으로 저장한 시각 (0 이면 모름)."""
+    info: Mapping[str, Any] = field(default_factory=dict)
+    """보유 상세 상태 칸에 쓰는 장부 값 (2026-10-10 화면 개선)."""
 
     @property
     def value_krw(self) -> float:
@@ -178,6 +184,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     cash = _f(state.get("cash_usd")) * (fx or 0.0)
     qty = state.get("qty") or {}
     spent: dict[str, float] = {}
+    spent_usd: dict[str, float] = {}
     pending: list[str] = []
     activity: list[tuple[str, str]] = [(str(d[0]), f"💵 입금 {_f(d[1]):,.0f} 원") for d in deposits]
     trades: list[Trade] = [
@@ -217,9 +224,13 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         )
         if filled > 0:
             spent[sym] = spent.get(sym, 0.0) + _f(o.get("filled_usd")) + _f(o.get("commission"))
+            spent_usd[sym] = spent_usd.get(sym, 0.0) + _f(o.get("filled_usd"))
             activity.append((str(o.get("date")), f"🛒 {sym} {filled:g}주 체결"))
         if o.get("status") == "SENT" and filled <= 0:
             pending.append(f"{sym} {_f(o.get('qty')):g}주 · 지정가 ${_f(o.get('limit')):,.2f}")
+    months = [m for m in state.get("months") or [] if isinstance(m, list) and len(m) >= 3]
+    lev_target = _f(months[-1][2]) if months else None
+    targets = {"TQQQ": lev_target, "SCHD": None if lev_target is None else 1 - lev_target}
     holdings = []
     for sym in GLIDE_TICKERS:
         n = _f(qty.get(sym))
@@ -232,10 +243,11 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 n,
                 spent.get(sym, 0.0) * (avg_fx or fx or 0.0),
                 None if price is None or fx is None else n * price * fx,
+                target=targets.get(sym),
+                avg_usd=spent_usd[sym] / n if spent_usd.get(sym) else None,
             )
         )
     notes = []
-    months = [m for m in state.get("months") or [] if isinstance(m, list) and len(m) >= 3]
     if months:
         m = months[-1]
         notes.append(f"{m[0]} TQQQ 목표 {_f(m[2]):.0%} (QQQ 20일 변동성 {_f(m[1]):.1%})")
@@ -244,6 +256,14 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         last = max(amounts)
         notes.append(f"{last} 납입 {_f(amounts[last]):,.0f} 원")
     notes.append(f"남은 달러 ${_f(state.get('cash_usd')):,.2f}")
+    last_month = max(amounts) if amounts else ""
+    info = {
+        "cash_usd": _f(state.get("cash_usd")),
+        "month": last_month,
+        "month_amount": _f(amounts[last_month]) if last_month else None,
+        "lev_target": lev_target,
+        "brake_stage": int(_f((state.get("brake") or {}).get("stage"))),
+    }
     return Book(
         "glide",
         "Glide",
@@ -255,6 +275,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         tuple(pending),
         tuple(activity),
         tuple(trades),
+        info=info,
     )
 
 
@@ -307,6 +328,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 float(costs[coin]),
                 None if price is None else n * price,
                 f"{trend} · 목표 {w:.0%}",
+                target=w,
             )
         )
     deposits = sum(_f(d[1]) for d in state.get("deposits") or [] if isinstance(d, list))
@@ -314,6 +336,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
     book = Book("cruise", "Cruise", "업비트 · BTC · ETH · SOL", deposits, cash, tuple(holdings))
     units, peak = _f(state.get("units")), _f(state.get("peak"))
     notes = []
+    dd: float | None = None
     if units > 0 and peak > 0:
         dd = max(0.0, 1 - book.value_krw / units / peak)
         drop = f"−{dd:.1%}" if dd >= 0.0005 else "0%"
@@ -361,6 +384,13 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 state_text,
             )
         )
+    info = {
+        "buying": sum(1 for c in CRUISE_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
+        "coins": len(CRUISE_COINS),
+        "dd": dd,
+        "stopped": bool(state.get("stopped")),
+        "last_decision": str(state.get("last_decision") or ""),
+    }
     return Book(
         book.key,
         book.title,
@@ -372,6 +402,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         (),
         tuple(activity),
         tuple(trades),
+        info=info,
     )
 
 
@@ -407,8 +438,17 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         if n <= 0:
             continue
         price = q.usd.get(sym)
+        bought = sum(_f(b.get("qty")) for b in buys)
+        usd = sum(_f(b.get("cost_usd")) for b in buys)
         holdings.append(
-            Holding(sym, n, cost, None if price is None or q.fx is None else n * price * q.fx)
+            Holding(
+                sym,
+                n,
+                cost,
+                None if price is None or q.fx is None else n * price * q.fx,
+                # 기존 보유분(장부 밖 원가)이 섞이면 평균 단가를 셀 수 없다
+                avg_usd=usd / n if bought > 0 and abs(bought - n) < 1e-9 else None,
+            )
         )
     return Book(
         "accumulate",
@@ -421,6 +461,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         (),
         tuple(activity),
         tuple(trades),
+        info={"last_buy": max((d for d, _ in activity), default="")},
     )
 
 

@@ -407,11 +407,6 @@ def _card(
             f"<b>{_won(value, hide)}원{_est(holding.value_krw is None)}</b>"
             f"<small>{row_pl}</small></div></button></li>"
         )
-    notes = "".join(f"<li>{escape(n)}</li>" for n in (*book.notes, *book.pending))
-    qty_rows = "".join(
-        f"<p>{escape(h.name)} · {_HIDDEN if hide else f'{h.qty:,.8g}'} · {escape(h.note)}</p>"
-        for h in book.holdings
-    )
     return (
         f'<section id="live-book-{index}" class="orbit-card orbit-{key}">'
         '<div class="orbit-card-heading">'
@@ -426,14 +421,171 @@ def _card(
         f'<ul class="orbit-holdings" data-live="card-{key}-holdings">'
         f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}</ul>"
         + "".join(pops)
-        + '<details class="orbit-book-detail"><summary aria-label="보유 수량과 장부 메모">'
+        + '<details class="orbit-book-detail"><summary aria-label="보유 상세">'
         '<span class="orbit-detail-open">보유 상세 ›</span>'
         '<span class="orbit-detail-close">보유 상세 닫기 ×</span></summary>'
-        f'<div data-live="card-{key}-detail">'
-        + qty_rows
-        + f"<p>현금 {_won(book.cash_krw, hide)}원</p>"
-        + f"<ul>{notes}</ul><p>장부 기준 · 세금 전 · "
-        f"{'평가액' if priced else '추정 평가액'}</p></div></details></section>"
+        f'<div class="orbit-dt" data-live="card-{key}-detail">'
+        + _detail(book, quotes, hide=hide, priced=priced, now_ms=now_ms)
+        + "</div></details></section>"
+    )
+
+
+# ---------------------------------------------------------------- 보유 상세 (타일 · 구성 · 표)
+
+_COLORS = {
+    "BTC": "#EF9F27",
+    "ETH": "#7F77DD",
+    "SOL": "#1D9E75",
+    "TQQQ": "#378ADD",
+    "SCHD": "#1D9E75",
+}
+_SPARE = ("#D4537E", "#378ADD", "#BA7517", "#5DCAA5", "#7F77DD")
+
+
+def _color(sym: str, i: int) -> str:
+    return _COLORS.get(sym, _SPARE[i % len(_SPARE)])
+
+
+def _tile(label: str, value: str, sub: str = "", cls: str = "") -> str:
+    return (
+        f'<div class="orbit-dt-tile"><span>{label}</span>'
+        f"<b{f' class={chr(34)}{cls}{chr(34)}' if cls else ''}>{value}</b>"
+        + (f"<small>{sub}</small>" if sub else "")
+        + "</div>"
+    )
+
+
+def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
+    """(타일 4 칸, 아래 왼쪽 일정 칩). 장부 값만 쓰고 없으면 '—'."""
+    info = book.info
+    cash = f"{_won(book.cash_krw, hide)}원"
+    if book.key == "cruise":
+        dd = info.get("dd")
+        stopped = bool(info.get("stopped"))
+        tiles = [
+            _tile("현금", cash, "남은 돈"),
+            _tile(
+                "사는 중인 코인", f"{info.get('buying', 0)} / {info.get('coins', 0)}개", cls="ok"
+            ),
+            _tile("최고점 기준", "—" if dd is None else f"−{dd:.1%}", "−30%면 매수 멈춤"),
+            _tile("매수", "멈춤" if stopped else "하는 중", cls="warn" if stopped else "ok"),
+        ]
+        last = str(info.get("last_decision") or "")
+        chip = "매일 09:05 판단" + (f" · 마지막 {last[5:].replace('-', '/')}" if last else "")
+        return "".join(tiles), chip
+    if book.key == "glide":
+        month = str(info.get("month") or "")
+        amount = info.get("month_amount")
+        lev = info.get("lev_target")
+        stage = int(info.get("brake_stage") or 0)
+        brake, bcls = {0: ("안 걸림", "ok"), 1: ("절반 팖", "warn"), 2: ("전부 팖", "warn")}.get(
+            stage, ("확인 필요", "warn")
+        )
+        usd = info.get("cash_usd")
+        tiles = [
+            _tile(
+                "현금",
+                cash,
+                "" if usd is None else f"남은 달러 {_HIDDEN if hide else f'${usd:,.2f}'}",
+            ),
+            _tile(
+                "이번 달 납입",
+                "—" if amount is None else f"{_won(amount, hide)}원",
+                f"{int(month[5:])}월 첫 거래일" if len(month) >= 7 else "",
+            ),
+            _tile("TQQQ 목표 비중", "—" if lev is None else f"{lev:.0%}"),
+            _tile("급락 브레이크", brake, "고점 −15%면 절반 팖", bcls),
+        ]
+        now = datetime.fromtimestamp(now_ms / 1000, UTC) + _KST
+        nxt = now.month % 12 + 1
+        return "".join(tiles), f"다음 매수 {nxt}월 첫 거래일"
+    # 자동 적립 · 그 밖의 장부
+    last = str(info.get("last_buy") or "")
+    tiles = [
+        _tile("넣은 원가", f"{_won(book.deposits_krw, hide)}원", "적립 매입원가"),
+        _tile("적립 종목", f"{len(book.holdings)}개"),
+        _tile("현금", cash),
+        _tile("마지막 적립", last[5:].replace("-", "/") if last else "—"),
+    ]
+    return "".join(tiles), "매일 적립 · 토스 주식 모으기"
+
+
+def _detail(book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int) -> str:
+    tiles, chip = _tiles(book, hide, now_ms)
+    total = book.value_krw
+    parts, legend, rows = [], [], []
+    for i, h in enumerate(book.holdings):
+        value = h.value_krw if h.value_krw is not None else h.cost_krw
+        w = value / total if total > 0 else 0.0
+        color = _color(h.name, i)
+        parts.append(f'<span style="width:{w * 100:.1f}%;background:{color}"></span>')
+        legend.append(
+            f'<span><i class="orbit-dt-dot" style="background:{color}"></i>'
+            f"{escape(h.name)} {w:.0%}</span>"
+        )
+        usd_now = quotes.usd.get(h.name)
+        if h.avg_usd is not None or usd_now is not None:
+            avg = "—" if h.avg_usd is None else f"${h.avg_usd:,.2f}"
+            now = "—" if usd_now is None else f"${usd_now:,.2f}"
+        else:
+            avg = f"{h.cost_krw / h.qty:,.0f}" if h.qty > 0 and h.cost_krw > 0 else "—"
+            now = f"{h.value_krw / h.qty:,.0f}" if h.qty > 0 and h.value_krw is not None else "—"
+        unit = "" if book.key == "cruise" else "주"
+        qty = _HIDDEN if hide else f"{h.qty:,.8g}{unit}"
+        if h.target is not None:
+            off = abs(w - h.target) >= 0.10
+            gauge = (
+                f'<span class="orbit-dt-gauge"><i style="width:{min(w, 1) * 100:.0f}%;'
+                f'background:{color}"></i><u style="left:{min(h.target, 1) * 100:.0f}%"></u></span>'
+                f"<em{' class=' + chr(34) + 'warn' + chr(34) if off else ''}>"
+                f"{w * 100:.0f} / {h.target * 100:.0f}%</em>"
+            )
+        else:
+            gauge = (
+                f'<span class="orbit-dt-gauge"><i style="width:{min(w, 1) * 100:.0f}%;'
+                f'background:{color}"></i></span><em>{w * 100:.0f}%</em>'
+            )
+        rows.append(
+            f"<tr><td>{escape(h.name)}</td><td>{qty}</td><td>{avg}</td><td>{now}</td>"
+            f'<td><div class="orbit-dt-wt">{gauge}</div></td></tr>'
+        )
+    cash_w = book.cash_krw / total if total > 0 else 0.0
+    if book.cash_krw > 0:
+        parts.append(f'<span style="width:{cash_w * 100:.1f}%;background:var(--line)"></span>')
+        legend.append(
+            '<span><i class="orbit-dt-dot" style="background:var(--line)"></i>'
+            f"현금 {cash_w:.0%}</span>"
+        )
+    has_target = any(h.target is not None for h in book.holdings)
+    table = (
+        (
+            '<p class="orbit-dt-sec">종목별'
+            + (" (막대 = 지금 · 세로선 = 목표)" if has_target else " (막대 = 지금 비중)")
+            + "</p>"
+            '<table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%">'
+            '<col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup>'
+            "<tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th>"
+            f"<th>{'비중 / 목표' if has_target else '비중'}</th></tr>{''.join(rows)}</table>"
+        )
+        if rows
+        else ""
+    )
+    bar = (
+        (
+            '<p class="orbit-dt-sec">지금 구성</p>'
+            f'<div class="orbit-dt-bar">{"".join(parts)}</div>'
+            f'<div class="orbit-dt-legend">{"".join(legend)}</div>'
+        )
+        if parts
+        else ""
+    )
+    foot = f"장부 기준 · 세금 전 · {'평가액' if priced else '추정 평가액'}"
+    return (
+        f'<div class="orbit-dt-tiles">{tiles}</div>'
+        + bar
+        + table
+        + f'<div class="orbit-dt-bottom"><span class="orbit-dt-chip">{escape(chip)}</span>'
+        f'<span class="orbit-dt-foot">{foot}</span></div>'
     )
 
 
