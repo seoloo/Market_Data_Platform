@@ -203,6 +203,17 @@ class TossReader:
                 out[str(row["symbol"]).upper()] = px
         return out
 
+    def stocks_all(self, market: str) -> list[dict[str, Any]]:
+        """거래소별 거래 가능 종목 (KOSPI · KOSDAQ · NYSE · NASDAQ · AMEX). 하루 한 번이면 충분."""
+        rows = self._get("/api/v1/stocks/all", {"market": market}) or []
+        return [dict(r) for r in rows if isinstance(r, dict)]
+
+    def kr_open_today(self, day: str) -> bool:
+        """국내 정규장이 그날 열리나 (휴장이면 ``integrated`` 가 비어 있다)."""
+        data = self._get("/api/v1/market-calendar/KR", {"date": day}) or {}
+        today = data.get("today") or {}
+        return str(today.get("date")) == day and bool(today.get("integrated"))
+
     def usd_krw(self) -> Decimal:
         row = self._get("/api/v1/exchange-rate", {"baseCurrency": "USD", "quoteCurrency": "KRW"})
         rate = _dec((row or {}).get("rate"))
@@ -327,12 +338,17 @@ class TossFill:
 
 @dataclass(slots=True)
 class TossTrader(TossReader):
-    """미국 주식 지정가 주문 (기본 장 마감 지정가 LOC = ``LIMIT`` + ``CLS``)."""
+    """지정가 주문. 미국은 기본 장 마감 지정가(LOC = ``LIMIT`` + ``CLS``).
+
+    국내(6 자리 종목코드, 2026-10-10 적립)는 ``CLS`` 가 없어 ``DAY`` 지정가 · 원 단위 정수 가격 ·
+    ``max_limit_krw`` 상한. 호가 단위는 부르는 쪽이 맞춘다(ops/kr_accumulate.tick_up).
+    """
 
     allowed_symbols: frozenset[str] = frozenset()
     max_qty: Mapping[str, int] = field(default_factory=dict)
     sell_symbols: frozenset[str] = frozenset()
     max_limit_usd: Decimal = Decimal(0)
+    max_limit_krw: Decimal = Decimal(0)
 
     def order(
         self,
@@ -356,8 +372,12 @@ class TossTrader(TossReader):
         top = self.max_qty.get(symbol, 1)
         if not 1 <= qty <= top:
             raise TradingDisabledError(f"수량은 1 ~ {top} 주만 허용한다 (요청 {qty})")
-        if not Decimal(0) < limit <= self.max_limit_usd:
-            raise TradingDisabledError(f"지정가 {limit} 가 허용 범위 (0, {self.max_limit_usd}] 밖")
+        kr = is_kr_symbol(symbol)
+        cap = self.max_limit_krw if kr else self.max_limit_usd
+        if not Decimal(0) < limit <= cap:
+            raise TradingDisabledError(f"지정가 {limit} 가 허용 범위 (0, {cap}] 밖")
+        if kr and (time_in_force != "DAY" or limit != limit.to_integral_value()):
+            raise TradingDisabledError("국내 주문은 당일(DAY) 지정가 · 원 단위 정수만")
         body = {
             "clientOrderId": client_order_id,
             "symbol": symbol,
@@ -365,7 +385,7 @@ class TossTrader(TossReader):
             "orderType": "LIMIT",
             "timeInForce": time_in_force,
             "quantity": str(qty),
-            "price": f"{limit:.2f}",
+            "price": f"{int(limit)}" if kr else f"{limit:.2f}",
         }
         try:
             response = self.client.post(
@@ -384,3 +404,8 @@ class TossTrader(TossReader):
             )
         err = self._error(response)
         return TossOrderResult(False, err.code, err.message)
+
+
+def is_kr_symbol(symbol: str) -> bool:
+    """국내 종목코드 (6 자리, 숫자 또는 영문 · 숫자 섞임: 005930 · 0101N0)."""
+    return len(symbol) == 6 and symbol.isalnum() and any(c.isdigit() for c in symbol[:2])

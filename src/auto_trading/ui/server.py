@@ -33,6 +33,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from auto_trading.ops import user_settings
+from auto_trading.ops.kr_accumulate import read_universe
 from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.data import DashboardData, load_dashboard
 from auto_trading.ui.orbit_home import layout as orbit_layout
@@ -267,7 +268,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(403, "<!doctype html><meta charset='utf-8'><p>화면을 새로 고친 뒤 다시</p>")
             return
         current = user_settings.load(root)
-        new, errors = user_settings.validate(form, current)
+        universe = read_universe(root / "data" / "toss" / "universe.json")
+        new, errors = user_settings.validate(form, current, universe)
         if errors:
             self._settings_page(new, errors)
             return
@@ -276,7 +278,7 @@ class _Handler(BaseHTTPRequestHandler):
             body = render_review(changes, form, token=self.server.settings_token)
             self._send(200, orbit_layout(body, self._theme(), "settings"))
             return
-        user_settings.apply(root, changes, datetime.now(UTC))
+        user_settings.apply(root, changes, datetime.now(UTC), new=new)
         self.send_response(303)
         self.send_header("Location", f"/settings?saved={len(changes)}")
         self.send_header("Content-Length", "0")

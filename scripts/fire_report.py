@@ -49,6 +49,9 @@ def dated_deposits(root: Path) -> list[tuple[str, float]]:
             continue
         for b in _read(path).get("buys") or []:
             if isinstance(b, dict):
+                if "cost_krw" in b:  # 국내 적립 장부 (KR_<코드>.json)
+                    out.append((str(b.get("date")), float(b["cost_krw"])))
+                    continue
                 cost = float(b.get("cost_usd") or 0) * float(b.get("fx_rate") or 0)
                 out.append((str(b.get("date")), cost))
     return out

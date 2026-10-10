@@ -386,3 +386,21 @@ def test_telegram_bot_replies_once_and_leaves_amounts(
     queue = json.loads((tmp_path / "data/telegram/inbox.json").read_text(encoding="utf-8"))
     assert [p["msg"]["text"] for p in queue["pending"]] == ["30만"]  # Glide 몫은 남는다
     assert bot_mod.run(tmp_path) == 0 and len(sent) == 1  # 새 명령 없으면 조용
+
+
+def test_kr_accumulate_state_is_valued_in_krw(tmp_path: Path) -> None:
+    from auto_trading.ui.live_home import accumulate_book, needed
+
+    st = {
+        "symbol": "069500",
+        "name": "KODEX 200",
+        "currency": "KRW",
+        "market": "KOSPI",
+        "last_qty": 2,
+        "buys": [{"date": "2026-10-13", "qty": 2, "cost_krw": 50_000}],
+    }
+    _write(tmp_path, "data/toss/KR_069500.json", st)
+    assert "069500.KS" in needed(tmp_path)[1] and "069500" not in needed(tmp_path)[1]
+    book = accumulate_book([st], Quotes(usd={"069500.KS": 26_000.0}, fx=1300.0))
+    assert book.deposits_krw == 50_000 and book.value_krw == pytest.approx(52_000)
+    assert book.holdings[0].name == "KODEX 200"

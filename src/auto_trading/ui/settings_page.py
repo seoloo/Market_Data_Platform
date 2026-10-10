@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from html import escape
 from typing import Any
 
-from auto_trading.ops.user_settings import ACC_SYMBOLS, Change, show
+from auto_trading.ops.user_settings import ACC_SYMBOLS, MAX_ITEMS, Change, show
 
 _CSS = """
 .set-wrap{max-width:1180px;margin:0 auto;padding:8px 0 40px}
@@ -36,6 +36,10 @@ padding:0 14px;min-height:48px;background:var(--surface)}
 .set-input input,.set-input select{border:0;outline:none;flex:1;min-width:0;font:inherit;
 font-size:17px;font-weight:700;color:var(--ink);background:transparent}
 .set-input span{color:var(--muted)}
+/* 펼친 목록은 운영체제 창 — 글씨색을 직접 정한다 (다크에서 안 보이던 것) */
+.set-input select option{color:#101b49;background:#ffffff}
+html[data-theme=dark] .set-input select{color-scheme:dark}
+html[data-theme=dark] .set-input select option{color:#edf3ff;background:#101e3b}
 .set-help{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .set-err{margin:6px 0 0;font-size:13px;color:#c23a4f;font-weight:700}
 .set-err-input{border-color:#c23a4f}
@@ -64,6 +68,11 @@ color:#12509c}
 .set-badge.kr{background:#fff1e0;color:#8a4b00}
 .set-acc .set-input{min-height:44px;width:130px}
 .set-acc b{min-width:64px}
+.set-rm{display:flex;align-items:center;gap:4px;font-size:13px;color:#a3283c;cursor:pointer;
+min-height:44px}
+.set-add{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 0;
+border-bottom:1px solid var(--line)}
+.set-add .set-input{min-height:46px}
 .set-acc small{flex:1 1 160px;color:var(--muted);font-size:13px}
 .set-danger{border:2px solid #f0c4cb}
 .set-danger h2{color:#a3283c}
@@ -280,33 +289,85 @@ def render_settings(
         )
     )
     rows = []
-    for s in ACC_SYMBOLS:
-        err = errors.get(f"acc.{s}.usd")
-        rows.append(
-            '<div class="set-acc"><span class="set-badge">미국</span>'
-            f"<b>{s}</b><small>{escape(_ACC_NOTE[s])}"
-            f"{' · ' + escape(holdings[s]) if s in holdings else ''}</small>"
-            f'<div class="set-input{" set-err-input" if err else ""}"><span>하루 $</span>'
-            f'<input name="acc.{s}.usd" value="{float(v[f"acc.{s}.usd"]):g}" inputmode="decimal" '
-            f'aria-label="{s} 하루 금액"></div>'
-            f"{_switch(f'acc.{s}.on', bool(v[f'acc.{s}.on']))}"
+
+    def acc_row(key: str, mkt: str, sym: str, note: str, amount: float, on: bool, rm: bool) -> str:
+        kr = mkt == "KR"
+        err = errors.get(f"{key}.{'daily' if key.startswith('x.') else 'usd'}")
+        name = f"{key}.daily" if key.startswith("x.") else f"{key}.usd"
+        shown = f"{amount:,.0f}" if kr else f"{amount:g}"
+        return (
+            f'<div class="set-acc"><span class="set-badge{" kr" if kr else ""}">'
+            f"{'국내' if kr else '미국'}</span><b>{escape(sym)}</b><small>{escape(note)}"
+            f"{' · ' + escape(holdings[sym]) if sym in holdings else ''}</small>"
+            f'<div class="set-input{" set-err-input" if err else ""}"><span>하루 '
+            f"{'' if kr else '$'}</span>"
+            f'<input name="{name}" value="{shown}" inputmode="decimal" '
+            f'aria-label="{escape(sym)} 하루 금액"><span>{"원" if kr else ""}</span></div>'
+            f"{_switch(f'{key}.on', on)}"
+            f'<label class="set-rm"><input type="checkbox" name="{key}.removed" value="on"'
+            f"{' checked' if rm else ''}> 빼기</label>"
             + (f'<p class="set-err" style="flex-basis:100%">{escape(err)}</p>' if err else "")
             + "</div>"
+        )
+
+    for s in ACC_SYMBOLS:
+        if v.get(f"acc.{s}.removed"):
+            continue
+        rows.append(
+            acc_row(
+                f"acc.{s}",
+                "US",
+                s,
+                _ACC_NOTE[s],
+                float(v[f"acc.{s}.usd"]),
+                bool(v[f"acc.{s}.on"]),
+                False,
+            )
+        )
+    for x in v.get("_extras") or []:
+        if x.get("removed"):
+            continue
+        k = f"x.{x['mkt']}.{x['sym']}"
+        rows.append(
+            acc_row(
+                k,
+                str(x["mkt"]),
+                str(x["sym"]),
+                f"{x.get('name') or x['sym']} · {x.get('market') or ''}",
+                float(v.get(f"{k}.daily") or 0),
+                bool(v.get(f"{k}.on")),
+                False,
+            )
         )
     rows.append(
         '<div class="set-acc"><span class="set-badge">미국</span><b>QNDX</b>'
         "<small>나스닥 100 · 적립 중단(보유 유지) · QS 전략과 얽혀 다시 켜기는 대화로</small>"
         '<input type="checkbox" class="set-switch" disabled aria-label="QNDX (대화로만)"></div>'
     )
+    q_err, d_err = errors.get("new.query"), errors.get("new.daily")
+    add = (
+        '<div class="set-add"><b>종목 추가</b>'
+        '<div class="set-input" style="width:120px"><select name="new.mkt" aria-label="시장">'
+        '<option value="US">미국</option><option value="KR">국내</option></select></div>'
+        f'<div class="set-input{" set-err-input" if q_err else ""}" style="flex:1 1 220px">'
+        '<input name="new.query" placeholder="미국 기호 (예: NVDA) · 국내 이름 또는 코드 '
+        '(예: 삼성전자 · 005930)" aria-label="추가할 종목"></div>'
+        f'<div class="set-input{" set-err-input" if d_err else ""}" style="width:150px">'
+        '<span>하루</span><input name="new.daily" placeholder="$1 · 5,000원" '
+        'inputmode="decimal" aria-label="하루 금액"></div>'
+        + (f'<p class="set-err" style="flex-basis:100%">{escape(q_err)}</p>' if q_err else "")
+        + (f'<p class="set-err" style="flex-basis:100%">{escape(d_err)}</p>' if d_err else "")
+        + '<p class="set-help" style="flex-basis:100%">[저장…]을 누르면 토스 종목 목록에서 찾아 '
+        "확인 화면에 이름 · 코드를 보여 드려요. 미국 하루 $0.5 ~ $20 · 국내 1,000 ~ 30,000원, "
+        f"합쳐서 최대 {MAX_ITEMS} 종목.</p></div>"
+    )
     toss = (
         '<section class="set-card" id="set-toss"><h2>토스 매일 적립</h2>'
-        '<p class="set-sub">쌓인 적립금이 1주 값이 되면 장 마감 지정가로 1주 사요. '
-        "바꾼 금액 · 켜기는 <b>내일 적립분부터</b>예요 (지난 날 다시 계산 안 함).</p>"
+        '<p class="set-sub">쌓인 적립금이 1주 값이 되면 1주 사요. 미국은 장 마감 지정가(밤), '
+        "국내는 평일 낮 12시 지정가예요. 바꾼 금액 · 켜기 · 빼기는 <b>내일 적립분부터</b>예요 "
+        "(빼도 보유는 그대로).</p>"
         + "".join(rows)
-        + '<div class="set-acc"><span class="set-badge">미국</span>'
-        '<span class="set-badge kr">국내</span><b>종목 추가</b>'
-        "<small>새 미국 종목 · 국내 주식 추가는 토스 종목 확인 · 국내 주문 시험 뒤 열어요</small>"
-        '<span class="set-soon">준비 중</span></div>'
+        + add
         + _toggle(
             "alerts.fx", "환전 알림", "평일 09 · 12 · 15시, 달러가 모자랄 때만", v["alerts.fx"]
         )

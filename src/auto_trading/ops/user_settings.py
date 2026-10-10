@@ -4,6 +4,9 @@
   파일이 없으면 기본값 = 2026-10-10 실제 운용값이라, 설정 화면을 한 번도 안 써도 동작은 같다.
 * 매매 규칙(연구로 정한 값)은 여기 없다 — 화면에서 잠금으로만 보여 준다.
 * 비상 정지는 따로 저장하지 않고 ``data/HALT`` 파일 그 자체다(모든 실행기가 이미 본다).
+* 종목 추가 · 빼기(2026-10-10): 미국은 기호, 국내는 이름 · 코드. 토스 종목 목록 파일
+  (``data/toss/universe.json``, 키 없이 읽음)에서 찾은 것만 받는다. 합쳐서 최대 8 종목.
+  추가 종목의 값 키는 ``x.<US|KR>.<기호>.daily|on|removed`` 다.
 * 토스 적립 하루 금액 · 켜기/끄기는 **내일(KST)부터** 바뀐다. 바꾼 날짜와 금액을 기록에 남겨,
   적립금 계산(그날부터 새 금액)이 지난 날을 다시 계산하지 않게 한다. 끈 기간은 금액 0 이다.
 """
@@ -17,17 +20,25 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+MAX_ITEMS = 8
+"""토스 적립 종목 수 상한 (미국 + 국내, QNDX 빼고)."""
+
 __all__ = [
     "ACC_SYMBOLS",
     "FIELDS",
+    "MAX_ITEMS",
     "Change",
     "Field",
     "acc_history",
+    "active_count",
     "apply",
     "diff",
+    "extras",
+    "fields",
     "get",
     "load",
     "read_log",
+    "show",
     "validate",
 ]
 
@@ -109,9 +120,18 @@ FIELDS: tuple[Field, ...] = (
         for s in ACC_SYMBOLS
     ),
     *(Field(f"acc.{s}.on", f"{s} 적립", "bool", True, "내일 적립분부터") for s in ACC_SYMBOLS),
+    *(
+        Field(
+            f"acc.{s}.removed",
+            f"{s} 목록에서 빼기",
+            "bool",
+            False,
+            "내일 적립분부터 (보유는 그대로)",
+        )
+        for s in ACC_SYMBOLS
+    ),
     Field("safety.halt", "비상 정지", "bool", False, "바로 (모든 새 주문)"),
 )
-_BY_KEY = {f.key: f for f in FIELDS}
 
 
 def _paths(root: Path) -> tuple[Path, Path, Path]:
@@ -127,11 +147,58 @@ def _read(root: Path) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
+def extras(root: Path) -> list[dict[str, Any]]:
+    """추가한 종목 (뺀 것도 ``removed`` 날짜와 함께 남는다 — 보유 기록을 잇기 위해)."""
+    raw = _read(root).get("extras") or []
+    return [dict(x) for x in raw if isinstance(x, dict) and x.get("sym") and x.get("mkt")]
+
+
+def _xkey(x: Mapping[str, Any]) -> str:
+    return f"x.{x['mkt']}.{x['sym']}"
+
+
+def _xfields(meta: Sequence[Mapping[str, Any]]) -> list[Field]:
+    out = []
+    for x in meta:
+        if x.get("removed"):
+            continue
+        k, name = _xkey(x), f"{x.get('name') or x['sym']} ({x['sym']})"
+        kr = x["mkt"] == "KR"
+        out += [
+            Field(
+                f"{k}.daily",
+                f"{name} 하루 금액",
+                "int" if kr else "float",
+                float(x.get("daily0") or (5_000 if kr else 1.0)),
+                "내일 적립분부터",
+                1_000 if kr else 0.5,
+                30_000 if kr else 20,
+            ),
+            Field(f"{k}.on", f"{name} 적립", "bool", True, "내일 적립분부터"),
+            Field(
+                f"{k}.removed",
+                f"{name} 목록에서 빼기",
+                "bool",
+                False,
+                "내일 적립분부터 (보유는 그대로)",
+            ),
+        ]
+    return out
+
+
+def fields(meta: Sequence[Mapping[str, Any]]) -> list[Field]:
+    return [*FIELDS, *_xfields(meta)]
+
+
 def load(root: Path) -> dict[str, Any]:
-    """키 → 값 (저장 안 된 것은 기본값). ``safety.halt`` 는 HALT 파일이 있는지."""
+    """키 → 값 (저장 안 된 것은 기본값). ``safety.halt`` 는 HALT 파일이 있는지.
+
+    ``_extras`` 에 추가 종목 정보(이름 · 시장)를 함께 싣는다 — 화면 · 검사 · 기록이 같이 쓴다."""
     saved = _read(root).get("values") or {}
-    out = {f.key: saved.get(f.key, f.default) for f in FIELDS}
+    meta = extras(root)
+    out: dict[str, Any] = {f.key: saved.get(f.key, f.default) for f in fields(meta)}
     out["safety.halt"] = _paths(root)[2].exists()
+    out["_extras"] = meta
     return out
 
 
@@ -140,7 +207,7 @@ def get(root: Path, key: str) -> Any:
 
 
 def acc_history(root: Path, symbol: str) -> list[tuple[str, float]]:
-    """그 종목의 (그날부터, 하루 금액) 기록 — 끈 기간은 0. ``Plan.changes`` 뒤에 붙인다."""
+    """그 종목의 (그날부터, 하루 금액) 기록 — 끈 · 뺀 기간은 0. ``Plan.changes`` 뒤에 붙인다."""
     raw = (_read(root).get("acc_history") or {}).get(symbol) or []
     return [(str(d), float(r)) for d, r in raw]
 
@@ -158,18 +225,36 @@ def _parse(f: Field, raw: str | None) -> Any:
     except ValueError:
         raise ValueError("숫자로 적어 주세요") from None
     if (f.lo is not None and num < f.lo) or (f.hi is not None and num > f.hi):
-        unit = "$" if f.key.startswith("acc.") else ""
-        raise ValueError(f"{unit}{f.lo:,g} ~ {unit}{f.hi:,g} 사이로 적어 주세요")
+        if f.key.startswith(("acc.", "x.US.")):
+            raise ValueError(f"${f.lo:,g} ~ ${f.hi:,g} 사이로 적어 주세요")
+        raise ValueError(f"{f.lo:,g} ~ {f.hi:,g} 사이로 적어 주세요")
     return round(num) if f.kind == "int" else round(num, 2)
 
 
+def active_count(values: Mapping[str, Any]) -> int:
+    """목록에 있는 적립 종목 수 (뺀 것 빼고)."""
+    built = sum(1 for s in ACC_SYMBOLS if not values.get(f"acc.{s}.removed"))
+    added = sum(
+        1
+        for x in values.get("_extras") or []
+        if not x.get("removed") and not values.get(f"{_xkey(x)}.removed")
+    )
+    return built + added
+
+
 def validate(
-    form: Mapping[str, str], current: Mapping[str, Any]
+    form: Mapping[str, str],
+    current: Mapping[str, Any],
+    universe: Sequence[Any] = (),
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """폼 → (새 값, 키별 오류). 폼에 없는 bool 은 꺼짐(체크 안 한 칸), 그 밖에 없는 칸은 그대로."""
+    """폼 → (새 값, 키별 오류). 폼에 없는 bool 은 꺼짐(체크 안 한 칸), 그 밖에 없는 칸은 그대로.
+
+    ``new.query`` 가 있으면 ``universe`` (ops.kr_accumulate.Listed 목록)에서 찾아 추가한다."""
     new = dict(current)
+    meta = [dict(x) for x in current.get("_extras") or []]
+    new["_extras"] = meta
     errors: dict[str, str] = {}
-    for f in FIELDS:
+    for f in fields(meta):
         if f.kind == "bool":
             new[f.key] = _parse(f, form.get(f.key))
             continue
@@ -179,12 +264,73 @@ def validate(
             new[f.key] = _parse(f, form[f.key])
         except ValueError as exc:
             errors[f.key] = str(exc)
+    query = (form.get("new.query") or "").strip()
+    if query:
+        _add(form, query, new, meta, universe, errors)
     if not errors:
         if not new["fire.rate_good"] >= new["fire.rate_mid"] >= new["fire.rate_bad"]:
             errors["fire.rate_mid"] = "좋을 때 ≥ 보통 ≥ 나쁠 때 순서로"
         if new["glide.monthly_krw"] > new["glide.max_krw"]:
             errors["glide.monthly_krw"] = "한 달 상한보다 클 수 없어요"
     return new, errors
+
+
+def _add(
+    form: Mapping[str, str],
+    query: str,
+    new: dict[str, Any],
+    meta: list[dict[str, Any]],
+    universe: Sequence[Any],
+    errors: dict[str, str],
+) -> None:
+    from auto_trading.ops.kr_accumulate import find
+
+    mkt = "KR" if form.get("new.mkt") == "KR" else "US"
+    if not universe:
+        errors["new.query"] = "토스 종목 목록을 아직 못 받았어요 — 잠시 뒤 다시"
+        return
+    hits = find(query, universe, mkt)
+    if len(hits) != 1:
+        errors["new.query"] = (
+            "찾지 못했어요 — 기호(미국) · 이름 또는 6 자리 코드(국내)로"
+            if not hits
+            else "여러 개가 맞아요: " + " · ".join(f"{h.name}({h.symbol})" for h in hits)
+        )
+        return
+    hit = hits[0]
+    if hit.symbol == "QNDX":
+        errors["new.query"] = "QNDX 는 QS 전략과 얽혀 대화로만 바꿔요"
+        return
+    if mkt == "US" and hit.symbol in ACC_SYMBOLS:
+        if new.get(f"acc.{hit.symbol}.removed"):
+            new[f"acc.{hit.symbol}.removed"] = False  # 뺐던 기본 종목을 다시 넣기
+            return
+        errors["new.query"] = f"{hit.symbol} 는 이미 목록에 있어요"
+        return
+    if any(x["sym"] == hit.symbol and not x.get("removed") for x in meta):
+        errors["new.query"] = f"{hit.name}({hit.symbol}) 는 이미 목록에 있어요"
+        return
+    if active_count(new) >= MAX_ITEMS:
+        errors["new.query"] = f"종목은 합쳐서 {MAX_ITEMS} 개까지예요 — 하나를 빼고 추가해 주세요"
+        return
+    x: dict[str, Any] = {
+        "mkt": mkt,
+        "sym": hit.symbol,
+        "name": hit.name,
+        "market": hit.market,
+        "kind": hit.kind,
+    }
+    f_daily = _xfields([x])[0]
+    try:
+        daily = _parse(f_daily, form.get("new.daily") or str(f_daily.default))
+    except ValueError as exc:
+        errors["new.daily"] = str(exc)
+        return
+    x["daily0"] = daily
+    meta[:] = [m for m in meta if m["sym"] != hit.symbol]  # 뺐던 종목을 다시 넣으면 새로
+    meta.append(x)
+    k = _xkey(x)
+    new.update({f"{k}.daily": daily, f"{k}.on": True, f"{k}.removed": False, f"{k}.added": True})
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,12 +343,17 @@ class Change:
 
 
 def show(key: str, value: Any) -> str:
-    f = _BY_KEY[key]
-    if f.kind == "bool":
+    if value is None:
+        return "없음"
+    if key.endswith(".removed"):
+        return "뺌" if value else "목록에 있음"
+    if key.endswith(".added"):
+        return "추가" if value else "없음"
+    if key.endswith(".on") or isinstance(value, bool):
         return "켜짐" if value else "꺼짐"
-    if f.kind == "enum":
+    if key == "screen.theme":
         return {"system": "시스템", "light": "라이트", "dark": "다크"}.get(str(value), str(value))
-    if key.startswith("acc."):
+    if key.startswith(("acc.", "x.US.")):
         return f"${float(value):g}"
     if key.startswith("fire.rate"):
         return f"연 {float(value):g}%"
@@ -210,19 +361,45 @@ def show(key: str, value: Any) -> str:
 
 
 def diff(current: Mapping[str, Any], new: Mapping[str, Any]) -> list[Change]:
-    return [
-        Change(f.key, f.label, current[f.key], new[f.key], f.applies)
-        for f in FIELDS
-        if current.get(f.key) != new.get(f.key)
-    ]
+    out = []
+    meta = new.get("_extras") or []
+    for x in meta:
+        k = _xkey(x)
+        if new.get(f"{k}.added"):
+            amount = new[k + ".daily"]
+            unit = f"{amount:,.0f}원" if x["mkt"] == "KR" else f"${amount:g}"
+            where = "국내" if x["mkt"] == "KR" else "미국"
+            out.append(
+                Change(
+                    f"{k}.added",
+                    f"{where} {x['name']}({x['sym']}) 추가 · 하루 {unit}",
+                    None,
+                    True,
+                    "내일 적립분부터",
+                )
+            )
+    for f in fields(meta):
+        if f.key.startswith("x.") and new.get(f.key.rsplit(".", 1)[0] + ".added"):
+            continue  # 새로 넣은 종목은 위의 '추가' 한 줄로
+        if current.get(f.key, f.default) != new.get(f.key, f.default):
+            out.append(Change(f.key, f.label, current.get(f.key, f.default), new[f.key], f.applies))
+    return out
 
 
 def _today_kst(now: datetime) -> str:
     return (now.astimezone(UTC) + _KST).strftime("%Y-%m-%d")
 
 
-def apply(root: Path, changes: Sequence[Change], now: datetime, by: str = "설정 화면") -> None:
-    """저장 · 기록 · 비상 정지 파일 · 적립 금액 기록. 바뀐 것이 없으면 아무것도 안 한다."""
+def apply(
+    root: Path,
+    changes: Sequence[Change],
+    now: datetime,
+    by: str = "설정 화면",
+    new: Mapping[str, Any] | None = None,
+) -> None:
+    """저장 · 기록 · 비상 정지 파일 · 적립 금액 기록. 바뀐 것이 없으면 아무것도 안 한다.
+
+    ``new`` 는 검사를 통과한 새 값 전체(추가 종목 정보 ``_extras`` 포함)."""
     if not changes:
         return
     path, log, halt = _paths(root)
@@ -230,40 +407,55 @@ def apply(root: Path, changes: Sequence[Change], now: datetime, by: str = "설�
     d = _read(root)
     values = dict(d.get("values") or {})
     hist = {k: list(v) for k, v in (d.get("acc_history") or {}).items()}
-    after = {**load(root), **{c.key: c.after for c in changes}}
-    tomorrow = (datetime.fromisoformat(_today_kst(now)) + timedelta(days=1)).strftime("%Y-%m-%d")
+    after = dict(new) if new is not None else {**load(root), **{c.key: c.after for c in changes}}
+    meta = [dict(x) for x in after.get("_extras") or d.get("extras") or []]
+    today = _today_kst(now)
+    tomorrow = (datetime.fromisoformat(today) + timedelta(days=1)).strftime("%Y-%m-%d")
     for c in changes:
         if c.key == "safety.halt":
             if c.after:
-                halt.write_text(f"설정 화면에서 켬 {_today_kst(now)}\n", encoding="utf-8")
+                halt.write_text(f"설정 화면에서 켬 {today}\n", encoding="utf-8")
             else:
                 halt.unlink(missing_ok=True)
             continue
-        values[c.key] = c.after
+        if not c.key.endswith(".added"):
+            values[c.key] = c.after
+
+    def touch(sym: str, rate: float) -> None:
+        rows = [r for r in hist.get(sym, []) if r[0] != tomorrow]
+        hist[sym] = [*rows, [tomorrow, rate]]
+
     for s in ACC_SYMBOLS:
         if any(c.key.startswith(f"acc.{s}.") for c in changes):
-            rate = float(after[f"acc.{s}.usd"]) if after[f"acc.{s}.on"] else 0.0
-            rows = [r for r in hist.get(s, []) if r[0] != tomorrow]
-            hist[s] = [*rows, [tomorrow, rate]]
-    d.update({"values": values, "acc_history": hist})
+            live = after[f"acc.{s}.on"] and not after.get(f"acc.{s}.removed")
+            touch(s, float(after[f"acc.{s}.usd"]) if live else 0.0)
+    for x in meta:
+        k = _xkey(x)
+        if not any(c.key.startswith(k + ".") for c in changes):
+            continue
+        if after.get(f"{k}.added"):
+            x["added"] = tomorrow
+            values[f"{k}.daily"], values[f"{k}.on"] = after[f"{k}.daily"], True
+            values.pop(f"{k}.removed", None)
+        if after.get(f"{k}.removed"):
+            x["removed"] = tomorrow
+            values.pop(f"{k}.removed", None)
+        live = after.get(f"{k}.on") and not after.get(f"{k}.removed")
+        touch(x["sym"], float(after[f"{k}.daily"]) if live else 0.0)
+    d.update({"values": values, "acc_history": hist, "extras": meta})
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(path)
     stamp = (now.astimezone(UTC) + _KST).strftime("%Y-%m-%d %H:%M")
     with log.open("a", encoding="utf-8") as fh:
         for c in changes:
-            fh.write(
-                json.dumps(
-                    {
-                        "at": stamp,
-                        "by": by,
-                        "key": c.key,
-                        "what": f"{c.label} {show(c.key, c.before)} → {show(c.key, c.after)}",
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
+            what = (
+                c.label
+                if c.key.endswith(".added")
+                else f"{c.label} {show(c.key, c.before)} → {show(c.key, c.after)}"
             )
+            row = {"at": stamp, "by": by, "key": c.key, "what": what}
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def read_log(root: Path, limit: int = 30) -> list[dict[str, str]]:

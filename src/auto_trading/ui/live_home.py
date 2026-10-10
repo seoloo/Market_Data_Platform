@@ -414,6 +414,34 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     for st in states:
         sym = str(st.get("symbol"))
         buys = [b for b in st.get("buys") or [] if isinstance(b, dict)]
+        if st.get("currency") == "KRW":  # 국내 적립 (scripts/toss_kr.py, 2026-10-10)
+            k_cost = sum(_f(b.get("cost_krw")) for b in buys)
+            total_cost += k_cost
+            name = str(st.get("name") or sym)
+            activity += [
+                (str(b.get("date")), f"🛒 {name} {_f(b.get('qty')):g}주 적립") for b in buys
+            ]
+            for b in buys:
+                n_b = _f(b.get("qty"))
+                trades.append(
+                    Trade(
+                        str(b.get("date")),
+                        "buy",
+                        name,
+                        n_b,
+                        _f(b.get("cost_krw")) / n_b if n_b > 0 else None,
+                        _f(b.get("cost_krw")),
+                        0.0,
+                        "KRW",
+                        "체결",
+                        "국내",
+                    )
+                )
+            n = _f(st.get("last_qty"))
+            if n > 0:
+                px = q.usd.get(kr_ticker(st))
+                holdings.append(Holding(name, n, k_cost, None if px is None else n * px))
+            continue
         # 'cost' 칸은 장부마다 단위가 달라(원 · 달러) 쓰지 않는다 — 달러 원가 × 그날 환율.
         cost = sum(_f(b.get("cost_usd")) * _f(b.get("fx_rate")) for b in buys)
         total_cost += cost
@@ -476,9 +504,16 @@ def _toss_states(root: Path) -> list[dict[str, Any]]:
     return out
 
 
+def kr_ticker(state: Mapping[str, Any]) -> str:
+    """국내 적립 장부 → 야후 시세 기호 (코스닥 .KQ · 그 밖 .KS, 값은 원)."""
+    return f"{state.get('symbol')}.{'KQ' if state.get('market') == 'KOSDAQ' else 'KS'}"
+
+
 def needed(root: Path) -> tuple[set[str], set[str]]:
-    """시세가 필요한 (코인, 미국 종목)."""
-    tickers = set(GLIDE_TICKERS) | {str(d["symbol"]) for d in _toss_states(root)}
+    """시세가 필요한 (코인, 미국 종목 · 국내는 .KS · .KQ 기호)."""
+    tickers = set(GLIDE_TICKERS) | {
+        kr_ticker(d) if d.get("currency") == "KRW" else str(d["symbol"]) for d in _toss_states(root)
+    }
     return set(CRUISE_COINS), tickers
 
 

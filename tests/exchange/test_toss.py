@@ -175,3 +175,48 @@ def test_reader_has_no_order_method(tmp_path: Path) -> None:
     reader = TossReader(_creds(), TossTokenCache(tmp_path / "t.json"))
     assert not hasattr(reader, "order")
     reader.close()
+
+
+def test_kr_order_is_day_limit_integer_price(tmp_path: Path) -> None:
+    """국내(2026-10-10): CLS 없음 → DAY 지정가, 원 단위 정수 가격, 원 상한."""
+    from auto_trading.exchange.toss import is_kr_symbol
+
+    assert is_kr_symbol("005930") and is_kr_symbol("0101N0") and not is_kr_symbol("GOOGL")
+    seen: list[httpx.Request] = []
+    t = TossTrader(
+        _creds(),
+        TossTokenCache(tmp_path / "tok.json"),
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                _handler({"POST /api/v1/orders": {"orderId": "OK1"}}, seen)
+            )
+        ),
+        clock=lambda: NOW,
+        sleep=lambda _s: None,
+        allowed_symbols=frozenset({"005930"}),
+        max_qty={"005930": 1},
+        max_limit_krw=Decimal(2_000_000),
+    )
+    with pytest.raises(TradingDisabledError):  # 국내는 장 마감 지정가 없음
+        t.order("005930", "BUY", 1, Decimal(70_400), client_order_id="a", time_in_force="CLS")
+    with pytest.raises(TradingDisabledError):  # 상한
+        t.order("005930", "BUY", 1, Decimal(3_000_000), client_order_id="b", time_in_force="DAY")
+    res = t.order("005930", "BUY", 1, Decimal(70_400), client_order_id="c", time_in_force="DAY")
+    assert res.accepted and res.code == "OK1"
+    body = json.loads(seen[-1].content)
+    assert body["price"] == "70400" and body["timeInForce"] == "DAY"
+
+
+def test_stock_list_and_kr_calendar(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    routes = {
+        "GET /api/v1/stocks/all": [
+            {"symbol": "005930", "name": "삼성전자", "securityType": "STOCK"}
+        ],
+        "GET /api/v1/market-calendar/KR": {
+            "today": {"date": "2026-10-12", "integrated": {"regularMarket": {}}}
+        },
+    }
+    r = _make(tmp_path, routes, seen)
+    assert r.stocks_all("KOSPI")[0]["name"] == "삼성전자"
+    assert r.kr_open_today("2026-10-12") and not r.kr_open_today("2026-10-13")

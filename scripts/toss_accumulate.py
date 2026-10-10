@@ -30,6 +30,7 @@ import math
 import re
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -207,10 +208,21 @@ def _m3_max() -> float:
     return float(_pref("glide.max_krw"))
 
 
+EXTRA_MAX_LIMIT_USD = 1_000.0
+"""설정 화면에서 추가한 미국 종목의 지정가 상한 (1 주 $1,000 넘는 종목은 적립에 안 맞는다)."""
+_EXCHANGES = {"NASDAQ": ("NAS", "NASD"), "NYSE": ("NYS", "NYSE"), "AMEX": ("AMS", "AMEX")}
+
+
 def _plans() -> tuple[Plan, ...]:
-    """적립 종목 + 설정 화면에서 바꾼 하루 금액 · 켜기 기록(내일부터, 끈 기간은 0)."""
+    """적립 종목 + 설정 화면에서 바꾼 하루 금액 · 켜기 기록(내일부터, 끈 기간은 0).
+
+    설정에서 뺀 기본 종목은 빼고, 추가한 **미국** 종목은 더한다(국내는 scripts/toss_kr.py).
+    뺀 종목의 장부 파일은 남는다 — 보유 · 원가 기록을 잇기 위해."""
+    prefs = user_settings.load(REPO)
     out = []
     for plan in PLANS:
+        if plan.symbol in user_settings.ACC_SYMBOLS and prefs.get(f"acc.{plan.symbol}.removed"):
+            continue
         hist = user_settings.acc_history(REPO, plan.symbol)
         if hist:
             top = max([plan.daily, *(r for _, r in plan.changes), *(r for _, r in hist)])
@@ -220,7 +232,47 @@ def _plans() -> tuple[Plan, ...]:
                 monthly_cap=max(plan.monthly_cap, top * 31),
             )
         out.append(plan)
+    for x in prefs.get("_extras") or []:
+        if x.get("mkt") != "US" or x.get("removed"):
+            continue
+        hist = user_settings.acc_history(REPO, str(x["sym"]))
+        if not hist:
+            continue
+        quote, order = _EXCHANGES.get(str(x.get("market")), ("NAS", "NASD"))
+        top = max(r for _, r in hist)
+        out.append(
+            Plan(
+                str(x["sym"]),
+                quote,
+                order,
+                "USD",
+                0.0,  # 추가한 다음 날부터 하루 금액 (기록이 정한다)
+                top * 31,
+                EXTRA_MAX_LIMIT_USD,
+                changes=tuple(hist),
+            )
+        )
     return tuple(out)
+
+
+def universe(_: bool = True) -> int:
+    """토스 거래 가능 종목 목록을 ``data/toss/universe.json`` 으로 (설정 화면이 키 없이 읽는다)."""
+    reader = _trader()
+    try:
+        markets = {m: reader.stocks_all(m) for m in ("KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX")}
+    finally:
+        reader.close()
+    keep = ("symbol", "name", "securityType")
+    body = {
+        "updated": _kst_now().strftime("%Y-%m-%d %H:%M"),
+        "markets": {m: [{k: r.get(k) for k in keep} for r in rows] for m, rows in markets.items()},
+    }
+    DATA.mkdir(parents=True, exist_ok=True)
+    tmp = DATA / "universe.tmp"
+    tmp.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(DATA / "universe.json")
+    print("종목 목록: " + " · ".join(f"{m} {len(r)}" for m, r in markets.items()))
+    return 0
 
 
 TOSS_FEE = 0.001
@@ -1446,9 +1498,21 @@ def _send(
     return "REJECTED", f"❌ {symbol} {word} 거절 {result.code}: {result.message}{hint}"
 
 
+def _refresh_universe() -> None:
+    """종목 목록이 하루 넘게 묵었으면 새로 받는다 (실패해도 적립은 그대로)."""
+    path = DATA / "universe.json"
+    try:
+        if path.exists() and time.time() - path.stat().st_mtime < 20 * 3600:
+            return
+        universe()
+    except Exception as exc:  # 부가 기능 — 어떤 실패도 적립을 막지 않는다
+        print(f"종목 목록 새로 받기 실패: {exc}")
+
+
 def run(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
+    _refresh_universe()
     states = {p.symbol: s for p in _plans() if (s := _load_plan_state(p)) is not None}
     qs = _live_qs()
     if not states:
@@ -1818,7 +1882,7 @@ def main(argv: list[str]) -> int:
     if args[:1] == ["harvest-plan"]:
         other = float(args[2]) if len(args) == 3 and args[1] == "--other-gains" else 0.0
         return harvest_plan(other)
-    commands = {
+    commands: dict[str, Callable[[], int]] = {
         "start": start,
         "run": lambda: run(telegram),
         "fx": lambda: fx(telegram),
@@ -1827,11 +1891,12 @@ def main(argv: list[str]) -> int:
         "m3-test": lambda: m3_test(telegram),
         "preview": preview,
         "status": status,
+        "universe": lambda: universe(telegram),
     }
     if len(args) != 1 or args[0] not in commands:
         raise SystemExit(
             "usage: python -m scripts.toss_accumulate"
-            " start|run|fx|m3|m3-chat|m3-test|preview|status"
+            " start|run|fx|m3|m3-chat|m3-test|preview|status|universe"
             " [--no-telegram]"
             " | harvest-plan [--other-gains 원]"
         )
