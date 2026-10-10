@@ -2,7 +2,7 @@
 
 사용 예::
 
-    python -m scripts.ledger_sync run      # PC DB 에 쓰고 Supabase 로 올림 (매일 한 번)
+    python -m scripts.ledger_sync run      # 오늘 평가 기록 → PC DB → Supabase (매일 한 번)
     python -m scripts.ledger_sync local    # PC DB 만 (인터넷 없이)
     python -m scripts.ledger_sync status   # 줄 수 보기
 
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import time
 from contextlib import closing
 from pathlib import Path
 
@@ -36,7 +37,22 @@ def _rows() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     return event_rows(books), snapshot_rows(load_history(REPO))
 
 
+def _snapshot_today() -> None:
+    """그래프용 오늘 평가 한 줄 (scripts/live_snapshot.py 와 같음). 실패해도 기록 맞추기는 계속."""
+    from scripts.live_snapshot import snapshot_row, write
+
+    try:
+        row = snapshot_row(REPO, int(time.time() * 1000))
+        if row is not None:
+            write(REPO, row)
+            print(f"오늘 평가 {row['date']} {row['value']:,}원{'' if row['priced'] else ' (추정)'}")
+    except Exception as exc:  # 공개 시세 실패 등
+        print(f"오늘 평가 기록 실패 (기록 맞추기는 계속): {type(exc).__name__}")
+
+
 def run(push: bool) -> int:
+    if push:
+        _snapshot_today()
     events, snaps = _rows()
     n_e, n_s = write_sqlite(REPO / DB_PATH, events, snaps)
     print(f"PC 기록 DB: 거래 · 입금 {n_e}줄 · 하루 평가 {n_s}줄 → {DB_PATH}")
