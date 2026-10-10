@@ -31,6 +31,14 @@ from tests.execution.test_paper_overlay import P0, FakeMarket, now_after
 
 D = 86_400_000
 EVIL = "<script>alert(1)</script>"
+LIVE_SCRIPT = '<script src="/assets/orbit-live.js" defer></script>'
+
+
+def _no_script(html: str, page: str) -> bool:
+    """실거래 홈만 같은 서버 스크립트 파일 하나 허용 (인라인 금지, 2026-10-10)."""
+    if page == "live":
+        return html.count(LIVE_SCRIPT) == 1 and html.replace(LIVE_SCRIPT, "").count("<script") == 0
+    return "<script" not in html
 
 
 def build_root(tmp_path: Path) -> Path:
@@ -188,7 +196,7 @@ class TestRender:
         else:
             assert "실거래 비활성" in html
         assert EVIL not in html  # 모든 동적 문자열은 이스케이프
-        assert "<form" not in html and "<script" not in html
+        assert "<form" not in html and _no_script(html, page)
 
     def test_every_page_sits_in_exactly_one_tab_menu(self, root: Path) -> None:
         data = load_dashboard(root, P0 + 11 * D)
@@ -580,7 +588,7 @@ class TestRender:
         assert f'data-theme="{theme}"' in html
         assert "라이트 모드" in html and "다크 모드" in html
         assert '<div class="topbar">' in html
-        assert "<script" not in html and EVIL not in html
+        assert _no_script(html, page) and EVIL not in html
 
     def test_invalid_theme_is_not_injected(self, root: Path) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), "overview", theme=EVIL)

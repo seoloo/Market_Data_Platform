@@ -10,6 +10,10 @@
 * 외부 노출 금지: 127.0.0.1·localhost 만 바인딩한다.
 * API 키를 읽지 않는다. 거래소는 실거래 홈의 **공개 시세**(키 없음 · 60 초 캐시)만
   부른다(2026-10-09).
+* **스크립트 예외 하나** (2026-10-10, 화면 개선): 실거래 홈(``/live``)만 같은 서버의
+  ``/assets/orbit-live.js`` 하나를 허용한다 — 숫자 칸만 60 초마다 새로 고치는 읽기 전용 스크립트.
+  인라인 스크립트 · 외부 스크립트는 여전히 막는다(CSP ``script-src 'self'``, 다른 화면은 그대로).
+* 실거래 홈 쿠키 둘: ``dashboard_amounts`` (금액 숨기기) · ``dashboard_onboard`` (첫 안내 봄).
 """
 
 from __future__ import annotations
@@ -44,6 +48,7 @@ _ASSETS = {
     "/assets/orbit-hero-dark-sleep.png": ("orbit-hero-dark-sleep.png", "image/png"),
     "/assets/orbit-space-dark.png": ("orbit-space-dark.png", "image/png"),
     "/assets/orbit-space-light.png": ("orbit-space-light.png", "image/png"),
+    "/assets/orbit-live.js": ("orbit-live.js", "text/javascript; charset=utf-8"),
 }
 _ASSETS.update(
     {
@@ -68,6 +73,11 @@ _HEADERS = {
         "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     ),
 }
+
+_LIVE_CSP = _HEADERS["Content-Security-Policy"].replace(
+    "default-src 'none';", "default-src 'none'; script-src 'self'; connect-src 'self';"
+)
+"""실거래 홈만: 같은 서버 스크립트 파일 하나 · 같은 서버 fetch. 인라인 스크립트는 여전히 막힌다."""
 
 Loader = Callable[[], DashboardData]
 
@@ -121,13 +131,40 @@ class _Handler(BaseHTTPRequestHandler):
                 cookie = SimpleCookie()
             saved = cookie.get("dashboard_theme")
             theme = selected if selected in {"light", "dark"} else saved.value if saved else "light"
+            cookies: list[str] = []
+            if page == "live":
+                amounts = (query.get("amounts") or [""])[0]
+                onboard = (query.get("onboard") or [""])[0]
+                saved_amounts = cookie.get("dashboard_amounts")
+                hide = (
+                    amounts == "hide"
+                    if amounts in {"hide", "show"}
+                    else bool(saved_amounts and saved_amounts.value == "hide")
+                )
+                seen = cookie.get("dashboard_onboard")
+                onboarded = (
+                    onboard == "done"
+                    if onboard in {"done", "again"}
+                    else bool(seen and seen.value == "done")
+                )
+                if amounts in {"hide", "show"}:
+                    cookies.append(f"dashboard_amounts={amounts}")
+                if onboard in {"done", "again"}:
+                    cookies.append(f"dashboard_onboard={'done' if onboard == 'done' else 'again'}")
+                data = replace(data, hide_amounts=hide, onboarded=onboarded)
             html = render_page(data, page, theme=theme)
         except Exception as exc:  # 화면 오류가 서버를 멈추지 않게 — 원인만 보인다
             self._send(
                 500, f"<!doctype html><meta charset='utf-8'><p>화면 오류: {type(exc).__name__}</p>"
             )
             return
-        self._send(200, html, theme=selected if selected in {"light", "dark"} else None)
+        self._send(
+            200,
+            html,
+            theme=selected if selected in {"light", "dark"} else None,
+            cookies=cookies,
+            csp=_LIVE_CSP if page == "live" else None,
+        )
 
     def do_POST(self) -> None:
         """놓친 작업 다시 실행 버튼 하나만 받는다."""
@@ -154,8 +191,23 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
 
-    def _send(self, status: int, html: str, *, theme: str | None = None) -> None:
-        self._send_bytes(status, html.encode("utf-8"), "text/html; charset=utf-8", theme=theme)
+    def _send(
+        self,
+        status: int,
+        html: str,
+        *,
+        theme: str | None = None,
+        cookies: list[str] | None = None,
+        csp: str | None = None,
+    ) -> None:
+        self._send_bytes(
+            status,
+            html.encode("utf-8"),
+            "text/html; charset=utf-8",
+            theme=theme,
+            cookies=cookies,
+            csp=csp,
+        )
 
     def _send_bytes(
         self,
@@ -164,16 +216,22 @@ class _Handler(BaseHTTPRequestHandler):
         content_type: str,
         *,
         theme: str | None = None,
+        cookies: list[str] | None = None,
+        csp: str | None = None,
     ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
-        if theme in {"light", "dark"}:
+        jar = ([f"dashboard_theme={theme}"] if theme in {"light", "dark"} else []) + list(
+            cookies or []
+        )
+        for pair in jar:
             self.send_header(
-                "Set-Cookie",
-                f"dashboard_theme={theme}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict",
+                "Set-Cookie", f"{pair}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict"
             )
         for name, value in _HEADERS.items():
+            if name == "Content-Security-Policy" and csp:
+                value = csp
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
