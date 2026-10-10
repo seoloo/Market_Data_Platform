@@ -291,7 +291,7 @@ html[data-theme=dark] .ico-to-dark{display:none}
 /* 오비가 그림 속에 있어 그림 전체를 살짝 움직인다 — 그림과 SVG 층을 같은 움직임으로 묶어
    눈꺼풀 위치가 어긋나지 않게. 중심은 오비(원본 1040, 470 = 67.7%, 45.9%). */
 .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{transform-origin:67.7% 45.9%;animation:obi-float 6.5s ease-in-out infinite}
-@keyframes obi-float{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-6px) rotate(-.5deg)}65%{transform:translateY(-2px) rotate(.4deg)}}
-html[data-theme=dark] .orbit-hero-art img,html[data-theme=dark] .orbit-hero-art .orbit-hero-fx{animation:obi-breathe 5s ease-in-out infinite}
-@keyframes obi-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.012) translateY(2px)}}
+@keyframes obi-float{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-16px) rotate(-1deg)}65%{transform:translateY(-5px) rotate(.8deg)}}
+html[data-theme=dark] .orbit-hero-art img,html[data-theme=dark] .orbit-hero-art .orbit-hero-fx{animation:obi-breathe 6s ease-in-out infinite}
+@keyframes obi-breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-12px) scale(1.015)}}
 @media (prefers-reduced-motion:reduce){.orbit-hero-fx *{animation:none!important}.orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{animation:none!important}.fx-lid,.fx-shut,.fx-twinkle,.fx-z,.fx-flow,.fx-sleepy{opacity:0}}
