@@ -304,3 +304,28 @@ def test_one_toggle_opens_all_three_details_and_words_stay_whole() -> None:
     opened = render_live([_book()], Quotes(), _NOW, show_detail=True)
     assert '-detail" hidden>' not in opened and 'href="/live?detail=close"' in opened
     assert "−30%\u2060면" in opened  # % 뒤에서 줄이 끊기지 않게
+
+
+def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> None:
+    two = Book(
+        "glide", "Glide", "토스", 1.0, 0.0, (Holding("TQQQ", 1, 1, 1), Holding("SCHD", 1, 1, 1))
+    )
+    three = Book(
+        "cruise",
+        "Cruise",
+        "업비트",
+        1.0,
+        0.0,
+        tuple(Holding(c, 1, 1, 1) for c in ("BTC", "ETH", "SOL")),
+    )
+    html = render_live([two, three], Quotes(), _NOW, show_detail=True)
+    glide = html.split('id="live-book-0"', 1)[1].split('id="live-book-1"', 1)[0]
+    acc = html.split('id="live-book-2"', 1)[1]
+    assert glide.count('<li class="orbit-pad"') == 1  # 3 종목 카드에 맞춰 한 줄 채움
+    assert glide.count('<tr class="orbit-pad"') == 1
+    assert acc.count('<li class="orbit-pad"') == 2  # 기록 없음 한 줄 + 빈 줄 둘
+    heading = acc.split('class="orbit-card-heading"', 1)[1].split('class="orbit-card-summary"', 1)[
+        0
+    ]
+    assert "orbit-detail-toggle" in heading and "orbit-cards-tools" not in html
+    assert "flex:" in html.split('class="orbit-dt-bar"', 1)[1][:200]  # 비율대로 꽉 채움

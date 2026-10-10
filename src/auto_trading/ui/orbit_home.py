@@ -363,6 +363,8 @@ def _card(
     now_ms: int = 0,
     history: Sequence[Mapping[str, Any]] = (),
     show_detail: bool = False,
+    head_extra: str = "",
+    pad_rows: int = 0,
 ) -> str:
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
     category, subtitle, glyph = {
@@ -413,20 +415,23 @@ def _card(
         '<div class="orbit-card-heading">'
         f'<span class="orbit-category-icon">{icon(glyph)}</span>'
         f"<div><h2>{category}</h2><span>{escape(subtitle)}</span></div>"
-        "</div>"
+        f"{head_extra}</div>"
         f'<div class="orbit-card-summary" data-live="card-{key}-summary"><div>'
         f"<strong>{amount}</strong><p>{change}</p>{stamp}</div>"
         f"{_spark(history, book.key)}</div>"
         f'<div class="orbit-row-label"><span>보유 종목 ({len(book.holdings)}개)</span>'
         "<span>평가금액</span></div>"
         f'<ul class="orbit-holdings" data-live="card-{key}-holdings">'
-        f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}</ul>"
+        f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}"
+        # 세 카드 줄을 맞추려고, 종목이 적은 카드는 보이지 않는 빈 줄로 채운다
+        + '<li class="orbit-pad" aria-hidden="true"></li>' * max(0, pad_rows - max(len(rows), 1))
+        + "</ul>"
         + "".join(pops)
         # 상세는 화면 위 '상세 보기' 버튼 하나로 셋을 함께 연다 (카드 바닥에 붙음)
         + f'<div class="orbit-dt orbit-book-detail" data-live="card-{key}-detail"'
         + ("" if show_detail else " hidden")
         + ">"
-        + _detail(book, quotes, hide=hide, priced=priced, now_ms=now_ms)
+        + _detail(book, quotes, hide=hide, priced=priced, now_ms=now_ms, pad_rows=pad_rows)
         + "</div></section>"
     )
 
@@ -513,7 +518,9 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
     return "".join(tiles), "매일 적립 · 토스 주식 모으기"
 
 
-def _detail(book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int) -> str:
+def _detail(
+    book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int, pad_rows: int = 0
+) -> str:
     tiles, chip = _tiles(book, hide, now_ms)
     total = book.value_krw
     parts, legend, rows = [], [], []
@@ -521,7 +528,7 @@ def _detail(book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int
         value = h.value_krw if h.value_krw is not None else h.cost_krw
         w = value / total if total > 0 else 0.0
         color = _color(h.name, i)
-        parts.append(f'<span style="width:{w * 100:.1f}%;background:{color}"></span>')
+        parts.append(f'<span style="flex:{w:.4f} 0 0;background:{color}"></span>')
         legend.append(
             f'<span><i class="orbit-dt-dot" style="background:{color}"></i>'
             f"{escape(h.name)} {w:.0%}</span>"
@@ -554,9 +561,9 @@ def _detail(book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int
         )
     cash_w = book.cash_krw / total if total > 0 else 0.0
     if book.cash_krw > 0:
-        parts.append(f'<span style="width:{cash_w * 100:.1f}%;background:var(--line)"></span>')
+        parts.append(f'<span style="flex:{cash_w:.4f} 0 0;background:var(--dt-cash)"></span>')
         legend.append(
-            '<span><i class="orbit-dt-dot" style="background:var(--line)"></i>'
+            '<span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>'
             f"현금 {cash_w:.0%}</span>"
         )
     has_target = any(h.target is not None for h in book.holdings)
@@ -568,7 +575,10 @@ def _detail(book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int
             '<table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%">'
             '<col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup>'
             "<tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th>"
-            f"<th>{'비중 / 목표' if has_target else '비중'}</th></tr>{''.join(rows)}</table>"
+            f"<th>{'비중 / 목표' if has_target else '비중'}</th></tr>{''.join(rows)}"
+            + '<tr class="orbit-pad" aria-hidden="true"><td colspan="5">&nbsp;</td></tr>'
+            * max(0, pad_rows - len(rows))
+            + "</table>"
         )
         if rows
         else ""
@@ -840,6 +850,14 @@ def render_live(
     if not pending_count and (warnings or not books):
         status += f'<p class="orbit-data-note" data-live="data-note">{escape(detail)}</p>'
     by_key = {b.key: b for b in books}
+    pad = max((len(b.holdings) for b in books), default=1)
+    toggle = (
+        f'<a class="orbit-detail-toggle{" on" if show_detail else ""}" '
+        f'href="/live?detail={"close" if show_detail else "open"}" '
+        f'aria-expanded="{str(show_detail).lower()}">'
+        f"{'상세 닫기' if show_detail else '상세 보기'}"
+        f'<span aria-hidden="true">{"⌃" if show_detail else "⌄"}</span></a>'
+    )
     cards = "".join(
         _card(
             by_key.get(k, Book(k, k, "", 0, 0, ())),
@@ -850,16 +868,10 @@ def render_live(
             now_ms=now_ms,
             history=hist,
             show_detail=show_detail,
+            head_extra=toggle if k == "accumulate" else "",
+            pad_rows=pad,
         )
         for i, k in enumerate(("glide", "cruise", "accumulate"))
-    )
-    toggle = (
-        '<div class="orbit-cards-tools">'
-        f'<a class="orbit-detail-toggle{" on" if show_detail else ""}" '
-        f'href="/live?detail={"close" if show_detail else "open"}" '
-        f'aria-expanded="{str(show_detail).lower()}">'
-        f"{'상세 닫기' if show_detail else '상세 보기'}"
-        f'<span aria-hidden="true">{"⌃" if show_detail else "⌄"}</span></a></div>'
     )
     trades = sorted((t for b in books for t in b.trades), key=lambda t: t.date, reverse=True)
     return (
@@ -868,7 +880,6 @@ def render_live(
         + alert
         + status
         + _accounts(books, now_ms)
-        + toggle
         + f'<div class="orbit-cards">{cards}</div>'
         + '<div class="orbit-bottom">'
         + _history_panel(hist, hide)
