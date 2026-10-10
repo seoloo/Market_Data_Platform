@@ -450,7 +450,7 @@ def cmd_run() -> int:
     out["xauusdt_reference"] = _xau_reference(rules)
     REPORT.mkdir(parents=True, exist_ok=True)
     (REPORT / "result.json").write_text(
-        json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8"
+        json.dumps(out, ensure_ascii=False, indent=1, default=str), encoding="utf-8"
     )
     (REPORT / "trades.json").write_text(
         json.dumps(

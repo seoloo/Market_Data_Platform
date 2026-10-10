@@ -22,6 +22,7 @@
 - **주간 테마 AI 답 JSON 깨짐 (10-10 09:00):** 한 번 더 묻고 깨진 답은 `reports/theme_alert/bad-answer-*.txt` 로 (`47a2f4d`). 다시 돌려 그 주 알림 보냄.
 - **실거래 홈 · 데스크톱 앱 (`15c4dee`):** `/live` 와 `dist/AutoTrading.exe` 첫판. 이후 Codex 가 '오르빗'으로 다시 꾸밈(위 항목들).
 - **기록 연구 (판정 없음):** 190 업비트판(김프 · 환율 몫) · 191 주도주 일찍 잡기 REJECT(알림 끔) · 192 Glide/Cruise 50/50 · 연금 비교 · 193 연금 · ISA = 나스닥 · S&P · 배당 · 금 25씩. 194 ~ 201 은 다른 세션(BRIEFING §3 표).
+- **202 금 장중 돌파 (2026-10-11, B · C REJECT):** 메타트레이더 조사 → MQL5 신호 8 개 거래 내역 역분석(사용자 로그인 · 집계만 · 로그아웃) → Gold Reaper 형 돌파를 XAUUSDT 실측 비용(이 계정 maker 0% · taker 0.04%)으로 판정. HistData 1분봉 2015 ~ 2026-09. 비용 전 9 년 0, 캔들 확인 C 더 나쁨. [202](docs/research/202-gold-session-breakout-preregistration.md).
 - **대화 계산 (문서 아님):** Glide 4분할 변형(3배 둘 + 배당 + 금)은 지금 Glide 보다 수익↓ · 낙폭 비슷 → 안 바꿈. 파이어 월 250만 원(7.5억)까지 월 100만 원이면 보통 14 ~ 15년(Cruise 김프 뺀 가정).
 - 다음: 10/23 O/v3 보고 · 10/24 Paper 점검 · 11/02 Glide 매수 · 연금 · ISA 는 한국투자증권 이전 뒤 자동화.
 
