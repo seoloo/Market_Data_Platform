@@ -19,6 +19,7 @@ from pathlib import Path
 
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
+from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import InboxQueue, TelegramInbox, is_command
 from auto_trading.ui.live_home import build_books, fetch_quotes, needed, summary_text
 
@@ -57,6 +58,7 @@ def run(root: Path = REPO) -> int:
         return 1
     if not cmds:
         print("현황 봇: 받은 명령 없음")
+        beat_and_alert(root, "telegram_bot", int(time.time() * 1000))
         return 0
     text = report(root)  # 여러 번 보내도 답은 한 통
     bot = TelegramNotifier(creds)
@@ -65,6 +67,7 @@ def run(root: Path = REPO) -> int:
     finally:
         bot.close()
     print(text)
+    beat_and_alert(root, "telegram_bot", int(time.time() * 1000))
     return 0
 
 

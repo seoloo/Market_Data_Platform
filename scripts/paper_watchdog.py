@@ -278,6 +278,14 @@ def pc_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     )
 
 
+def bot_status(now_ms: int) -> tuple[list[str], list[Finding]]:
+    """텔레그램 봇 둘(현황 · 정보) — 1 시간 넘게 조용하면 심각(서로 알리지 못하는 경우)."""
+    from auto_trading.notify.heartbeat import daily_findings
+
+    found = [Finding("CRITICAL", label, text) for label, text in daily_findings(REPO, now_ms)]
+    return [], found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-send", action="store_true", help="텔레그램을 보내지 않는다")
@@ -313,7 +321,7 @@ def main() -> int:
     shadow_lines, shadow_findings = shadow_status(now_ms)
     drill_lines += shadow_lines
     findings += shadow_findings
-    for status_fn in (demo_t2_status, demo_o2_status, demo_ew_status):
+    for status_fn in (demo_t2_status, demo_o2_status, demo_ew_status, bot_status):
         demo_lines, demo_findings = status_fn(now_ms)
         drill_lines += demo_lines
         findings += demo_findings

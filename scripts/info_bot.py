@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ from auto_trading.config.secrets import (
     read_env_file,
 )
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
+from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import InboxQueue, TelegramInbox
 from auto_trading.ops.news_rss import NewsItem, parse_feed
 from auto_trading.ops.stock_news import (
@@ -137,6 +139,7 @@ def run(root: Path = REPO) -> int:
     asks = [m.text for m in msgs if m.text][-PER_RUN:]
     if not asks:
         print("정보 봇: 받은 글 없음")
+        beat_and_alert(root, "info_bot", int(time.time() * 1000))
         return 0
     bot = TelegramNotifier(creds)
     try:
@@ -151,6 +154,7 @@ def run(root: Path = REPO) -> int:
         return 1
     finally:
         bot.close()
+    beat_and_alert(root, "info_bot", int(time.time() * 1000))
     return 0
 
 
