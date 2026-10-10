@@ -122,3 +122,72 @@ summary::-webkit-details-marker{display:none}
  .orbit-popover>header{padding:12px 16px}.orbit-popover-body{padding:4px 16px 16px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* 2026-10-10 보완: 금액 숨기기 · 갱신 시각 · 추정 · 종목 상세 · 그래프 · 거래 필터 · 계좌 상태 · 첫 안내 */
+.orbit-eye{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;font-weight:500;text-decoration:none;border:1px solid var(--line);border-radius:14px;padding:3px 9px}
+.orbit-eye svg{width:16px!important}.orbit-eye:hover,.orbit-eye.on{color:var(--blue);border-color:var(--blue)}
+.orbit-updated{grid-column:1/-1;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--muted);font-size:12px}
+.orbit-card-stamp{color:var(--muted);font-size:11px;margin-top:4px}
+.orbit-stale{color:#d6455d!important;font-weight:600}[data-theme=dark] .orbit-stale{color:#ff8fa3!important}
+.orbit-est{font-style:normal;font-size:11px;font-weight:600;color:#a15c00;background:#fff1d6;border-radius:8px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+[data-theme=dark] .orbit-est{color:#ffd28a;background:#4a3510}
+.orbit-holdings>li{padding:0}
+.orbit-holding-btn{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;min-height:63px;padding:9px 4px;cursor:pointer;border-radius:12px}
+.orbit-holding-btn:hover{background:var(--soft)}.orbit-holding-btn:focus-visible{outline:3px solid #448eff;outline-offset:1px}
+.orbit-detail-list{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin:4px 0 12px}
+.orbit-detail-list dt{color:var(--muted)}.orbit-detail-list dd{text-align:right;font-weight:600}
+.orbit-detail-list dd span b{font-weight:600}.orbit-detail-list dd small{margin-left:6px}
+.orbit-detail-foot{color:var(--muted);font-size:11px;margin-top:8px}
+.orbit-history .orbit-panel-heading{flex-wrap:wrap;gap:8px}
+.orbit-views{display:flex;gap:5px}.orbit-views label{cursor:pointer}.orbit-views input{position:absolute;opacity:0;width:1px;height:1px}
+.orbit-views span{display:block;border:1px solid var(--line);color:var(--muted);border-radius:17px;font-size:12px;padding:5px 11px;white-space:nowrap}
+.orbit-views input:checked+span{border-color:var(--blue);color:var(--blue);font-weight:600}.orbit-views input:focus-visible+span{outline:3px solid #448eff;outline-offset:2px}
+.orbit-plot{display:none;margin-top:10px}
+.orbit-history:has(input[value=asset]:checked):has(input[value=w1]:checked) .p-w1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m1]:checked) .p-m1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m3]:checked) .p-m3.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m6]:checked) .p-m6.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=y1]:checked) .p-y1.v-asset,
+.orbit-history:has(input[value=perf]:checked):has(input[value=w1]:checked) .p-w1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m1]:checked) .p-m1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m3]:checked) .p-m3.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m6]:checked) .p-m6.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=y1]:checked) .p-y1.v-perf{display:block}
+.orbit-history:has(input[value=asset]:checked):has(input[value=w1]:checked) .orbit-chart-empty.p-w1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m1]:checked) .orbit-chart-empty.p-m1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m3]:checked) .orbit-chart-empty.p-m3.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m6]:checked) .orbit-chart-empty.p-m6.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=y1]:checked) .orbit-chart-empty.p-y1.v-asset,
+.orbit-history:has(input[value=perf]:checked):has(input[value=w1]:checked) .orbit-chart-empty.p-w1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m1]:checked) .orbit-chart-empty.p-m1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m3]:checked) .orbit-chart-empty.p-m3.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m6]:checked) .orbit-chart-empty.p-m6.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=y1]:checked) .orbit-chart-empty.p-y1.v-perf{display:flex}
+.orbit-plot-svg{width:100%;height:auto;display:block}
+.orbit-plot-svg .grid{stroke:var(--line);stroke-width:1}.orbit-plot-svg .axis{fill:var(--muted);font-size:11px}
+.orbit-plot-line{fill:none;stroke:var(--blue);stroke-width:2.4;stroke-linejoin:round}
+.orbit-plot-base{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4}
+.orbit-plot-cap{color:var(--muted);font-size:12px;margin-top:4px}
+.orbit-spark{width:92px;height:34px;flex-shrink:0}.orbit-spark polyline{fill:none;stroke-width:2;stroke-linejoin:round}
+.orbit-spark.pos polyline{stroke:#16a37f}.orbit-spark.neg polyline{stroke:#d6455d}
+.orbit-trade-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.orbit-trade-filter label{cursor:pointer}
+.orbit-trade-filter input{position:absolute;opacity:0;width:1px;height:1px}
+.orbit-trade-filter span{display:block;background:var(--soft);color:var(--muted);border-radius:16px;font-size:12px;padding:6px 12px}
+.orbit-trade-filter input:checked+span{background:#1677df;color:#fff}.orbit-trade-filter input:focus-visible+span{outline:3px solid #448eff;outline-offset:2px}
+.orbit-trade-filter:has(#tf-buy:checked)+.orbit-trades-list>li:not(.kind-buy),
+.orbit-trade-filter:has(#tf-sell:checked)+.orbit-trades-list>li:not(.kind-sell),
+.orbit-trade-filter:has(#tf-deposit:checked)+.orbit-trades-list>li:not(.kind-deposit){display:none}
+.orbit-trade-state.state-wait{background:#fff1d6;color:#a15c00}.orbit-trade-state.state-other{background:var(--soft);color:var(--muted)}
+.orbit-trade-state.state-deposit{background:#e3efff;color:#1f5fb8}
+[data-theme=dark] .orbit-trade-state.state-wait{background:#4a3510;color:#ffd28a}[data-theme=dark] .orbit-trade-state.state-deposit{background:#1d3560;color:#9cc7ff}
+.orbit-accounts-list{display:grid;gap:10px;margin-bottom:12px}
+.orbit-accounts-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.orbit-accounts-list li small{display:block;color:var(--muted);font-size:12px}.orbit-accounts-list .orbit-trade-state{white-space:normal;text-align:right}
+.orbit-onboard{background:var(--surface);border:2px solid var(--blue);border-radius:22px;padding:18px 22px;margin-bottom:18px}
+.orbit-onboard h2{font-size:18px;margin-bottom:10px}.orbit-onboard ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-left:18px}
+.orbit-onboard li b{display:block}.orbit-onboard li span{color:var(--muted);font-size:13px}
+.orbit-onboard-key{margin-top:12px;font-weight:600;color:var(--blue)}
+.orbit-onboard-actions{display:flex;gap:10px;margin-top:10px}
+.orbit-onboard-actions a,.orbit-onboard-actions button{font:inherit;font-size:13px;border-radius:16px;padding:7px 14px;cursor:pointer;text-decoration:none}
+.orbit-onboard-actions a{background:#1677df;color:#fff}.orbit-onboard-actions button{background:none;border:1px solid var(--line);color:var(--ink)}
+.orbit-refresh-failed::after{content:" · 새로 고침 실패 (다음 분에 다시)";color:#d6455d}
+@media (max-width:700px){.orbit-onboard ol{grid-template-columns:1fr}}

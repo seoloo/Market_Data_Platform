@@ -178,6 +178,10 @@ class DashboardData:
     """저장소 루트 — 실행 현황 화면이 보고서 파일을 찾는 곳."""
     catchup: CatchupView | None = None
     """놓친 작업 다시 실행 (서버가 채운다. 없으면 버튼을 그리지 않는다)."""
+    hide_amounts: bool = False
+    """실거래 홈 금액 숨기기 (서버가 쿠키로 채운다, 2026-10-10)."""
+    onboarded: bool = True
+    """처음 쓰는 사람 안내를 이미 봤는지 (서버가 쿠키로 채운다)."""
 
 
 def _day(decision_ms: int) -> int:

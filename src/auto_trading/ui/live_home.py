@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -19,7 +19,7 @@ from typing import Any
 
 from auto_trading.ui.data import DashboardData
 
-__all__ = ["Quotes", "build_books", "fetch_quotes", "live_page"]
+__all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_history"]
 
 CRUISE_COINS = ("BTC", "ETH", "SOL")
 GLIDE_TICKERS = ("TQQQ", "SCHD")
@@ -108,6 +108,26 @@ class Holding:
 
 
 @dataclass(frozen=True, slots=True)
+class Trade:
+    """거래 내역 한 줄 (장부 그대로 읽은 값, 2026-10-10 화면 개선)."""
+
+    date: str
+    kind: str
+    """buy · sell · deposit."""
+    symbol: str
+    qty: float = 0.0
+    price: float | None = None
+    """1 단위 체결가 (``currency`` 단위)."""
+    amount: float = 0.0
+    """체결 금액 또는 입금액 (``currency`` 단위)."""
+    fee: float = 0.0
+    currency: str = "KRW"
+    status: str = "체결"
+    """체결 · 접수(체결 확인 대기) · 체결 없음 · 입금 기록 · 그 밖의 장부 상태."""
+    note: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class Book:
     key: str
     title: str
@@ -119,6 +139,9 @@ class Book:
     pending: tuple[str, ...] = ()
     activity: tuple[tuple[str, str], ...] = ()
     """(날짜, 한 줄)."""
+    trades: tuple[Trade, ...] = ()
+    updated_ms: int = 0
+    """장부 파일을 마지막으로 저장한 시각 (0 이면 모름)."""
 
     @property
     def value_krw(self) -> float:
@@ -157,9 +180,41 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     spent: dict[str, float] = {}
     pending: list[str] = []
     activity: list[tuple[str, str]] = [(str(d[0]), f"💵 입금 {_f(d[1]):,.0f} 원") for d in deposits]
+    trades: list[Trade] = [
+        Trade(
+            str(d[0]),
+            "deposit",
+            "KRW",
+            amount=_f(d[1]),
+            status="입금 기록",
+            note=f"${_f(d[2]):,.2f} 환전 · {_f(d[3]):,.1f}원/$",
+        )
+        for d in deposits
+    ]
     for o in state.get("orders") or []:
         sym = str(o.get("symbol"))
         filled = _f(o.get("filled_qty"))
+        status = str(o.get("status") or "")
+        if filled > 0:
+            state_text = "체결"
+        elif status == "SENT":
+            state_text = "접수 · 체결 확인 대기"
+        else:
+            state_text = status or "기록"
+        trades.append(
+            Trade(
+                str(o.get("date")),
+                "sell" if str(o.get("side")).upper() == "SELL" else "buy",
+                sym,
+                filled if filled > 0 else _f(o.get("qty")),
+                _f(o.get("filled_usd")) / filled if filled > 0 else (_f(o.get("limit")) or None),
+                _f(o.get("filled_usd")),
+                _f(o.get("commission")),
+                "USD",
+                state_text,
+                "" if filled > 0 else f"지정가 ${_f(o.get('limit')):,.2f}",
+            )
+        )
         if filled > 0:
             spent[sym] = spent.get(sym, 0.0) + _f(o.get("filled_usd")) + _f(o.get("commission"))
             activity.append((str(o.get("date")), f"🛒 {sym} {filled:g}주 체결"))
@@ -199,6 +254,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         tuple(notes),
         tuple(pending),
         tuple(activity),
+        tuple(trades),
     )
 
 
@@ -276,6 +332,35 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         for d in state.get("deposits") or []
         if isinstance(d, list)
     ]
+    trades = [
+        Trade(str(d[0]), "deposit", "KRW", amount=_f(d[1]), status="입금 기록")
+        for d in state.get("deposits") or []
+        if isinstance(d, list)
+    ]
+    for o in state.get("orders") or []:
+        parts = str(o.get("identifier") or o.get("id") or "").split("-")
+        coin = parts[-2] if len(parts) >= 3 else "?"
+        vol = _f(o.get("executed_volume"))
+        funds = _f(o.get("funds"))
+        if vol > 0:
+            state_text = "체결"
+        elif o.get("state"):
+            state_text = "체결 없음"
+        else:
+            state_text = "결과 확인 안 됨"
+        trades.append(
+            Trade(
+                str(o.get("id", ""))[4:14],
+                "buy" if o.get("side") == "bid" or parts[-1:] == ["B"] else "sell",
+                coin,
+                vol if vol > 0 else _f(o.get("volume")),
+                funds / vol if vol > 0 else None,
+                funds,
+                _f(o.get("paid_fee")),
+                "KRW",
+                state_text,
+            )
+        )
     return Book(
         book.key,
         book.title,
@@ -286,12 +371,14 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         tuple(notes),
         (),
         tuple(activity),
+        tuple(trades),
     )
 
 
 def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     holdings = []
     activity: list[tuple[str, str]] = []
+    trades: list[Trade] = []
     total_cost = 0.0
     for st in states:
         sym = str(st.get("symbol"))
@@ -300,6 +387,22 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         cost = sum(_f(b.get("cost_usd")) * _f(b.get("fx_rate")) for b in buys)
         total_cost += cost
         activity += [(str(b.get("date")), f"🛒 {sym} {_f(b.get('qty')):g}주 적립") for b in buys]
+        for b in buys:
+            n_b = _f(b.get("qty"))
+            trades.append(
+                Trade(
+                    str(b.get("date")),
+                    "buy",
+                    sym,
+                    n_b,
+                    _f(b.get("cost_usd")) / n_b if n_b > 0 else None,
+                    _f(b.get("cost_usd")),
+                    0.0,
+                    "USD",
+                    "체결",
+                    f"{_f(b.get('fx_rate')):,.1f}원/$",
+                )
+            )
         n = _f(st.get("last_qty"))
         if n <= 0:
             continue
@@ -317,6 +420,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         ("입금 = 산 원가 (적립은 따로 입금 기록이 없다)",),
         (),
         tuple(activity),
+        tuple(trades),
     )
 
 
@@ -337,18 +441,52 @@ def needed(root: Path) -> tuple[set[str], set[str]]:
     return set(CRUISE_COINS), tickers
 
 
+def _mtime_ms(*paths: Path) -> int:
+    best = 0
+    for p in paths:
+        try:
+            best = max(best, int(p.stat().st_mtime * 1000))
+        except OSError:
+            continue
+    return best
+
+
 def build_books(root: Path, q: Quotes) -> list[Book]:
     out = []
-    glide = _read(root / "data" / "toss" / "M3.json")
+    toss = root / "data" / "toss"
+    glide = _read(toss / "M3.json")
     if glide:
-        out.append(glide_book(glide, q))
-    cruise = _read(root / "data" / "upbit_t2" / "state.json")
+        out.append(replace(glide_book(glide, q), updated_ms=_mtime_ms(toss / "M3.json")))
+    cruise_path = root / "data" / "upbit_t2" / "state.json"
+    cruise = _read(cruise_path)
     if cruise:
-        out.append(cruise_book(cruise, q))
+        out.append(replace(cruise_book(cruise, q), updated_ms=_mtime_ms(cruise_path)))
     acc = _toss_states(root)
     if acc:
-        out.append(accumulate_book(acc, q))
+        files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
+        out.append(replace(accumulate_book(acc, q), updated_ms=_mtime_ms(*files)))
     return out
+
+
+HISTORY = Path("data") / "live" / "history.jsonl"
+"""하루 한 줄 실거래 평가 기록 (``scripts/live_snapshot.py`` 가 쓴다). 화면은 읽기만."""
+
+
+def load_history(root: Path) -> list[dict[str, Any]]:
+    """기록 파일 → 날짜 오름차순 줄들 (깨진 줄은 건너뜀, 같은 날은 마지막 줄)."""
+    try:
+        text = (root / HISTORY).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    by_day: dict[str, dict[str, Any]] = {}
+    for line in text.splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and isinstance(row.get("date"), str):
+            by_day[row["date"]] = row
+    return [by_day[d] for d in sorted(by_day)]
 
 
 # ---------------------------------------------------------------- 화면
@@ -370,11 +508,19 @@ def _priced(b: Book, q: Quotes) -> bool:
     return b.priced and (b.key not in {"glide", "accumulate"} or q.fx is not None)
 
 
-def render_live(books: list[Book], q: Quotes, now_ms: int) -> str:
+def render_live(
+    books: list[Book],
+    q: Quotes,
+    now_ms: int,
+    *,
+    hide: bool = False,
+    onboarded: bool = True,
+    history: list[dict[str, Any]] | None = None,
+) -> str:
     """실거래 계산은 보존하고 사용자 승인 오르빗 화면만 렌더링한다."""
     from auto_trading.ui.orbit_home import render_live as render_orbit
 
-    return render_orbit(books, q, now_ms)
+    return render_orbit(books, q, now_ms, hide=hide, onboarded=onboarded, history=history)
 
 
 QuoteSource = Callable[[set[str], set[str]], Quotes]
@@ -391,11 +537,18 @@ quote_source: QuoteSource = _default_quotes
 def live_page(data: DashboardData) -> str:
     if data.root is None:
         return '<section class="panel"><h2>저장소 위치 없음</h2></section>'
+    hide, onboarded = data.hide_amounts, data.onboarded
+    history = load_history(data.root)
     if not build_books(data.root, Quotes()):
-        return render_live([], Quotes(), data.now_ms)  # 장부가 없으면 시세도 부르지 않는다
+        # 장부가 없으면 시세도 부르지 않는다
+        return render_live(
+            [], Quotes(), data.now_ms, hide=hide, onboarded=onboarded, history=history
+        )
     coins, tickers = needed(data.root)
     q = quote_source(coins, tickers)
-    return render_live(build_books(data.root, q), q, data.now_ms)
+    return render_live(
+        build_books(data.root, q), q, data.now_ms, hide=hide, onboarded=onboarded, history=history
+    )
 
 
 # ---------------------------------------------------------------- 텔레그램 '현황' 답

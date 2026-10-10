@@ -46,7 +46,13 @@ def test_all_popups_have_fixed_header_close_and_matching_targets() -> None:
     for t, a in parser.tags:
         if t == "button" and "popovertarget" in a:
             assert a["popovertarget"] in dialogs
-    assert "<script" not in layout("", "light") and "<form" not in layout("", "light")
+    shell = layout("", "light")
+    # 실거래 홈만 같은 서버의 새로 고침 스크립트 파일 하나를 허용한다 (인라인 금지)
+    assert (
+        shell.count("<script") == 1
+        and '<script src="/assets/orbit-live.js" defer></script>' in shell
+    )
+    assert "<form" not in shell
 
 
 @pytest.mark.parametrize("pending", [(), ("BTC 지정가 체결 확인",)])

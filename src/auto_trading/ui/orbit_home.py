@@ -1,11 +1,19 @@
-"""사용자 승인 오르빗 실거래 화면. 장부·공개 시세를 표시만 한다."""
+"""사용자 승인 오르빗 실거래 화면. 장부·공개 시세를 표시만 한다.
+
+2026-10-10 보완 (Codex 제안 · 사용자 "일단 작업해봐"):
+금액 숨기기 · 장부/시세 갱신 시각과 '추정' 표시 · 부분 새로고침(`data-live` 칸만) · 하루 평가
+기록 그래프 · 종목 상세 · 거래 내역 필터 · 연결 계좌 상태 · 처음 쓰는 사람 안내.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from datetime import UTC, date, datetime, timedelta
 from html import escape
 from pathlib import Path
+from typing import Any
 
-from auto_trading.ui.live_home import Book, Quotes, _priced, _won
+from auto_trading.ui.live_home import Book, Quotes, Trade, _priced
 from auto_trading.ui.orbit_icons import icon, symbol_icon
 
 _CSS = Path(__file__).with_name("orbit.css").read_text(encoding="utf-8")
@@ -19,6 +27,32 @@ _NAMES = {
     "WQTM": "WQTM",
     "QS": "QuantumScape",
 }
+_KST = timedelta(hours=9)
+_HIDDEN = "•••••"
+STALE_HOURS = {"cruise": 30, "accumulate": 30, "glide": 24 * 35}
+"""장부가 이 시간보다 오래되면 '오래된 기록' (Cruise · 적립은 매일, Glide 는 매달 돈다)."""
+PERIODS = (
+    ("w1", "1주", 7),
+    ("m1", "1개월", 31),
+    ("m3", "3개월", 92),
+    ("m6", "6개월", 183),
+    ("y1", "1년", 366),
+)
+_KIND_WORD = {"buy": "매수", "sell": "매도", "deposit": "입금"}
+
+
+def _won(x: float, hide: bool = False) -> str:
+    return _HIDDEN if hide else f"{x:,.0f}"
+
+
+def _kst(ms: int) -> str:
+    return (datetime.fromtimestamp(ms / 1000, UTC) + _KST).strftime("%m/%d %H:%M")
+
+
+def _stale(book: Book, now_ms: int) -> bool:
+    if not book.updated_ms:
+        return False
+    return now_ms - book.updated_ms > STALE_HOURS.get(book.key, 30) * 3_600_000
 
 
 def _popup(target: str, title: str, content: str) -> str:
@@ -42,11 +76,15 @@ def _guide() -> str:
             "<p>내 자산은 실거래 장부의 현금과 보유 평가액입니다. "
             "기준 금액은 총 입금 + 적립 매입원가입니다. "
             "평가 차액은 세금 전이며 확정 수익이 아닙니다.</p>"
-            "<p>시세가 없으면 원가로 셈 합니다. 환율 미확인 시에도 추정 평가액입니다. "
+            "<p>시세가 없으면 원가로 셈 하고 <em class='orbit-est'>추정</em>을 붙입니다. "
             "주문 접수 ≠ 체결 완료. 장부만으로 프로그램의 현재 가동 여부를 확정하지 않습니다.</p>"
+            "<p>‘장부 업데이트’는 매매 프로그램이 장부를 마지막으로 저장한 시각, "
+            "‘시세 업데이트’는 이 화면이 공개 시세를 받은 시각입니다. "
+            "화면이 열려 있다고 매매가 정상이라는 뜻은 아닙니다.</p>"
             "<p>Glide는 미국 주식, Cruise는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. "
             "이 화면은 읽기 전용입니다. 앱을 닫아도 매매 프로그램은 종료되지 않습니다.</p>"
-            "<p>자산 그래프는 검증된 실거래 평가 이력만 표시합니다. 입금은 수익이 아닙니다.</p>",
+            "<p>자산 그래프는 하루 한 번 남긴 실거래 평가 기록만 그립니다. "
+            "기록이 없는 과거는 채우지 않습니다. 입금은 수익이 아닙니다.</p>",
         )
     )
 
@@ -68,10 +106,14 @@ def layout(body: str, theme: str) -> str:
         f'<!doctype html><html lang="ko" data-theme="{theme}" data-page="live">'
         '<head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<meta http-equiv="refresh" content="60"><title>오르빗 · 내 자산</title>'
+        # 스크립트가 꺼진 브라우저만 예전처럼 화면 전체를 60 초마다 새로 고친다
+        '<noscript><meta http-equiv="refresh" content="60"></noscript>'
+        "<title>오르빗 · 내 자산</title>"
         '<link rel="icon" type="image/png" href="/assets/obi.png?v=3">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">'
-        f'<style>{_CSS}</style></head><body><div class="topbar">'
+        f"<style>{_CSS}</style>"
+        '<script src="/assets/orbit-live.js" defer></script>'
+        '</head><body><div class="topbar">'
         '<a class="logo" href="/live"><img src="/assets/orbit-obi.png" '
         'alt="오비, 네온 궤도 속 우주 고양이" width="44" height="44"><b>오르빗</b></a>'
         '<nav class="orbit-nav" aria-label="주 메뉴">'
@@ -81,21 +123,15 @@ def layout(body: str, theme: str) -> str:
         '<button type="button" class="orbit-accounts" popovertarget="orbit-accounts" '
         'aria-label="연결 계좌">'
         f"{icon('wallet')}<span>연결 계좌</span></button>"
-        + _popup(
-            "orbit-accounts",
-            "연결 계좌",
-            "<p>Glide · 자동 적립: 토스<br>Cruise: 업비트</p>"
-            "<p>저장된 장부 기준입니다. 실제 API 연결·잔고를 새로 조회하지 않습니다. "
-            "계좌번호·API 키는 표시하지 않습니다.</p>",
-        )
-        + '<button type="button" class="orbit-settings" popovertarget="orbit-settings" '
+        '<button type="button" class="orbit-settings" popovertarget="orbit-settings" '
         'aria-label="설정">'
         f"{icon('gear')}<span>설정</span></button>"
         + _popup(
             "orbit-settings",
             "화면 설정",
             f'<div class="orbit-themes">{themes}</div>'
-            "<p>표시 테마만 바꿉니다. 매매 설정은 변경하지 않습니다.</p>",
+            "<p>표시 테마만 바꿉니다. 매매 설정은 변경하지 않습니다.</p>"
+            '<p><a href="/live?onboard=again">처음 안내 다시 보기</a></p>',
         )
         + f'{_guide()}</nav><div class="orbit-tools">'
         '<button type="button" popovertarget="orbit-status" aria-label="확인할 사항">'
@@ -108,88 +144,448 @@ def layout(body: str, theme: str) -> str:
     )
 
 
-def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> str:
+def _change(value: float, base: float, hide: bool = False) -> str:
+    diff = value - base
+    if hide:
+        return f'<span class="mute"><b>{_HIDDEN}원</b><small>{_HIDDEN}</small></span>'
+    cls = "pos" if diff > 0 else "neg" if diff < 0 else "mute"
+    pct = f"<small>{diff / base:+.2%}</small>" if base > 0 else ""
+    return f'<span class="{cls}"><b>{diff:+,.0f}원</b>{pct}</span>'
+
+
+def _est(on: bool) -> str:
+    return '<em class="orbit-est" title="시세·환율이 없어 원가로 셈">추정</em>' if on else ""
+
+
+# ---------------------------------------------------------------- 그래프 (기록만)
+
+
+def _nav_points(
+    rows: Sequence[Mapping[str, Any]], key: str | None = None
+) -> list[tuple[str, float, float, float]]:
+    """기록 → (날짜, 평가액, 기준 금액, 투자 성과 지수 1.0 시작). 입금 · 출금은 수익에서 뺀다."""
+    out: list[tuple[str, float, float, float]] = []
+    nav, prev_v, prev_d = 1.0, 0.0, 0.0
+    for r in rows:
+        src = r if key is None else (r.get("books") or {}).get(key)
+        if not isinstance(src, Mapping) or src.get("priced") is False:
+            continue  # 시세 없이 원가로 셈한 날(추정)은 그래프에 쓰지 않는다
+        try:
+            v, dep = float(src["value"]), float(src["deposits"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if out and prev_v > 0:
+            nav *= (v - (dep - prev_d)) / prev_v
+        out.append((str(r["date"]), v, dep, nav))
+        prev_v, prev_d = v, dep
+    return out
+
+
+def _svg_line(
+    points: Sequence[tuple[str, float]],
+    *,
+    base: Sequence[float] | None = None,
+    label: str,
+    fmt: str,
+    hide_axis: bool,
+) -> str:
+    w, h, left, right, top, bottom = 620, 170, 62, 14, 12, 26
+    vals = [v for _, v in points] + list(base or [])
+    lo, hi = min(vals), max(vals)
+    pad = (hi - lo) * 0.12 or abs(hi) * 0.02 or 1.0
+    lo, hi = lo - pad, hi + pad
+    n = len(points)
+
+    def px(i: int) -> float:
+        return left + (i / (n - 1)) * (w - left - right)
+
+    def py(v: float) -> float:
+        return top + (hi - v) / (hi - lo) * (h - top - bottom)
+
+    parts = [
+        f'<svg class="orbit-plot-svg" viewBox="0 0 {w} {h}" role="img" '
+        f'aria-label="{escape(label)}">'
+    ]
+    for k in range(3):
+        v = lo + (hi - lo) * k / 2
+        y = py(v)
+        txt = "•••" if hide_axis else fmt.format(v)
+        parts.append(
+            f'<line x1="{left}" x2="{w - right}" y1="{y:.1f}" y2="{y:.1f}" class="grid"/>'
+            f'<text x="{left - 6}" y="{y + 4:.1f}" class="axis" text-anchor="end">{txt}</text>'
+        )
+    for i, anchor in ((0, "start"), (n - 1, "end")):
+        parts.append(
+            f'<text x="{px(i):.1f}" y="{h - 7}" class="axis" text-anchor="{anchor}">'
+            f"{escape(points[i][0][5:].replace('-', '/'))}</text>"
+        )
+    if base:
+        pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(base))
+        parts.append(
+            f'<polyline points="{pts}" class="orbit-plot-base"><title>기준 금액</title></polyline>'
+        )
+    pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, (_, v) in enumerate(points))
+    parts.append(
+        f'<polyline points="{pts}" class="orbit-plot-line">'
+        f"<title>{escape(label)}</title></polyline>"
+    )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
+    pts = _nav_points(history)
+    views = (("asset", "자산 변화"), ("perf", "투자 성과"))
+    head = (
+        '<div class="orbit-panel-heading">'
+        f"<h2>{icon('chart')}자산 변화</h2>"
+        '<div class="orbit-views" role="group" aria-label="그래프 종류">'
+        + "".join(
+            f'<label><input type="radio" name="orbit-view" value="{k}" '
+            f"{'checked' if k == 'asset' else ''}><span>{t}</span></label>"
+            for k, t in views
+        )
+        + '</div><div class="orbit-periods" role="group" aria-label="자산 변화 표시 기간">'
+        + "".join(
+            f'<label><input type="radio" name="orbit-range" value="{code}" '
+            f"{'checked' if code == 'm1' else ''}><span>{word}</span></label>"
+            for code, word, _ in PERIODS
+        )
+        + "</div></div>"
+    )
+    if len(pts) < 2:
+        first = f"{pts[0][0]} 부터 기록 중 · " if pts else ""
+        body = (
+            '<div class="orbit-chart-empty"><span>평가 기록 대기</span>'
+            f"<p>{first}하루 한 번 남기는 실거래 평가 기록이 2일 이상 쌓이면 "
+            "그래프가 그려집니다.</p></div>"
+        )
+    else:
+        last = date.fromisoformat(pts[-1][0])
+        plots = []
+        for code, word, days in PERIODS:
+            sub = [p for p in pts if date.fromisoformat(p[0]) >= last - timedelta(days=days)]
+            for view, title in views:
+                cls = f"orbit-plot p-{code} v-{view}"
+                if len(sub) < 2:
+                    plots.append(
+                        f'<div class="{cls} orbit-chart-empty"><span>{word} 기록 '
+                        f"{len(sub)}일</span></div>"
+                    )
+                    continue
+                if view == "asset":
+                    svg = _svg_line(
+                        [(d, v) for d, v, _, _ in sub],
+                        base=[b for _, _, b, _ in sub],
+                        label=f"{word} {title}",
+                        fmt="{:,.0f}",
+                        hide_axis=hide,
+                    )
+                    cap = (
+                        f"평가액 {_won(sub[0][1], hide)} → {_won(sub[-1][1], hide)}원"
+                        " · 점선은 기준 금액(입금 포함)"
+                    )
+                else:
+                    start = sub[0][3]
+                    perf = [(d, (n / start - 1) * 100) for d, _, _, n in sub]
+                    svg = _svg_line(perf, label=f"{word} {title}", fmt="{:+.1f}%", hide_axis=False)
+                    cap = f"입출금 뺀 수익률 {perf[-1][1]:+.2f}%"
+                plots.append(f'<div class="{cls}">{svg}<p class="orbit-plot-cap">{cap}</p></div>')
+        body = f'<div class="orbit-plots">{"".join(plots)}</div>'
+    return (
+        '<section class="orbit-panel orbit-history">'
+        + head
+        + f'<div data-live="history">{body}</div>'
+        '<p class="orbit-chart-note">실거래 장부만 표시 · 하루 한 번 남긴 평가 기록만 · '
+        "기록 없는 과거는 채우지 않음 · 자산 변화 = 입금으로 늘어난 금액 포함 · "
+        "투자 성과 = 입출금 영향 뺀 수익률</p></section>"
+    )
+
+
+def _spark(history: Sequence[Mapping[str, Any]], key: str) -> str:
+    pts = _nav_points(history, key)[-30:]
+    if len(pts) < 2:
+        return '<div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div>'
+    perf = [n for _, _, _, n in pts]
+    lo, hi = min(perf), max(perf)
+    span = (hi - lo) or 1.0
+    xy = " ".join(
+        f"{i / (len(perf) - 1) * 90 + 1:.1f},{32 - (v - lo) / span * 28:.1f}"
+        for i, v in enumerate(perf)
+    )
+    cls = "pos" if perf[-1] >= perf[0] else "neg"
+    return (
+        f'<svg class="orbit-spark {cls}" viewBox="0 0 92 34" role="img" '
+        f'aria-label="최근 {len(perf)}일 투자 성과"><polyline points="{xy}"/></svg>'
+    )
+
+
+# ---------------------------------------------------------------- 카드 · 종목 상세
+
+
+def _holding_popup(book: Book, j: int, quotes: Quotes, hide: bool) -> tuple[str, str]:
+    h = book.holdings[j]
+    pid = f"orbit-h-{book.key}-{j}"
+    unit = "주" if book.key != "cruise" else ""
+    avg = h.cost_krw / h.qty if h.qty > 0 else 0.0
+    rows = [
+        ("보유 수량", _HIDDEN if hide else f"{h.qty:,.8g}{unit}"),
+        ("평균 매입단가", f"{avg:,.0f}원" if avg else "—"),
+    ]
+    if h.value_krw is not None and h.qty > 0:
+        rows.append(("현재 가격", f"{h.value_krw / h.qty:,.0f}원"))
+        usd = quotes.usd.get(h.name)
+        if usd is not None:
+            rows.append(("현재 가격 (달러)", f"${usd:,.2f}"))
+        rows.append(("평가금액", f"{_won(h.value_krw, hide)}원"))
+        rows.append(("평가손익", _change(h.value_krw, h.cost_krw, hide)))
+    else:
+        rows.append(("현재 가격", "시세 미확인"))
+        rows.append(("평가금액", f"{_won(h.cost_krw, hide)}원 {_est(True)}"))
+    rows.append(("가격 기준", _kst(quotes.at_ms) if quotes.at_ms else "시세 없음"))
+    if h.note:
+        rows.append(("메모", escape(h.note)))
+    table = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in rows)
+    body = (
+        f'<dl class="orbit-detail-list" data-live="{pid}">{table}</dl>'
+        "<p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p>"
+    )
+    return pid, _popup(pid, f"{escape(h.name)} 보유 상세", body)
+
+
+def _card(
+    book: Book,
+    quotes: Quotes,
+    index: int,
+    *,
+    recorded: bool = True,
+    hide: bool = False,
+    now_ms: int = 0,
+    history: Sequence[Mapping[str, Any]] = (),
+) -> str:
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
     category, subtitle, glyph = {
         "glide": ("미국 주식", "Glide", "chart"),
         "cruise": ("코인", "Cruise", "coins"),
         "accumulate": ("자동 적립", "자동 적립", "leaf"),
     }.get(key, ("투자 장부", book.title, "wallet"))
+    priced = _priced(book, quotes)
     change = (
-        _change(book.value_krw, book.deposits_krw)
-        if _priced(book, quotes)
+        _change(book.value_krw, book.deposits_krw, hide)
+        if priced
         else ('<span class="mute">시세 확인 후 표시</span>')
     )
     if not recorded:
         change = '<span class="mute">장부 기록 대기</span>'
-    amount = _won(book.value_krw) + "<span>원</span>" if recorded else "—"
-    rows = []
-    for holding in book.holdings:
+    amount = _won(book.value_krw, hide) + "<span>원</span>" + _est(not priced) if recorded else "—"
+    stamp = ""
+    if recorded and book.updated_ms:
+        old = _stale(book, now_ms)
+        stamp = (
+            f'<p class="orbit-card-stamp{" orbit-stale" if old else ""}">'
+            f"장부 업데이트 {_kst(book.updated_ms)}{' · 오래된 기록' if old else ''}</p>"
+        )
+    rows, pops = [], []
+    for j, holding in enumerate(book.holdings):
         symbol = escape(holding.name)
         coin_class = holding.name.lower() if holding.name in _NAMES else "other"
         company = escape(_NAMES.get(holding.name, holding.name))
         value = holding.value_krw if holding.value_krw is not None else holding.cost_krw
         row_pl = (
-            _change(holding.value_krw, holding.cost_krw)
+            _change(holding.value_krw, holding.cost_krw, hide)
             if holding.value_krw is not None
             else ('<span class="mute">시세 미확인</span>')
         )
+        pid, pop = _holding_popup(book, j, quotes, hide)
+        pops.append(pop)
         rows.append(
-            '<li><div class="orbit-holding-name">'
+            f'<li><button type="button" class="orbit-holding-btn" popovertarget="{pid}" '
+            f'aria-label="{symbol} 보유 상세 열기"><div class="orbit-holding-name">'
             f'<span class="orbit-coin coin-{coin_class}">{symbol_icon(holding.name)}</span>'
             f"<div><b>{symbol}</b><small>{company}</small></div>"
             '</div><div class="orbit-holding-value">'
-            f"<b>{_won(value)}원</b>"
-            f"<small>{row_pl}</small></div></li>"
+            f"<b>{_won(value, hide)}원{_est(holding.value_krw is None)}</b>"
+            f"<small>{row_pl}</small></div></button></li>"
         )
     notes = "".join(f"<li>{escape(n)}</li>" for n in (*book.notes, *book.pending))
+    qty_rows = "".join(
+        f"<p>{escape(h.name)} · {_HIDDEN if hide else f'{h.qty:,.8g}'} · {escape(h.note)}</p>"
+        for h in book.holdings
+    )
     return (
         f'<section id="live-book-{index}" class="orbit-card orbit-{key}">'
         '<div class="orbit-card-heading">'
         f'<span class="orbit-category-icon">{icon(glyph)}</span>'
         f"<div><h2>{category}</h2><span>{escape(subtitle)}</span></div>"
         "</div>"
-        '<div class="orbit-card-summary"><div>'
-        f"<strong>{amount}</strong><p>{change}</p></div>"
-        '<div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div>'
+        f'<div class="orbit-card-summary" data-live="card-{key}-summary"><div>'
+        f"<strong>{amount}</strong><p>{change}</p>{stamp}</div>"
+        f"{_spark(history, book.key)}</div>"
         f'<div class="orbit-row-label"><span>보유 종목 ({len(book.holdings)}개)</span>'
-        '<span>평가금액</span></div><ul class="orbit-holdings">'
+        "<span>평가금액</span></div>"
+        f'<ul class="orbit-holdings" data-live="card-{key}-holdings">'
         f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}</ul>"
-        '<details class="orbit-book-detail"><summary aria-label="보유 수량과 장부 메모">'
+        + "".join(pops)
+        + '<details class="orbit-book-detail"><summary aria-label="보유 수량과 장부 메모">'
         '<span class="orbit-detail-open">보유 상세 ›</span>'
-        '<span class="orbit-detail-close">보유 상세 닫기 ×</span></summary><div>'
-        + "".join(
-            f"<p>{escape(h.name)} · {h.qty:,.8g} · {escape(h.note)}</p>" for h in book.holdings
-        )
-        + f"<p>현금 {_won(book.cash_krw)}원</p>"
+        '<span class="orbit-detail-close">보유 상세 닫기 ×</span></summary>'
+        f'<div data-live="card-{key}-detail">'
+        + qty_rows
+        + f"<p>현금 {_won(book.cash_krw, hide)}원</p>"
         + f"<ul>{notes}</ul><p>장부 기준 · 세금 전 · "
-        f"{'평가액' if _priced(book, quotes) else '추정 평가액'}</p></div></details></section>"
+        f"{'평가액' if priced else '추정 평가액'}</p></div></details></section>"
     )
 
 
-def _change(value: float, base: float) -> str:
-    diff = value - base
-    cls = "pos" if diff > 0 else "neg" if diff < 0 else "mute"
-    pct = f"<small>{diff / base:+.2%}</small>" if base > 0 else ""
-    return f'<span class="{cls}"><b>{diff:+,.0f}원</b>{pct}</span>'
+# ---------------------------------------------------------------- 거래 내역
 
 
-def _activity_rows(activities: list[tuple[str, str, str]]) -> str:
+def _trade_rows(trades: Sequence[Trade], hide: bool) -> str:
     out = []
-    for date, text, _key in activities:
-        sym = next((s for s in _NAMES if s in text), "")
-        cls = sym.lower() if sym in _NAMES else "other"
+    for t in trades:
+        sym = t.symbol if t.symbol in _NAMES else ""
+        cls = sym.lower() if sym else "other"
+        word = _KIND_WORD.get(t.kind, t.kind)
+        usd = t.currency == "USD"
+        cur, won = ("$", "") if usd else ("", "원")
+        digits = 2 if usd else 0
+
+        def money(x: float, d: int, *, cur: str = cur, won: str = won) -> str:
+            return _HIDDEN if hide else f"{cur}{x:,.{d}f}{won}"
+
+        if t.kind == "deposit":
+            title = f"{word} {money(t.amount, 0)}"
+            info = [t.note] if t.note else []
+        else:
+            qty = _HIDDEN if hide else f"{t.qty:,.8g}{'주' if usd else ''}"
+            title = f"{escape(t.symbol)} {word} {qty}"
+            info = []
+            if t.price:
+                head = "체결가" if t.status == "체결" else "가격"
+                info.append(f"{head} {cur}{t.price:,.{digits}f}{won}")
+            if t.amount:
+                info.append(f"금액 {money(t.amount, digits)}")
+            if t.fee:
+                small = not usd and t.fee < 1 and not hide
+                info.append(
+                    "수수료 1원 미만" if small else f"수수료 {money(t.fee, 2 if usd else 0)}"
+                )
+            if t.note:
+                info.append(t.note)
+        if t.status == "체결":
+            state_cls = "done"
+        elif t.kind == "deposit":
+            state_cls = "deposit"
+        elif "대기" in t.status:
+            state_cls = "wait"
+        else:
+            state_cls = "other"
+        sub = escape(t.date) + (" · " + escape(" · ".join(info)) if info else "")
         out.append(
-            f'<li><span class="orbit-coin coin-{cls}">{symbol_icon(sym)}</span>'
-            f"<div><b>{escape(text)}</b><small>{escape(date)}</small></div>"
-            '<span class="orbit-trade-state">'
-            f"{'입금 기록' if '입금' in text else '저장 체결'}</span></li>"
+            f'<li class="kind-{escape(t.kind)}">'
+            f'<span class="orbit-coin coin-{cls}">{symbol_icon(sym)}</span>'
+            f"<div><b>{title}</b><small>{sub}</small></div>"
+            f'<span class="orbit-trade-state state-{state_cls}">{escape(t.status)}</span></li>'
         )
     return "".join(out)
 
 
-def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
+def _trades_panel(trades: Sequence[Trade], hide: bool) -> str:
+    filt = (
+        '<div class="orbit-trade-filter" role="group" aria-label="거래 종류">'
+        + "".join(
+            f'<label><input type="radio" name="orbit-trade-filter" id="tf-{k}" value="{k}" '
+            f"{'checked' if k == 'all' else ''}><span>{w}</span></label>"
+            for k, w in (("all", "전체"), ("buy", "매수"), ("sell", "매도"), ("deposit", "입금"))
+        )
+        + "</div>"
+    )
+    rows = _trade_rows(trades, hide) or "<li>아직 거래 기록이 없습니다.</li>"
+    recent = _trade_rows(trades[:5], hide) or "<li>아직 거래·입금 기록이 없습니다.</li>"
+    return (
+        '<section class="orbit-panel orbit-recent" id="orbit-recent">'
+        '<div class="orbit-panel-heading">'
+        f"<h2>{icon('log')}거래 내역 <small>(최근 5건)</small></h2>"
+        '<button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">'
+        "전체 보기 ›</button>"
+        + _popup(
+            "orbit-all-trades",
+            "거래 내역",
+            filt + f'<ul class="orbit-trades-list" data-live="trades-all">{rows}</ul>'
+            "<p class='orbit-detail-foot'>체결 = 거래소가 체결을 돌려준 기록 · "
+            "접수 = 주문은 들어갔고 체결 확인 대기 · "
+            "체결 없음 = 즉시 체결 주문이 체결되지 않음</p>",
+        )
+        + "</div>"
+        f'<ul data-live="trades-recent">{recent}</ul></section>'
+    )
+
+
+# ---------------------------------------------------------------- 연결 계좌 · 처음 안내
+
+
+def _accounts(books: Sequence[Book], now_ms: int) -> str:
+    by_key = {b.key: b for b in books}
+    rows = []
+    for key, name, venue in (
+        ("glide", "Glide", "토스증권 · 미국 주식"),
+        ("cruise", "Cruise", "업비트 · 코인"),
+        ("accumulate", "자동 적립", "토스증권 · 주식 모으기"),
+    ):
+        b = by_key.get(key)
+        if b is None:
+            state, cls = "연결 미확인 · 장부 없음", "other"
+        elif not b.updated_ms:
+            state, cls = "저장 장부만 표시 · 저장 시각 모름", "other"
+        elif _stale(b, now_ms):
+            state, cls = f"오래된 장부 · {_kst(b.updated_ms)} — 매매 프로그램 확인 필요", "wait"
+        else:
+            state, cls = f"마지막 조회 성공 · {_kst(b.updated_ms)}", "done"
+        rows.append(
+            f"<li><div><b>{name}</b><small>{venue}</small></div>"
+            f'<span class="orbit-trade-state state-{cls}">{escape(state)}</span></li>'
+        )
+    return _popup(
+        "orbit-accounts",
+        "연결 계좌",
+        f'<ul class="orbit-accounts-list" data-live="accounts">{"".join(rows)}</ul>'
+        "<p>‘마지막 조회 성공’은 매매 프로그램이 계좌를 조회한 뒤 장부를 저장한 시각입니다. "
+        "이 화면은 계좌를 새로 조회하지 않고 저장 장부만 표시합니다. "
+        "계좌번호·API 키는 표시하지 않습니다.</p>",
+    )
+
+
+def _onboard() -> str:
+    return (
+        '<section class="orbit-onboard" aria-labelledby="orbit-onboard-title">'
+        '<h2 id="orbit-onboard-title">처음 오셨나요? 세 가지만 보면 됩니다</h2><ol>'
+        "<li><b>화면 설명</b><span>내 자산 = 장부의 현금 + 보유 평가액. "
+        "기준 금액은 넣은 돈입니다. 눈 아이콘으로 금액을 가릴 수 있습니다.</span></li>"
+        "<li><b>계좌 연결</b><span>Glide · 자동 적립은 토스증권, Cruise 는 업비트입니다. "
+        "연결은 매매 프로그램이 하고, 이 화면은 저장 장부만 읽습니다.</span></li>"
+        "<li><b>기록 확인</b><span>장부 업데이트 시각과 거래 내역으로 프로그램이 일했는지 "
+        "봅니다. 오래된 장부는 빨갛게 표시됩니다.</span></li></ol>"
+        '<p class="orbit-onboard-key">이 화면(앱)을 닫아도 매매 프로그램은 멈추지 않습니다 — '
+        "예약 작업으로 따로 돕니다.</p>"
+        '<p class="orbit-onboard-actions"><a href="/live?onboard=done">확인했어요</a>'
+        '<button type="button" popovertarget="orbit-guide">자세히 보기</button></p></section>'
+    )
+
+
+# ---------------------------------------------------------------- 화면
+
+
+def render_live(
+    books: list[Book],
+    quotes: Quotes,
+    now_ms: int,
+    *,
+    hide: bool = False,
+    onboarded: bool = True,
+    history: Sequence[Mapping[str, Any]] | None = None,
+) -> str:
     """승인한 화면의 요소만 표시. 예시 수익/이력/연결 상태를 만들어 넣지 않는다."""
+    hist = list(history or [])
     complete = bool(books) and all(_priced(b, quotes) for b in books)
     value = sum(b.value_krw for b in books)
     base = sum(b.deposits_krw for b in books)
@@ -201,6 +597,9 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
         f"{b.title} · 매수 정지 기록을 확인하세요"
         for b in books
         if any("낙폭 정지 중" in n for n in b.notes)
+    )
+    warnings.extend(
+        f"{b.title} · 장부가 오래됨 ({_kst(b.updated_ms)})" for b in books if _stale(b, now_ms)
     )
     warnings.extend(f"{b.title} · {p}" for b in books for p in b.pending)
     title = (
@@ -221,10 +620,25 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
             "아직 실거래 장부가 없습니다. 기록 없음은 잔고 0원이나 운영 중단을 뜻하지 않습니다."
         )
     else:
-        amount = _won(value) + "<small>원</small>"
-        base_text = _won(base) + "원"
-        change = _change(value, base) if complete else '<span class="mute">시세 확인 필요</span>'
+        amount = _won(value, hide) + "<small>원</small>" + _est(not complete)
+        base_text = _won(base, hide) + "원"
+        change = (
+            _change(value, base, hide) if complete else '<span class="mute">시세 확인 필요</span>'
+        )
     caution = "확정 수익 아님" if complete else "추정치 포함 · 확정 수익 아님"
+    ledger_ms = max((b.updated_ms for b in books), default=0)
+    stale_n = sum(_stale(b, now_ms) for b in books)
+    stamp = (
+        f"장부 업데이트 {_kst(ledger_ms) if ledger_ms else '모름'}"
+        f" · 시세 업데이트 {_kst(quotes.at_ms) if quotes.at_ms else '없음'}"
+        + (f" · 오래된 장부 {stale_n}개" if stale_n else "")
+    )
+    word = "보이기" if hide else "숨기기"
+    eye = (
+        f'<a class="orbit-eye{" on" if hide else ""}" '
+        f'href="/live?amounts={"show" if hide else "hide"}" '
+        f'aria-label="금액 {word}" title="금액 {word}">{icon("eye")}<span>{word}</span></a>'
+    )
     hero = (
         '<section class="orbit-hero">'
         '<div class="orbit-hero-art" aria-hidden="true">'
@@ -233,12 +647,14 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
         '<h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1>'
         "<p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div>"
         '<section class="orbit-networth" id="orbit-assets" aria-labelledby="live-total-title">'
-        f'<div><h2 id="live-total-title">내 자산 {icon("eye")}</h2>'
-        f'<strong class="orbit-total">{amount}</strong></div>'
-        f"<div><span>기준 금액</span><b>{base_text}</b></div>"
-        f"<div><span>평가 차액</span><strong>{change}</strong>"
+        f'<div><h2 id="live-total-title">내 자산 {eye}</h2>'
+        f'<strong data-live="total" class="orbit-total">{amount}</strong></div>'
+        f'<div><span>기준 금액</span><b data-live="base">{base_text}</b></div>'
+        f'<div><span>평가 차액</span><strong data-live="change">{change}</strong>'
         f'<small class="orbit-caution">ⓘ {caution}'
-        "</small></div></section>"
+        "</small></div>"
+        f'<p class="orbit-updated{" orbit-stale" if stale_n else ""}" data-live="updated">'
+        f"{stamp}</p></section>"
         '<button type="button" class="orbit-help-card" popovertarget="orbit-guide">'
         f"<b>{icon('help')} 화면 읽는 법 {icon('arrow')}</b>"
         "<span>이 화면에서<br>무엇을 볼 수 있나요?</span></button></section>"
@@ -258,57 +674,35 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
     status = _popup(
         "orbit-status",
         "확인할 사항",
-        f"<p>{escape(title)}</p><p>{escape(detail)}</p>"
+        f'<div data-live="status"><p>{escape(title)}</p><p>{escape(detail)}</p></div>'
         "<p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p>",
     )
     # 체결 대기 줄만 숨긴다. 시세/정지/장부 결측 경고는 계속 읽을 수 있어야 한다.
     if not pending_count and (warnings or not books):
-        status += f'<p class="orbit-data-note">{escape(detail)}</p>'
+        status += f'<p class="orbit-data-note" data-live="data-note">{escape(detail)}</p>'
     by_key = {b.key: b for b in books}
     cards = "".join(
-        _card(by_key.get(k, Book(k, k, "", 0, 0, ())), quotes, i, recorded=k in by_key)
+        _card(
+            by_key.get(k, Book(k, k, "", 0, 0, ())),
+            quotes,
+            i,
+            recorded=k in by_key,
+            hide=hide,
+            now_ms=now_ms,
+            history=hist,
+        )
         for i, k in enumerate(("glide", "cruise", "accumulate"))
     )
-    charts = (
-        '<section class="orbit-panel orbit-history"><div class="orbit-panel-heading">'
-        f'<h2>{icon("chart")}자산 변화</h2><div class="orbit-periods" role="group" '
-        'aria-label="자산 변화 표시 기간">'
-        + "".join(
-            f'<label><input type="radio" name="orbit-range" value="{p}" '
-            f"{'checked' if p == '1개월' else ''}><span>{p}</span></label>"
-            for p in ("1주", "1개월", "3개월", "6개월", "1년")
-        )
-        + '</div></div><div class="orbit-chart-empty"><span>평가 기록 대기</span>'
-        "<p>전체 실거래의 일별 평가 이력이 없어 아직 그래프를 표시할 수 없습니다.</p>"
-        '</div><p class="orbit-chart-note">총 입금 + 적립 매입원가 기준 · '
-        "실거래 장부만 표시 · 공개 시세 미확인 시 추정 평가액</p></section>"
-    )
-    activities = sorted(
-        ((date, text, b.key) for b in books for date, text in b.activity),
-        key=lambda a: a[0],
-        reverse=True,
-    )
-    activity_rows = _activity_rows(activities[:5])
-    recent = (
-        '<section class="orbit-panel orbit-recent" id="orbit-recent">'
-        '<div class="orbit-panel-heading">'
-        f"<h2>{icon('log')}최근 거래 <small>(최근 5건)</small></h2>"
-        '<button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">'
-        "전체 보기 ›</button>"
-        + _popup(
-            "orbit-all-trades",
-            "전체 거래 기록",
-            '<ul class="orbit-trades-list">'
-            f"{_activity_rows(activities) or '<li>아직 거래 기록이 없습니다.</li>'}"
-            "</ul>",
-        )
-        + "</div>"
-        f"<ul>{activity_rows or '<li>아직 거래·입금 기록이 없습니다.</li>'}</ul></section>"
-    )
+    trades = sorted((t for b in books for t in b.trades), key=lambda t: t.date, reverse=True)
     return (
-        hero
+        ("" if onboarded else _onboard())
+        + hero
         + alert
         + status
+        + _accounts(books, now_ms)
         + f'<div class="orbit-cards">{cards}</div>'
-        + (f'<div class="orbit-bottom">{charts}{recent}</div>')
+        + '<div class="orbit-bottom">'
+        + _history_panel(hist, hide)
+        + _trades_panel(trades, hide)
+        + "</div>"
     )

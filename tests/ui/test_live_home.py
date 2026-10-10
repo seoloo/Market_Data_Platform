@@ -14,6 +14,8 @@ from auto_trading.ui.data import load_dashboard
 from auto_trading.ui.live_home import Book, Quotes, build_books, fetch_quotes, render_live
 from auto_trading.ui.render import render_page
 
+LIVE_SCRIPT = '<script src="/assets/orbit-live.js" defer></script>'
+
 _KST = timezone(timedelta(hours=9))
 _NOW = int(datetime(2026, 10, 9, 22, tzinfo=_KST).timestamp() * 1000)
 _Q = Quotes({"BTC": 110_000_000.0}, {"TQQQ": 80.0, "SCHD": 30.0, "BTQ": 3.0}, 1300.0, _NOW)
@@ -181,7 +183,7 @@ def test_desktop_home_has_explanations_and_read_only_navigation(
         assert f'id="live-book-{i}"' in html
     for excluded in ('href="/research"', 'href="/compare"', 'href="/running"', "토스 적립"):
         assert excluded not in html
-    assert "<script" not in html and "<form" not in html
+    assert html.replace(LIVE_SCRIPT, "").count("<script") == 0 and "<form" not in html
 
 
 def test_missing_prices_hide_aggregate_profit_not_fabricate_a_return(tmp_path: Path) -> None:
