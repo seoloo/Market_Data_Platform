@@ -12,6 +12,7 @@ from html import escape
 from typing import Any
 
 from auto_trading.ops.user_settings import ACC_SYMBOLS, MAX_ITEMS, Change, show
+from auto_trading.ui.settings_extra import EXTRA_CSS
 
 _CSS = """
 .set-wrap{max-width:1180px;margin:0 auto;padding:8px 0 40px}
@@ -116,6 +117,8 @@ top:0;border-radius:0 0 16px 16px;box-shadow:0 4px 14px rgba(16,27,73,.12)}
 """
 
 SECTIONS = (
+    ("keys", "연결 · 키"),
+    ("tasks", "자동 실행"),
     ("goal", "목표 · 보고"),
     ("glide", "Glide"),
     ("cruise", "Cruise"),
@@ -124,6 +127,39 @@ SECTIONS = (
     ("screen", "화면"),
     ("safety", "안전 · 기록"),
 )
+FORM_TABS = ("goal", "glide", "cruise", "toss", "alerts", "screen")
+"""큰 설정 폼(확인 → 저장)을 쓰는 쪽 — 아래 '저장…' 막대는 이 쪽에서만 보인다."""
+
+
+def _tab_css() -> str:
+    """메뉴마다 한 쪽만 보이게 (CSS :target, 스크립트 없음).
+
+    화면을 다시 불러오지 않으니 다른 쪽에서 고치던 값이 그대로 남는다.
+    """
+    keys = [k for k, _ in SECTIONS]
+    first = keys[0]
+    active = ",".join(f'.set-row:has(#set-{k}:target) .set-menu a[href="#set-{k}"]' for k in keys)
+    no_bar = ",".join(
+        f".set-body:has(#set-{k}:target) .set-bar" for k in keys if k not in FORM_TABS
+    )
+    # 쪽을 바꿔도 맨 위(설정 제목)부터 보이게 (scroll-margin 100vh)
+    return (
+        ".set-tab{display:none;flex-direction:column;gap:16px;scroll-margin-top:100vh}"
+        ".set-tab:target{display:flex}"
+        f".set-body:not(:has(.set-tab:target)) #set-{first}{{display:flex}}"
+        f'{active},.set-row:not(:has(.set-tab:target)) .set-menu a[href="#set-{first}"]'
+        "{background:var(--soft);color:var(--blue)}"
+        f"{no_bar},.set-body:not(:has(.set-tab:target)) .set-bar{{display:none}}"
+        # 위 메뉴(오르빗 · 홈 · 설정 …)를 스크롤해도 고정
+        "html[data-page=settings] .topbar{position:sticky;top:0;z-index:30;"
+        "backdrop-filter:blur(10px)}"
+        "html[data-page=settings] .set-menu{top:84px}"
+        # 메뉴와 내용이 좁은 창에서도 나란히 (내용이 아래로 밀려 고정 메뉴에 덮이지 않게)
+        ".set-body{flex-basis:420px}"
+        "@media(max-width:760px){html[data-page=settings] .set-menu{top:64px}}"
+    )
+
+
 _ACC_NOTE = {
     "BTQ": "BTQ Technologies",
     "WQTM": "양자컴퓨팅 ETF",
@@ -187,9 +223,14 @@ def render_settings(
     log: Sequence[Mapping[str, str]] = (),
     holdings: Mapping[str, str] | None = None,
     halt_note: str = "",
+    extra_tabs: Mapping[str, tuple[str, str]] | None = None,
 ) -> str:
-    """``halt_note``: 비상 정지 파일에 적힌 이유(켜져 있을 때 보여 준다)."""
+    """``halt_note``: 비상 정지 파일에 적힌 이유(켜져 있을 때 보여 준다).
+
+    ``extra_tabs``: '연결 · 키' · '자동 실행' 쪽 (쪽 HTML, 큰 폼 밖에 둘 작은 폼) — settings_extra.
+    """
     errors = errors or {}
+    extra_tabs = extra_tabs or {}
     holdings = holdings or {}
     menu = "".join(f'<a href="#set-{k}">{escape(t)}</a>' for k, t in SECTIONS)
     note = ""
@@ -492,8 +533,25 @@ def render_settings(
         '<section class="set-card"><h2>변경 기록</h2>'
         f'<div class="set-log">{log_rows}</div></section>'
     )
+    parts = {
+        "goal": goal,
+        "glide": glide,
+        "cruise": cruise,
+        "toss": toss,
+        "alerts": alerts,
+        "screen": screen,
+        "safety": safety,
+        **{k: v[0] for k, v in extra_tabs.items()},
+    }
+    tabs = "".join(
+        f'<div class="set-tab" id="set-{k}">'
+        + parts.get(k, "").replace(f' id="set-{k}"', "", 1)
+        + "</div>"
+        for k, _ in SECTIONS
+        if k in parts
+    )
     return (
-        f"<style>{_CSS}</style>"
+        f"<style>{_CSS}{EXTRA_CSS}{_tab_css()}</style>"
         '<div class="set-wrap"><div class="set-head"><h1>설정</h1>'
         "<p>바꾼 값은 확인 창을 거쳐 저장되고, 저장한 뒤 <b>다음 실행부터</b> 적용돼요. "
         "연구로 정한 매매 규칙은 잠겨 있어요.</p></div>"
@@ -501,13 +559,14 @@ def render_settings(
         '<form method="post" action="/settings/review">'
         f'<input type="hidden" name="token" value="{escape(token)}">'
         f'<div class="set-row"><nav class="set-menu" aria-label="설정 메뉴">{menu}</nav>'
-        f'<div class="set-body">{goal}{glide}{cruise}{toss}{alerts}{screen}{safety}'
+        f'<div class="set-body">{tabs}'
         '<div class="set-bar"><div><b>저장 전에 바뀌는 값을 한 번 더 보여 드려요</b>'
         "<small>매매 규칙 · 보유는 바뀌지 않아요</small></div>"
         '<div style="display:flex;gap:8px"><a href="/settings">되돌리기</a>'
         '<button type="submit">저장…</button></div></div>'
         "</div></div></form>"
         + "".join(del_forms)  # 삭제 폼은 큰 폼 밖에 (폼 안에 폼을 둘 수 없다)
+        + "".join(v[1] for v in extra_tabs.values())
         + '<form id="halt-f" method="post" action="/settings/halt">'
         f'<input type="hidden" name="token" value="{escape(token)}">'
         f'<input type="hidden" name="action" value="{"off" if halted else "on"}"></form>' + "</div>"

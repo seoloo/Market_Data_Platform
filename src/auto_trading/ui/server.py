@@ -32,13 +32,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from auto_trading.ops import user_settings
+from auto_trading.ops import env_keys, task_setup, user_settings
+from auto_trading.ops.conn_test import run_test
 from auto_trading.ops.kr_accumulate import read_universe
 from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.data import DashboardData, load_dashboard
 from auto_trading.ui.orbit_home import layout as orbit_layout
 from auto_trading.ui.orbit_icons import ICON_ASSETS
 from auto_trading.ui.render import PAGES, render_page
+from auto_trading.ui.settings_extra import keys_tab, tasks_tab
 from auto_trading.ui.settings_page import render_review, render_settings
 
 __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
@@ -105,7 +107,26 @@ class DashboardServer(ThreadingHTTPServer):
         self.catchup = catchup
         self.root = root
         self.settings_token = secrets.token_urlsafe(24)
+        self.key_tests: dict[str, tuple[bool, str]] = {}
+        """설정 '연결 시험' 마지막 결과 (키 · 금액 없는 한 줄)."""
+        self.task_note: tuple[str, str] = ("", "")
+        """설정 '자동 실행' 마지막 결과 (알림, 오류)."""
+        self.task_runner: task_setup.Runner | None = None
+        """시험에서 PowerShell 대신 끼운다."""
+        self._task_cache: tuple[float, dict[str, task_setup.TaskState] | None] = (0.0, None)
         super().__init__(address, _Handler)
+
+    def task_states(self, *, fresh: bool = False) -> dict[str, task_setup.TaskState] | None:
+        """이 PC 의 예약 상태 (20 초 저장). 못 읽으면 None."""
+        at, cached = self._task_cache
+        if not fresh and cached is not None and time.monotonic() - at < 20:
+            return cached
+        try:
+            got = task_setup.status(self.task_runner or task_setup._powershell)
+        except Exception:
+            return None
+        self._task_cache = (time.monotonic(), got)
+        return got
 
     def same_origin(self, origin: str | None, host: str | None) -> bool:
         port = self.server_address[1]
@@ -131,6 +152,9 @@ class _Handler(BaseHTTPRequestHandler):
             query = parse_qs(self.path.partition("?")[2])
             saved_n = (query.get("saved") or [""])[0]
             notice = f"저장했어요 · 바뀐 값 {saved_n}개" if saved_n.isdigit() else ""
+            keys_n = (query.get("keys") or [""])[0]
+            if keys_n.isdigit():
+                notice = f"키 {keys_n}개를 .env 에 저장했어요 (화면에는 다시 보이지 않아요)"
             pick = (query.get("theme") or [""])[0]
             self._settings_page(
                 user_settings.load(self.server.root),
@@ -240,19 +264,40 @@ class _Handler(BaseHTTPRequestHandler):
         notice: str = "",
         *,
         theme: str | None = None,
+        key_errors: dict[str, str] | None = None,
     ) -> None:
         """``theme``: 해 · 달 버튼(?theme=)으로 고른 값 — 화면에 쓰고 쿠키로 기억한다."""
         assert self.server.root is not None
+        root = self.server.root
+        status = env_keys.key_status(root)
+        states = self.server.task_states()
+        defaults = _default_groups(status, states)
+        tnote, terr = self.server.task_note
         body = render_settings(
             values,
             token=self.server.settings_token,
             errors=errors,
             notice=notice,
-            log=user_settings.read_log(self.server.root),
-            halt_note=_halt_note(self.server.root),
+            log=user_settings.read_log(root),
+            halt_note=_halt_note(root),
+            extra_tabs={
+                "keys": keys_tab(
+                    status,
+                    token=self.server.settings_token,
+                    errors=key_errors,
+                    tests=self.server.key_tests,
+                ),
+                "tasks": tasks_tab(
+                    states,
+                    token=self.server.settings_token,
+                    defaults=defaults,
+                    note=tnote,
+                    error=terr,
+                ),
+            },
         )
         self._send(
-            200 if not errors else 400,
+            200 if not (errors or key_errors) else 400,
             orbit_layout(body, theme or self._theme(), "settings"),
             theme=theme,
         )
@@ -274,6 +319,51 @@ class _Handler(BaseHTTPRequestHandler):
         form = {k: v[-1] for k, v in raw.items()}
         if not secrets.compare_digest(form.get("token", ""), self.server.settings_token):
             self._send(403, "<!doctype html><meta charset='utf-8'><p>화면을 새로 고친 뒤 다시</p>")
+            return
+        if self.path == "/settings/keys":  # 값은 .env 로만 · 화면 · 기록에 남기지 않는다
+            updates, key_errors = env_keys.validate(form)
+            if env_keys.TOSS_SWITCH in updates:
+                now_on = bool(env_keys.key_status(root)[env_keys.TOSS_SWITCH]["set"])
+                if (updates[env_keys.TOSS_SWITCH] == "true") == now_on:
+                    updates.pop(env_keys.TOSS_SWITCH)  # 바뀌지 않았으면 쓰지 않는다
+            if key_errors:
+                self._settings_page(user_settings.load(root), {}, key_errors=key_errors)
+                return
+            saved = env_keys.save_keys(root, updates, datetime.now(UTC))
+            self._redirect(f"/settings?keys={len(saved)}#set-keys")
+            return
+        if self.path == "/settings/test":
+            service = form.get("service", "")
+            self.server.key_tests[service] = run_test(root, service)
+            self._redirect("/settings#set-keys")
+            return
+        if self.path == "/settings/tasks":
+            groups = [g for g, _, _ in task_setup.GROUPS if form.get(f"g_{g}") == "on"]
+            action = form.get("action")
+            states = self.server.task_states(fresh=True)
+            runner = self.server.task_runner or task_setup._powershell
+            if not groups:
+                self.server.task_note = ("", "묶음을 하나 이상 골라 주세요")
+            elif states is None:
+                self.server.task_note = ("", "이 PC 의 Windows 예약을 읽지 못했어요")
+            else:
+                try:
+                    if action == "on":
+                        made, enabled = task_setup.register_missing(root, groups, states, runner)
+                        self.server.task_note = (
+                            f"자동 실행 켬 · 새로 만든 예약 {len(made)}개 · 다시 켠 예약 "
+                            f"{len(enabled)}개 (이미 있던 예약은 그대로)",
+                            "",
+                        )
+                    elif action == "off":
+                        off = task_setup.disable(groups, states, runner)
+                        self.server.task_note = (f"자동 실행 끔 · 예약 {len(off)}개 사용 안 함", "")
+                    else:
+                        self.server.task_note = ("", "알 수 없는 요청")
+                except Exception as exc:  # PowerShell 오류 문구에 비밀값은 없다(예약 이름 · 경로)
+                    self.server.task_note = ("", f"예약 등록 실패: {str(exc)[:200]}")
+                self.server.task_states(fresh=True)
+            self._redirect("/settings#set-tasks")
             return
         current = user_settings.load(root)
         if self.path == "/settings/halt":  # 비상 정지는 확인 창을 거친 이 길로만 켜고 끈다
@@ -324,6 +414,9 @@ class _Handler(BaseHTTPRequestHandler):
             "/settings/save",
             "/settings/delete",
             "/settings/halt",
+            "/settings/keys",
+            "/settings/test",
+            "/settings/tasks",
         ):
             self._settings_post()
             return
@@ -421,3 +514,23 @@ def make_server(
         return load_dashboard(root, int(time.time() * 1000))
 
     return DashboardServer((host, port), loader, catchup or CatchupRunner(root), root)
+
+
+def _default_groups(
+    keys: dict[str, dict[str, str | bool]], states: dict[str, task_setup.TaskState] | None
+) -> list[str]:
+    """자동 실행에서 처음 체크해 둘 묶음 — 이 PC 에 이미 켜진 예약이 있거나, 필요한 키가 있으면."""
+    have = {n for n, st in (states or {}).items() if st.state != "Disabled"}
+    out = []
+    for g, _, _ in task_setup.GROUPS:
+        names = {t.name for t in task_setup.TASKS if t.group == g}
+        need = {
+            "glide": ("TOSS_CLIENT_ID",),
+            "toss": ("TOSS_CLIENT_ID",),
+            "cruise": ("UPBIT_API_KEY",),
+            "common": ("TELEGRAM_BOT_TOKEN",),
+            "info": ("TELEGRAM_INFO_BOT_TOKEN",),
+        }.get(g, ())
+        if names & have or (need and all(keys.get(n, {}).get("set") for n in need)):
+            out.append(g)
+    return out

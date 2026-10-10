@@ -245,3 +245,80 @@ def test_theme_route_sets_cookie_only(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def _serve(tmp_path: Path) -> tuple[object, str, str]:
+    server = make_server(tmp_path, port=0, catchup=None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    with urllib.request.urlopen(base + "/settings") as r:
+        token = re.search(r'name="token" value="([^"]+)"', r.read().decode())
+    assert token
+    return server, base, token.group(1)
+
+
+def test_settings_tabs_one_page_per_menu() -> None:
+    html = render_settings(us.load(Path("__nope__")), token="T")
+    assert ".set-tab:target{display:flex}" in html
+    assert html.count('class="set-tab"') == 7  # 키 · 예약 쪽은 서버가 붙인다
+    assert "html[data-page=settings] .topbar{position:sticky" in html
+
+
+def test_keys_route_writes_env_never_echoes(tmp_path: Path) -> None:
+    secret = "fake-toss-id-for-test"
+    server, base, token = _serve(tmp_path)
+    post = TestServer._post
+    try:
+        code, body = post(base, "/settings/keys", {"token": token, "TOSS_CLIENT_ID": secret})
+        assert code == 303
+        assert f"TOSS_CLIENT_ID={secret}" in (tmp_path / ".env").read_text(encoding="utf-8")
+        with urllib.request.urlopen(base + "/settings?keys=1") as r:
+            page = r.read().decode()
+        assert secret not in page and "키 1개를 .env 에 저장했어요" in page
+        bad = "bad value!!"
+        code, body = post(base, "/settings/keys", {"token": token, "UPBIT_API_KEY": bad})
+        assert code == 400 and bad not in body and "형식이 맞지 않아요" in body
+        assert post(base, "/settings/keys", {"token": "x", "TOSS_CLIENT_ID": secret})[0] == 403
+        assert secret not in (tmp_path / "data" / "settings" / "changes.jsonl").read_text(
+            encoding="utf-8"
+        )
+    finally:
+        server.shutdown()  # type: ignore[attr-defined]
+        server.server_close()  # type: ignore[attr-defined]
+
+
+def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
+    from auto_trading.ops import task_setup
+
+    tdir = tmp_path / task_setup.TEMPLATE_DIR
+    tdir.mkdir(parents=True)
+    for t in task_setup.TASKS:
+        (tdir / f"{t.name}.xml").write_text("<Task>{REPO}</Task>", encoding="utf-8")
+    calls: list[str] = []
+    row = {"n": "AutoTrading_Upbit_T2_Live", "s": "Ready", "nx": "", "lr": "", "res": 0}
+    live = json.dumps([row])
+
+    def runner(script: str) -> str:
+        calls.append(script)
+        return live if "Get-ScheduledTask -TaskName 'AutoTrading_*'" in script else ""
+
+    server, base, token = _serve(tmp_path)
+    server.task_runner = runner  # type: ignore[attr-defined]
+    post = TestServer._post
+    try:
+        assert post(base, "/settings/tasks", {"token": token, "action": "on"})[0] == 303
+        assert "하나 이상" in server.task_note[1]  # type: ignore[attr-defined]
+        form = {"token": token, "g_cruise": "on", "action": "on"}
+        assert post(base, "/settings/tasks", form)[0] == 303
+        reg = [c for c in calls if "Register-ScheduledTask" in c]
+        assert len(reg) == 1 and "AutoTrading_Upbit_T2_Weekly" in reg[0]
+        assert "새로 만든 예약 1개" in server.task_note[0]  # type: ignore[attr-defined]
+        assert post(base, "/settings/tasks", {**form, "action": "off"})[0] == 303
+        off = "Disable-ScheduledTask -TaskName 'AutoTrading_Upbit_T2_Live'"
+        assert any(off in c for c in calls)
+        with urllib.request.urlopen(base + "/settings") as r:
+            page = r.read().decode()
+        assert "자동 실행" in page and "Cruise 매매" in page
+    finally:
+        server.shutdown()  # type: ignore[attr-defined]
+        server.server_close()  # type: ignore[attr-defined]
