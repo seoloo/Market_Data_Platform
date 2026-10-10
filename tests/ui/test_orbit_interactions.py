@@ -194,3 +194,16 @@ def test_obi_motion_layer() -> None:
     assert "<script" not in HERO_FX
     assert ".orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{" in _CSS
     assert "prefers-reduced-motion:reduce" in _CSS
+
+
+def test_sleepy_eyes_and_instant_theme_toggle() -> None:
+    from auto_trading.ui.orbit_home import _CSS, HERO_FX
+
+    assert HERO_FX.count('clip-path="url(#obi-eye') == 2  # 다크: 졸린 눈 둘
+    assert 'class="fx-zzz"' in HERO_FX and 'class="fx-flow"' in HERO_FX
+    assert "@keyframes obi-sleepy" in _CSS and "@keyframes obi-zzz" in _CSS
+    shell = layout("", "light")
+    assert 'class="orbit-theme-toggle"' in shell
+    assert 'class="ico-to-dark"' in shell and 'class="ico-to-light"' in shell
+    js = (Path(__file__).parents[2] / "src/auto_trading/ui/assets/orbit-live.js").read_text("utf-8")
+    assert "a.orbit-theme-toggle" in js and '"/theme?set="' in js

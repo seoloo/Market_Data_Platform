@@ -231,3 +231,17 @@ def test_halt_route_on_then_off(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_theme_route_sets_cookie_only(tmp_path: Path) -> None:
+    server = make_server(tmp_path, port=0, catchup=None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/theme?set=dark") as r:
+            assert r.status == 204 and "dashboard_theme=dark" in r.headers.get("Set-Cookie", "")
+        with pytest.raises(urllib.error.HTTPError):
+            urllib.request.urlopen(base + "/theme?set=evil")
+    finally:
+        server.shutdown()
+        server.server_close()

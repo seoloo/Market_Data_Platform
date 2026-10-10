@@ -76,12 +76,22 @@ def fetch_quotes(
             errors.append(f"업비트 시세 실패: {type(exc).__name__}")
     usd: dict[str, float] = {}
     fx: float | None = None
-    for sym in (*tickers, "KRW=X"):
+
+    def one(sym: str) -> float:
+        meta = get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d")[
+            "chart"
+        ]["result"][0]["meta"]
+        return float(meta["regularMarketPrice"])
+
+    # 종목마다 따로 기다리면 화면 열기가 몇 초씩 걸렸다 (2026-10-10) — 한꺼번에 묻는다
+    from concurrent.futures import ThreadPoolExecutor
+
+    names = (*tickers, "KRW=X")
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {sym: pool.submit(one, sym) for sym in names}
+    for sym in names:
         try:
-            meta = get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
-            )["chart"]["result"][0]["meta"]
-            price = float(meta["regularMarketPrice"])
+            price = futures[sym].result()
         except Exception as exc:
             errors.append(f"{sym} 시세 실패: {type(exc).__name__}")
             continue

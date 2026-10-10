@@ -48,13 +48,18 @@ _KIND_WORD = {"buy": "매수", "sell": "매도", "deposit": "입금"}
 _EYES = ((978, 442, 38, 44), (1108, 450, 41, 42))
 """(중심 x, 중심 y, 가로 반지름, 세로 반지름) — 청록 눈 테두리까지 덮는 크기."""
 _TWINKLES = (
-    (640, 182, 0.0),
-    (868, 212, 1.3),
-    (1312, 180, 2.1),
-    (1266, 250, 0.7),
-    (1478, 328, 2.8),
-    (1250, 537, 1.8),
+    (868, 300, 0.0),
+    (1292, 252, 1.2),
+    (1255, 540, 2.0),
+    (1004, 618, 0.6),
+    (1405, 468, 2.7),
+    (822, 470, 1.6),
+    (640, 182, 3.1),
 )
+"""(x, y, 시작 지연 초) — 오비 · 고리 둘레의 하늘 쪽 (배경과 대비가 나는 곳)."""
+_SLEEPY = ((978, 452), (1111, 462))
+"""다크(잠자는 오비) 그림의 감은 눈 중심 — 밝은 그림보다 조금 아래."""
+_FACE_DARK = "#071a52"
 
 
 def _star(x: int, y: int, r: int) -> str:
@@ -64,29 +69,56 @@ def _star(x: int, y: int, r: int) -> str:
     )
 
 
+def _sleepy_eye(x: int, y: int, i: int) -> str:
+    """반쯤 뜬 졸린 눈: 감은 선을 얼굴색으로 덮고, 위 절반을 눈꺼풀로 가린 청록 눈."""
+    return (
+        f'<ellipse cx="{x}" cy="{y}" rx="44" ry="26" fill="{_FACE_DARK}"/>'
+        f'<clipPath id="obi-eye{i}"><ellipse cx="{x}" cy="{y}" rx="33" ry="30"/></clipPath>'
+        f'<g clip-path="url(#obi-eye{i})">'
+        f'<ellipse cx="{x}" cy="{y}" rx="33" ry="30" fill="#36dbe8"/>'
+        f'<ellipse cx="{x}" cy="{y + 5}" rx="23" ry="23" fill="#08133a"/>'
+        f'<circle cx="{x + 8}" cy="{y + 1}" r="6" fill="#ffffff"/>'
+        f'<rect x="{x - 40}" y="{y - 40}" width="80" height="38" fill="{_FACE_DARK}"/></g>'
+        f'<path d="M{x - 34} {y - 1}Q{x} {y - 9} {x + 34} {y - 1}" fill="none" '
+        'stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/>'
+    )
+
+
 HERO_FX = (
     '<svg class="orbit-hero-fx" viewBox="0 0 1536 1024" aria-hidden="true" focusable="false">'
     '<defs><filter id="obi-glow" x="-20%" y="-50%" width="140%" height="200%">'
-    '<feGaussianBlur stdDeviation="14"/></filter></defs>'
-    '<g class="fx-awake">'
+    '<feGaussianBlur stdDeviation="14"/></filter>'
+    '<filter id="obi-spark" x="-100%" y="-100%" width="300%" height="300%">'
+    '<feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/>'
+    '<feMergeNode in="SourceGraphic"/></feMerge></filter>'
+    # 고리 앞쪽(아래 절반)만 — 뒤쪽 빛이 오비 얼굴 위로 지나가지 않게
+    '<clipPath id="obi-front"><rect x="700" y="548" width="800" height="200" '
+    'transform="rotate(-11 1075 556)"/></clipPath></defs>'
+    '<g class="fx-glow" clip-path="url(#obi-front)">'
     '<ellipse class="fx-ring" cx="1075" cy="556" rx="300" ry="78" '
     'transform="rotate(-11 1075 556)" filter="url(#obi-glow)"/>'
+    '<ellipse class="fx-flow" cx="1075" cy="556" rx="300" ry="78" '
+    'transform="rotate(-11 1075 556)" filter="url(#obi-spark)"/></g>'
+    + "".join(
+        f'<path class="fx-twinkle" style="animation-delay:{d}s" d="{_star(x, y, 26)}" '
+        'filter="url(#obi-spark)"/>'
+        for x, y, d in _TWINKLES
+    )
+    + '<g class="fx-awake">'
     + "".join(
         f'<ellipse class="fx-lid" cx="{x}" cy="{y}" rx="{rx}" ry="{ry}"/>'
         f'<path class="fx-shut" d="M{x - rx + 8} {y + 4}'
         f'Q{x} {y + ry // 2 + 6} {x + rx - 8} {y + 4}"/>'
         for x, y, rx, ry in _EYES
     )
-    + "".join(
-        f'<path class="fx-twinkle" style="animation-delay:{d}s" d="{_star(x, y, 18)}"/>'
-        for x, y, d in _TWINKLES
-    )
     + "</g>"
-    '<g class="fx-sleep">'
+    '<g class="fx-sleep"><g class="fx-zzz">'
     '<text class="fx-z" x="1248" y="420">z</text>'
     '<text class="fx-z" x="1282" y="388" style="animation-delay:1.1s">z</text>'
-    '<text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text>'
-    "</g></svg>"
+    '<text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text></g>'
+    '<g class="fx-sleepy">'
+    + "".join(_sleepy_eye(x, y, i) for i, (x, y) in enumerate(_SLEEPY))
+    + "</g></g></svg>"
 )
 
 
@@ -190,10 +222,13 @@ def layout(body: str, theme: str, active: str = "live") -> str:
             if active == "live"
             else ""
         )
-        + f'<a href="/{active}?theme={"dark" if theme == "light" else "light"}" '
+        + '<a class="orbit-theme-toggle" '
+        f'href="/{active}?theme={"dark" if theme == "light" else "light"}" '
         f'aria-label="{"다크" if theme == "light" else "라이트"} 모드로 전환" '
         f'title="{"다크" if theme == "light" else "라이트"} 모드로 전환">'
-        f"{icon('moon' if theme == 'light' else 'sun')}</a>"
+        # 해 · 달 둘 다 넣고 테마에 따라 하나만 보인다 — 스크립트가 다시 불러오지 않고 바로 바꾼다
+        f'<span class="ico-to-dark">{icon("moon")}</span>'
+        f'<span class="ico-to-light">{icon("sun")}</span></a>'
         f'</div></div><main class="orbit-main">{body}</main></body></html>'
     )
 

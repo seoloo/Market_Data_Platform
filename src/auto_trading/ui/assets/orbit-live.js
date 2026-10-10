@@ -41,4 +41,26 @@
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) tick();
   });
+
+  // 테마 버튼: 화면을 다시 불러오지 않고 그 자리에서 바꾼다 (다시 불러오면 공개 시세를 새로
+  // 받느라 몇 초 걸려 '씹힌' 것처럼 보였다, 2026-10-10). 기억은 /theme 이 쿠키로 남긴다.
+  var HERO = { light: "/assets/orbit-hero-light.png", dark: "/assets/orbit-hero-dark-sleep.png" };
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a.orbit-theme-toggle") : null;
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    var root = document.documentElement;
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    document.querySelectorAll("img.orbit-hero-cat").forEach(function (img) {
+      img.setAttribute("src", HERO[next]);
+    });
+    var label = (next === "dark" ? "라이트" : "다크") + " 모드로 전환";
+    a.setAttribute("href", location.pathname + "?theme=" + (next === "dark" ? "light" : "dark"));
+    a.setAttribute("aria-label", label);
+    a.setAttribute("title", label);
+    fetch("/theme?set=" + next, { credentials: "same-origin", cache: "no-store" }).catch(
+      function () {}
+    );
+  });
 })();

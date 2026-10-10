@@ -120,6 +120,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/theme":  # 오르빗 테마 버튼이 화면을 다시 불러오지 않고 기억만 남긴다
+            pick = (parse_qs(self.path.partition("?")[2]).get("set") or [""])[0]
+            if pick not in {"light", "dark"}:
+                self._send(400, "<!doctype html><meta charset='utf-8'><p>light · dark 만</p>")
+                return
+            self._send_bytes(204, b"", "text/plain; charset=utf-8", theme=pick)
+            return
         if path == "/settings" and self.server.root is not None:
             query = parse_qs(self.path.partition("?")[2])
             saved_n = (query.get("saved") or [""])[0]
