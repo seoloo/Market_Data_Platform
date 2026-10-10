@@ -91,12 +91,14 @@ def simulate_cruise(
     tax: bool = True,
     lag: int = 0,
     stop: str | None = None,
+    signal_px: Mapping[str, Mapping[str, float]] | None = None,
 ) -> dict[str, Any]:
     """일간 모의 Cruise 계좌 (순수). ``lag`` 1 이면 종가 d 목표를 종가 d+1 에 체결(190 틀 점검용).
 
     ``stop`` (199): 계좌 NAV 낙폭 30% 면 새 매수를 멈춘다(실거래와 같다). 풀기 —
     ``"never"`` 안 풂 · ``"days30"`` · ``"days90"`` 그만큼 지나면 · ``"trend"`` BTC 종가가 20 · 60 · 120 일
     전보다 모두 높은 첫날. 풀 때 NAV 를 새 고점으로. ``None`` 이면 정지 없음(197 그대로).
+    ``signal_px`` (200 진단): 비중 신호를 이 가격으로 계산하고 체결 · 평가는 ``px`` 로. 없으면 ``px``.
     """
     coins = list(px)
     qty = dict.fromkeys(coins, 0.0)
@@ -122,9 +124,10 @@ def simulate_cruise(
         return cash + sum(qty[c] * px[c][d] for c in coins if qty[c])
 
     for i, d in enumerate(days):
+        sig = px if signal_px is None else signal_px
         for c in coins:
-            if d in px[c]:
-                hist[c].append(px[c][d])
+            if d in sig[c]:
+                hist[c].append(sig[c][d])
         if d < start:
             continue
         prev = days[i - 1] if i else d

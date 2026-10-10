@@ -87,3 +87,11 @@ def test_stop_blocks_buys_until_release() -> None:
     assert never["halts"] == 1 and never["halted_days"] > d30["halted_days"]
     assert never["vals"][-1] < d30["vals"][-1]  # 안 풀면 다시 오를 때 못 탄다
     assert base["vals"] == simulate_cruise(days, px, start=days[200], stop=None)["vals"]
+
+
+def test_signal_px_same_as_px_changes_nothing() -> None:
+    days = [(date(2020, 1, 1) + timedelta(days=i)).isoformat() for i in range(400)]
+    px = {"BTC": {d: 100 * 1.003**i * (1.02 if i % 3 else 0.98) for i, d in enumerate(days)}}
+    a = simulate_cruise(days, px, start=days[150])
+    b = simulate_cruise(days, px, start=days[150], signal_px=px)
+    assert a["vals"] == b["vals"]
