@@ -68,8 +68,17 @@ color:#12509c}
 .set-badge.kr{background:#fff1e0;color:#8a4b00}
 .set-acc .set-input{min-height:44px;width:130px}
 .set-acc b{min-width:64px}
-.set-rm{display:flex;align-items:center;gap:4px;font-size:13px;color:#a3283c;cursor:pointer;
-min-height:44px}
+.set-del{min-height:44px;padding:0 14px;border:1px solid #f0c4cb;border-radius:12px;
+background:#fdecee;color:#a3283c;font:inherit;font-weight:800;cursor:pointer}
+.set-modal{border:0;border-radius:20px;padding:24px 26px;max-width:420px;width:calc(100% - 40px);
+background:var(--surface);color:var(--ink);box-shadow:0 18px 48px rgba(16,27,73,.35)}
+.set-modal::backdrop{background:rgba(6,13,39,.45)}
+.set-modal h3{margin:0 0 8px;font-size:20px}
+.set-modal p{margin:0 0 18px;color:var(--muted);font-size:14px}
+.set-modal div{display:flex;justify-content:flex-end;gap:8px}
+.set-modal button{min-height:46px;padding:0 20px;border-radius:12px;font:inherit;font-weight:800;
+cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.set-modal button.set-danger-btn{border:0;background:#c23a4f;color:#fff}
 .set-add{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 0;
 border-bottom:1px solid var(--line)}
 .set-add .set-input{min-height:46px}
@@ -292,12 +301,20 @@ def render_settings(
         )
     )
     rows = []
+    del_forms: list[str] = []
 
     def acc_row(key: str, mkt: str, sym: str, note: str, amount: float, on: bool, rm: bool) -> str:
+        """한 줄 + [삭제] → '정말 삭제하시겠습니까?' 창(팝오버, 스크립트 없음) → 따로 둔 작은 폼."""
         kr = mkt == "KR"
         err = errors.get(f"{key}.{'daily' if key.startswith('x.') else 'usd'}")
         name = f"{key}.daily" if key.startswith("x.") else f"{key}.usd"
         shown = f"{amount:,.0f}" if kr else f"{amount:g}"
+        pid = "del-" + key.replace(".", "-")
+        del_forms.append(
+            f'<form id="{pid}-f" method="post" action="/settings/delete">'
+            f'<input type="hidden" name="token" value="{escape(token)}">'
+            f'<input type="hidden" name="key" value="{escape(key)}"></form>'
+        )
         return (
             f'<div class="set-acc"><span class="set-badge{" kr" if kr else ""}">'
             f"{'국내' if kr else '미국'}</span><b>{escape(sym)}</b><small>{escape(note)}"
@@ -307,8 +324,14 @@ def render_settings(
             f'<input name="{name}" value="{shown}" inputmode="decimal" '
             f'aria-label="{escape(sym)} 하루 금액"></div>'
             f"{_switch(f'{key}.on', on)}"
-            f'<label class="set-rm"><input type="checkbox" name="{key}.removed" value="on"'
-            f"{' checked' if rm else ''}> 빼기</label>"
+            f'<button type="button" class="set-del" popovertarget="{pid}">삭제</button>'
+            f'<div popover id="{pid}" class="set-modal" role="alertdialog" '
+            f'aria-labelledby="{pid}-t"><h3 id="{pid}-t">정말 삭제하시겠습니까?</h3>'
+            f"<p>{escape(note.split(' · ')[0])}({escape(sym)}) 적립을 내일부터 멈추고 목록에서 "
+            "지워요. 이미 산 주식과 그동안의 기록은 그대로예요.</p>"
+            f'<div><button type="button" popovertarget="{pid}" popovertargetaction="hide">'
+            f'취소</button><button type="submit" form="{pid}-f" class="set-danger-btn">'
+            "삭제</button></div></div>"
             + (f'<p class="set-err" style="flex-basis:100%">{escape(err)}</p>' if err else "")
             + "</div>"
         )
@@ -458,7 +481,9 @@ def render_settings(
         "<small>매매 규칙 · 보유는 바뀌지 않아요</small></div>"
         '<div style="display:flex;gap:8px"><a href="/settings">되돌리기</a>'
         '<button type="submit">저장…</button></div></div>'
-        "</div></div></form></div>"
+        "</div></div></form>"
+        + "".join(del_forms)  # 삭제 폼은 큰 폼 밖에 (폼 안에 폼을 둘 수 없다)
+        + "</div>"
     )
 
 

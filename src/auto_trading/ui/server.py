@@ -268,6 +268,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(403, "<!doctype html><meta charset='utf-8'><p>화면을 새로 고친 뒤 다시</p>")
             return
         current = user_settings.load(root)
+        if self.path == "/settings/delete":  # '정말 삭제하시겠습니까?' 창에서 이미 확인함
+            flag = f"{form.get('key', '')}.removed"
+            if flag not in current or current[flag]:
+                self._send(400, "<!doctype html><meta charset='utf-8'><p>없는 종목</p>")
+                return
+            new = {**current, flag: True}
+            changes = user_settings.diff(current, new)
+            user_settings.apply(root, changes, datetime.now(UTC), new=new)
+            self._redirect(f"/settings?saved={len(changes)}#set-toss")
+            return
         universe = read_universe(root / "data" / "toss" / "universe.json")
         new, errors = user_settings.validate(form, current, universe)
         if errors:
@@ -279,8 +289,11 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, orbit_layout(body, self._theme(), "settings"))
             return
         user_settings.apply(root, changes, datetime.now(UTC), new=new)
+        self._redirect(f"/settings?saved={len(changes)}")
+
+    def _redirect(self, location: str) -> None:
         self.send_response(303)
-        self.send_header("Location", f"/settings?saved={len(changes)}")
+        self.send_header("Location", location)
         self.send_header("Content-Length", "0")
         for name, value in _HEADERS.items():
             self.send_header(name, value)
@@ -288,7 +301,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """놓친 작업 다시 실행 버튼 · 설정 화면(확인 → 저장)만 받는다."""
-        if self.path in ("/settings/review", "/settings/save"):
+        if self.path in ("/settings/review", "/settings/save", "/settings/delete"):
             self._settings_post()
             return
         if self.path != "/catchup" or self.server.catchup is None:

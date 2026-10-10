@@ -113,7 +113,11 @@ def test_page_shows_added_rows_and_errors(tmp_path: Path) -> None:
     v = us.load(tmp_path)
     html = render_settings(v, token="T", errors={"new.query": "찾지 못했어요"})
     assert 'name="x.KR.069500.daily" value="3,000"' in html
-    assert 'name="x.KR.069500.removed"' in html and 'name="acc.BTQ.removed"' in html
+    assert 'popovertarget="del-x-KR-069500">삭제</button>' in html
+    assert "정말 삭제하시겠습니까?" in html and 'form="del-x-KR-069500-f"' in html
+    assert '<form id="del-acc-BTQ-f" method="post" action="/settings/delete">' in html
+    big = html.split('<form method="post" action="/settings/review">')[1].split("</form>")[0]
+    assert "/settings/delete" not in big  # 삭제 폼은 큰 폼 밖에
     assert 'name="new.query"' in html and "찾지 못했어요" in html
     assert "준비 중</span></div>" not in html.split('id="set-toss"')[1].split("</section>")[0]
 
@@ -127,3 +131,48 @@ def test_won_sign_and_add_button(tmp_path: Path) -> None:
     assert "<span>하루 ₩</span>" in row and "원</span>" not in row
     assert '<button type="submit" class="set-add-btn">+ 추가</button>' in html
     assert us.show("x.KR.005930.daily", 7000) == "₩7,000"
+
+
+def test_delete_route(tmp_path: Path) -> None:
+    import re
+    import threading
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    from auto_trading.ui.server import make_server
+
+    _save(tmp_path, **{"new.mkt": "KR", "new.query": "삼성전자", "new.daily": "1000"})
+    server = make_server(tmp_path, port=0, catchup=None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(form: dict[str, str]) -> int:
+        req = urllib.request.Request(
+            base + "/settings/delete", data=urllib.parse.urlencode(form).encode(), method="POST"
+        )
+        req.add_header("Origin", base)
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a: object, **k: object) -> None:
+                return None
+
+        try:
+            with urllib.request.build_opener(NoRedirect).open(req) as r:
+                return int(r.status)
+        except urllib.error.HTTPError as err:
+            return err.code
+
+    try:
+        with urllib.request.urlopen(base + "/settings") as r:
+            token = re.search(r'name="token" value="([^"]+)"', r.read().decode())
+        assert token
+        assert post({"token": "x", "key": "x.KR.005930"}) == 403
+        assert post({"token": token.group(1), "key": "x.KR.999999"}) == 400
+        assert post({"token": token.group(1), "key": "x.KR.005930"}) == 303
+        assert "x.KR.005930.daily" not in us.load(tmp_path)
+        assert us.acc_history(tmp_path, "005930")[-1][1] == 0.0
+        assert post({"token": token.group(1), "key": "x.KR.005930"}) == 400  # 두 번은 안 됨
+    finally:
+        server.shutdown()
+        server.server_close()
