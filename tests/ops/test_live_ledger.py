@@ -133,8 +133,11 @@ def test_snapshots_and_supabase_upsert_requests(tmp_path: Path) -> None:
     h = calls[0][1]
     assert h["apikey"] == "sb_secret_x" and "Authorization" not in h
     assert "merge-duplicates" in h["Prefer"]
-    legacy = []
-    push_supabase(
-        "https://p.supabase.co", "eyJabc", events, [], lambda u, hd, b: legacy.append(hd) or 201
-    )
+    legacy: list[dict[str, str]] = []
+
+    def post_legacy(url: str, headers: Any, body: list[dict[str, Any]]) -> int:
+        legacy.append(dict(headers))
+        return 201
+
+    push_supabase("https://p.supabase.co", "eyJabc", events, [], post_legacy)
     assert legacy[0]["Authorization"] == "Bearer eyJabc"
