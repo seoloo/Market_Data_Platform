@@ -139,6 +139,10 @@ class Trade:
     status: str = "체결"
     """체결 · 접수(체결 확인 대기) · 체결 없음 · 입금 기록 · 그 밖의 장부 상태."""
     note: str = ""
+    ref: str = ""
+    """기록 DB 고유 번호 (장부 · 주문 번호 · 입금 순서로 고정, 2026-10-10 기록 DB)."""
+    fx: float | None = None
+    """원/달러 (장부에 있을 때만 — Glide 입금 · 미국 적립 매수)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,10 +211,12 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
             amount=_f(d[1]),
             status="입금 기록",
             note=f"${_f(d[2]):,.2f} 환전 · {_f(d[3]):,.1f}원/$",
+            ref=f"glide:deposit:{d[0]}:{i}",
+            fx=_f(d[3]) or None,
         )
-        for d in deposits
+        for i, d in enumerate(deposits)
     ]
-    for o in state.get("orders") or []:
+    for oi, o in enumerate(state.get("orders") or []):
         sym = str(o.get("symbol"))
         filled = _f(o.get("filled_qty"))
         status = str(o.get("status") or "")
@@ -232,6 +238,8 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 "USD",
                 state_text,
                 "" if filled > 0 else f"지정가 ${_f(o.get('limit')):,.2f}",
+                ref="glide:order:"
+                + str(o.get("client_id") or o.get("order_id") or f"{o.get('date')}-{sym}-{oi}"),
             )
         )
         if filled > 0:
@@ -371,8 +379,15 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         if isinstance(d, list)
     ]
     trades = [
-        Trade(str(d[0]), "deposit", "KRW", amount=_f(d[1]), status="입금 기록")
-        for d in state.get("deposits") or []
+        Trade(
+            str(d[0]),
+            "deposit",
+            "KRW",
+            amount=_f(d[1]),
+            status="입금 기록",
+            ref=f"cruise:deposit:{d[0]}:{i}",
+        )
+        for i, d in enumerate(state.get("deposits") or [])
         if isinstance(d, list)
     ]
     for o in state.get("orders") or []:
@@ -397,6 +412,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 _f(o.get("paid_fee")),
                 "KRW",
                 state_text,
+                ref=f"cruise:order:{o.get('identifier') or o.get('id')}",
             )
         )
     info = {
@@ -436,7 +452,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
             activity += [
                 (str(b.get("date")), f"🛒 {name} {_f(b.get('qty')):g}주 적립") for b in buys
             ]
-            for b in buys:
+            for bi, b in enumerate(buys):
                 n_b = _f(b.get("qty"))
                 trades.append(
                     Trade(
@@ -450,6 +466,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
                         "KRW",
                         "체결",
                         "국내",
+                        ref=f"accumulate:{sym}:buy:{b.get('date')}:{bi}",
                     )
                 )
             n = _f(st.get("last_qty"))
@@ -461,7 +478,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         cost = sum(_f(b.get("cost_usd")) * _f(b.get("fx_rate")) for b in buys)
         total_cost += cost
         activity += [(str(b.get("date")), f"🛒 {sym} {_f(b.get('qty')):g}주 적립") for b in buys]
-        for b in buys:
+        for bi, b in enumerate(buys):
             n_b = _f(b.get("qty"))
             trades.append(
                 Trade(
@@ -475,6 +492,8 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
                     "USD",
                     "체결",
                     f"{_f(b.get('fx_rate')):,.1f}원/$",
+                    ref=f"accumulate:{sym}:buy:{b.get('date')}:{bi}",
+                    fx=_f(b.get("fx_rate")) or None,
                 )
             )
         n = _f(st.get("last_qty"))
