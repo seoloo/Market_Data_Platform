@@ -400,6 +400,12 @@ def combo_stats(parts: Sequence[tuple[dict[str, float], dict[str, float]]]) -> d
         navs.append(v / units if units > 0 else 1.0)
         prev_paid = p
     out: dict[str, Any] = {"mdd": mdd(navs)}
+    # 201: 달 단위 가치 수익의 연 샤프(금리 0) — 192 와 같은 잣대
+    rets = [b / a - 1 for a, b in pairwise(navs) if a > 0]
+    if len(rets) > 1:
+        m = sum(rets) / len(rets)
+        sd = math.sqrt(sum((r - m) ** 2 for r in rets) / (len(rets) - 1))
+        out["sharpe"] = m / sd * math.sqrt(12) if sd > 0 else None
     for h in HORIZONS:
         k = h * 12 - 1
         out[f"x{h}"] = val[k] / paid[k] if k < len(months) and paid[k] else None
