@@ -79,7 +79,9 @@ background:var(--surface);color:var(--ink);box-shadow:0 18px 48px rgba(16,27,73,
 .set-modal button{min-height:46px;padding:0 20px;border-radius:12px;font:inherit;font-weight:800;
 cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 .set-modal button.set-danger-btn{border:0;background:#c23a4f;color:#fff}
-.set-halt-btn{min-height:48px;padding:0 22px;font-size:15px;margin-top:4px}
+.set-halt-btn{min-height:48px;padding:0 22px;font-size:15px;flex-shrink:0}
+.set-halt-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.set-halt-row .set-note{margin:0;flex:1 1 260px}
 .set-add{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 0;
 border-bottom:1px solid var(--line)}
 .set-add .set-input{min-height:46px}
@@ -478,9 +480,9 @@ def render_settings(
         )
     safety = (
         '<section class="set-card set-danger" id="set-safety"><h2>비상 정지</h2>'
-        f"{state}"
+        f'<div class="set-halt-row">{state}'
         '<button type="button" class="set-del set-halt-btn" popovertarget="halt-ask">'
-        f"{btn}</button>"
+        f"{btn}</button></div>"
         '<div popover id="halt-ask" class="set-modal" role="alertdialog" '
         f'aria-labelledby="halt-ask-t"><h3 id="halt-ask-t">{ask_t}</h3><p>{ask_p}</p>'
         '<div><button type="button" popovertarget="halt-ask" popovertargetaction="hide">취소'
