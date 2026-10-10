@@ -43,6 +43,175 @@
 | 28 | **FLOW 후속 검증: 한국 수급 효과의 분해 + 미국 개별주 기관 보유 변화** | 사용자(2026-10-08) 통과 연구 3번 후속 및 미국 개별주 포함 요청 | **정리 — 보류** (2026-10-08, [감사](FOLLOWUP_26_28_PHASE0_AUDIT.md) §3) | 한국 FLOW 분해는 월 차이 SD 7.5 ~ 7.8% 로 검출 한계 연 26%p → 설명용만 가능 · 당시 업종 출처 없음. 미국 13F 는 폐지 가격 · 당시 CUSIP→티커 무료 미확보로 DATA_NOT_READY. 아래 28번. 한국 PASS의 최근 장세/대형·저회전 효과를 구분. 미국은 SEC 13F 보유 변화라는 별도 가설이며 일별 매수 흐름 아님. 무료 폐지 시세·CUSIP 이력·공시 시점 미확보면 중단 |
 | 29 | **시장·종목 하락 브리핑**: 무료 Gemini + 공식 사건·시장 데이터 + VIX + 미국 대형 시가총액 기업 뉴스 | 사용자(2026-10-08) 하락 원인 도구 검토 → 무료 Gemini 보완·뉴스 입력 범위·VIX·미국 대형주 뉴스 추가 → "ideas에 넣어줘" | **정보 도구 초안 — Phase 0 자료·정확성 감사 / NOT_IMPLEMENTED** | 아래 29번. 뉴스 6개 사건군과 미국 대형주 입력층을 명시. 확인된 사실/원인 후보/확인 불가 구분. 당시 기업 시총·지수 비중·공시 시각·VIX 관측 시각 감사. 가격 기여도≠뉴스 인과성. 유료 구매·새 수집/예약·코드/매매 변경 없음 |
 | 30 | **JEV × Elliott 복수 시나리오 상대 평가**: 같은 인과적 후보 묶음에서 기존 순위 규칙보다 판독을 개선하는가 | 사용자(2026-10-08) TypeSafe $10 충전 안내 → 기존 연구 보완 검토 → "1번으로 할 수있게 ideas에 기록해줘" | **사용자 선택 / Phase 0 / DRAFT / NOT_IMPLEMENTED / NOT_TESTED** | 아래 30번. 후보 포함률과 선택률 분리, 동결 기준선과 합성 비교 → 승인 후 전향 Shadow. 최소 마감 4h. 정확도≠수익, 기존 Elliott 기각 유지. 초기 파일럿 누적 $1 상한 제안·추가 충전 금지. 이번 작업은 문서만이며 API 호출·코드/매매 변경 없음 |
+| 31 | **BTC·ETH 독립 ML/DL 추가 edge**: 규칙→LR→XGBoost→작은 MLP→TCN→조건부 Transformer, 독립 방향 A와 T/v2 위험·복귀 필터 B를 별도 검증 | 사용자(2026-10-11) 상세 연구 요청, 다른 세션 작업 중 IDEAS만 수정 | **사용자 선택 / Phase 0 / DRAFT / NOT_IMPLEMENTED / NOT_TRAINED** | 아래31번. 4h·24h label·42봉 sequence 제안, Train-only 전처리·동기간 ablation·비용/지정가·80%·미열람 전향 관문. DMN19 버림/기각 판정 유지, 단순 모델부터. 기존 코드/운영/다른 문서 불변 |
+
+## 31번 독립 ML/DL 연구 설계 — BTC·ETH 추가 edge 검증 (2026-10-11, Codex)
+
+**상태: 사용자 선택 / Phase 0 / DRAFT / NOT_IMPLEMENTED / NOT_TRAINED.** 사용자 요청으로 이번에는 **이 파일만 수정**한다. 다른 세션의 작업·PROGRESS·Current·코드·의존성·DB·예약·기존 T/v2/Paper/Live는 수정하지 않는다. 아래 수치는 성과를 보기 전의 설계 제안이지 확정 사전등록/검정력 통과/학습 허가가 아니다. 자료·비용·위험·독립 표본·미열람 기간 관문을 해결하고 확정 커밋한 뒤에만 구현·학습한다. 무료 로컬 자료 우선, 유료 구매·GPU/라이브러리 설치·계좌 호출 없음.
+
+### 31.1 가설·기각 연구와의 경계
+
+- **H-A / 독립 모델:** 당시 알려진 추세·변동성·거래량 및 감사된 포지셔닝 정보의 조건부 상호작용이 단순 규칙보다 향후 24시간의 비용 후 방향/거래 edge를 구분한다. LONG/FLAT/SHORT 확률을 연구 전용으로 출력한다. 분류 정확도와 실제 체결 손익을 따로 검증한다.
+- **H-B / T/v2 연구용 위험 필터:** 같은 정보로 T/v2의 손실 위험을 감지하여 정상 1.0 / 위험 0.5 / 강한 위험 0.0 배율을 연구 원장에만 적용했을 때, 피한 손실뿐 아니라 놓친 상승·복귀 비용까지 포함해 비용 후 수익을 개선한다. 기존 운영 T/v2를 수정하는 연구가 아니다.
+- **H-C / 복잡도 필요성:** 동일 정보·기간·체결·위험 조건에서 비선형 ML이 LR보다, sequence DL이 일반 ML보다, Transformer가 작은 sequence 모델보다 추가 성과를 제공한다. 복잡하다는 이유만으로 승격하지 않는다.
+- 기존 [DMN 감사](DMN_PHASE0_AUDIT.md)는 IDEAS 19를 검정력 부족으로 **버림** 처리했다. 이번은 비용 고려 Sharpe 직접 최적화 DMN의 재판정이 아니라, 비용 문턱 label의 지도학습과 분리된 필터 비교다. 하지만 BTC·ETH의 같은 정보/표본 부족은 그대로다. 4h 행 수·모델명 변경만으로 해결됐다고 주장하지 않는다. 신규 미열람 자료와 검정력 관문이 없으면 판정형 연구를 중단한다.
+- IDEAS 22 차트 패턴·23/24 ETF flow·25 순서 정보·26 방어/복귀의 기각/보류는 유지한다. 해당 입력을 ML에 넣었다는 이유로 이미 실패한 수익원을 부활시키지 않는다. 기존 가설 대비 추가 정보·동결 비교·새 전향 자료가 필요하다. Elliott/JEV/뉴스 AI 출력과 D22는 초기 입력에서 제외한다.
+- A와 B는 독립 가설이며 성과를 보고 둘 중 하나만 남기지 않는다. LONG/SHORT도 개별 보고하고, 롱만 통과하면 숏 우위를 주장하지 않는다. 전략 후보군은 A/B 두 개이고 모델들은 같은 가설의 제한된 비교 도구다.
+
+### 31.2 현재 구조·자료 점검 결과와 미확인 사항
+
+2026-10-11 로컬 읽기 전용 점검: `data/trading.db`를 `mode=ro` + `query_only`로 조회했다. 아래는 **행 수/최초·최후 시각**이지 연속 커버리지·PIT 가용성·체결 품질 보증이 아니다. 날짜는 UTC, 마지막 날짜는 마지막 봉의 시작 시각이다. 계좌/주문 테이블은 읽지 않았다.
+
+| 자료 | 확인한 기간·규모 | 사용 전 관문 |
+|---|---|---|
+| Binance 현물 BTCUSDT·ETHUSDT 일봉 | 각 3,302행, 2017-08-17~2026-08-31 | 결측/중복/단위/마감 시각, 과거 성과 노출 확인 |
+| 현물 BTC·ETH 1h | 각 79,060행, 2017-08-17 04:00~2026-08-31 23:00 | UTC 4h 완성봉 4개로 연구 메모리/별도 파일에 집계, 원 DB 쓰기 금지 |
+| USD-M BTC 1d/1h/4h | 2,454 / 59,304 / 14,724행; 1d·4h 2020-01-01~2026-09-19, 1h ~2026-10-06 | 교차 TF 정합성·마감 시각·실행 1m 커버리지 |
+| USD-M ETH 1d/1h | 2,435행(2020-01-01~2026-08-31), 56,256행(2020-04-01~2026-08-31) | 4h DB 행 없음. 1h 완성봉으로 인과적 집계 필요 |
+| funding BTC / ETH | 7,395행 2020-01-01~2026-09-30 / 7,125행 2020-03-01~2026-08-31 | **mark_price 전부 NULL**. 실현 정산률과 당시 예상률 구분, 지급 시각/간격 확인 |
+| perp_metrics OI BTC / ETH | 503,002행 2021-01-01~2026-08-31 / 390,400행 2022-12-14 15:35~2026-08-31 | 관측 at_ms는 있지만 공개/수집 시각 없음. 실제 통화/계약 단위·보고 지연 감사, 과거 엄격 PIT 인증 전 제외 |
+| BTC ETF flow | `data/research/etf_flow/` Farside HTML/meta·FINRA·Wayback·가격·funding 꼬리 존재; 기존 [160](160-btc-etf-flow-preregistration.md)에서 2024-01~2026-10 연구 | 수정본/부분 발표/휴장/첫 가용 시각 문제. 과거 표의 날짜를 공개 시각으로 쓰지 않음; ETH ETF 자체 흐름 확보는 미확인 |
+| cross-asset | `data/research/tradfi/manifest.json`: QQQ/SPY/GLD/SLV 원/수정 일봉 2007~2026-08, SP500 2016~2026-08; multi_asset에 DGS10·DEXKOUS 등 파일 | 과거 수정주가·금리 revised 값·공개 지연·미국 장 마감/DST 감사. 파일 존재만 확인, 일별 PIT 행 수 미검산 |
+| basis / mark / 규격·요율 | 과거 DMN 감사에 공개 mark 파일/1m 아카이브 기록. 현재 mark/규격/수수료 완전 이력 미검증 | 현물-무기한 last 괴리와 mark/index premium·분기물 basis 구분. 실제 청산/보호·틱/최소주문을 따로 감사 |
+
+기존 재사용 후보: `features/tsmom.py`(20/60/120일 부호 추세·실현 변동성), `indicators.py`(SMA/EMA/ATR/RSI), `normalize.py`(causal z/백분위), `structure.py`(confirmed_at_ms 스윙). `registry.py`의 옛 MVP 특징은 존재하나 현행 전략의 유효성 근거가 아니다. 연구 구현은 순수 계산만 재사용하고 기존 registry/decide/실행기에는 등록하지 않는다.
+
+프로젝트 `.venv`에 **numpy/sklearn/torch/xgboost/lightgbm 모두 미설치**(import 여부가 아니라 모듈 명세 유무만 확인). pyproject 운영 의존성에도 ML이 없다. Python/CUDA/드라이버/OS 호환성·GPU 실물/여유 VRAM은 미검산이다. RTX 3060 12GB·RAM 32GB는 사용자 제공 조건이다. 별도 연구 환경/고정 lock을 후속 승인 범위에서 준비하며 운영 venv를 자동 갱신하지 않는다.
+
+### 31.3 시간 축과 feature 사전 목록
+
+**기본 결정 시점:** UTC 마감 4h(00/04/08/12/16/20시), 최소 시간대 4h. 일봉 변수는 해당 시각에 이미 마감된 마지막 UTC 일봉만 사용한다. 일간 자료를 6번 반복해도 새 독립 관찰이 아니다. sequence는 **최근 42개 완성 4h = 7일**, primary horizon은 **24시간 하나**. 72h/7d 등 추가 horizon은 이번 판에서 검색하지 않고 별도 가설/표본 계획으로만 다룬다.
+
+`C_t`는 완성봉 종가, 일봉 `D_t`, `r_k=log(D_t/D_{t-k})`; `RV_n=sd(log 일간수익, ddof=1)*sqrt(365)`. 모든 rolling 계산은 그 시점 이하만 포함하며 확정되지 않은 봉/스윙은 금지한다. 분모 0/이력 부족은 결측이지 0 신호가 아니다.
+
+| ID·묶음 | 파생변수 정의·고정 창 | 역할/경계 |
+|---|---|---|
+| P0 raw 저장 | 4h O/H/L/C/V·quote_volume·source·open/close_ms, 1h/1m 실행 자료 | 원자료 보존. 절대 USD 가격과 무정규화 거래량을 모두 주 모델에 넣지 않음 |
+| P1 봉 형태 | log(C/O), log(H/L), (C-L)/(H-L), log(C_t/C_{t-1}) | raw OHLC의 무차원 표현, 범위 0이면 위치값 결측 |
+| P2 수익률 | 일간 r_1/r_5/r_20/r_60/r_120 | 추세/momentum. 일중 현재 미마감 일봉을 사용하지 않음 |
+| P3 MA 거리 | D/SMA20−1, D/SMA60−1, D/SMA120−1; SMA20/SMA60−1 | 추세·과확장. SMA/EMA 조합 무한 추가 금지 |
+| P4 breakout·DD | (D−L20)/(H20−L20), D/max(C 최근20일 포함현재)−1, D/max(C 최근120일 포함현재)−1 | H20/L20은 현재 봉 이전 완성 일봉 high/low. breakout은1 초과 가능, DD는 현재 포함 고점 대비0 이하 |
+| P5 변동성 | RV20/RV60, Wilder ATR14/D, RV20의 직전365일 percentile | 과열/저변동. 365일 순위 워밍업은 최소365개 RV 관찰; 부족한 구간은 제거 |
+| V1 거래량 | 4h log(1+V), log((1+V_t)/(1+V_{t-6})), 직전180개 4h log(1+V)의 z | 24h 변화, 자기 시각 이전 mean/SD. 거래소·기초/견적 단위 고정 |
+| V2 가격-volume divergence | z_180(4h 로그수익) × z_180(log(1+V)) | 방향×참여 상호작용 대리. 실제 매집/분산이나 RSI 스윙 다이버전스로 부르지 않음 |
+| R1 BTC/ETH 상대강도 | BTC r_5−ETH r_5, BTC r_20−ETH r_20 | 동일 마감 시각. ETH 행에는 부호 반전; 거래소 다른 가격을 혼합하지 않음 |
+| D1 OI | log(1+OI 기초수량)의 직전180개 4h z, log(OI_t/OI_{t-6}), log(OI_t/OI_{t-30}) | USD OI가 가격과 기계적으로 함께 움직이는 문제를 분리. 원 수준은 저장/감사, primary 입력은 상대 수준 |
+| D2 funding | 직전 실현 rate_bps, 지난24h/7d 정산률 합, 24h 합의 전일 대비 차이 | 정산이 발생/공개된 후만 feature. 미래 실제 funding은 label/원장에만 사용 |
+| D3 basis | 10,000×(동시각 perp last/spot last−1), 그 괴리의24h 차이 | last premium 대리라고 명시. mark/index·분기물 만기 basis라고 부르지 않음 |
+| D4 가격-OI divergence | z_180(24h 가격수익)−z_180(24h log OI 변화) | 미정 스윙을 사후 그리지 않는 고정 통계 정의; OI 증가=LONG 아님 |
+| F1 ETF flow | 공개된 전체 BTC ETF 순flow/AUM(직전 알려진 AUM), 최근5 미국 세션 합/AUM | AUM 이력 없으면 제외, USD 합으로 몰래 대체 금지. ETH에는 BTC 시장 맥락일 뿐 ETH 자체 flow 아님 |
+| X1 cross-asset | 마지막 가용 QQQ/SPY/GLD 1·5 거래일 수익, DGS10 5거래일 변화 | 미장 마감·공식 공개 이후만 as-of join. SPY/QQQ 중복은 Train 상관 제거. VIX는 PIT 확보 전 보류 |
+| Q1 품질·레짐 | optional 입력의 age_hours/결측 flag, 자산 식별 BTC/ETH; 추세 부호 평균·vol percentile | 인과적 관측 변수만 사용. 사후 bull/bear/HMM 전표본 fit 레짐 금지 |
+
+**초기 primary = P1~P5 + V1/V2 + R1 + 자산 식별, 선택 후 연속 변수 최대32개.** D/F/X는 가용성·기간·검정력 감사 뒤 수익 열람 전 확정한 추가정보 판에서만 허용한다. 모든 묶음을 합쳐 가장 짧은 기간으로 primary를 축소하지 않는다. 새 피처/기간을 보고 선택하거나 기각 flow의 threshold를 학습 성과에 맞춰 바꾸지 않는다. raw-only 대조는 raw OHLCV를 Train-only scaling한 제한 입력으로 고정하고, 큰 가격 수준 추세가 성과를 지배하는지 따로 보고한다.
+
+### 31.4 label·prediction과 거래 가능성
+
+- Primary label은 마감 시각 t 이후 **t+1분의 기준가격부터 24h 뒤 기준가격**까지의 수익이다. 이는 비교용 가격 anchor이지 시장가 주문/종가 보장 체결이 아니다. 실제 성과는 별도 지정가 원장으로 평가한다. 미래 1m·funding을 입력 matrix에 섞지 않는다.
+- 미래 기준수익 bps를 R, 사전 고정 LONG/SHORT 왕복 fee+실행 비용을 c_L/c_S, 보유 구간 실현 funding의 LONG 비용을 F라고 두면 `edge_L=R−c_L−F`, `edge_S=−R−c_S+F`(선형 수익 기준; 정확 회계는 Decimal 원장). **LONG: edge_L>20bps, SHORT: edge_S>20bps, 그 외 FLAT**를 초안으로 제안한다. 20bps는 기대 효과의 근거가 아니라 거래할 최소 잔여 폭 제안이다. 확정 전 비용/표본 관문으로 승인하며 결과 뒤 변경 금지. 두 조건 동시 충족/자료 불명은 오류/label 제외로 처리한다.
+- SHORT는 실제 funding·차입/계약·체결 비용을 따로 반영한다. c_L=c_S를 억지로 고정하거나 LONG 비진입을 SHORT로 바꾸지 않는다. 미래 실현 funding을 label 계산에 쓰는 것은 허용하되 예측 시 입력/예상 비용에는 그때 알려진 값만 쓴다.
+- label과 체결은 서로 다르다. OHLC anchor 예측을 잘해도 지정가 미체결·비용 때문에 거래 edge가 없으면 FAIL. 훈련용 label이 stop 손익을 정확히 예측한다고 주장하지 않고, 보호 스톱 포함 실제 원장을 별도 평가한다.
+- 확률은 p_LONG/p_FLAT/p_SHORT, 합1·결측 상태·모델 버전과 함께 출력. A 행동은 calibrated p_LONG>=0.60 또는 p_SHORT>=0.60 + Train에서 산정한 해당 확률 구간의 보수 순 edge>0 조건, 둘 다 아니면 FLAT. 0.60/구간 수/최소 구간 관찰 수는 수익 전 확정하고 OOS threshold 검색 금지. 모델 argmax만으로 반드시 거래하지 않는다.
+- 동일 자산 포지션이 있으면 추가 진입하지 않고, 기본 청산 horizon은 첫 실제 체결로부터24h. SHORT 반전 시 즉시 뒤집기/시장가 추격 없음. 청산 미체결이면 보유 위험/비용은 계속 기록하고 신규 진입 차단; 청산 완료 뒤 기존 재진입 대기·위험 게이트 준수. 하루/같은 방향 횟수 제한을 새로 만들지 않는다.
+
+### 31.5 preprocessing·selection·imbalance
+
+1. 봉 gap/시간 역순·중복·OHLC 모순·음수 거래량·단위 오류를 먼저 검사한다. 품질 이상값을 winsorize로 감추지 않는다. primary 이력 부족/필수 시세 결측/sequence gap은 해당 예측을 거부한다. 거래 표본 감소까지 보고하며 지운 날짜에서 나쁜 거래를 빼 성과를 개선하지 않는다.
+2. optional source는 엄격 backward as-of join, available_at_ms<=t. 선물 funding은 다음 정산이 확인될 때까지 마지막 실현값/경과시간, OI 최대8h, 미국 일봉 최대96h, ETF 다음 세션 발표 전 최대96h까지만 허용하는 초안이다. 휴장/주말 age와 누락을 구분한다. 역채움/양방향 보간 금지. history PIT 불명은 미확인으로 제외하고 현재 수집 시각을 과거 첫 공개 시각으로 쓰지 않는다.
+3. optional 결측은 Train median + missing/age flag로 처리하되 Train 결측률20% 초과 변수는 그 fold에서 제외; 완전 미출시 묶음은 제거/별도 기간 연구다. 필수 거래 입력 결측을 median으로 대체해 진입시키지 않는다. feature mask/제외 이유를 저장하고 OOS 커버리지로 다시 고르지 않는다.
+4. 연속 변수 clipping은 각 Train의0.5/99.5 percentile, scaler는 Train median/IQR(0 IQR은 상수 제거). LR/MLP/TCN 동일 transform, XGBoost도 같은 결측·클리핑 계약. 계산 순서는 split → Train fit → validation/test transform이다. 온라인 rolling z는 과거180개 관측으로 정의하고 전표본 통계 사용 금지.
+5. Train에서 상수 및 |Spearman rho|>=0.90 중복 제거, 가족 내 표에 먼저 적힌 변수 우선; 선택 후 최대32개. 기존 Phase2 상관<0.7 기준과 이 연구의 비선형 상호작용 계약 차이는 확정 전 감사/승인 필요하며 기존 기준을 자동 완화하지 않는다. label 기반 importance/RFE 무한 반복은 primary에서 금지. 중요도는 내부 holdout/Train-only 진단 또는 동결 후 설명에만 사용한다.
+6. 각 Train에서 클래스별 건수·비율·시간별 분포 보고. 최대/최소 비율>3이면 `min(3, n/(3*n_class))` 가중치를 평균1로 다시 정규화하는 고정 방식; 그 외1. FLAT만 찍는 majority/prior baseline도 보고. 미래 oversampling/전체 기간 SMOTE 금지. 클래스가 없는 fold는 학습 불가로 기록하고 경계를 옮겨 숨기지 않는다.
+7. calibration은 Train 내부 마지막 비중의 별도 시간 holdout에서 **단일 temperature scaling**만 fit, outer validation/OOS에 fit하지 않는다. 클래스 가중 학습 확률과 자연 발생 클래스 빈도 차이를 검산한다. calibration에 모든 클래스/필요 표본이 없으면 복잡한 isotonic으로 바꾸지 않고 판정을 보류한다. [sklearn 누수 지침](https://scikit-learn.org/stable/common_pitfalls.html)·[확률 보정](https://scikit-learn.org/stable/modules/calibration.html)을 구현 때 적용한다.
+
+### 31.6 Train / Validation / 역사 test / 진짜 OOS
+
+| 구간 | 제안 | 할 수 있는 일 / 금지 |
+|---|---|---|
+| 원자료·워밍업 | primary 공통 2020-04-01~2026-08-31; RV percentile 365일 준비 후 첫 유효 시점은 다시 산정 | 120일 수익·365일 순위·42개 sequence의 **실제 최대 준비기간** 적용. 준비가 안 된 첫 날짜에 0 입력 금지 |
+| 개발 Train universe | 유효 시점~2023-12-31 | 각 fold Train12개월, 다음3개월 outer 확인, 3개월 step. 입력 이력이 부족하면 fold 제외/표본 부족 보고 |
+| 모델 승격 Validation | 2024-01-01~2024-12-31 | 동결 후보·재학습 규약 비교/승격. hyperparameter·선택·calibration은 각12개월 Train 내부에만 fit |
+| 역사적 holdout/test | 2025-01-01~2026-08-31 | 새 모델 선택에 쓰지 않고 잠근 비교 1회. BTC·ETH 성과를 여러 연구에서 이미 봤으므로 **프로젝트 수준 미열람 OOS 아님** |
+| 최종 미열람 OOS | 확정 커밋·모델/데이터 계약 동결 이후 첫 UTC 00:00부터, 감사로 미리 정한 종료일 | 시작/종료일·필요 독립 n·검정력을 확정 전 명시. 최소12개월 관찰 제안은 검정력 통과 보장이 아님. 매달 성과를 보고 유리한 때 종료/연장/재튜닝 금지 |
+
+각12개월 Train은 시간순70% fitting /15% 내부 tuning·early-stop /15% calibration으로 나눈다. 하이퍼파라미터는 Train 내부 log-loss 최소(동점 단순판)로만 선택한다. 분할마다 scaler/feature mask/class weight 모두 다시 fit하고 artifact를 고정한다. Train 끝 이후 아직 label이 완성되지 않은 행은 학습 금지한다. BTC와 ETH의 같은 시각은 항상 같은 fold에 두고 자산을 나눠 시간 누수를 만들지 않는다.
+
+label 구간24h + entry/exit 최대 실행 대기 예산을 기준으로 **최소48h purge/embargo**를 제안한다. label_interval이 다음 fold/보정 구간에 걸치는 행은 정확히 제거한다. sequence는 과거 입력이므로 test 첫 sequence가 Train 과거를 참조하는 것 자체는 허용하지만 미래 label/보정값 재유입은 금지한다. 월/분기 경계 열린 포지션은 위험·손익 carry, 새 모델은 그 포지션의 원래 청산 horizon/stop을 바꾸지 않는다. 48h가 실제 최대 실행 구간을 덮지 못하면 계약을 수정한 뒤 확정한다. [TimeSeriesSplit](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html)만으로 label 중첩 제거가 자동 해결되는 것은 아니다.
+
+**정보 묶음별 기간:** BTC/ETH OI 공통은2022-12-14 이후, ETF는2024 이후라 primary 2020~2026 전체 입력으로 사용할 수 없다. 묶음의 존재/누락 패턴으로 미래 시기를 암기하지 않게 별도 동기간 대조한다. 학습12개월·워밍업·독립 outer 기간이 모자라면 확장판은 `DATA_INSUFFICIENT`; primary를 줄여 2024 표본에 모든 모델을 몰아 넣지 않는다. 2026-09 이후 기존 Paper/Live로 본 기록도 새 미열람 구간으로 재명명하지 않는다.
+
+### 31.7 baseline·모델 사다리·학습 예산
+
+먼저 baseline 재현 및 회계/누수 테스트, 그다음 **LR → XGBoost → 작은 MLP → 작은 TCN → 조건부 Transformer** 순서다. LightGBM 또는 LSTM으로 바꿀 필요가 있다면 설치/실행 호환성 등 **성과 이전 근거**로 한쪽만 확정한다. XGBoost/LightGBM 또는 TCN/LSTM 둘 다 돌려 유리한 쪽을 고르지 않는다. 초기 검토는 baseline/LR/XGBoost 최대3개만, DL은 앞 단계 자료/검정력 관문 뒤 별도 승격한다.
+
+| 모델 | 허용 복잡도·trial 상한 초안 |
+|---|---|
+| 기준선 | 동결 T/v2(20/60/120일 부호·기존 vol sizing) 연구 복제, 동일 자산 buy&hold, 항상FLAT/클래스 prior. A는 같은 선물 venue/24h/위험의 단순 20일 추세 LONG/SHORT도 추가; T/v2를24h 청산으로 바꿔 약하게 만들지 않음 |
+| LR | L2 다항 로지스틱, C={0.1,1,10}, 최대3설정, 연속 입력<=32 + flag/asset. 모델당 피처를 다르게 골라 비교하지 않음 |
+| XGBoost | CPU 우선, depth={2,3}, trees<=200, eta0.05, subsample/colsample1, L2=1, 최대2설정, early-stop20. leaf 수/최소 child weight도 확정 전 고정 |
+| MLP | 32→16 hidden, ReLU/dropout0.1, 총 파라미터<=6,000, lr={0.001,0.0003}, weight decay0.0001, 최대2설정 |
+| TCN(우선) | causal conv kernel3, dilation1/2/4, 채널16, 3블록·각2conv, <=15,000파라미터; sequence42, dropout0.1, lr0.001 단일판. 대안 LSTM이면 1층hidden16·<=8,000으로 사전 교체, 둘 다 학습 금지 |
+| 작은 Transformer(조건부) | sequence42, d_model32, 2heads·1layer, FF64, causal attention/마지막시점 출력, <=30,000파라미터, lr0.0003 단일판. TCN까지 일반 ML보다 개선되고 추가 장기 의존의 사전 가설·검정력이 있어야 허용; 기존 실패 후 구조만 바꿔 반복 금지 |
+
+DL 공통: PyTorch+CUDA 우선, batch64, epoch<=50, Train 내부 early-stop patience8, gradient clip1.0. seed11/29/47 세 개를 고정하고 **가장 좋은 seed 선택 금지**, 같은 설정 세 확률의 평균을 사전 ensemble로 사용; seed별 분산도 보고한다. LR/트리는 CPU seed11 고정. 초기 LR3+XGB2+MLP2+TCN1+Transformer1 설정 외 Bayesian/Optuna 무제한 탐색 금지. A/B에는 같은 잠근 predictor를 적용하고 별도 threshold 경연을 하지 않는다.
+
+RTX3060 12GB: peak VRAM **8GB 이하 목표**, RAM20GB 이하 목표, worker<=2·CPU thread<=4, 원자료/sequence 스트리밍. FP32를 재현 기준으로 하고 AMP는 동일 예측 허용오차를 확인한 뒤 사용한다. OOM 때 모델/window를 바꾸지 않고 batch64→32→16의 고정 fallback만; 여전히 실패하면 RESOURCE_BLOCKED. 운영 작업 시간에는 학습 금지, GPU 학습시간 합계12h/연구 버전 초안 상한, 실패 재시도까지 포함. 설치/호환성·예산 확정 전 실행 금지. [PyTorch 재현성](https://docs.pytorch.org/docs/stable/notes/randomness.html)·[AMP](https://docs.pytorch.org/docs/stable/amp.html) 참고, seed만으로 GPU/OS 간 비트 동일성을 보장하지 않는다. checkpoint/lock/CUDA·cuDNN·driver·하드웨어·precision·예측 해시·추론 replay를 저장한다.
+
+### 31.8 A/B 실행 계약·비용·복귀
+
+- **A:** Binance USD-M BTC/ETH 연구용 LONG/FLAT/SHORT, 현물 롱/선물 숏 혼합으로 비용을 숨기지 않는다. 최초 가정은 순노출 합<=100%·종목별<=50%·레버리지1x, 그러나 이는 새 선물 위험 한도를 완화하는 허가가 아니다. 기존 거래 위험1%·증거금10%·일 손실2%·DD30%·보호/청산거리·게이트의 제약을 함께 적용해 더 작은 크기로 제한한다. stop 예시는 마감4h ATR14의2배이며 min-distance/WIDEN C1·실제 stop/mark/규격·사이징을 확정 전 해결해야 한다. 신호당 위험/stop을 A 비교 규칙에도 똑같이 적용한다. O/v2의 무손절/−20% 예외를 복제하지 않는다.
+- **B:** 동결 T/v2 BTC/ETH 현물 원장에만 필터 배율을 곱한다. 마지막24h SHORT 확률을 위험 대리로 사용, p_SHORT<0.40은1.0 /0.40~0.60은0.5 />=0.60은0.0의 초안. T/v2 청산이면 ML 확률과 무관하게 목표0.0. 위험 완화 때 **연속2개 마감4h에서 p_SHORT<0.35이면1.0, <0.55이면 최소0.5**로 복귀하는 hysteresis를 함께 고정한다. 위험 진입은 한 봉, 복귀는 두 봉; 모든 계산은 당시 예측만 사용한다. 마지막 두 예측이 없으면 새 증액 금지. 이 thresholds는 수익 전 승인/동결하고 결과 뒤 재진입 규칙 튜닝 금지.
+- B의 손실 방지 label은 ‘24h 하락’ 대리이지 장기 crash 보장 아니다. 피한 손실, 위험감소 중 놓친 상승, 재진입 비용, 복귀 지연4h단위, 재차 손실, CASH 지속시간, 감소/복귀 횟수를 같은 원장에 표시한다. 낙폭만 낮고 순수익이 줄면 이 연구의 수익 개선 PASS가 아니다. 동일 평균 exposure의 단순 축소 T/v2와도 비교하여 단순히 덜 투자한 효과를 분리한다.
+- **일반 주문은 가격 한도 지정가만:** t+1분부터 last 대비±0.30% IOC 한도, 최대3개의 사전 정한1분 실행 시도·잔여 처리 제안. OHLC에서는 touch=전량 체결 금지; 한도 관통·거래량>0·더 유리한 시가 min/max·부분체결·tick/step·미체결을 보수적으로 모델링하고 동일 실행모형으로 모두 비교한다. 장기 대기/종가 보장/무한 추격 금지. 실제 BID/ASK·틱 경로가 없다는 한계를 명시한다.
+- 기본 비용 초안(현행 거래소 요율 사실 아님): 선물 **편도 fee5bps+spread/slippage4bps = 왕복18bps**, 현물 **편도 fee10bps+실행5bps = 왕복30bps**, funding 실현 시계열·mark/보호/강제청산·부분체결 포함. 체결가격과 slippage 가산의 중복 계산을 막는다. 지정가도 taker일 수 있으며 maker 할인 고정 가정 금지. 현재/과거 계정 등급·규격 자료 감사 후 수익 전에 비용 버전 동결한다.
+- 수수료·실행 비용2배 스트레스, 불리한 funding은 LONG=max(F,0)/SHORT=max(−F,0)로 수취혜택0 처리하는 별도 스트레스, 실행1개 마감4h 지연을 사전 진단한다. T/v2 시장가 추격 예외는 새 ML에 전이하지 않는다. 비교용 연구 T/v2는 같은 지정가 계약을 사용하며 현행 baseline 실행과의 차이를 병기, 운영 실행기 변경 없음.
+- 강제청산0·DD한도·보호주문 계약이 없으면 수익성 결과를 운용 가능으로 인증하지 않는다. C11~13 독립감시/내구성 미해결도 그대로다. 지연·실행3회·cleanup 예산·stop 체결은 확정 전 gate이며 초안 숫자만으로 안전성 통과 아님.
+
+### 31.9 평가·검정력·PASS / FAIL
+
+**G0 / 학습 이전 관문:** 자료 manifest·공개/가용 시각·단위·커버리지·hash·code/config·split 노출표·비용/지정가/보호 계약·Python/CUDA·독립 표본/용량·필요 기간을 감사한다. 과거 DMN의 월 차이 SD3.6%/최소 연16%p는 이번 후보의 실측 분산이 아니라 경고용 대리다. 더 짧은4h 입력으로 바꿨다고 없애지 않는다.
+
+검정력80%, 기본z2 유지. 계획용 최소 유용 증분은 **연 산술3%p(월0.25%p)** 제안이며 그런 효과가 존재한다고 가정/주장하지 않는다. 기준선 차이의 보수 SD/장기 의존을 이용해 필요 월수·가용 월수·MDE·최종 종료일을 계산한다. 비용 후 paired 차이에 비용을 다시 빼지 않는다. 6개 비교 동시성 보정 후의 z로 power도 다시 계산한다. 후보 학습 전 SD 근거가 없으면 승인된 Train-only 계획 파일럿을 별도 사전등록/커밋하거나 `POWER_UNRESOLVED`로 중단한다. 필요 효과를 크게 올리거나 n을4h 행수/BTC+ETH 합으로 부풀려 gate를 통과시키지 않는다.
+
+**출력 지표:** accuracy(보조), 클래스별 precision/recall/F1/support·confusion matrix·PR-AUC, log-loss/Brier·동일10개 확률 구간 reliability/ECE·클래스 prior 대조. LONG/SHORT별 실제 체결 건수·순 edge·PnL·승률도 보고한다. 원장에는 fee/slippage/funding 기여, CAGR/Sharpe/MDD, 월별·worst30/90일, turnover, 노출(평균/시간/롱숏), 실제 체결·미체결/부분체결률, veto/정지, 비용 후 평균 trade edge/SE 및 benchmark 대비 paired 증분을 포함한다.
+
+| 판정 | 사전 제안 기준(최종 확정 전 G0 필요) |
+|---|---|
+| HISTORICAL_SUPPORT | 잠근 역사 test에서 아래 경제·강건성·누수 기준 충족. 이미 본 프로젝트 과거라 FINAL_OOS_PASS 아님 |
+| FINAL_OOS_PASS A | 고정 전향 OOS 실제 거래>=100 및80% 필요 독립 표본 충족; 거래 순평균−2SE>0; 같은 위험의 단순 A규칙 대비 paired 순수익 증분의 보정 하한>0·연 산술증분>=3%p, Sharpe 개선>=0.10·MDD 악화<=2%p, buy&hold 대비 Sharpe 우위 |
+| FINAL_OOS_PASS B | 동결 T/v2 대비 paired 순수익 증분 보정 하한>0·연 산술증분>=3%p, Sharpe 개선>=0.10·MDD 악화<=2%p; 낙폭 개선을 주장하려면 MDD 상대10% 이상 감소도 필요. 순수익 감소/복귀 실패면 채택 안 함; 실제 거래 n·필터 감소/복귀 사건 독립 n은 각각 검정력 감사 |
+| 복잡 모델 채택 | 동결 단순 incumbent보다 같은 경제 증분/유의성·Sharpe/MDD 기준 통과, calibration 악화 없음. 한 번 좋았다는 이유나 accuracy 몇% 개선만으로 채택 금지 |
+| 공통 강건성 | 비용2배에도 순평균 및 기준선 대비 paired 평균>0, quarter WF 창60% 이상 순수익>0, 최악30일 수익이 benchmark보다2%p 이상 나빠지지 않음, 강제청산0·현행DD한도 이하·causal/replay 통과 |
+| DATA_INSUFFICIENT / NOT_READY | 필수 PIT/기간/체결·위험/검정력/클래스/실제 거래 n 부족. 전략 FAIL과 구분, 효과 가정/기준 완화 금지 |
+| FAIL / REJECT | 충분한 표본·자료에서 사전 기준 미달. 해당 버전 끝; threshold/feature/horizon/seed 수정 후 같은 OOS 재판정 금지 |
+
+BTC·ETH 동시각/중첩 horizon·군집 위험 때문에 independent n은 raw 행 수가 아니다. paired 월 수익·거래 사건별 장기 의존을 함께 보고, 두 자산은 같은 시간 block으로 재표집한다. 30일 시간 block bootstrap10,000회/seed11과 month HAC lag3를 사전 제안; 주 통계·SE/CI 계산·block 경계·HAC와 충돌 처리·80% 계산은 확정 전 명시한다. 최대6개 확인 비교(A−규칙, B−T/v2, XGB−LR, MLP−일반ML, TCN−일반ML, Transformer−TCN)는 Holm familywise0.05, 활성화 안 된 비교는 p1로 기록한다. 주장할 숏/feature 묶음별 유의성은 추가 다중성 계약 없이 보조 진단이다. **모든 조건 수치를 유리한 성과에 맞춰 선택하지 않는다.**
+
+Validation에서 단순 incumbent를 잠그고 최종 OOS는 그 선택에 쓰지 않는다. A의 수익 개선 주장은 단순A규칙뿐 아니라T/v2 대비 증분도 통과해야 한다. A−규칙은 두 대조 모두를 요구하는 intersection 판정(p값은 두 대조의 큰 값)으로 사전 동결하며, 시장/위험/노출 차이와 그 비교 한계를 따로 보고한다. T/v2를 못 이겼는데 단순A만 이겼으면 독립 모델의 기존 전략 개선 PASS가 아니다. 모델 사다리 승격은 내부 Train·2024 Validation에서만 수행하며, 필요한 DL 모델·비교·checkpoint를 **최종 OOS 열기 전에 전부 고정**한다. 최종 OOS에서 LR를 본 뒤 MLP/Transformer를 추가 학습해 같은 OOS를 재사용하지 않는다. 새로운 후속 모델은 새 사전등록·별도 미래 구간이 필요하다. Phase4 공통 랜덤95백분위·셔플·민감도±20%·시작일±30일·지연/심볼 교차 계약도 확정 전 정량화하며 이 표로 생략하지 않는다. 민감도 결과에서 승자를 재선택하지 않는다.
+
+### 31.10 ablation — 정보와 모델 효과를 분리
+
+모델이 통과한 뒤 중요 정보를 설명하되 **제거판은 결과 열람 전에 미리 설계/동결**한다. OOS를 보고 제거할 묶음을 고르지 않는다. 주모델/threshold는 그대로이고, 같은 Train에서 제거판을 동일 예산·고정 hyperparameter로 재학습한다. 진단에서 더 좋은 제거판이 나와도 같은 OOS에서 주모델로 교체하지 않는다.
+
+1. raw OHLCV 제한 입력 vs engineered P/V/R(동일 공통 날짜).
+2. engineered P/V/R vs +D(OI/funding/basis), 둘 다 D가 가용한 **동일 날짜**로 재학습/비교.
+3. P/V/R+D vs +F(ETF), 둘 다 F가 가용한 동일 날짜. 짧은ETF 기간 효과와 feature 효과를 분리.
+4. P/V/R+D vs +X(cross-asset), 동일 날짜·missing 규약.
+5. full 확정 묶음에서 D/F/X 각각 하나 제거, 동일 날짜. 이 단계는 해당 full판이 처음부터 승인/등록된 경우만.
+
+초기부터5판 모두로 모델 경연하지 않는다. 정보 묶음별 power가 부족하면 설명 통계/불확실성만 보고하고 ‘기여 확인’이라고 부르지 않는다. price-only 우위가 없다면 OI/ETF를 순차 붙여 나올 때까지 탐색하는 방식도 금지한다.
+
+### 31.11 완전 분리 구현 계획·운영 단계·인계
+
+확정 뒤 후속 구현 제안(이번 생성 안 함): `src/auto_trading/research/ml/`의 contract/features/labels/split/preprocess/models/evaluate, 전용 `scripts/` runner·연구 config·Fake/leakage/replay 시험. 기존 회계/체결 원칙을 재사용하고 외부 backtest 프레임워크로 다른 전략 경로를 만들지 않는다. 운영 core/features/strategy/risk/실행기/주문 코드 수정·ML import 없음. 운영 DB는 읽기 전용·짧은 transaction, 동결 시장 스냅숏을 사용하며 라이브 원장 migration 없음.
+
+연구 artifact는 별도 Git 제외 경로, 이후 Shadow DB도 `ml_shadow.db` 같은 별도 DB다. A/B·모델·split·asset·as_of_ms·feature available_at_ms·snapshot_digest·feature_mask·scaler/calibrator/checkpoint/code/config/dependency hash·확률·action·예상비용/edge·veto/결측 사유·추론시간을 주문 유무와 무관하게 남긴다. label은 horizon이 지난 뒤 별도 outcome 행에 기록하고 과거 prediction을 수정하지 않는다. 가상체결/fee/funding/PnL도 연구 run_id로 분리한다. 파일 삭제/키 입력/실계좌 호출/자동 설치 없음.
+
+순서: **Phase0 자료·누수·용량·검정력 감사 → 확정 커밋 → Phase1~3 독립 구현/합성·causal·회계 검증 → 역사 WF/검증 → 고정 전향 OOS(읽기 전용 연구 기록) → 통과 후 별도 Shadow 운영 검산 → 별도 승인 Paper → 별도 승인 Live.** 최종 전향 OOS를 수집하는 연구 prediction logger는 예측 기록만 하며 운영 전략 연결/차단/사이징이 아니다. 중간 이력 축적과 OOS 성과 열람/판정은 구분한다. Shadow/Paper도 자동 켜지 않는다.
+
+**다른 세션에 전달:** "IDEAS31 독립 BTC/ETH ML/DL 초안을 읽고 자료 manifest/PIT·현재 feature 재사용·공통기간·120일/365일/42봉 워밍업·label24h·지정가/보호/비용·과거노출·독립 표본80%·CUDA 환경 관문부터 감사해 주세요. DMN19 버림과 ETF23/24 기각은 유지하고 4h 행수로 검정력을 부풀리지 마세요. 미확정 계약은 수익/학습 전에 이유를 남겨 보정하고 확정 커밋하세요. 그 뒤 baseline/LR/XGB부터 구현·학습하며 동일 Train-only 전처리/selection/calibration 및 동일 평가로 비교하세요. DL은 제한된 사전 승격 조건을 만족할 때만, Transformer는 가장 마지막입니다. A/B는 별도 연구 원장, 운영 T/v2/Paper/Live·주문 코드는 변경하지 마세요. G0가 안 되면 학습/판정을 멈추고 막힌 항목과 증명 가능한 효과 크기를 보고해 주세요."
+
+이번 작업 검산: 시장 DB 메타데이터/기간·기존 계산/연구 감사·공식 ML 문서 읽기만 수행했다. 학습/후보 수익/테스트 실행/의존성 설치/원장 저장 없음. 다른 세션 작업 중이므로 PROGRESS·Current·BRIEFING은 변경하지 않았고, 이 절 자체를 문서 전용 인계로 남긴다.
 
 ## 30번 사전등록 초안 — JEV × Elliott 복수 시나리오 판독 비교시험 (2026-10-08, Codex)
 
