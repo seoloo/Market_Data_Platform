@@ -124,7 +124,7 @@ def _ask(messages: list[dict[str, str]]) -> dict[str, Any]:
 
 
 def _send(texts: list[str], telegram: bool) -> list[str]:
-    from auto_trading.config.secrets import load_telegram_credentials
+    from auto_trading.config.secrets import load_telegram_info_credentials
     from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -133,7 +133,7 @@ def _send(texts: list[str], telegram: bool) -> list[str]:
         OutboxNotifier(REPORTS / "outbox.log").send(text)
         if not telegram:
             continue
-        creds = load_telegram_credentials(REPO / ".env")
+        creds = load_telegram_info_credentials(REPO / ".env")  # 정보 봇 (2026-10-10)
         if creds is None:
             errors.append("텔레그램 설정 없음")
             continue

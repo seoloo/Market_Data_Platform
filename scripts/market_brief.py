@@ -38,7 +38,7 @@ if str(REPO / "src") not in sys.path:
 
 from auto_trading.config.secrets import (  # noqa: E402
     load_gemini_key,
-    load_telegram_credentials,
+    load_telegram_info_credentials,
     read_env_file,
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
@@ -481,7 +481,7 @@ def main(argv: list[str] | None = None) -> int:
     (OUT / f"{stem}.txt").write_text(text, encoding="utf-8")
     OutboxNotifier(OUT / "outbox.log").send(text)
     if not args.no_send:
-        creds = load_telegram_credentials(REPO / ".env")
+        creds = load_telegram_info_credentials(REPO / ".env")  # 정보 봇 (2026-10-10)
         if creds is not None:
             try:
                 TelegramNotifier(creds).send(text)

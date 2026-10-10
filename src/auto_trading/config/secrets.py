@@ -22,6 +22,7 @@ __all__ = [
     "load_kis_credentials",
     "load_openai_key",
     "load_telegram_credentials",
+    "load_telegram_info_credentials",
     "read_env_file",
 ]
 
@@ -88,6 +89,21 @@ def load_telegram_credentials(
     if not token or not chat:
         return None
     return TelegramCredentials(token, chat)
+
+
+def load_telegram_info_credentials(
+    path: Path | str = ".env", environ: Mapping[str, str] | None = None
+) -> TelegramCredentials | None:
+    """정보 봇(테마 · 시장 브리핑 · 종목 뉴스, 2026-10-10).
+
+    ``TELEGRAM_INFO_BOT_TOKEN`` + 같은 채팅.
+    없으면 투자 봇으로 돌아간다 (알림이 사라지지 않게)."""
+    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
+    token = merged.get("TELEGRAM_INFO_BOT_TOKEN", "")
+    chat = merged.get("TELEGRAM_CHAT_ID", "")
+    if token and chat:
+        return TelegramCredentials(token, chat)
+    return load_telegram_credentials(path, environ)
 
 
 @dataclass(frozen=True, slots=True)
