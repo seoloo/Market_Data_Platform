@@ -1,6 +1,7 @@
 """파이어 진행 보고 — 매달 1 일, 실거래 장부 합계가 목표에 얼마나 왔나 (사용자 2026-10-10). 순수.
 
-* 목표: 지금은 **1 억 원**(사용자 2026-10-10 "지금 현재 목표는 1억으로"). 바꾸려면 ``TARGET_KRW``.
+* 목표: 지금은 **1 억 원**(사용자 2026-10-10 "지금 현재 목표는 1억으로").
+  오르빗 설정 화면에서 바꾼다(``fire.*``).
 * 평가: 대시보드 실거래 홈과 같은 장부 + 공개 시세(Glide · Cruise · 토스 적립).
   연금 · ISA 는 빠짐(장부 없음).
 * 도달 예상은 **가정한 연수익 셋**으로 단순 복리 계산한 것이다. 예측이 아니다.
@@ -68,6 +69,7 @@ def report_text(
     monthly: float,
     last: Snapshot | None,
     target: float = TARGET_KRW,
+    scenarios: Sequence[tuple[str, str, float]] = SCENARIOS,
 ) -> str:
     from auto_trading.notify.style import RULE, sub
 
@@ -95,7 +97,7 @@ def report_text(
         lines.append("입금 기록이 아직 없어 도달 예상을 계산하지 못했어요")
     else:
         lines.append(f"이 속도(월 {monthly:,.0f}원 입금)면 목표까지")
-        for icon, label, annual in SCENARIOS:
+        for icon, label, annual in scenarios:
             n = months_to_target(now.value, monthly, annual, target)
             when = "50년 넘음" if n is None else f"{_add_months(today, n)} · {_span(n)}"
             lines.append(sub(f"{icon} {label}(연 {annual:.0%}) {when}"))

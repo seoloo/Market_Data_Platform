@@ -29,13 +29,14 @@ def test_all_popups_have_fixed_header_close_and_matching_targets() -> None:
     parser = _Tags()
     parser.feed(layout(render_live([], Quotes(), 0), "light"))
     dialogs = {a["id"] for t, a in parser.tags if t == "section" and a.get("popover") == "auto"}
+    # '설정' 은 팝업이 아니라 설정 화면(/settings) 링크다 (2026-10-10)
     assert dialogs == {
         "orbit-guide",
         "orbit-accounts",
-        "orbit-settings",
         "orbit-status",
         "orbit-all-trades",
     }
+    assert any(t == "a" and a.get("href") == "/settings" for t, a in parser.tags)
     closers = [
         a for t, a in parser.tags if t == "button" and a.get("popovertargetaction") == "hide"
     ]

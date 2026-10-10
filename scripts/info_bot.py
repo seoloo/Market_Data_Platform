@@ -30,6 +30,7 @@ from auto_trading.config.secrets import (
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
 from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import InboxQueue, TelegramInbox
+from auto_trading.ops import user_settings
 from auto_trading.ops.news_rss import NewsItem, parse_feed
 from auto_trading.ops.stock_news import (
     Target,
@@ -117,6 +118,8 @@ def answer(text: str, root: Path = REPO) -> str:
     t = text.strip()
     if t.lower() in ("/start", "/help", "도움", "도움말", "help", "?"):
         return HELP
+    if not user_settings.get(root, "alerts.news"):
+        return "종목 뉴스 답이 꺼져 있어요 — 오르빗 설정 › 알림에서 켤 수 있어요"
     if len(t) > 30:
         return "종목 이름이나 기호만 보내 주세요 (예: 삼성전자, NVDA)"
     target = resolve(t.removeprefix("뉴스").strip() or t, _kr(root))
@@ -139,12 +142,24 @@ def run(root: Path = REPO) -> int:
     asks = [m.text for m in msgs if m.text][-PER_RUN:]
     if not asks:
         print("정보 봇: 받은 글 없음")
-        beat_and_alert(root, "info_bot", int(time.time() * 1000))
+        beat_and_alert(
+            root,
+            "info_bot",
+            int(time.time() * 1000),
+            alert=bool(user_settings.get(root, "alerts.bot_down")),
+        )
         return 0
     bot = TelegramNotifier(creds)
     try:
         for text in asks:
-            if text.strip().lower() not in ("/start", "/help", "도움", "도움말", "help", "?"):
+            if user_settings.get(root, "alerts.news") and text.strip().lower() not in (
+                "/start",
+                "/help",
+                "도움",
+                "도움말",
+                "help",
+                "?",
+            ):
                 bot.send(f"🔎 '{text.strip()[:30]}' 뉴스 찾는 중…")
             reply = answer(text, root)
             bot.send(reply)
@@ -154,7 +169,12 @@ def run(root: Path = REPO) -> int:
         return 1
     finally:
         bot.close()
-    beat_and_alert(root, "info_bot", int(time.time() * 1000))
+    beat_and_alert(
+        root,
+        "info_bot",
+        int(time.time() * 1000),
+        alert=bool(user_settings.get(root, "alerts.bot_down")),
+    )
     return 0
 
 

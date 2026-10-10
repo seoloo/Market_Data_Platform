@@ -113,16 +113,17 @@ def daily_findings(root: Path, now_ms: int) -> list[tuple[str, str]]:
     return out
 
 
-def beat_and_alert(root: Path, me: str, now_ms: int) -> str | None:
+def beat_and_alert(root: Path, me: str, now_ms: int, *, alert: bool = True) -> str | None:
     """``beat`` + 알릴 것이 있으면 **투자 봇**으로 보낸다 (정보 봇이 멈춰도 알림이 가게).
 
+    ``alert`` 가 False(설정에서 봇 멈춤 알림 끔)면 기록만 한다.
     보내기에 실패하면 그 이유를 돌려준다."""
     from auto_trading.config.secrets import load_telegram_credentials
     from auto_trading.notify.channels import NotifyError, TelegramNotifier
 
     text = beat(root, me, now_ms)
     creds = load_telegram_credentials(root / ".env")
-    if text is None or creds is None:
+    if text is None or creds is None or not alert:
         return None
     bot = TelegramNotifier(creds)
     try:

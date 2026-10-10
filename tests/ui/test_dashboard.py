@@ -586,7 +586,11 @@ class TestRender:
     def test_both_themes_on_every_page(self, root: Path, page: str, theme: str) -> None:
         html = render_page(load_dashboard(root, P0 + 11 * D), page, theme=theme)
         assert f'data-theme="{theme}"' in html
-        assert "라이트 모드" in html and "다크 모드" in html
+        if page == "live":  # 오르빗: 테마 고르기는 설정 화면, 위쪽엔 해 · 달 전환 버튼 하나
+            other = "라이트" if theme == "dark" else "다크"
+            assert f"{other} 모드로 전환" in html and 'href="/settings"' in html
+        else:
+            assert "라이트 모드" in html and "다크 모드" in html
         assert '<div class="topbar">' in html
         assert _no_script(html, page) and EVIL not in html
 

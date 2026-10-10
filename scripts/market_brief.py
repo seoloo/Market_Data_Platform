@@ -42,6 +42,7 @@ from auto_trading.config.secrets import (  # noqa: E402
     read_env_file,
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
+from auto_trading.ops import user_settings  # noqa: E402
 from auto_trading.ops.market_brief import (  # noqa: E402
     JEV_PROMPT_VERSION,
     Evidence,
@@ -480,7 +481,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     (OUT / f"{stem}.txt").write_text(text, encoding="utf-8")
     OutboxNotifier(OUT / "outbox.log").send(text)
-    if not args.no_send:
+    if not args.no_send and user_settings.get(REPO, "alerts.brief"):
         creds = load_telegram_info_credentials(REPO / ".env")  # 정보 봇 (2026-10-10)
         if creds is not None:
             try:

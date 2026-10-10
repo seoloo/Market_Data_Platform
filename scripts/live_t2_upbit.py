@@ -38,6 +38,7 @@ from auto_trading.core.errors import AutoTradingError, ExchangeError, OrderState
 from auto_trading.exchange.upbit import UpbitClient, UpbitOrder
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, sub
+from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.ops.t2_upbit import (
     COINS,
@@ -313,7 +314,9 @@ def run_cmd() -> int:
         ]
     )
     print(text)
-    if lines or fill_lines:  # 주문 · 입출금 · 정지가 있던 날만 알린다
+    # 주문 · 입출금 · 정지가 있던 날만 알린다. 설정에서 매매 알림을 꺼도 정지 · 경고는 보낸다.
+    risky = any("정지" in x or "⚠" in x for x in lines)
+    if (lines or fill_lines) and (user_settings.get(REPO, "alerts.cruise_trade") or risky):
         _notify(text)
     return 0
 
@@ -454,7 +457,8 @@ def weekly_cmd() -> int:
         ]
     )
     print(text)
-    _notify(text)
+    if user_settings.get(REPO, "alerts.cruise_weekly"):
+        _notify(text)
     return 0
 
 

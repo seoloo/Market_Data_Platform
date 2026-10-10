@@ -30,7 +30,7 @@ import math
 import re
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -53,6 +53,7 @@ from auto_trading.exchange.toss import (
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
+from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.ops.m3_guard import (
     DIV_STEPS_KRW,
@@ -189,6 +190,39 @@ DIV_STEP_DAYS = 30
 """배당 단계 질문은 30 일 동안 열어 두고, 답이 없으면 '이번엔 안 함' 으로 넘어간다."""
 M3_MAX_KRW = 5_000_000.0
 """텔레그램 금액 답의 상한 (오타 방지). 넘으면 다시 묻는다."""
+
+
+def _pref(key: str) -> Any:
+    """오르빗 설정 화면 값 (사용자 2026-10-10). 저장 전이면 기본값 = 위 상수들과 같은 지금 운용값.
+
+    REPO 를 부를 때마다 본다 — 시험이 REPO 를 임시 폴더로 바꾼다."""
+    return user_settings.get(REPO, key)
+
+
+def _m3_monthly() -> float:
+    return float(_pref("glide.monthly_krw"))
+
+
+def _m3_max() -> float:
+    return float(_pref("glide.max_krw"))
+
+
+def _plans() -> tuple[Plan, ...]:
+    """적립 종목 + 설정 화면에서 바꾼 하루 금액 · 켜기 기록(내일부터, 끈 기간은 0)."""
+    out = []
+    for plan in PLANS:
+        hist = user_settings.acc_history(REPO, plan.symbol)
+        if hist:
+            top = max([plan.daily, *(r for _, r in plan.changes), *(r for _, r in hist)])
+            plan = replace(
+                plan,
+                changes=(*plan.changes, *hist),
+                monthly_cap=max(plan.monthly_cap, top * 31),
+            )
+        out.append(plan)
+    return tuple(out)
+
+
 TOSS_FEE = 0.001
 """토스 미국 수수료 0.1% (2026-10-04 API). 실행 때 ``/commissions`` 값이 있으면 그것을 쓴다."""
 FX_BUFFER = 0.02
@@ -269,8 +303,8 @@ def _notify(text: str, telegram: bool) -> None:
 
 
 def _trader() -> TossTrader:
-    symbols = {p.symbol for p in PLANS} | {TQQQ} | set(M3_SYMBOLS)
-    limit = max([p.max_limit_usd for p in PLANS] + [MAX_TQQQ_LIMIT_USD])
+    symbols = {p.symbol for p in _plans()} | {TQQQ} | set(M3_SYMBOLS)
+    limit = max([p.max_limit_usd for p in _plans()] + [MAX_TQQQ_LIMIT_USD])
     return TossTrader(
         load_toss_credentials(REPO / ".env"),
         TossTokenCache(TOKEN),
@@ -530,7 +564,7 @@ def _m3_plan(
         share *= 1.0 if rebuying else STAGE_SHARE[int(m3.brake.get("stage", 0))]
     events = _dividend_events() if events is None else events
     notes = credit_dividends(m3, events, day.today, _since)
-    krw = m3.amounts.get(day.today[:7], M3_MONTHLY_KRW)
+    krw = m3.amounts.get(day.today[:7], _m3_monthly())
     usd = deposit(m3, day.today, krw, day.fx)
     if usd:
         src = "텔레그램 답" if day.today[:7] in m3.amounts else "기본"
@@ -613,9 +647,9 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
         krw = parse_krw(msg.text)
         if krw is None:
             _notify("❓ 금액으로 읽지 못했어요. 예: 30만 · 500000 · 0(이번 달 쉬기)", telegram)
-        elif krw > M3_MAX_KRW:
+        elif krw > _m3_max():
             _notify(
-                f"❓ {krw:,.0f}원은 상한({M3_MAX_KRW:,.0f}원)보다 커요. 다시 보내 주세요", telegram
+                f"❓ {krw:,.0f}원은 상한({_m3_max():,.0f}원)보다 커요. 다시 보내 주세요", telegram
             )
         else:
             m3.amounts[target] = krw
@@ -633,21 +667,21 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
 
 def _m3_ask_today(today: str, telegram: bool) -> bool:
     """매수 당일(이번 달 아직 안 산 평일) 아침에 금액을 묻는다. 달마다 한 번. 물었으면 True."""
-    if not M3_ENABLED:
-        return False
+    if not M3_ENABLED or not _pref("glide.ask_on"):
+        return False  # 묻기 꺼짐(설정) — 기본 월 납입으로 산다
     m3 = _load_m3()
     month = today[:7]
     if not due(m3, today) or deposited(m3, month) or month in (m3.ask_month, *m3.amounts):
         return False  # 이미 물었거나 이번 달 금액을 미리 정해 두었다
     m3.ask_month, m3.ask_ts = today[:7], int(time.time())
     _save_m3(m3)
-    _notify(ask_message(today, M3_MONTHLY_KRW), telegram)
+    _notify(ask_message(today, _m3_monthly()), telegram)
     return True
 
 
 def _m3_preview(now: datetime, *, title: str = "") -> str:
     """오늘 밤 M3 계획 · 보유 · 배당 (상태는 복사본으로만 계산, 주문 없음)."""
-    states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
+    states = {p.symbol: s for p in _plans() if (s := _load_plan_state(p)) is not None}
     qs = _live_qs()
     trader = _trader()
     try:
@@ -663,7 +697,7 @@ def _m3_preview(now: datetime, *, title: str = "") -> str:
         needs = _needs(day, states, qs)
     finally:
         trader.close()
-    krw = before.amounts.get(day.today[:7], M3_MONTHLY_KRW)
+    krw = before.amounts.get(day.today[:7], _m3_monthly())
     source = "텔레그램 답" if day.today[:7] in before.amounts else "기본"
     if deposited(before, day.today[:7]):
         krw, source = 0.0, "이미 넣음"
@@ -1000,7 +1034,8 @@ def _glide_morning(now: datetime, telegram: bool) -> None:
             changed = True
     year = now.year
     want_harvest = (
-        now.month == 12
+        bool(_pref("glide.harvest_on"))
+        and now.month == 12
         and not any(x.pid == f"h{year}" for x in props)
         and today <= harvest_deadline(year)
     )
@@ -1170,7 +1205,8 @@ class Day:
         self.notes: list[str] = []
         self.holdings: dict[str, TossPosition] = reader.holdings()
         self.prices = {
-            k: float(v) for k, v in reader.prices([p.symbol for p in PLANS] + [TQQQ, DIV]).items()
+            k: float(v)
+            for k, v in reader.prices([p.symbol for p in _plans()] + [TQQQ, DIV]).items()
         }
         self.fx = float(reader.usd_krw())
         fee = reader.us_commission()
@@ -1234,7 +1270,7 @@ def _needs(day: Day, states: dict[str, State], qs: QsLiveState | None) -> list[d
     """오늘 밤 낼 매수 주문 (종목·수량·지정가·달러). 상태는 복사본으로 계산한다."""
     out: list[dict[str, Any]] = []
     accrued_qndx = 0.0
-    for plan in PLANS:
+    for plan in _plans():
         state = states.get(plan.symbol)
         if state is None:
             continue
@@ -1270,7 +1306,7 @@ def _needs(day: Day, states: dict[str, State], qs: QsLiveState | None) -> list[d
 
 
 def start() -> int:
-    if any(_path(f"{p.symbol}.json").exists() for p in PLANS) or _path(QS_FILE).exists():
+    if any(_path(f"{p.symbol}.json").exists() for p in _plans()) or _path(QS_FILE).exists():
         print(f"이미 시작했다: {DATA}")
         return 2
     now = _kst_now()
@@ -1282,7 +1318,7 @@ def start() -> int:
     finally:
         reader.close()
     lines = [f"토스 적립 + QS 시작 {today}"]
-    for plan in PLANS:
+    for plan in _plans():
         pos = holdings.get(plan.symbol)
         qty = float(pos.qty) if pos else 0.0
         _save_plan_state(
@@ -1307,7 +1343,7 @@ def fx(telegram: bool = True) -> int:
     if now.weekday() >= 5:
         print("주말 — 오늘 밤 미국 장 없음")
         return 0
-    states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
+    states = {p.symbol: s for p in _plans() if (s := _load_plan_state(p)) is not None}
     qs = _live_qs()
     if not states:
         print("아직 시작 전 (start)")
@@ -1343,6 +1379,9 @@ def fx(telegram: bool = True) -> int:
     )
     if not needs or short <= 0:
         print(f"환전 필요 없음 — 오늘 밤 매수 {len(needs)}건, 달러 {day.usd:,.2f}")
+        return 0
+    if not _pref("alerts.fx"):
+        print(f"환전 알림 꺼짐 (설정) — 모자란 달러 약 ${short:,.2f}")
         return 0
     usd_to_buy = math.ceil(short)
     items = [f"• {n['symbol']} {n['qty']}주  약 ${n['usd']:,.2f}" for n in needs]
@@ -1410,7 +1449,7 @@ def _send(
 def run(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
-    states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
+    states = {p.symbol: s for p in _plans() if (s := _load_plan_state(p)) is not None}
     qs = _live_qs()
     if not states:
         print("아직 시작 전 (start)")
@@ -1426,7 +1465,7 @@ def run(telegram: bool = True) -> int:
         enabled = trader.credentials.trading_enabled
         halted = halted_reason(HALT)
         accrued_qndx = 0.0
-        for plan in PLANS:
+        for plan in _plans():
             state = states.get(plan.symbol)
             if state is None:  # 새로 추가된 종목 — 오늘 시작, 지금 보유는 적립 밖
                 q, avg = day.qty_avg(plan.symbol)
@@ -1617,14 +1656,14 @@ def m3_only(telegram: bool = True) -> int:
 
 def preview() -> int:
     now = _kst_now()
-    states = {p.symbol: s for p in PLANS if (s := _load_plan_state(p)) is not None}
+    states = {p.symbol: s for p in _plans() if (s := _load_plan_state(p)) is not None}
     qs = _live_qs()
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
         if not states:  # 시작 전이면 지금 보유를 기준으로 가정
             today = now.strftime("%Y-%m-%d")
-            for plan in PLANS:
+            for plan in _plans():
                 q, a = day.qty_avg(plan.symbol)
                 states[plan.symbol] = State(plan.symbol, today, q, q, q * a)
             q, a = day.qty_avg(TQQQ)
@@ -1634,7 +1673,7 @@ def preview() -> int:
         needs = _needs(day, states, qs)
         advices = [
             day.plan_advice(p, states[p.symbol], qs)
-            for p in PLANS
+            for p in _plans()
             if p.symbol in states and p.symbol not in STOPPED
         ]
     finally:
@@ -1654,7 +1693,7 @@ def preview() -> int:
 
 
 def status() -> int:
-    for plan in PLANS:
+    for plan in _plans():
         s = _load_plan_state(plan)
         if s is None:
             print(f"{plan.symbol}: 시작 전")
@@ -1678,7 +1717,7 @@ def status() -> int:
         print(
             f"Glide(M3): 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
             f" · 전략 현금 ${m3.cash_usd:,.2f} · TQQQ {m3.qty.get(LEV, 0):g}"
-            f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {M3_MONTHLY_KRW:,.0f}원"
+            f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {_m3_monthly():,.0f}원"
         )
         b = _brake_of(m3)
         print(
@@ -1704,7 +1743,7 @@ def harvest_plan(other_gains_krw: float) -> int:
         fee = reader.us_commission()
     finally:
         reader.close()
-    strategy = {p.symbol for p in PLANS}
+    strategy = {p.symbol for p in _plans()}
     hs = [
         Holding(sym, float(pos.qty), float(pos.avg_price), float(pos.last), sym in strategy)
         for sym, pos in holdings.items()
@@ -1764,7 +1803,7 @@ def m3_test(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
     mark = "🧪 테스트 — 실제 묻기 · 주문 아님"
-    ask = f"{mark}\n{ask_message(today, M3_MONTHLY_KRW)}"
+    ask = f"{mark}\n{ask_message(today, _m3_monthly())}"
     _notify(ask, telegram)
     print(ask)
     plan = _m3_preview(now, title=f"{mark} (답 30만원이라고 가정)")

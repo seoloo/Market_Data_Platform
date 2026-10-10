@@ -81,6 +81,8 @@ def export(folder: Path) -> int:
                     )
                 html = html.replace(f'href="{other_href}"', f'href="{target}{suffix}.html"')
                 html = html.replace(f'href="{other_href}#', f'href="{target}{suffix}.html#')
+            # 설정 화면은 서버가 있어야 저장되므로 파일 묶음에는 없다 — 실거래 홈으로 보낸다
+            html = html.replace('href="/settings"', f'href="live{suffix}.html"')
             (folder / f"{stem}{suffix}.html").write_text(html, encoding="utf-8", newline="\n")
     print(f"화면 {len(PAGES)}개 × 2개 테마 저장: {folder}")
     if data.errors:

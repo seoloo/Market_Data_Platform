@@ -20,6 +20,7 @@ from typing import Any
 
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
+from auto_trading.ops import user_settings
 from auto_trading.ops.fire import Snapshot, monthly_rate, report_text
 from auto_trading.ui.live_home import build_books, fetch_quotes, needed
 
@@ -64,7 +65,20 @@ def build(root: Path, today: date) -> tuple[str, Snapshot]:
         if "deposits" in last_raw and "value" in last_raw
         else None
     )
-    text = report_text(today, now, monthly_rate(dated_deposits(root), today), last)
+    prefs = user_settings.load(root)
+    scenarios = (
+        ("🟢", "좋을 때", float(prefs["fire.rate_good"]) / 100),
+        ("⚪", "보통", float(prefs["fire.rate_mid"]) / 100),
+        ("🔴", "나쁠 때", float(prefs["fire.rate_bad"]) / 100),
+    )
+    text = report_text(
+        today,
+        now,
+        monthly_rate(dated_deposits(root), today),
+        last,
+        target=float(prefs["fire.target_krw"]),
+        scenarios=scenarios,
+    )
     if q.errors:
         text += "\n⚠ 시세 일부 실패 — 원가로 셈: " + " · ".join(q.errors)
     return text, now
@@ -75,6 +89,9 @@ def _today() -> date:
 
 
 def run(root: Path = REPO) -> int:
+    if not user_settings.get(root, "fire.report_on"):
+        print("파이어 보고 꺼짐 (설정)")
+        return 0
     today = _today()
     text, now = build(root, today)
     creds = load_telegram_credentials(root / ".env")

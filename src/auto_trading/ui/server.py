@@ -4,6 +4,9 @@
 
 * 별도 프로세스: 매매·Paper 실행기와 따로 돈다. 죽어도 매매에 닿지 않는다.
 * 읽기 전용: 요청마다 DB 를 ``mode=ro`` 로 열고 닫는다.
+* **예외 둘째** (사용자 2026-10-10 시안 확정): ``POST /settings/review`` · ``/settings/save`` —
+  설정 화면. 같은 출처 + 프로세스마다 새 토큰 + 확인 화면을 거쳐야 저장된다. 쓰는 곳은
+  ``data/settings/`` 와 비상 정지 ``data/HALT`` 뿐 (ops/user_settings.py). 매매 규칙은 못 바꾼다.
 * **예외 하나** (사용자 요청 2026-10-02): ``POST /catchup`` — 놓친 예약 작업을 작업 스케줄러로
   다시 시작한다(ui/catchup.py). 받는 값은 화면에 심은 토큰뿐이고, 무엇을 돌릴지는 서버가 정한다.
   같은 출처(Origin·Host)와 프로세스마다 새로 만든 토큰이 맞아야 한다. PUT·DELETE 등은 501.
@@ -23,15 +26,19 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import UTC, datetime
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from auto_trading.ops import user_settings
 from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.data import DashboardData, load_dashboard
+from auto_trading.ui.orbit_home import layout as orbit_layout
 from auto_trading.ui.orbit_icons import ICON_ASSETS
 from auto_trading.ui.render import PAGES, render_page
+from auto_trading.ui.settings_page import render_review, render_settings
 
 __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
 
@@ -87,10 +94,16 @@ class DashboardServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(
-        self, address: tuple[str, int], loader: Loader, catchup: CatchupRunner | None = None
+        self,
+        address: tuple[str, int],
+        loader: Loader,
+        catchup: CatchupRunner | None = None,
+        root: Path | None = None,
     ) -> None:
         self.loader = loader
         self.catchup = catchup
+        self.root = root
+        self.settings_token = secrets.token_urlsafe(24)
         super().__init__(address, _Handler)
 
     def same_origin(self, origin: str | None, host: str | None) -> bool:
@@ -106,6 +119,11 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/settings" and self.server.root is not None:
+            saved_n = (parse_qs(self.path.partition("?")[2]).get("saved") or [""])[0]
+            notice = f"저장했어요 · 바뀐 값 {saved_n}개" if saved_n.isdigit() else ""
+            self._settings_page(user_settings.load(self.server.root), {}, notice)
+            return
         asset = _ASSETS.get(path)
         if asset is not None:
             try:
@@ -131,7 +149,17 @@ class _Handler(BaseHTTPRequestHandler):
             except CookieError:
                 cookie = SimpleCookie()
             saved = cookie.get("dashboard_theme")
-            theme = selected if selected in {"light", "dark"} else saved.value if saved else "light"
+            prefs = user_settings.load(self.server.root) if self.server.root else {}
+            default_theme = (
+                prefs.get("screen.theme") if prefs.get("screen.theme") != "system" else ""
+            )
+            theme = (
+                selected
+                if selected in {"light", "dark"}
+                else saved.value
+                if saved
+                else default_theme or "light"
+            )
             cookies: list[str] = []
             if page == "live":
                 amounts = (query.get("amounts") or [""])[0]
@@ -140,7 +168,9 @@ class _Handler(BaseHTTPRequestHandler):
                 hide = (
                     amounts == "hide"
                     if amounts in {"hide", "show"}
-                    else bool(saved_amounts and saved_amounts.value == "hide")
+                    else saved_amounts.value == "hide"
+                    if saved_amounts
+                    else bool(prefs.get("screen.hide_amounts"))
                 )
                 seen = cookie.get("dashboard_onboard")
                 onboarded = (
@@ -176,8 +206,72 @@ class _Handler(BaseHTTPRequestHandler):
             csp=_LIVE_CSP if page == "live" else None,
         )
 
+    def _theme(self) -> str:
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except CookieError:
+            return "light"
+        saved = cookie.get("dashboard_theme")
+        if saved and saved.value in {"light", "dark"}:
+            return saved.value
+        pref = user_settings.get(self.server.root, "screen.theme") if self.server.root else ""
+        return pref if pref in {"light", "dark"} else "light"
+
+    def _settings_page(
+        self, values: dict[str, object], errors: dict[str, str], notice: str = ""
+    ) -> None:
+        assert self.server.root is not None
+        body = render_settings(
+            values,
+            token=self.server.settings_token,
+            errors=errors,
+            notice=notice,
+            log=user_settings.read_log(self.server.root),
+        )
+        self._send(200 if not errors else 400, orbit_layout(body, self._theme(), "settings"))
+
+    def _settings_post(self) -> None:
+        """설정 화면 두 단계: review(확인 화면) → save(저장). 둘 다 값을 다시 검사한다."""
+        root = self.server.root
+        if root is None:
+            self._send(404, "<!doctype html><meta charset='utf-8'><p>없는 화면</p>")
+            return
+        if not self.server.same_origin(self.headers.get("Origin"), self.headers.get("Host")):
+            self._send(403, "<!doctype html><meta charset='utf-8'><p>다른 출처의 요청</p>")
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length <= 32_768:
+            self._send(400, "<!doctype html><meta charset='utf-8'><p>잘못된 요청</p>")
+            return
+        raw = parse_qs(self.rfile.read(length).decode("utf-8", "replace"))
+        form = {k: v[-1] for k, v in raw.items()}
+        if not secrets.compare_digest(form.get("token", ""), self.server.settings_token):
+            self._send(403, "<!doctype html><meta charset='utf-8'><p>화면을 새로 고친 뒤 다시</p>")
+            return
+        current = user_settings.load(root)
+        new, errors = user_settings.validate(form, current)
+        if errors:
+            self._settings_page(new, errors)
+            return
+        changes = user_settings.diff(current, new)
+        if self.path == "/settings/review":
+            body = render_review(changes, form, token=self.server.settings_token)
+            self._send(200, orbit_layout(body, self._theme(), "settings"))
+            return
+        user_settings.apply(root, changes, datetime.now(UTC))
+        self.send_response(303)
+        self.send_header("Location", f"/settings?saved={len(changes)}")
+        self.send_header("Content-Length", "0")
+        for name, value in _HEADERS.items():
+            self.send_header(name, value)
+        self.end_headers()
+
     def do_POST(self) -> None:
-        """놓친 작업 다시 실행 버튼 하나만 받는다."""
+        """놓친 작업 다시 실행 버튼 · 설정 화면(확인 → 저장)만 받는다."""
+        if self.path in ("/settings/review", "/settings/save"):
+            self._settings_post()
+            return
         if self.path != "/catchup" or self.server.catchup is None:
             self._send(404, "<!doctype html><meta charset='utf-8'><p>없는 화면</p>")
             return
@@ -264,4 +358,4 @@ def make_server(
     def loader() -> DashboardData:
         return load_dashboard(root, int(time.time() * 1000))
 
-    return DashboardServer((host, port), loader, catchup or CatchupRunner(root))
+    return DashboardServer((host, port), loader, catchup or CatchupRunner(root), root)

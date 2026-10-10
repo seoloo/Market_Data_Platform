@@ -23,6 +23,7 @@ from typing import Any
 from scripts.run_lt_kr import build_panel, members
 from scripts.run_lt_leaders import trend_up
 
+from auto_trading.ops import user_settings
 from auto_trading.ops.theme_alert import (
     build_messages,
     diff_weeks,
@@ -131,8 +132,8 @@ def _send(texts: list[str], telegram: bool) -> list[str]:
     errors: list[str] = []
     for text in texts:
         OutboxNotifier(REPORTS / "outbox.log").send(text)
-        if not telegram:
-            continue
+        if not telegram or not user_settings.get(REPO, "alerts.theme"):
+            continue  # 설정에서 주간 테마를 끄면 기록만 남긴다
         creds = load_telegram_info_credentials(REPO / ".env")  # 정보 봇 (2026-10-10)
         if creds is None:
             errors.append("텔레그램 설정 없음")

@@ -89,7 +89,8 @@ def _guide() -> str:
     )
 
 
-def layout(body: str, theme: str) -> str:
+def layout(body: str, theme: str, active: str = "live") -> str:
+    """``active``: 'live'(실거래 홈) · 'settings'(설정, 2026-10-10 — 스크립트 없음)."""
     # 앱의 선택 테마를 따른다. OS 테마나 CSS 필터로 낮 그림을 어둡게 만들지 않는다.
     if theme == "dark":
         body = body.replace(
@@ -97,46 +98,50 @@ def layout(body: str, theme: str) -> str:
             '<img class="orbit-hero-cat" src="/assets/orbit-hero-dark-sleep.png"',
             1,
         )
-    themes = "".join(
-        f'<a href="/live?theme={key}" aria-label="{label} 모드" '
-        f'aria-current="{"true" if theme == key else "false"}">{label}</a>'
-        for key, label in (("light", "라이트"), ("dark", "다크"))
-    )
+    # 테마 고르기는 설정 화면(/settings)과 위쪽 해 · 달 버튼으로 옮겼다 (2026-10-10).
     return (
-        f'<!doctype html><html lang="ko" data-theme="{theme}" data-page="live">'
+        f'<!doctype html><html lang="ko" data-theme="{theme}" data-page="{active}">'
         '<head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        # 스크립트가 꺼진 브라우저만 예전처럼 화면 전체를 60 초마다 새로 고친다
-        '<noscript><meta http-equiv="refresh" content="60"></noscript>'
-        "<title>오르빗 · 내 자산</title>"
+        # 스크립트가 꺼진 브라우저만 60 초마다 새로 고친다 (설정 화면은 입력이 지워져 뺌)
+        + (
+            '<noscript><meta http-equiv="refresh" content="60"></noscript>'
+            if active == "live"
+            else ""
+        )
+        + f"<title>오르빗 · {'설정' if active == 'settings' else '내 자산'}</title>"
         '<link rel="icon" type="image/png" href="/assets/obi.png?v=3">'
         '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">'
         f"<style>{_CSS}</style>"
-        '<script src="/assets/orbit-live.js" defer></script>'
-        '</head><body><div class="topbar">'
+        + ('<script src="/assets/orbit-live.js" defer></script>' if active == "live" else "")
+        + '</head><body><div class="topbar">'
         '<a class="logo" href="/live"><img src="/assets/orbit-obi.png" '
         'alt="오비, 네온 궤도 속 우주 고양이" width="44" height="44"><b>오르빗</b></a>'
         '<nav class="orbit-nav" aria-label="주 메뉴">'
-        '<a class="on" href="/live" aria-current="page" aria-label="홈">'
-        f"{icon('home')}<span>홈</span></a>"
-        f'<a href="#orbit-assets" aria-label="내 자산">{icon("pie")}<span>내 자산</span></a>'
-        '<button type="button" class="orbit-accounts" popovertarget="orbit-accounts" '
-        'aria-label="연결 계좌">'
-        f"{icon('wallet')}<span>연결 계좌</span></button>"
-        '<button type="button" class="orbit-settings" popovertarget="orbit-settings" '
-        'aria-label="설정">'
-        f"{icon('gear')}<span>설정</span></button>"
-        + _popup(
-            "orbit-settings",
-            "화면 설정",
-            f'<div class="orbit-themes">{themes}</div>'
-            "<p>표시 테마만 바꿉니다. 매매 설정은 변경하지 않습니다.</p>"
-            '<p><a href="/live?onboard=again">처음 안내 다시 보기</a></p>',
+        + (
+            '<a class="on" href="/live" aria-current="page" aria-label="홈">'
+            if active == "live"
+            else '<a href="/live" aria-label="홈">'
         )
+        + f"{icon('home')}<span>홈</span></a>"
+        f'<a href="/live#orbit-assets" aria-label="내 자산">{icon("pie")}<span>내 자산</span></a>'
+        + (
+            '<button type="button" class="orbit-accounts" popovertarget="orbit-accounts" '
+            f'aria-label="연결 계좌">{icon("wallet")}<span>연결 계좌</span></button>'
+            if active == "live"
+            else ""
+        )
+        + f'<a class="orbit-settings{" on" if active == "settings" else ""}" href="/settings" '
+        f'aria-label="설정"{" aria-current=page" if active == "settings" else ""}>'
+        f"{icon('gear')}<span>설정</span></a>"
         + f'{_guide()}</nav><div class="orbit-tools">'
-        '<button type="button" popovertarget="orbit-status" aria-label="확인할 사항">'
-        f"{icon('bell')}</button>"
-        f'<a href="/live?theme={"dark" if theme == "light" else "light"}" '
+        + (
+            '<button type="button" popovertarget="orbit-status" aria-label="확인할 사항">'
+            f"{icon('bell')}</button>"
+            if active == "live"
+            else ""
+        )
+        + f'<a href="/{active}?theme={"dark" if theme == "light" else "light"}" '
         f'aria-label="{"다크" if theme == "light" else "라이트"} 모드로 전환" '
         f'title="{"다크" if theme == "light" else "라이트"} 모드로 전환">'
         f"{icon('moon' if theme == 'light' else 'sun')}</a>"
