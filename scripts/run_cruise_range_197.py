@@ -90,8 +90,14 @@ def simulate_cruise(
     lump: float = 0.0,
     tax: bool = True,
     lag: int = 0,
+    stop: str | None = None,
 ) -> dict[str, Any]:
-    """일간 모의 Cruise 계좌 (순수). ``lag`` 1 이면 종가 d 목표를 종가 d+1 에 체결(190 틀 점검용)."""
+    """일간 모의 Cruise 계좌 (순수). ``lag`` 1 이면 종가 d 목표를 종가 d+1 에 체결(190 틀 점검용).
+
+    ``stop`` (199): 계좌 NAV 낙폭 30% 면 새 매수를 멈춘다(실거래와 같다). 풀기 —
+    ``"never"`` 안 풂 · ``"days30"`` · ``"days90"`` 그만큼 지나면 · ``"trend"`` BTC 종가가 20 · 60 · 120 일
+    전보다 모두 높은 첫날. 풀 때 NAV 를 새 고점으로. ``None`` 이면 정지 없음(197 그대로).
+    """
     coins = list(px)
     qty = dict.fromkeys(coins, 0.0)
     cost = dict.fromkeys(coins, 0.0)
@@ -108,6 +114,9 @@ def simulate_cruise(
     trades = 0
     pending: dict[str, float] | None = None
     peak, dd_hit = 0.0, None
+    s_peak, stopped, stop_day = 0.0, False, ""
+    halts = halted_days = 0
+    stop_days: list[str] = []
 
     def value(d: str) -> float:
         return cash + sum(qty[c] * px[c][d] for c in coins if qty[c])
@@ -140,6 +149,16 @@ def simulate_cruise(
             cash += amt
             paid += amt
             flows.append((d, amt))
+        if stop is not None and units > 0:
+            nav_now = value(d) / units
+            s_peak = max(s_peak, nav_now)
+            if stopped and _release(stop, d, stop_day, hist.get("BTC", [])):
+                stopped, s_peak = False, nav_now
+            if not stopped and nav_now <= s_peak * (1 - DD_STOP):
+                stopped, stop_day = True, d
+                halts += 1
+                stop_days.append(d)
+            halted_days += stopped
         w_now = weights(hist)
         w = w_now if lag == 0 else pending
         pending = w_now
@@ -167,6 +186,8 @@ def simulate_cruise(
                     qty[c] -= q
                     cash += proceeds
                 else:
+                    if stopped:
+                        continue
                     krw = min((want - cur) * eq, cash)
                     if krw < MIN_KRW:
                         continue
@@ -192,7 +213,21 @@ def simulate_cruise(
         "taxes": taxes,
         "trades": trades,
         "dd_hit": dd_hit,
+        "halts": halts,
+        "halted_days": halted_days,
+        "stop_days": stop_days,
     }
+
+
+def _release(stop: str, d: str, stop_day: str, btc: Sequence[float]) -> bool:
+    if stop == "never":
+        return False
+    if stop.startswith("days"):
+        gap = (date.fromisoformat(d) - date.fromisoformat(stop_day)).days
+        return gap >= int(stop[4:])
+    if stop == "trend":
+        return len(btc) > max(LOOKBACKS) and all(btc[-1] > btc[-1 - k] for k in LOOKBACKS)
+    raise ValueError(stop)
 
 
 def mdd(xs: Sequence[float]) -> float:

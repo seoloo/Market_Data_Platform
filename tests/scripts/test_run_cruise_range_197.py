@@ -67,3 +67,23 @@ def test_combo_stats_flows_do_not_count_as_returns() -> None:
     paid = {m: 100.0 * (i + 1) for i, m in enumerate(months)}
     flat = combo_stats([(dict(paid), paid)])  # 넣은 만큼만 있음 → 배수 1, 낙폭 0
     assert flat["x1"] == pytest.approx(1.0) and flat["mdd"] == pytest.approx(0.0)
+
+
+def test_stop_blocks_buys_until_release() -> None:
+    days = [(date(2020, 1, 1) + timedelta(days=i)).isoformat() for i in range(900)]
+    px = {}
+    for c in ("BTC", "ETH"):
+        s, p = {}, 100.0
+        for i, d in enumerate(days):
+            # 오름 → 하루 −40% → 다시 오름
+            p *= 1.006 if i < 300 else 0.6 if i == 300 else 1.004
+            p *= 1.01 if i % 2 else 0.99
+            s[d] = p
+        px[c] = s
+    base = simulate_cruise(days, px, start=days[200])
+    assert base["halts"] == 0  # 정지 없음은 197 그대로
+    never = simulate_cruise(days, px, start=days[200], stop="never")
+    d30 = simulate_cruise(days, px, start=days[200], stop="days30")
+    assert never["halts"] == 1 and never["halted_days"] > d30["halted_days"]
+    assert never["vals"][-1] < d30["vals"][-1]  # 안 풀면 다시 오를 때 못 탄다
+    assert base["vals"] == simulate_cruise(days, px, start=days[200], stop=None)["vals"]
