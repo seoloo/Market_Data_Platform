@@ -1,7 +1,7 @@
 :root{color-scheme:light;--ink:#101b49;--muted:#526a94;--line:#d1e3f5;--surface:#ffffffed;--soft:#eaf3fc;--blue:#1677df}
 html[data-theme=dark]{color-scheme:dark;--ink:#edf3ff;--muted:#aabddd;--line:#344a70;--surface:#101e3bea;--soft:#233858;--blue:#83c9ff}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;font:15px/1.5 "Segoe UI","Malgun Gothic",sans-serif;color:var(--ink);background:linear-gradient(120deg,#e3f4ffeb,#e7ebffc9 58%,#e1fff4d9),url('/assets/orbit-space-dark.png') center/cover fixed;min-height:100vh}
+body{margin:0;font:15px/1.5 "Segoe UI","Malgun Gothic",sans-serif;color:var(--ink);background:#eef7ff url('/assets/orbit-space-light.png') center/cover fixed;min-height:100vh}
 html[data-theme=dark] body{background:#060d27 url('/assets/orbit-space-dark.png') center/cover fixed}
 a{color:inherit;text-decoration:none}button,input,summary{font:inherit}button{color:inherit;border:0;background:none;cursor:pointer}
 a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid #2e8cff;outline-offset:3px}
@@ -25,8 +25,10 @@ h1,h2,p{margin:0}h2{font-size:23px;line-height:1.3}small{font-size:13px}ul{list-
 .orbit-themes{display:flex;gap:12px;margin-top:16px}.orbit-themes a{padding:10px 24px;border:1px solid var(--line);border-radius:14px}.orbit-themes [aria-current=true]{background:var(--soft);color:var(--blue)}
 .orbit-main{max-width:1680px;margin:auto;padding:0 clamp(14px,1.7vw,28px) 24px}
 .orbit-hero{min-height:320px;position:relative;padding:24px;display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:22px;align-items:end;isolation:isolate}
-.orbit-hero::before{content:"";position:absolute;inset:0;z-index:-2;pointer-events:none;background:radial-gradient(ellipse at 75% 15%,#98d8ff50,transparent 65%)}
-.orbit-hero-cat{position:absolute;right:7%;top:0;width:31%;height:310px;object-fit:contain;pointer-events:none;z-index:-1}
+.orbit-hero::before{content:"";position:absolute;inset:0;z-index:-3;pointer-events:none;background:radial-gradient(ellipse at 75% 15%,#98d8ff50,transparent 65%)}
+.orbit-hero-art{position:absolute;inset:0 calc(-1 * clamp(14px,1.7vw,28px));z-index:-2;overflow:hidden;pointer-events:none;border-radius:0 0 28px 28px}
+.orbit-hero-art img{position:absolute;right:0;top:-162px;width:1050px;height:700px;object-fit:contain;max-width:none;mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,#000 78%,transparent);mask-composite:intersect}
+html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 30% 85% at 76% 45%,#000 55%,transparent 100%)}
 .orbit-greeting{grid-column:1;align-self:start}.orbit-greeting>span{font-size:clamp(16px,1.4vw,21px);color:var(--muted)}
 .orbit-greeting h1{font-size:clamp(28px,2.8vw,44px);letter-spacing:-1.5px;line-height:1.35}.orbit-greeting h1 span{font-size:.9em}
 .orbit-greeting p{color:var(--muted);font-size:clamp(13px,1.2vw,18px);margin-top:4px}
@@ -62,7 +64,13 @@ html[data-theme=dark] .orbit-alert{background:#34213ce8;border-color:#714064;col
 .orbit-row-label{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:8px}
 .orbit-holdings>li{display:flex;align-items:center;gap:8px;min-height:63px;padding:9px 0;border-bottom:1px solid var(--line)}.orbit-holdings>li:last-child{border:0}
 .orbit-holding-name{display:flex;align-items:center;gap:10px;min-width:0;flex:1}.orbit-coin{height:40px;width:40px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;background:var(--soft);color:var(--blue);overflow:hidden}
-.orbit-coin img{width:100%;height:100%;object-fit:contain}.coin-tqqq,.coin-schd,.coin-btq,.coin-qs{background:#fff;padding:3px;border:1px solid #e3eaf3}
+.orbit-coin img{width:100%;height:100%;object-fit:contain}
+.coin-tqqq{color:#fff;background:linear-gradient(145deg,#9673ff,#5056da)}
+.coin-schd{color:#fff;background:linear-gradient(145deg,#48d6af,#078b74)}
+.coin-btq{color:#fff;background:linear-gradient(145deg,#bc80fa,#7043c7)}
+.coin-qs{color:#fff;background:linear-gradient(145deg,#54c9ed,#237bc8)}
+.coin-wqtm{color:#fff;background:linear-gradient(145deg,#81a7ff,#466bdb)}
+.orbit-coin .orbit-icon{width:24px;height:24px;stroke-width:1.8}
 .orbit-holding-name b{font-size:16px}.orbit-holding-name small{display:block;color:var(--muted);font-size:12px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .orbit-holding-value{text-align:right;flex-shrink:0}.orbit-holding-value b{font-size:16px}.orbit-holding-value small{display:block;font-size:12px}
 .orbit-holding-value small b{font-size:12px;font-weight:400}.orbit-holding-value small small{display:inline;margin-left:4px}
@@ -87,13 +95,16 @@ summary::-webkit-details-marker{display:none}
 @media(max-width:1100px){
  .orbit-nav{gap:3px}.orbit-nav>a,.orbit-nav>button{padding:10px}.orbit-nav>a>span,.orbit-nav>button>span{display:none}
  .orbit-hero{grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);padding:24px 0}
- .orbit-help-card{width:170px;padding:14px}.orbit-help-card b{font-size:14px}.orbit-hero-cat{right:0;width:34%}
+ .orbit-help-card{width:170px;padding:14px}.orbit-help-card b{font-size:14px}
+ .orbit-hero-art img{right:-120px}
  .orbit-networth{grid-template-columns:1.5fr 1fr 1fr}.orbit-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
  .orbit-card:last-child{grid-column:1/-1}.orbit-card-pills small{display:none}.orbit-alert-copy{display:none}.orbit-bottom{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
- .orbit-hero{min-height:335px;grid-template-columns:1fr;gap:16px}.orbit-hero-cat{width:34%;height:160px;right:0;top:0;opacity:.9}
+ .orbit-hero{min-height:335px;grid-template-columns:1fr;gap:16px}
  .orbit-greeting{max-width:80%}.orbit-greeting h1{font-size:29px}.orbit-greeting p{max-width:75%}.orbit-help-card{display:none}
+ .orbit-hero-art img{width:640px;height:427px;right:-30px;top:-70px}
+ html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 31% 39% at 82% 20%,#000 60%,transparent 100%)}
  .orbit-networth{grid-column:1}.orbit-total{font-size:35px}.orbit-cards,.orbit-bottom{grid-template-columns:1fr}.orbit-card:last-child{grid-column:auto}
  .orbit-card-pills small{display:block}.orbit-card-summary strong{font-size:clamp(32px,8cqw,43px)}
 }
@@ -101,7 +112,8 @@ summary::-webkit-details-marker{display:none}
  .topbar{flex-wrap:wrap;gap:5px}.logo{font-size:24px}.logo img{height:38px;width:38px}.orbit-tools{margin-left:auto}
  .orbit-nav{order:3;flex-basis:100%;justify-content:space-between}.orbit-nav>a,.orbit-nav>button{padding:10px 14px}
  .orbit-hero{min-height:340px;padding:20px 0;gap:18px}.orbit-greeting h1{font-size:26px;letter-spacing:-1px}.orbit-greeting h1 span{display:none}
- .orbit-greeting p{font-size:12px}.orbit-hero-cat{width:33%;height:145px;top:4px}
+ .orbit-greeting p{font-size:12px}
+ .orbit-hero-art img{width:410px;height:273px;right:-20px;top:-15px}
  .orbit-networth{grid-template-columns:1fr 1fr;gap:9px;padding:15px 18px}.orbit-networth>div:first-child{grid-column:1/-1}
  .orbit-networth>div:nth-child(2){border:0;padding:0}.orbit-networth>div:nth-child(3){padding-left:12px}.orbit-networth h2{font-size:18px}
  .orbit-total{font-size:38px}.orbit-networth>div>span{font-size:12px}.orbit-alert summary{gap:8px;padding:11px 12px}

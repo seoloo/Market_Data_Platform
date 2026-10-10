@@ -48,6 +48,7 @@ def export(folder: Path) -> int:
         "orbit-obi.png",
         "orbit-hero-light.png",
         "orbit-space-dark.png",
+        "orbit-space-light.png",
     ):
         shutil.copyfile(ASSET_DIR / name, assets / name)
     (assets / "icons").mkdir(exist_ok=True)

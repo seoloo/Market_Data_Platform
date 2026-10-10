@@ -674,6 +674,7 @@ class TestServer:
             ("/assets/orbit-obi.png", "image/png"),
             ("/assets/orbit-hero-light.png", "image/png"),
             ("/assets/orbit-space-dark.png", "image/png"),
+            ("/assets/orbit-space-light.png", "image/png"),
             ("/assets/icons/btc.svg", "image/svg+xml"),
             ("/assets/icons/eth.svg", "image/svg+xml"),
             ("/assets/icons/sol.svg", "image/svg+xml"),

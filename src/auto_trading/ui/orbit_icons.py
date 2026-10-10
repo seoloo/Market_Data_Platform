@@ -30,12 +30,13 @@ _SYMBOLS = {
     "BTC": "btc.svg",
     "ETH": "eth.svg",
     "SOL": "sol.svg",
-    "TQQQ": "tqqq.png",
-    "SCHD": "schd.ico",
-    "BTQ": "btq.ico",
-    "QS": "qs.png",
 }
-ICON_ASSETS = tuple(dict.fromkeys((*[f"{v}.svg" for v in _LUCIDE.values()], *_SYMBOLS.values())))
+_STOCKS = {"TQQQ": "chart", "SCHD": "leaf", "BTQ": "quantum", "QS": "stock", "WQTM": "quantum"}
+# 예전 정적 내보내기/주소와 원본 보존. 최신 홈은 작은 비트맵 로고를 확대하지 않는다.
+_LEGACY = ("tqqq.png", "schd.ico", "btq.ico", "qs.png")
+ICON_ASSETS = tuple(
+    dict.fromkeys((*[f"{v}.svg" for v in _LUCIDE.values()], *_SYMBOLS.values(), *_LEGACY))
+)
 ICON_NOTICES = ("LICENSE-lucide", "LICENSE-cryptocurrency.md", "SOURCES.md")
 _PATHS = {
     key: (_ROOT / f"{filename}.svg")
@@ -52,8 +53,8 @@ def icon(name: str) -> str:
 
 
 def symbol_icon(symbol: str) -> str:
-    """기업 로고는 종목 식별용. 미등록 종목은 중립 펀드 아이콘."""
+    """코인은 로고, 주식은 선명한 Lucide 벡터. 공식 기업 로고로 위장하지 않는다."""
     filename = _SYMBOLS.get(symbol)
     if filename is None:
-        return icon("quantum" if symbol == "WQTM" else "deposit" if not symbol else "fund")
+        return icon(_STOCKS.get(symbol, "deposit" if not symbol else "fund"))
     return f'<img src="/assets/icons/{filename}" alt="" aria-hidden="true" width="38" height="38">'

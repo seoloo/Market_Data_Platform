@@ -224,7 +224,8 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
     caution = "확정 수익 아님" if complete else "추정치 포함 · 확정 수익 아님"
     hero = (
         '<section class="orbit-hero">'
-        '<img class="orbit-hero-cat" src="/assets/orbit-obi.png" alt="" aria-hidden="true">'
+        '<div class="orbit-hero-art" aria-hidden="true">'
+        '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png" alt=""></div>'
         '<div class="orbit-greeting"><span>안녕하세요,</span>'
         '<h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1>'
         "<p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div>"

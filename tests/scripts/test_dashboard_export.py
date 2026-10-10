@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from auto_trading.ui.orbit_icons import ICON_ASSETS, ICON_NOTICES
-from auto_trading.ui.render import PAGES
+from auto_trading.ui.render import ASSET_DIR, PAGES
 from scripts import dashboard
 
 
@@ -39,6 +39,10 @@ def test_export_both_themes_without_broken_internal_links(
         brand = "orbit-obi.png" if path.stem.startswith("live") else "obi.png?v=3"
         assert f'src="assets/{brand}"' in html
         assert "url('/assets/" not in html
+        if path.stem.startswith("live"):
+            assert 'src="assets/orbit-hero-light.png"' in html
+            assert "url('assets/orbit-space-light.png')" in html
+            assert "url('assets/orbit-space-dark.png')" in html
         assert 'href="assets/auto-trading.ico?v=3"' in html
         links = _Links()
         links.feed(html)
@@ -51,5 +55,7 @@ def test_export_both_themes_without_broken_internal_links(
     for name in (*ICON_ASSETS, *ICON_NOTICES):
         assert (folder / "assets/icons" / name).is_file()
     assert (folder / "assets" / "auto-trading.svg").exists()
+    for name in ("orbit-hero-light.png", "orbit-space-light.png", "orbit-space-dark.png"):
+        assert (folder / "assets" / name).read_bytes() == (ASSET_DIR / name).read_bytes()
     assert (folder / "assets" / "obi.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert (folder / "assets" / "auto-trading.ico").read_bytes().startswith(b"\x00\x00\x01\x00")

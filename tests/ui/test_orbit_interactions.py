@@ -74,6 +74,7 @@ def test_theme_toggle_and_shared_mascot(theme: str, expected: str) -> None:
     tools = html.split('class="orbit-tools"', 1)[1].split("</div>", 1)[0]
     assert icon(expected) in tools and icon("gear") not in tools
     assert html.count('class="orbit-hero-cat"') == 1
+    assert '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png"' in html
     assert 'class="orbit-hero-dark-cat"' not in html
 
 
@@ -107,10 +108,25 @@ def test_icon_files_safe_local_and_exactly_whitelisted() -> None:
         assert request_path not in _ASSETS
 
 
-@pytest.mark.parametrize("symbol", ["BTC", "ETH", "SOL", "TQQQ", "SCHD", "BTQ", "QS"])
+@pytest.mark.parametrize("symbol", ["BTC", "ETH", "SOL"])
 def test_known_instruments_use_local_logo_not_letter(symbol: str) -> None:
     assert 'src="/assets/icons/' in symbol_icon(symbol)
     assert 'aria-hidden="true"' in symbol_icon(symbol)
+
+
+@pytest.mark.parametrize("symbol", ["TQQQ", "SCHD", "BTQ", "QS", "WQTM"])
+def test_stock_icons_are_scalable_vectors_not_small_bitmaps(symbol: str) -> None:
+    assert symbol_icon(symbol).startswith('<svg class="orbit-icon"')
+    assert "<img" not in symbol_icon(symbol)
+
+
+def test_original_light_art_and_mascot_are_not_desktop_icon() -> None:
+    html = layout(render_live([], Quotes(), 0), "light")
+    assert 'src="/assets/orbit-hero-light.png"' in html
+    assert '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png"' in html
+    css = Path("src/auto_trading/ui/orbit.css").read_text(encoding="utf-8")
+    light_body = css.split("body{", 1)[1].split("}", 1)[0]
+    assert "orbit-space-light.png" in light_body and "orbit-space-dark.png" not in light_body
 
 
 def test_unknown_instrument_never_becomes_asset_path() -> None:
