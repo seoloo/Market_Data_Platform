@@ -328,3 +328,27 @@ def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> N
     tools = html.split('class="orbit-cards-tools"', 1)[1].split('class="orbit-cards"', 1)[0]
     assert "orbit-detail-toggle" in tools and "orbit-detail-toggle" not in acc
     assert "flex:" in html.split('class="orbit-dt-bar"', 1)[1][:200]  # 비율대로 꽉 채움
+
+
+def test_glide_brake_reserve_counts_in_value_summary_and_tiles() -> None:
+    from auto_trading.ui import live_home
+
+    state = {
+        "deposits": [["2026-10-09", 260_000.0, 200.0, 1300.0]],
+        "cash_usd": 10.0,
+        "qty": {"TQQQ": 0.0, "SCHD": 3.0},
+        "brake": {"stage": 1, "reserve_usd": 90.0},
+    }
+    q = Quotes(usd={"SCHD": 30.0}, fx=1300.0, at_ms=_NOW)
+    book = live_home.glide_book(state, q)
+    # 남은 달러 10 + 보관 90 = 100 달러 → 130,000원, SCHD 3 × 30 × 1300 = 117,000원
+    assert book.cash_krw == pytest.approx(130_000.0)
+    assert book.value_krw == pytest.approx(247_000.0)
+    assert book.info["reserve_usd"] == 90.0
+    assert any("브레이크 보관 달러 $90.00" in n for n in book.notes)
+    assert "247,000원" in live_home.summary_text([book], q, _NOW)  # 텔레그램 현황도 같은 합
+    html = render_live([book], q, _NOW, show_detail=True)
+    dt = html.split('data-live="card-glide-detail"', 1)[1].split("</section>", 1)[0]
+    assert "보관 $90.00 포함" in dt and "판 돈 $90.00 보관" in dt and "절반 팖" in dt
+    hidden = render_live([book], q, _NOW, show_detail=True, hide=True)
+    assert "90.00" not in hidden.split('data-live="card-glide-detail"', 1)[1]

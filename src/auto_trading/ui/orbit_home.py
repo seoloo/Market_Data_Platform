@@ -579,19 +579,28 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
             stage, ("확인 필요", "warn")
         )
         usd = info.get("cash_usd")
+        reserve = float(info.get("reserve_usd") or 0.0)
+
+        def dollars(x: float) -> str:
+            return _HIDDEN if hide else f"${x:,.2f}"
+
+        cash_sub = "" if usd is None else f"남은 달러 {dollars(usd)}"
+        if reserve > 0:  # 현금 = 남은 달러 + 브레이크 보관 달러
+            cash_sub = f"보관 {dollars(reserve)} 포함"
         tiles = [
-            _tile(
-                "현금",
-                cash,
-                "" if usd is None else f"남은 달러 {_HIDDEN if hide else f'${usd:,.2f}'}",
-            ),
+            _tile("현금", cash, cash_sub),
             _tile(
                 "이번 달 납입",
                 "—" if amount is None else f"{_won(amount, hide)}원",
                 f"{int(month[5:])}월 첫 거래일" if len(month) >= 7 else "",
             ),
             _tile("TQQQ 목표 비중", "—" if lev is None else f"{lev:.0%}"),
-            _tile("급락 브레이크", brake, "고점 −15%면 절반 팖", bcls),
+            _tile(
+                "급락 브레이크",
+                brake,
+                f"판 돈 {dollars(reserve)} 보관" if reserve > 0 else "고점 −15%면 절반 팖",
+                bcls,
+            ),
         ]
         now = datetime.fromtimestamp(now_ms / 1000, UTC) + _KST
         nxt = now.month % 12 + 1

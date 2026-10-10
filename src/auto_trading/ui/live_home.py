@@ -191,7 +191,9 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     dep_usd = sum(_f(d[2]) for d in deposits)
     avg_fx = dep_krw / dep_usd if dep_usd > 0 else None
     fx = q.fx or avg_fx
-    cash = _f(state.get("cash_usd")) * (fx or 0.0)
+    # T 브레이크로 판 돈은 cash_usd 와 따로 brake.reserve_usd 에 달러로 들고 있다 — 평가액에 넣는다
+    reserve_usd = _f((state.get("brake") or {}).get("reserve_usd"))
+    cash = (_f(state.get("cash_usd")) + reserve_usd) * (fx or 0.0)
     qty = state.get("qty") or {}
     spent: dict[str, float] = {}
     spent_usd: dict[str, float] = {}
@@ -266,6 +268,8 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         last = max(amounts)
         notes.append(f"{last} 납입 {_f(amounts[last]):,.0f} 원")
     notes.append(f"남은 달러 ${_f(state.get('cash_usd')):,.2f}")
+    if reserve_usd > 0:
+        notes.append(f"브레이크 보관 달러 ${reserve_usd:,.2f} (재매수 때 씀)")
     last_month = max(amounts) if amounts else ""
     info = {
         "cash_usd": _f(state.get("cash_usd")),
@@ -273,6 +277,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         "month_amount": _f(amounts[last_month]) if last_month else None,
         "lev_target": lev_target,
         "brake_stage": int(_f((state.get("brake") or {}).get("stage"))),
+        "reserve_usd": reserve_usd,
     }
     return Book(
         "glide",
