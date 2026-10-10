@@ -324,8 +324,7 @@ def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> N
     assert glide.count('<li class="orbit-pad"') == 1  # 3 종목 카드에 맞춰 한 줄 채움
     assert glide.count('<tr class="orbit-pad"') == 1
     assert acc.count('<li class="orbit-pad"') == 2  # 기록 없음 한 줄 + 빈 줄 둘
-    heading = acc.split('class="orbit-card-heading"', 1)[1].split('class="orbit-card-summary"', 1)[
-        0
-    ]
-    assert "orbit-detail-toggle" in heading and "orbit-cards-tools" not in html
+    # 버튼은 카드 밖, 화면 읽는 법 카드와 카드들 사이 줄에 (오른쪽 선 맞춤은 CSS)
+    tools = html.split('class="orbit-cards-tools"', 1)[1].split('class="orbit-cards"', 1)[0]
+    assert "orbit-detail-toggle" in tools and "orbit-detail-toggle" not in acc
     assert "flex:" in html.split('class="orbit-dt-bar"', 1)[1][:200]  # 비율대로 꽉 채움

@@ -256,3 +256,7 @@ summary::-webkit-details-marker{display:none}
 .orbit-dt-table tr.orbit-pad td{border-bottom-color:transparent}
 .orbit-dt-tile{min-height:94px}
 .orbit-dt.orbit-book-detail{margin-top:auto}
+/* 상세 보기 버튼: 화면 읽는 법 카드와 자동 적립 카드 사이, 오른쪽 선 맞춤 (2026-10-10) */
+.orbit-cards-tools{display:flex;justify-content:flex-end;margin:0;padding:0}
+.orbit-help-card{margin-right:calc(-1 * var(--hero-indent,0px))}
+.orbit-cards-tools{margin:-12px 0 12px}

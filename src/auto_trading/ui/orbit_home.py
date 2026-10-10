@@ -868,7 +868,6 @@ def render_live(
             now_ms=now_ms,
             history=hist,
             show_detail=show_detail,
-            head_extra=toggle if k == "accumulate" else "",
             pad_rows=pad,
         )
         for i, k in enumerate(("glide", "cruise", "accumulate"))
@@ -880,6 +879,7 @@ def render_live(
         + alert
         + status
         + _accounts(books, now_ms)
+        + f'<div class="orbit-cards-tools">{toggle}</div>'
         + f'<div class="orbit-cards">{cards}</div>'
         + '<div class="orbit-bottom">'
         + _history_panel(hist, hide)
