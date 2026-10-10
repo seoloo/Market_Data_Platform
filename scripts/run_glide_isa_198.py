@@ -213,6 +213,7 @@ def simulate_split(
         "dep_year_max": max(dep_year.values()) if dep_year else 0.0,
         "years_over_cap": over_year,
         "dep_total": dep_total,
+        "dep_by_year": dep_year,
         "over_withdraw_months": over_withdraw,
     }
 
