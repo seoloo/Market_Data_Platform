@@ -73,6 +73,9 @@ min-height:44px}
 .set-add{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 0;
 border-bottom:1px solid var(--line)}
 .set-add .set-input{min-height:46px}
+.set-add-btn{min-height:46px;padding:0 18px;border:0;border-radius:12px;background:var(--blue);
+color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.set-add-btn:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .set-acc small{flex:1 1 160px;color:var(--muted);font-size:13px}
 .set-danger{border:2px solid #f0c4cb}
 .set-danger h2{color:#a3283c}
@@ -300,9 +303,9 @@ def render_settings(
             f"{'국내' if kr else '미국'}</span><b>{escape(sym)}</b><small>{escape(note)}"
             f"{' · ' + escape(holdings[sym]) if sym in holdings else ''}</small>"
             f'<div class="set-input{" set-err-input" if err else ""}"><span>하루 '
-            f"{'' if kr else '$'}</span>"
+            f"{'₩' if kr else '$'}</span>"
             f'<input name="{name}" value="{shown}" inputmode="decimal" '
-            f'aria-label="{escape(sym)} 하루 금액"><span>{"원" if kr else ""}</span></div>'
+            f'aria-label="{escape(sym)} 하루 금액"></div>'
             f"{_switch(f'{key}.on', on)}"
             f'<label class="set-rm"><input type="checkbox" name="{key}.removed" value="on"'
             f"{' checked' if rm else ''}> 빼기</label>"
@@ -353,12 +356,13 @@ def render_settings(
         '<input name="new.query" placeholder="미국 기호 (예: NVDA) · 국내 이름 또는 코드 '
         '(예: 삼성전자 · 005930)" aria-label="추가할 종목"></div>'
         f'<div class="set-input{" set-err-input" if d_err else ""}" style="width:150px">'
-        '<span>하루</span><input name="new.daily" placeholder="$1 · 5,000원" '
+        '<span>하루</span><input name="new.daily" placeholder="$1 · ₩5,000" '
         'inputmode="decimal" aria-label="하루 금액"></div>'
+        '<button type="submit" class="set-add-btn">+ 추가</button>'
         + (f'<p class="set-err" style="flex-basis:100%">{escape(q_err)}</p>' if q_err else "")
         + (f'<p class="set-err" style="flex-basis:100%">{escape(d_err)}</p>' if d_err else "")
-        + '<p class="set-help" style="flex-basis:100%">[저장…]을 누르면 토스 종목 목록에서 찾아 '
-        "확인 화면에 이름 · 코드를 보여 드려요. 미국 하루 $0.5 ~ $20 · 국내 1,000 ~ 30,000원, "
+        + '<p class="set-help" style="flex-basis:100%">[+ 추가]를 누르면 토스 종목 목록에서 찾아 '
+        "확인 화면에 이름 · 코드를 보여 드려요. 미국 하루 $0.5 ~ $20 · 국내 ₩1,000 ~ ₩30,000, "
         f"합쳐서 최대 {MAX_ITEMS} 종목.</p></div>"
     )
     toss = (

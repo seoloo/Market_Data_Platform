@@ -215,7 +215,8 @@ def acc_history(root: Path, symbol: str) -> list[tuple[str, float]]:
 def _parse(f: Field, raw: str | None) -> Any:
     if f.kind == "bool":
         return raw in ("on", "1", "true")
-    text = (raw or "").replace(",", "").replace("원", "").replace("$", "").strip()
+    text = (raw or "").replace(",", "").replace("원", "").replace("$", "")
+    text = text.replace("₩", "").replace("\\", "").strip()
     if f.kind == "enum":
         if text not in f.options:
             raise ValueError("고를 수 없는 값")
@@ -227,6 +228,8 @@ def _parse(f: Field, raw: str | None) -> Any:
     if (f.lo is not None and num < f.lo) or (f.hi is not None and num > f.hi):
         if f.key.startswith(("acc.", "x.US.")):
             raise ValueError(f"${f.lo:,g} ~ ${f.hi:,g} 사이로 적어 주세요")
+        if f.key.startswith("x.KR."):
+            raise ValueError(f"₩{f.lo:,g} ~ ₩{f.hi:,g} 사이로 적어 주세요")
         raise ValueError(f"{f.lo:,g} ~ {f.hi:,g} 사이로 적어 주세요")
     return round(num) if f.kind == "int" else round(num, 2)
 
@@ -355,6 +358,8 @@ def show(key: str, value: Any) -> str:
         return {"system": "시스템", "light": "라이트", "dark": "다크"}.get(str(value), str(value))
     if key.startswith(("acc.", "x.US.")):
         return f"${float(value):g}"
+    if key.startswith("x.KR."):
+        return f"₩{float(value):,.0f}"
     if key.startswith("fire.rate"):
         return f"연 {float(value):g}%"
     return f"{float(value):,.0f}원"
@@ -367,7 +372,7 @@ def diff(current: Mapping[str, Any], new: Mapping[str, Any]) -> list[Change]:
         k = _xkey(x)
         if new.get(f"{k}.added"):
             amount = new[k + ".daily"]
-            unit = f"{amount:,.0f}원" if x["mkt"] == "KR" else f"${amount:g}"
+            unit = f"₩{amount:,.0f}" if x["mkt"] == "KR" else f"${amount:g}"
             where = "국내" if x["mkt"] == "KR" else "미국"
             out.append(
                 Change(

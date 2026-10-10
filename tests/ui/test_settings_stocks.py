@@ -44,7 +44,7 @@ def _save(root: Path, **over: str) -> list[us.Change]:
 
 def test_add_kr_and_us_then_remove(tmp_path: Path) -> None:
     ch = _save(tmp_path, **{"new.mkt": "KR", "new.query": "삼성 전자", "new.daily": "5,000"})
-    assert [c.label for c in ch] == ["국내 삼성전자(005930) 추가 · 하루 5,000원"]
+    assert [c.label for c in ch] == ["국내 삼성전자(005930) 추가 · 하루 ₩5,000"]
     assert us.acc_history(tmp_path, "005930") == [("2026-10-11", 5000.0)]
     ch = _save(tmp_path, **{"new.mkt": "US", "new.query": "엔비디아", "new.daily": "2"})
     assert ch[0].label == "미국 엔비디아(NVDA) 추가 · 하루 $2"
@@ -70,7 +70,7 @@ def test_add_errors(tmp_path: Path) -> None:
     _, err = us.validate(
         _form(v, **{"new.mkt": "KR", "new.query": "KODEX 200", "new.daily": "100"}), v, UNIVERSE
     )
-    assert "1,000 ~ 30,000" in err["new.daily"]
+    assert "₩1,000 ~ ₩30,000" in err["new.daily"]
     _, err = us.validate(_form(v, **{"new.mkt": "KR", "new.query": "삼성전자"}), v, [])
     assert "목록을 아직" in err["new.query"]
 
@@ -116,3 +116,14 @@ def test_page_shows_added_rows_and_errors(tmp_path: Path) -> None:
     assert 'name="x.KR.069500.removed"' in html and 'name="acc.BTQ.removed"' in html
     assert 'name="new.query"' in html and "찾지 못했어요" in html
     assert "준비 중</span></div>" not in html.split('id="set-toss"')[1].split("</section>")[0]
+
+
+def test_won_sign_and_add_button(tmp_path: Path) -> None:
+    _save(tmp_path, **{"new.mkt": "KR", "new.query": "005930", "new.daily": "₩7,000"})
+    v = us.load(tmp_path)
+    assert v["x.KR.005930.daily"] == 7000
+    html = render_settings(v, token="T")
+    row = html.split('name="x.KR.005930.daily"')[0].rsplit('<div class="set-acc">', 1)[1]
+    assert "<span>하루 ₩</span>" in row and "원</span>" not in row
+    assert '<button type="submit" class="set-add-btn">+ 추가</button>' in html
+    assert us.show("x.KR.005930.daily", 7000) == "₩7,000"
