@@ -13,7 +13,8 @@
 * **스크립트 예외 하나** (2026-10-10, 화면 개선): 실거래 홈(``/live``)만 같은 서버의
   ``/assets/orbit-live.js`` 하나를 허용한다 — 숫자 칸만 60 초마다 새로 고치는 읽기 전용 스크립트.
   인라인 스크립트 · 외부 스크립트는 여전히 막는다(CSP ``script-src 'self'``, 다른 화면은 그대로).
-* 실거래 홈 쿠키 둘: ``dashboard_amounts`` (금액 숨기기) · ``dashboard_onboard`` (첫 안내 봄).
+* 실거래 홈 쿠키 셋: ``dashboard_amounts`` (금액 숨기기) · ``dashboard_onboard`` (첫 안내 봄) ·
+  ``dashboard_detail`` (세 카드 보유 상세 펼침).
 """
 
 from __future__ import annotations
@@ -151,7 +152,16 @@ class _Handler(BaseHTTPRequestHandler):
                     cookies.append(f"dashboard_amounts={amounts}")
                 if onboard in {"done", "again"}:
                     cookies.append(f"dashboard_onboard={'done' if onboard == 'done' else 'again'}")
-                data = replace(data, hide_amounts=hide, onboarded=onboarded)
+                detail = (query.get("detail") or [""])[0]
+                saved_detail = cookie.get("dashboard_detail")
+                show = (
+                    detail == "open"
+                    if detail in {"open", "close"}
+                    else bool(saved_detail and saved_detail.value == "open")
+                )
+                if detail in {"open", "close"}:
+                    cookies.append(f"dashboard_detail={detail}")
+                data = replace(data, hide_amounts=hide, onboarded=onboarded, show_detail=show)
             html = render_page(data, page, theme=theme)
         except Exception as exc:  # 화면 오류가 서버를 멈추지 않게 — 원인만 보인다
             self._send(

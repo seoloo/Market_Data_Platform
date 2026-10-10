@@ -362,6 +362,7 @@ def _card(
     hide: bool = False,
     now_ms: int = 0,
     history: Sequence[Mapping[str, Any]] = (),
+    show_detail: bool = False,
 ) -> str:
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
     category, subtitle, glyph = {
@@ -421,12 +422,12 @@ def _card(
         f'<ul class="orbit-holdings" data-live="card-{key}-holdings">'
         f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}</ul>"
         + "".join(pops)
-        + '<details class="orbit-book-detail"><summary aria-label="보유 상세">'
-        '<span class="orbit-detail-open">보유 상세 ›</span>'
-        '<span class="orbit-detail-close">보유 상세 닫기 ×</span></summary>'
-        f'<div class="orbit-dt" data-live="card-{key}-detail">'
+        # 상세는 화면 위 '상세 보기' 버튼 하나로 셋을 함께 연다 (카드 바닥에 붙음)
+        + f'<div class="orbit-dt orbit-book-detail" data-live="card-{key}-detail"'
+        + ("" if show_detail else " hidden")
+        + ">"
         + _detail(book, quotes, hide=hide, priced=priced, now_ms=now_ms)
-        + "</div></details></section>"
+        + "</div></section>"
     )
 
 
@@ -447,6 +448,8 @@ def _color(sym: str, i: int) -> str:
 
 
 def _tile(label: str, value: str, sub: str = "", cls: str = "") -> str:
+    # '−15%면' 처럼 % 뒤에 붙은 말은 떼지 않는다 (브라우저는 % 뒤를 줄바꿈 자리로 본다)
+    sub = sub.replace("%면", "%\u2060면")
     return (
         f'<div class="orbit-dt-tile"><span>{label}</span>'
         f"<b{f' class={chr(34)}{cls}{chr(34)}' if cls else ''}>{value}</b>"
@@ -738,6 +741,7 @@ def render_live(
     hide: bool = False,
     onboarded: bool = True,
     history: Sequence[Mapping[str, Any]] | None = None,
+    show_detail: bool = False,
 ) -> str:
     """승인한 화면의 요소만 표시. 예시 수익/이력/연결 상태를 만들어 넣지 않는다."""
     hist = list(history or [])
@@ -845,8 +849,17 @@ def render_live(
             hide=hide,
             now_ms=now_ms,
             history=hist,
+            show_detail=show_detail,
         )
         for i, k in enumerate(("glide", "cruise", "accumulate"))
+    )
+    toggle = (
+        '<div class="orbit-cards-tools">'
+        f'<a class="orbit-detail-toggle{" on" if show_detail else ""}" '
+        f'href="/live?detail={"close" if show_detail else "open"}" '
+        f'aria-expanded="{str(show_detail).lower()}">'
+        f"{'상세 닫기' if show_detail else '상세 보기'}"
+        f'<span aria-hidden="true">{"⌃" if show_detail else "⌄"}</span></a></div>'
     )
     trades = sorted((t for b in books for t in b.trades), key=lambda t: t.date, reverse=True)
     return (
@@ -855,6 +868,7 @@ def render_live(
         + alert
         + status
         + _accounts(books, now_ms)
+        + toggle
         + f'<div class="orbit-cards">{cards}</div>'
         + '<div class="orbit-bottom">'
         + _history_panel(hist, hide)

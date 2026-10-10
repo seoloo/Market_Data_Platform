@@ -557,11 +557,14 @@ def render_live(
     hide: bool = False,
     onboarded: bool = True,
     history: list[dict[str, Any]] | None = None,
+    detail: bool = False,
 ) -> str:
     """실거래 계산은 보존하고 사용자 승인 오르빗 화면만 렌더링한다."""
     from auto_trading.ui.orbit_home import render_live as render_orbit
 
-    return render_orbit(books, q, now_ms, hide=hide, onboarded=onboarded, history=history)
+    return render_orbit(
+        books, q, now_ms, hide=hide, onboarded=onboarded, history=history, show_detail=detail
+    )
 
 
 QuoteSource = Callable[[set[str], set[str]], Quotes]
@@ -578,18 +581,18 @@ quote_source: QuoteSource = _default_quotes
 def live_page(data: DashboardData) -> str:
     if data.root is None:
         return '<section class="panel"><h2>저장소 위치 없음</h2></section>'
-    hide, onboarded = data.hide_amounts, data.onboarded
-    history = load_history(data.root)
+    flags: dict[str, Any] = {
+        "hide": data.hide_amounts,
+        "onboarded": data.onboarded,
+        "history": load_history(data.root),
+        "detail": data.show_detail,
+    }
     if not build_books(data.root, Quotes()):
         # 장부가 없으면 시세도 부르지 않는다
-        return render_live(
-            [], Quotes(), data.now_ms, hide=hide, onboarded=onboarded, history=history
-        )
+        return render_live([], Quotes(), data.now_ms, **flags)
     coins, tickers = needed(data.root)
     q = quote_source(coins, tickers)
-    return render_live(
-        build_books(data.root, q), q, data.now_ms, hide=hide, onboarded=onboarded, history=history
-    )
+    return render_live(build_books(data.root, q), q, data.now_ms, **flags)
 
 
 # ---------------------------------------------------------------- 텔레그램 '현황' 답

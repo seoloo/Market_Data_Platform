@@ -225,3 +225,13 @@ summary::-webkit-details-marker{display:none}
 .orbit-dt-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
 .orbit-dt-chip{font-size:12px;background:var(--soft);border-radius:10px;padding:4px 9px;color:var(--muted)}
 .orbit-dt-foot{font-size:11px;color:var(--muted);margin-left:auto}
+/* 상세 보기 버튼 하나로 세 카드 상세 함께 열기 · 상세는 카드 바닥에 · 단어 단위 줄바꿈 (2026-10-10) */
+.orbit-cards-tools{display:flex;justify-content:flex-end;margin:0 0 10px}
+.orbit-detail-toggle{display:inline-flex;align-items:center;gap:6px;background:#1677df;color:#fff;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none}
+.orbit-detail-toggle:hover{background:#0f5fbf}.orbit-detail-toggle.on{background:#0c447c}
+.orbit-detail-toggle:focus-visible{outline:3px solid #448eff;outline-offset:2px}
+[data-theme=dark] .orbit-detail-toggle{background:#2f7fe0}[data-theme=dark] .orbit-detail-toggle.on{background:#185fa5}
+.orbit-card{display:flex;flex-direction:column}
+.orbit-dt.orbit-book-detail{margin-top:auto;padding:14px 0 8px;border-top:1px dashed var(--line)}
+.orbit-dt.orbit-book-detail[hidden]{display:none}
+.orbit-dt-tile,.orbit-dt-tile span,.orbit-dt-tile small{word-break:keep-all;text-wrap:balance}

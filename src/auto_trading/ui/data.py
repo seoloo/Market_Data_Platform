@@ -182,6 +182,8 @@ class DashboardData:
     """실거래 홈 금액 숨기기 (서버가 쿠키로 채운다, 2026-10-10)."""
     onboarded: bool = True
     """처음 쓰는 사람 안내를 이미 봤는지 (서버가 쿠키로 채운다)."""
+    show_detail: bool = False
+    """실거래 홈 세 카드 보유 상세 펼침 (서버가 쿠키로 채운다)."""
 
 
 def _day(decision_ms: int) -> int:

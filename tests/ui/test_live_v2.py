@@ -243,7 +243,7 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
             "last_decision": "2026-10-09",
         },
     )
-    html = render_live([cruise], Quotes(at_ms=_NOW), _NOW)
+    html = render_live([cruise], Quotes(at_ms=_NOW), _NOW, show_detail=True)
     dt = html.split('data-live="card-cruise-detail"', 1)[1].split("</details>", 1)[0]
     for text in (
         "현금",
@@ -252,7 +252,7 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
         "1 / 3개",
         "최고점 기준",
         "−0.6%",
-        "−30%면 매수 멈춤",
+        "−30%\u2060면 매수 멈춤",
         "하는 중",
         "지금 구성",
         "비중 / 목표",
@@ -277,7 +277,7 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
             "brake_stage": 1,
         },
     )
-    g = render_live([glide], Quotes(usd={"TQQQ": 80.98}, at_ms=_NOW), _NOW)
+    g = render_live([glide], Quotes(usd={"TQQQ": 80.98}, at_ms=_NOW), _NOW, show_detail=True)
     gd = g.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
     for text in (
         "남은 달러 $42.55",
@@ -294,3 +294,13 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
     hidden = render_live([glide], Quotes(usd={"TQQQ": 80.98}), _NOW, hide=True)
     hd = hidden.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
     assert "57,057" not in hd and "300,000" not in hd and "42.55" not in hd and "60%" in hd
+
+
+def test_one_toggle_opens_all_three_details_and_words_stay_whole() -> None:
+    closed = render_live([_book(), _book("glide")], Quotes(), _NOW)
+    assert closed.count("orbit-book-detail") == 3 and closed.count('-detail" hidden>') == 3
+    assert 'href="/live?detail=open"' in closed and "상세 보기" in closed
+    assert "orbit-detail-open" not in closed  # 카드마다 있던 링크는 없다
+    opened = render_live([_book()], Quotes(), _NOW, show_detail=True)
+    assert '-detail" hidden>' not in opened and 'href="/live?detail=close"' in opened
+    assert "−30%\u2060면" in opened  # % 뒤에서 줄이 끊기지 않게

@@ -180,4 +180,4 @@ def test_header_badges_removed_but_actual_holdings_kept(key: str, symbols: tuple
     for symbol in symbols:
         assert f"<b>{symbol}</b>" in html
     assert f"보유 종목 ({len(symbols)}개)" in html
-    assert "20원" in html and "보유 상세" in html
+    assert "20원" in html and "상세 보기" in html

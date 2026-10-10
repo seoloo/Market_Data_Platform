@@ -178,7 +178,7 @@ def test_desktop_home_has_explanations_and_read_only_navigation(
         "연결 계좌",
     ):
         assert label in html
-    assert 'class="orbit-holdings"' in html and 'class="orbit-book-detail"' in html
+    assert 'class="orbit-holdings"' in html and 'orbit-book-detail"' in html and "상세 보기" in html
     for i in range(3):
         assert f'id="live-book-{i}"' in html
     for excluded in ('href="/research"', 'href="/compare"', 'href="/running"', "토스 적립"):

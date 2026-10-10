@@ -68,7 +68,9 @@ def export(folder: Path) -> int:
             # 정적 파일엔 서버가 없다: 새로 고침 스크립트는 빼고,
             # 금액 숨기기 · 첫 안내 전환 링크는 같은 쪽으로
             html = html.replace('<script src="assets/orbit-live.js" defer></script>', "")
-            html = re.sub(r'href="(/[a-z_]*)\?(?:amounts|onboard)=[a-z]+"', r'href="\1"', html)
+            html = re.sub(
+                r'href="(/[a-z_]*)\?(?:amounts|onboard|detail)=[a-z]+"', r'href="\1"', html
+            )
             for _, other_href, _ in PAGES:  # 파일끼리 이동되게 링크를 바꾼다
                 target = "index" if other_href == "/" else other_href.strip("/")
                 for selected in ("light", "dark"):
