@@ -27,7 +27,7 @@ h1,h2,p{margin:0}h2{font-size:23px;line-height:1.3}small{font-size:13px}ul{list-
 .orbit-hero{--hero-indent:24px;min-height:320px;position:relative;padding:24px var(--hero-indent);display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:22px;align-items:end;isolation:isolate}
 .orbit-hero::before{content:"";position:absolute;inset:0;z-index:-3;pointer-events:none;background:radial-gradient(ellipse at 75% 15%,#98d8ff50,transparent 65%)}
 .orbit-hero-art{position:absolute;inset:0 calc(-1 * clamp(14px,1.7vw,28px));z-index:-2;overflow:hidden;pointer-events:none;border-radius:0 0 28px 28px}
-.orbit-hero-art img{position:absolute;right:0;top:-162px;width:1050px;height:700px;object-fit:contain;max-width:none;mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,#000 78%,transparent);mask-composite:intersect}
+.orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{position:absolute;right:0;top:-162px;width:1050px;height:700px;object-fit:contain;max-width:none;mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,#000 78%,transparent);mask-composite:intersect}
 html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 30% 85% at 76% 45%,#000 55%,transparent 100%)}
 .orbit-greeting{grid-column:1;align-self:start}.orbit-greeting>span{font-size:clamp(16px,1.4vw,21px);color:var(--muted)}
 .orbit-greeting h1{font-size:clamp(28px,2.8vw,44px);letter-spacing:-1.5px;line-height:1.35}.orbit-greeting h1 span{font-size:.9em}
@@ -94,14 +94,14 @@ summary::-webkit-details-marker{display:none}
  .orbit-nav{gap:3px}.orbit-nav>a,.orbit-nav>button{padding:10px}.orbit-nav>a>span,.orbit-nav>button>span{display:none}
  .orbit-hero{--hero-indent:0px;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);padding:24px 0}
  .orbit-help-card{width:170px;padding:14px}.orbit-help-card b{font-size:14px}
- .orbit-hero-art img{right:-120px}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{right:-120px}
  .orbit-networth{grid-template-columns:1.5fr 1fr 1fr}.orbit-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
  .orbit-card:last-child{grid-column:1/-1}.orbit-alert-copy{display:none}.orbit-bottom{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
  .orbit-hero{min-height:335px;grid-template-columns:1fr;gap:16px}
  .orbit-greeting{max-width:80%}.orbit-greeting h1{font-size:29px}.orbit-greeting p{max-width:75%}.orbit-help-card{display:none}
- .orbit-hero-art img{width:640px;height:427px;right:-30px;top:-70px}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{width:640px;height:427px;right:-30px;top:-70px}
  html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 31% 39% at 82% 20%,#000 60%,transparent 100%)}
  .orbit-networth{grid-column:1}.orbit-total{font-size:35px}.orbit-cards,.orbit-bottom{grid-template-columns:1fr}.orbit-card:last-child{grid-column:auto}
  .orbit-card-summary strong{font-size:clamp(32px,8cqw,43px)}
@@ -111,7 +111,7 @@ summary::-webkit-details-marker{display:none}
  .orbit-nav{order:3;flex-basis:100%;justify-content:space-between}.orbit-nav>a,.orbit-nav>button{padding:10px 14px}
  .orbit-hero{min-height:340px;padding:20px 0;gap:18px}.orbit-greeting h1{font-size:26px;letter-spacing:-1px}.orbit-greeting h1 span{display:none}
  .orbit-greeting p{font-size:12px}
- .orbit-hero-art img{width:410px;height:273px;right:-20px;top:-15px}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{width:410px;height:273px;right:-20px;top:-15px}
  .orbit-networth{grid-template-columns:1fr 1fr;gap:9px;padding:15px 18px}.orbit-networth>div:first-child{grid-column:1/-1}
  .orbit-networth>div:nth-child(2){border:0;padding:0}.orbit-networth>div:nth-child(3){padding-left:12px}.orbit-networth h2{font-size:18px}
  .orbit-total{font-size:38px}.orbit-networth>div>span{font-size:12px}.orbit-alert summary{gap:8px;padding:11px 12px}
@@ -262,3 +262,20 @@ summary::-webkit-details-marker{display:none}
 .orbit-cards-tools{margin:-12px 0 12px}
 /* 타일 숫자 글색: 테마 파랑 (상태 초록·노랑은 그대로) (2026-10-10) */
 .orbit-dt-tile b:not(.ok):not(.warn){color:var(--blue)}
+
+/* 오비 움직임 — 그림과 같은 크기의 SVG 층 (orbit_home.HERO_FX, 2026-10-10) */
+.orbit-hero-fx{pointer-events:none;overflow:visible}
+.fx-lid{fill:#071a5e;transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0);animation:obi-blink 5.2s infinite}
+.fx-shut{fill:none;stroke:#3fe6f0;stroke-width:7;stroke-linecap:round;opacity:0;animation:obi-shut 5.2s infinite}
+@keyframes obi-blink{0%,90%,100%{transform:scaleY(0)}93%,95%{transform:scaleY(1)}97%{transform:scaleY(.2)}}
+@keyframes obi-shut{0%,92%,96.5%,100%{opacity:0}93%,95.5%{opacity:1}}
+.fx-twinkle{fill:#fff;transform-box:fill-box;transform-origin:center;opacity:0;animation:obi-twinkle 3.4s ease-in-out infinite}
+@keyframes obi-twinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0)}50%{opacity:.95;transform:scale(1) rotate(20deg)}}
+.fx-ring{fill:none;stroke:#5ff2ff;stroke-width:26;opacity:.08;animation:obi-ring 4.6s ease-in-out infinite;mix-blend-mode:screen}
+@keyframes obi-ring{0%,100%{opacity:.06}50%{opacity:.34}}
+.fx-sleep{display:none}
+html[data-theme=dark] .fx-awake{display:none}
+html[data-theme=dark] .fx-sleep{display:inline}
+.fx-z{fill:#c9d8ff;font:800 44px 'Segoe UI',sans-serif;opacity:0;animation:obi-z 3.3s ease-out infinite}
+@keyframes obi-z{0%{opacity:0;transform:translate(0,0)}30%{opacity:.9}100%{opacity:0;transform:translate(26px,-60px)}}
+@media (prefers-reduced-motion:reduce){.orbit-hero-fx *{animation:none!important}.fx-lid,.fx-shut,.fx-twinkle,.fx-z{opacity:0}}

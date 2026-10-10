@@ -182,3 +182,15 @@ def test_header_badges_removed_but_actual_holdings_kept(key: str, symbols: tuple
         assert f"<b>{symbol}</b>" in html
     assert f"보유 종목 ({len(symbols)}개)" in html
     assert "20원" in html and "상세 보기" in html
+
+
+def test_obi_motion_layer() -> None:
+    """오비 움직임 (2026-10-10): 그림과 같은 크기 SVG 층 · 스크립트 없음 · 움직임 줄이기면 멈춤."""
+    from auto_trading.ui.orbit_home import _CSS, HERO_FX
+
+    html = render_live([], Quotes(), 0)
+    assert html.count('class="orbit-hero-fx" viewBox="0 0 1536 1024"') == 1
+    assert HERO_FX.count('class="fx-lid"') == 2 and HERO_FX.count('class="fx-z"') == 3
+    assert "<script" not in HERO_FX
+    assert ".orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{" in _CSS
+    assert "prefers-reduced-motion:reduce" in _CSS

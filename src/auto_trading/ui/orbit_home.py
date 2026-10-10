@@ -41,6 +41,55 @@ PERIODS = (
 _KIND_WORD = {"buy": "매수", "sell": "매도", "deposit": "입금"}
 
 
+# 오비 움직임 (사용자 2026-10-10 "오비 텔레그램 스티커처럼 움직이게" → 2번: 둥실 대신 눈 깜빡임 등).
+# 오비는 배경 그림 안에 그려져 있어 떼어 움직일 수 없다 → 같은 크기(1536 × 1024)의 투명 SVG 층을
+# 그림 위에 겹쳐 눈꺼풀 · 반짝이 · 궤도 빛 · 잠꼬대(다크)만 움직인다. 위치는 원본 그림에서 잰 값.
+# 움직임 줄이기를 켠 PC 에서는 멈춘다 (orbit.css @media prefers-reduced-motion).
+_EYES = ((978, 442, 38, 44), (1108, 450, 41, 42))
+"""(중심 x, 중심 y, 가로 반지름, 세로 반지름) — 청록 눈 테두리까지 덮는 크기."""
+_TWINKLES = (
+    (640, 182, 0.0),
+    (868, 212, 1.3),
+    (1312, 180, 2.1),
+    (1266, 250, 0.7),
+    (1478, 328, 2.8),
+    (1250, 537, 1.8),
+)
+
+
+def _star(x: int, y: int, r: int) -> str:
+    return (
+        f"M{x} {y - r}Q{x} {y} {x + r} {y}Q{x} {y} {x} {y + r}"
+        f"Q{x} {y} {x - r} {y}Q{x} {y} {x} {y - r}Z"
+    )
+
+
+HERO_FX = (
+    '<svg class="orbit-hero-fx" viewBox="0 0 1536 1024" aria-hidden="true" focusable="false">'
+    '<defs><filter id="obi-glow" x="-20%" y="-50%" width="140%" height="200%">'
+    '<feGaussianBlur stdDeviation="14"/></filter></defs>'
+    '<g class="fx-awake">'
+    '<ellipse class="fx-ring" cx="1075" cy="556" rx="300" ry="78" '
+    'transform="rotate(-11 1075 556)" filter="url(#obi-glow)"/>'
+    + "".join(
+        f'<ellipse class="fx-lid" cx="{x}" cy="{y}" rx="{rx}" ry="{ry}"/>'
+        f'<path class="fx-shut" d="M{x - rx + 8} {y + 4}'
+        f'Q{x} {y + ry // 2 + 6} {x + rx - 8} {y + 4}"/>'
+        for x, y, rx, ry in _EYES
+    )
+    + "".join(
+        f'<path class="fx-twinkle" style="animation-delay:{d}s" d="{_star(x, y, 18)}"/>'
+        for x, y, d in _TWINKLES
+    )
+    + "</g>"
+    '<g class="fx-sleep">'
+    '<text class="fx-z" x="1248" y="420">z</text>'
+    '<text class="fx-z" x="1282" y="388" style="animation-delay:1.1s">z</text>'
+    '<text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text>'
+    "</g></svg>"
+)
+
+
 def _won(x: float, hide: bool = False) -> str:
     return _HIDDEN if hide else f"{x:,.0f}"
 
@@ -816,7 +865,8 @@ def render_live(
     hero = (
         '<section class="orbit-hero">'
         '<div class="orbit-hero-art" aria-hidden="true">'
-        '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png" alt=""></div>'
+        '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png" alt="">'
+        f"{HERO_FX}</div>"
         '<div class="orbit-greeting"><span>안녕하세요,</span>'
         '<h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1>'
         "<p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div>"
