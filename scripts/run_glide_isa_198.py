@@ -91,7 +91,7 @@ def simulate_split(
     i0 = next(i for i, d in enumerate(days) if d >= data["start"] and i > 0)
 
     def toss_value(d: str) -> float:
-        return tb.q["L"] * lev[d] + res_cash
+        return float(tb.q["L"] * lev[d]) + res_cash
 
     def value(d: str) -> float:
         return toss_value(d) + q_isa * d_isa[d]
