@@ -38,6 +38,11 @@ create table if not exists public.daily_snapshots (
 alter table public.ledger_events enable row level security;
 alter table public.daily_snapshots enable row level security;
 
+-- 새 프로젝트는 새 표에 API 역할 권한을 자동으로 주지 않는다 → PC 스크립트(Secret 키 = service_role)에만 준다.
+-- anon · authenticated 에는 주지 않는다 (바깥에서 못 읽게). 폰 앱 때 authenticated 읽기 + 정책을 더한다.
+grant select, insert, update on public.ledger_events to service_role;
+grant select, insert, update on public.daily_snapshots to service_role;
+
 -- 해 볼 만한 질문들 (SQL Editor 에서 하나씩):
 -- select account, kind, count(*), sum(amount) from ledger_events group by 1, 2 order by 1, 2;
 -- select date_trunc('month', trade_date) as month, sum(fee) from ledger_events where fee > 0 group by 1;
