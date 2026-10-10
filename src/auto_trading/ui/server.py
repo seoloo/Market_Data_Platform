@@ -41,6 +41,7 @@ _ASSETS = {
     "/assets/obi.png": ("obi.png", "image/png"),
     "/assets/orbit-obi.png": ("orbit-obi.png", "image/png"),
     "/assets/orbit-hero-light.png": ("orbit-hero-light.png", "image/png"),
+    "/assets/orbit-hero-dark-sleep.png": ("orbit-hero-dark-sleep.png", "image/png"),
     "/assets/orbit-space-dark.png": ("orbit-space-dark.png", "image/png"),
     "/assets/orbit-space-light.png": ("orbit-space-light.png", "image/png"),
 }

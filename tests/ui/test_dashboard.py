@@ -673,6 +673,7 @@ class TestServer:
             ("/assets/obi.png?v=3", "image/png"),
             ("/assets/orbit-obi.png", "image/png"),
             ("/assets/orbit-hero-light.png", "image/png"),
+            ("/assets/orbit-hero-dark-sleep.png", "image/png"),
             ("/assets/orbit-space-dark.png", "image/png"),
             ("/assets/orbit-space-light.png", "image/png"),
             ("/assets/icons/btc.svg", "image/svg+xml"),

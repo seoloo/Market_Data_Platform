@@ -47,6 +47,7 @@ def export(folder: Path) -> int:
         "obi.png",
         "orbit-obi.png",
         "orbit-hero-light.png",
+        "orbit-hero-dark-sleep.png",
         "orbit-space-dark.png",
         "orbit-space-light.png",
     ):

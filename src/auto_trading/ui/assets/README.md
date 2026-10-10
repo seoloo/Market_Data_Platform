@@ -1,5 +1,38 @@
 # 오비 브랜드 자산
 
+## 다크 전용 잠든 오비 (2026-10-10 추가 후속)
+
+사용자가 다크에서만 오비의 눈을 감고 주변도 다크 테마로 바꾸도록 승인했다.
+`orbit-hero-dark-sleep.png`는 내장 imagegen 편집 도구로 만든 1536×1024 PNG다.
+편집 대상은 `orbit-hero-light.png`, 색상 참고는 `orbit-space-dark.png`다.
+두 눈은 편안한 청록 곡선, 주변은 남색/보라색 밤구름·별·행성으로 변경했다.
+원래 오비의 자세·헬멧·귀·두 발·민트 궤도·배치와 3:2 canvas를 유지한다.
+SHA256: `89899b2aaaf79614b28cd2398dad67204d6437a3d56aee24e93e42028cd64157`.
+
+라이트 원본·두 전체 배경·앱 로고/아이콘은 수정하지 않는다. 새 그림은 앱의 선택된 다크
+테마에서만 참조하며 OS 테마/밝기 필터를 사용하지 않는다. 정적 whitelist 1경로와
+HTML export에 포함, 계좌/장부 loader·런타임 생성·외부 CDN 호출 없음.
+내장 도구 편집 모드, `transparent_background=false`, API CLI 미사용.
+
+최종 프롬프트:
+
+> Use case: precise-object-edit. Asset type: 1536x1024 dark-mode desktop dashboard hero
+> artwork, no UI. Image 1 is the EDIT TARGET; Image 2 is only a night color-palette
+> reference. Make exactly TWO edits to Image 1: (1) Obi the cat closes BOTH eyes into
+> relaxed curved cyan eyelids, peacefully asleep; keep the tiny mouth, head angle,
+> helmet, cat ears, two paws, body, identity, silhouette and pose unchanged. Do not
+> draw extra eyes, sleeping letters, pillow or change pose. (2) Replace all bright
+> daytime sky and white/lilac clouds surrounding Obi with a deep midnight navy/indigo
+> night-space version matching Image 2, with subtle violet-blue nebula clouds, sparse
+> small cool stars, darker blue/purple planets. No bright white cloud banks or sky-blue
+> daylight behind cat. Keep the original illustration style and mint/cyan glowing
+> orbital ring, gently toned for nighttime. STRICT composition lock: exact original
+> 3:2 canvas, cat/ears/paws/ring same positions, sizes and framing as Image 1, cat on
+> right, left quiet dark negative space for HTML headings. Keep white helmet
+> recognizable with cool moonlit shading, do NOT darken entire cat beyond recognition.
+> This is a night variation of the SAME scene, not a new cat. No text, numbers, labels,
+> charts, panels, UI or watermarks. Do not add a moon or additional objects.
+
 ## 승인 원본 오비·라이트 전용 배경 보정 (2026-10-10 최종 후속)
 
 아래 생성 이력보다 우선한다. 사용자 첨부 `ChatGPT 이미지 2026년 10월 10일 오후

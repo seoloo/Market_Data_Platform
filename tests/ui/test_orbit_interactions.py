@@ -69,12 +69,15 @@ def test_hiding_pending_banner_does_not_hide_data_or_risk_warnings() -> None:
 
 
 @pytest.mark.parametrize("theme,expected", [("light", "moon"), ("dark", "sun")])
-def test_theme_toggle_and_shared_mascot(theme: str, expected: str) -> None:
+def test_theme_toggle_and_theme_specific_mascot(theme: str, expected: str) -> None:
     html = layout(render_live([], Quotes(), 0), theme)
     tools = html.split('class="orbit-tools"', 1)[1].split("</div>", 1)[0]
     assert icon(expected) in tools and icon("gear") not in tools
     assert html.count('class="orbit-hero-cat"') == 1
-    assert '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png"' in html
+    hero = "orbit-hero-dark-sleep.png" if theme == "dark" else "orbit-hero-light.png"
+    assert f'<img class="orbit-hero-cat" src="/assets/{hero}"' in html
+    other = "orbit-hero-light.png" if theme == "dark" else "orbit-hero-dark-sleep.png"
+    assert f'<img class="orbit-hero-cat" src="/assets/{other}"' not in html
     assert 'class="orbit-hero-dark-cat"' not in html
 
 
@@ -127,6 +130,23 @@ def test_original_light_art_and_mascot_are_not_desktop_icon() -> None:
     css = Path("src/auto_trading/ui/orbit.css").read_text(encoding="utf-8")
     light_body = css.split("body{", 1)[1].split("}", 1)[0]
     assert "orbit-space-light.png" in light_body and "orbit-space-dark.png" not in light_body
+
+
+def test_dark_hero_does_not_change_live_records_or_light_art() -> None:
+    body = render_live(
+        [Book("cruise", "Cruise", "업비트", 100, 100, (), pending=("체결 확인 대기",))],
+        Quotes(errors=("시세 확인 필요",)),
+        0,
+    )
+    light = layout(body, "light").split('<main class="orbit-main">', 1)[1]
+    dark = layout(body, "dark").split('<main class="orbit-main">', 1)[1]
+    assert dark.replace("orbit-hero-dark-sleep.png", "orbit-hero-light.png") == light
+    assets = ASSETS.parent
+    original = (assets / "orbit-hero-light.png").read_bytes()
+    night = (assets / "orbit-hero-dark-sleep.png").read_bytes()
+    assert night.startswith(b"\x89PNG\r\n\x1a\n")
+    assert night[16:24] == original[16:24]  # 같은 PNG canvas 너비/높이
+    assert night != original
 
 
 def test_unknown_instrument_never_becomes_asset_path() -> None:

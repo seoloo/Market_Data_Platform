@@ -52,6 +52,13 @@ def _guide() -> str:
 
 
 def layout(body: str, theme: str) -> str:
+    # 앱의 선택 테마를 따른다. OS 테마나 CSS 필터로 낮 그림을 어둡게 만들지 않는다.
+    if theme == "dark":
+        body = body.replace(
+            '<img class="orbit-hero-cat" src="/assets/orbit-hero-light.png"',
+            '<img class="orbit-hero-cat" src="/assets/orbit-hero-dark-sleep.png"',
+            1,
+        )
     themes = "".join(
         f'<a href="/live?theme={key}" aria-label="{label} 모드" '
         f'aria-current="{"true" if theme == key else "false"}">{label}</a>'
