@@ -25,6 +25,7 @@ from urllib.parse import parse_qs
 
 from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.data import DashboardData, load_dashboard
+from auto_trading.ui.orbit_icons import ICON_ASSETS
 from auto_trading.ui.render import PAGES, render_page
 
 __all__ = ["ALLOWED_HOSTS", "DashboardServer", "make_server"]
@@ -42,6 +43,17 @@ _ASSETS = {
     "/assets/orbit-hero-light.png": ("orbit-hero-light.png", "image/png"),
     "/assets/orbit-space-dark.png": ("orbit-space-dark.png", "image/png"),
 }
+_ASSETS.update(
+    {
+        f"/assets/icons/{name}": (
+            f"icons/{name}",
+            {".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon"}[
+                Path(name).suffix
+            ],
+        )
+        for name in ICON_ASSETS
+    }
+)
 _HEADERS = {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",

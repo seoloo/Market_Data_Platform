@@ -674,6 +674,13 @@ class TestServer:
             ("/assets/orbit-obi.png", "image/png"),
             ("/assets/orbit-hero-light.png", "image/png"),
             ("/assets/orbit-space-dark.png", "image/png"),
+            ("/assets/icons/btc.svg", "image/svg+xml"),
+            ("/assets/icons/eth.svg", "image/svg+xml"),
+            ("/assets/icons/sol.svg", "image/svg+xml"),
+            ("/assets/icons/tqqq.png", "image/png"),
+            ("/assets/icons/schd.ico", "image/x-icon"),
+            ("/assets/icons/btq.ico", "image/x-icon"),
+            ("/assets/icons/qs.png", "image/png"),
         ],
     )
     def test_brand_assets_do_not_load_account_data(
@@ -706,6 +713,9 @@ class TestServer:
             "/assets/%2e%2e/server.py",
             "/assets/.env",
             "/assets/other.svg",
+            "/assets/icons/../server.py",
+            "/assets/icons/%2e%2e/.env",
+            "/assets/icons/LICENSE-lucide",
         ],
     )
     def test_asset_requests_are_exactly_whitelisted(self, base: str, path: str) -> None:

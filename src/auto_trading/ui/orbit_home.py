@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 
 from auto_trading.ui.live_home import Book, Quotes, _priced, _won
+from auto_trading.ui.orbit_icons import icon, symbol_icon
 
 _CSS = Path(__file__).with_name("orbit.css").read_text(encoding="utf-8")
 _NAMES = {
@@ -18,44 +19,35 @@ _NAMES = {
     "WQTM": "WQTM",
     "QS": "QuantumScape",
 }
-_GLYPHS = {"BTC": "₿", "ETH": "◆", "SOL": "≋", "TQQQ": "T", "SCHD": "S"}
 
 
-def icon(name: str) -> str:
-    paths = {
-        "home": '<path d="m3 10 9-7 9 7v10h-6v-7H9v7H3z"/>',
-        "chart": '<path d="M4 20V12m7 8V7m7 13V3"/>',
-        "pie": '<path d="M12 3v9h9M9 3a9 9 0 1 0 12 12"/>',
-        "wallet": '<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-6 4h6"/>',
-        "gear": (
-            '<path d="m9 3-1 3-3 1 1 3-2 2 2 3-1 3 3 1 1 3h6l1-3 '
-            '3-1-1-3 2-3-2-2 1-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/>'
-        ),
-        "help": '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/>',
-        "bell": '<path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4zm5 3h4"/>',
-        "leaf": '<path d="M5 19C1 8 11 5 21 3c0 12-7 18-16 16Zm0 0L16 8"/>',
-        "eye": (
-            '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/>'
-            '<circle cx="12" cy="12" r="3"/>'
-        ),
-        "log": '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6m-6 4h6m-6 4h4"/>',
-    }
-    return f'<svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>'
+def _popup(target: str, title: str, content: str) -> str:
+    return (
+        f'<section popover="auto" class="orbit-popover" id="{target}" role="dialog" '
+        f'aria-labelledby="{target}-title"><header><h2 id="{target}-title">{title}</h2>'
+        f'<button type="button" class="orbit-close" popovertarget="{target}" '
+        f'popovertargetaction="hide" aria-label="{title} 닫기" autofocus>{icon("x")}</button>'
+        f'</header><div class="orbit-popover-body">{content}</div></section>'
+    )
 
 
 def _guide() -> str:
     return (
-        '<details class="orbit-guide" id="orbit-guide"><summary>'
-        f'{icon("help")}<span>화면 읽는 법</span></summary><div class="orbit-popover">'
-        "<h2>화면 읽는 법</h2><p>내 자산은 실거래 장부의 현금과 보유 평가액입니다. "
-        "기준 금액은 총 입금 + 적립 매입원가입니다. "
-        "평가 차액은 세금 전이며 확정 수익이 아닙니다.</p>"
-        "<p>시세가 없으면 원가로 셈 합니다. 환율 미확인 시에도 추정 평가액입니다. "
-        "주문 접수 ≠ 체결 완료. 장부만으로 프로그램의 현재 가동 여부를 확정하지 않습니다.</p>"
-        "<p>Glide는 미국 주식, Cruise는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. "
-        "이 화면은 읽기 전용입니다. 앱을 닫아도 매매 프로그램은 종료되지 않습니다.</p>"
-        "<p>자산 그래프는 검증된 실거래 평가 이력만 표시합니다. 입금은 수익이 아닙니다.</p>"
-        "</div></details>"
+        '<button type="button" class="orbit-guide" popovertarget="orbit-guide" '
+        'aria-label="화면 읽는 법">'
+        f"{icon('help')}<span>화면 읽는 법</span></button>"
+        + _popup(
+            "orbit-guide",
+            "화면 읽는 법",
+            "<p>내 자산은 실거래 장부의 현금과 보유 평가액입니다. "
+            "기준 금액은 총 입금 + 적립 매입원가입니다. "
+            "평가 차액은 세금 전이며 확정 수익이 아닙니다.</p>"
+            "<p>시세가 없으면 원가로 셈 합니다. 환율 미확인 시에도 추정 평가액입니다. "
+            "주문 접수 ≠ 체결 완료. 장부만으로 프로그램의 현재 가동 여부를 확정하지 않습니다.</p>"
+            "<p>Glide는 미국 주식, Cruise는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. "
+            "이 화면은 읽기 전용입니다. 앱을 닫아도 매매 프로그램은 종료되지 않습니다.</p>"
+            "<p>자산 그래프는 검증된 실거래 평가 이력만 표시합니다. 입금은 수익이 아닙니다.</p>",
+        )
     )
 
 
@@ -76,21 +68,35 @@ def layout(body: str, theme: str) -> str:
         '<a class="logo" href="/live"><img src="/assets/orbit-obi.png" '
         'alt="오비, 네온 궤도 속 우주 고양이" width="44" height="44"><b>오르빗</b></a>'
         '<nav class="orbit-nav" aria-label="주 메뉴">'
-        f'<a class="on" href="/live" aria-current="page">{icon("home")}홈</a>'
-        f'<a href="#orbit-assets">{icon("pie")}내 자산</a>'
-        '<details class="orbit-accounts"><summary>'
-        f'{icon("wallet")}연결 계좌</summary><div class="orbit-popover">'
-        "<h2>연결 계좌</h2><p>Glide · 자동 적립: 토스<br>Cruise: 업비트</p>"
-        "<p>저장된 장부 기준입니다. 실제 API 연결·잔고를 새로 조회하지 않습니다. "
-        "계좌번호·API 키는 표시하지 않습니다.</p></div></details>"
-        '<details class="orbit-settings"><summary>'
-        f'{icon("gear")}설정</summary><div class="orbit-popover"><h2>화면 설정</h2>'
-        f'<div class="orbit-themes">{themes}</div>'
-        "<p>표시 테마만 바꿉니다. 매매 설정은 변경하지 않습니다.</p></div></details>"
-        f'{_guide()}</nav><div class="orbit-tools">'
-        f'<a href="#orbit-attention" aria-label="확인할 사항">{icon("bell")}</a>'
+        '<a class="on" href="/live" aria-current="page" aria-label="홈">'
+        f"{icon('home')}<span>홈</span></a>"
+        f'<a href="#orbit-assets" aria-label="내 자산">{icon("pie")}<span>내 자산</span></a>'
+        '<button type="button" class="orbit-accounts" popovertarget="orbit-accounts" '
+        'aria-label="연결 계좌">'
+        f"{icon('wallet')}<span>연결 계좌</span></button>"
+        + _popup(
+            "orbit-accounts",
+            "연결 계좌",
+            "<p>Glide · 자동 적립: 토스<br>Cruise: 업비트</p>"
+            "<p>저장된 장부 기준입니다. 실제 API 연결·잔고를 새로 조회하지 않습니다. "
+            "계좌번호·API 키는 표시하지 않습니다.</p>",
+        )
+        + '<button type="button" class="orbit-settings" popovertarget="orbit-settings" '
+        'aria-label="설정">'
+        f"{icon('gear')}<span>설정</span></button>"
+        + _popup(
+            "orbit-settings",
+            "화면 설정",
+            f'<div class="orbit-themes">{themes}</div>'
+            "<p>표시 테마만 바꿉니다. 매매 설정은 변경하지 않습니다.</p>",
+        )
+        + f'{_guide()}</nav><div class="orbit-tools">'
+        '<button type="button" popovertarget="orbit-status" aria-label="확인할 사항">'
+        f"{icon('bell')}</button>"
         f'<a href="/live?theme={"dark" if theme == "light" else "light"}" '
-        f'aria-label="{"다크" if theme == "light" else "라이트"} 모드로 전환">{icon("gear")}</a>'
+        f'aria-label="{"다크" if theme == "light" else "라이트"} 모드로 전환" '
+        f'title="{"다크" if theme == "light" else "라이트"} 모드로 전환">'
+        f"{icon('moon' if theme == 'light' else 'sun')}</a>"
         f'</div></div><main class="orbit-main">{body}</main></body></html>'
     )
 
@@ -99,7 +105,7 @@ def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> s
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
     category, subtitle, description, glyph = {
         "glide": ("미국 주식", "Glide", "미국 ETF에 자동으로", "chart"),
-        "cruise": ("코인", "Cruise", "주요 코인에 자동으로", "pie"),
+        "cruise": ("코인", "Cruise", "주요 코인에 자동으로", "coins"),
         "accumulate": ("자동 적립", "자동 적립", "자동으로 차곡차곡", "leaf"),
     }.get(key, ("투자 장부", book.title, "저장된 기록", "wallet"))
     symbols = {"glide": ("TQQQ", "SCHD"), "cruise": ("BTC", "ETH", "SOL")}.get(
@@ -118,7 +124,6 @@ def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> s
     for holding in book.holdings:
         symbol = escape(holding.name)
         coin_class = holding.name.lower() if holding.name in _NAMES else "other"
-        coin_glyph = escape(_GLYPHS.get(holding.name, holding.name[:1]))
         company = escape(_NAMES.get(holding.name, holding.name))
         value = holding.value_krw if holding.value_krw is not None else holding.cost_krw
         row_pl = (
@@ -128,7 +133,7 @@ def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> s
         )
         rows.append(
             '<li><div class="orbit-holding-name">'
-            f'<span class="orbit-coin coin-{coin_class}">{coin_glyph}</span>'
+            f'<span class="orbit-coin coin-{coin_class}">{symbol_icon(holding.name)}</span>'
             f"<div><b>{symbol}</b><small>{company}</small></div>"
             '</div><div class="orbit-holding-value">'
             f"<b>{_won(value)}원</b>"
@@ -148,7 +153,8 @@ def _card(book: Book, quotes: Quotes, index: int, *, recorded: bool = True) -> s
         '<span>평가금액</span></div><ul class="orbit-holdings">'
         f"{''.join(rows) if rows else '<li>아직 보유 기록이 없습니다.</li>'}</ul>"
         '<details class="orbit-book-detail"><summary aria-label="보유 수량과 장부 메모">'
-        "보유 상세 ›</summary><div>"
+        '<span class="orbit-detail-open">보유 상세 ›</span>'
+        '<span class="orbit-detail-close">보유 상세 닫기 ×</span></summary><div>'
         + "".join(
             f"<p>{escape(h.name)} · {h.qty:,.8g} · {escape(h.note)}</p>" for h in book.holdings
         )
@@ -169,10 +175,9 @@ def _activity_rows(activities: list[tuple[str, str, str]]) -> str:
     out = []
     for date, text, _key in activities:
         sym = next((s for s in _NAMES if s in text), "")
-        glyph = _GLYPHS.get(sym, sym[:1]) if sym else "₩" if "입금" in text else "·"
         cls = sym.lower() if sym in _NAMES else "other"
         out.append(
-            f'<li><span class="orbit-coin coin-{cls}">{escape(glyph)}</span>'
+            f'<li><span class="orbit-coin coin-{cls}">{symbol_icon(sym)}</span>'
             f"<div><b>{escape(text)}</b><small>{escape(date)}</small></div>"
             '<span class="orbit-trade-state">'
             f"{'입금 기록' if '입금' in text else '저장 체결'}</span></li>"
@@ -218,9 +223,8 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
         change = _change(value, base) if complete else '<span class="mute">시세 확인 필요</span>'
     caution = "확정 수익 아님" if complete else "추정치 포함 · 확정 수익 아님"
     hero = (
-        '<section class="orbit-hero"><img class="orbit-hero-art" '
-        'src="/assets/orbit-hero-light.png" alt="" aria-hidden="true">'
-        '<img class="orbit-hero-dark-cat" src="/assets/orbit-obi.png" alt="" aria-hidden="true">'
+        '<section class="orbit-hero">'
+        '<img class="orbit-hero-cat" src="/assets/orbit-obi.png" alt="" aria-hidden="true">'
         '<div class="orbit-greeting"><span>안녕하세요,</span>'
         '<h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1>'
         "<p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div>"
@@ -231,22 +235,31 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
         f"<div><span>평가 차액</span><strong>{change}</strong>"
         f'<small class="orbit-caution">ⓘ {caution}'
         "</small></div></section>"
-        '<details class="orbit-help-card"><summary><b>💡 화면 읽는 법 ›</b>'
-        "<span>이 화면에서<br>무엇을 볼 수 있나요?</span></summary>"
-        '<div class="orbit-popover"><h2>화면 읽는 법</h2>'
-        "<p>내 자산은 장부의 현금과 보유 평가액입니다. 기준 금액은 입금과 적립 원가이며 "
-        "평가 차액은 확정 수익이 아닙니다.</p><p>시세 누락·체결 대기·매수 정지는 "
-        "확인할 사항에서 읽습니다. 상단 화면 읽는 법에서 상세 안내를 볼 수 있습니다.</p>"
-        "</div></details></section>"
+        '<button type="button" class="orbit-help-card" popovertarget="orbit-guide">'
+        f"<b>{icon('help')} 화면 읽는 법 {icon('arrow')}</b>"
+        "<span>이 화면에서<br>무엇을 볼 수 있나요?</span></button></section>"
     )
     alert = (
-        '<details class="orbit-alert" id="orbit-attention"><summary>'
-        '<span class="orbit-alert-mark">!</span><b>먼저 확인해 주세요 · '
-        f'<span>{title}</span></b><span class="orbit-alert-copy">'
-        f'{escape(detail)}</span><span class="orbit-chevron">›</span></summary>'
-        f"<div>{escape(detail)}<p>주문 접수 ≠ 체결 완료. "
-        "프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></details>"
+        (
+            '<details class="orbit-alert" id="orbit-attention"><summary>'
+            '<span class="orbit-alert-mark">!</span><b>먼저 확인해 주세요 · '
+            f'<span>{title}</span></b><span class="orbit-alert-copy">'
+            f'{escape(detail)}</span><span class="orbit-chevron">›</span></summary>'
+            f"<div>{escape(detail)}<p>주문 접수 ≠ 체결 완료. "
+            "프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></details>"
+        )
+        if pending_count
+        else ""
     )
+    status = _popup(
+        "orbit-status",
+        "확인할 사항",
+        f"<p>{escape(title)}</p><p>{escape(detail)}</p>"
+        "<p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p>",
+    )
+    # 체결 대기 줄만 숨긴다. 시세/정지/장부 결측 경고는 계속 읽을 수 있어야 한다.
+    if not pending_count and (warnings or not books):
+        status += f'<p class="orbit-data-note">{escape(detail)}</p>'
     by_key = {b.key: b for b in books}
     cards = "".join(
         _card(by_key.get(k, Book(k, k, "", 0, 0, ())), quotes, i, recorded=k in by_key)
@@ -276,15 +289,22 @@ def render_live(books: list[Book], quotes: Quotes, now_ms: int) -> str:
         '<section class="orbit-panel orbit-recent" id="orbit-recent">'
         '<div class="orbit-panel-heading">'
         f"<h2>{icon('log')}최근 거래 <small>(최근 5건)</small></h2>"
-        '<details class="orbit-all-trades"><summary>전체 보기 ›</summary>'
-        '<div class="orbit-popover"><h2>전체 거래 기록</h2><ul>'
-        f"{_activity_rows(activities) or '<li>아직 거래 기록이 없습니다.</li>'}"
-        "</ul></div></details></div>"
+        '<button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">'
+        "전체 보기 ›</button>"
+        + _popup(
+            "orbit-all-trades",
+            "전체 거래 기록",
+            '<ul class="orbit-trades-list">'
+            f"{_activity_rows(activities) or '<li>아직 거래 기록이 없습니다.</li>'}"
+            "</ul>",
+        )
+        + "</div>"
         f"<ul>{activity_rows or '<li>아직 거래·입금 기록이 없습니다.</li>'}</ul></section>"
     )
     return (
         hero
         + alert
+        + status
         + f'<div class="orbit-cards">{cards}</div>'
         + (f'<div class="orbit-bottom">{charts}{recent}</div>')
     )

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from auto_trading.ui.orbit_icons import ICON_ASSETS, ICON_NOTICES
 from auto_trading.ui.render import PAGES
 from scripts import dashboard
 
@@ -47,6 +48,8 @@ def test_export_both_themes_without_broken_internal_links(
             assert not href.startswith("/") and "?theme=" not in href
             assert (folder / href.partition("#")[0]).exists(), (path.name, href)
     assert not (source / "data").exists()
+    for name in (*ICON_ASSETS, *ICON_NOTICES):
+        assert (folder / "assets/icons" / name).is_file()
     assert (folder / "assets" / "auto-trading.svg").exists()
     assert (folder / "assets" / "obi.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert (folder / "assets" / "auto-trading.ico").read_bytes().startswith(b"\x00\x00\x01\x00")

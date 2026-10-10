@@ -24,6 +24,7 @@ import webbrowser
 from pathlib import Path
 
 from auto_trading.ui.data import load_dashboard
+from auto_trading.ui.orbit_icons import ICON_ASSETS, ICON_NOTICES
 from auto_trading.ui.render import ASSET_DIR, PAGES, render_page
 from auto_trading.ui.server import make_server
 
@@ -49,6 +50,9 @@ def export(folder: Path) -> int:
         "orbit-space-dark.png",
     ):
         shutil.copyfile(ASSET_DIR / name, assets / name)
+    (assets / "icons").mkdir(exist_ok=True)
+    for name in (*ICON_ASSETS, *ICON_NOTICES):
+        shutil.copyfile(ASSET_DIR / "icons" / name, assets / "icons" / name)
     for theme in ("light", "dark"):
         suffix = "" if theme == "light" else "-dark"
         for key, href, _ in PAGES:
