@@ -40,19 +40,31 @@ def _run(args: Sequence[str]) -> str:
     exe = find_exe()
     if exe is None:
         raise RuntimeError("Tailscale 이 설치되어 있지 않아요")
-    done = subprocess.run(
-        [exe, *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-        check=False,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    )
+    try:
+        done = subprocess.run(
+            [exe, *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except subprocess.TimeoutExpired as exc:
+        # 처음 serve 는 '허용 링크를 열어 주세요' 를 찍고 기다린다 — 그 링크를 사람에게 보여 준다
+        raise RuntimeError(
+            _text(exc.stdout) + _text(exc.stderr) or "Tailscale 이 응답하지 않아요"
+        ) from None
     if done.returncode != 0:
         raise RuntimeError((done.stderr or done.stdout).strip()[:400])
     return done.stdout
+
+
+def _text(raw: str | bytes | None) -> str:
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", "replace")
+    return " ".join((raw or "").split())[:400]
 
 
 @dataclass(frozen=True, slots=True)

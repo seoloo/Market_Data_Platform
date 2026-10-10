@@ -166,3 +166,10 @@ def test_phone_route_registers_server_and_serves(
     form = urllib.parse.urlencode({"token": token.group(1), "action": "off"})
     assert _req(port, "POST", "/settings/phone", headers, form)[0] == 303
     assert ts.calls[-1] == ["serve", "--https=443", "off"]
+
+
+def test_phone_error_link_is_clickable_only_for_tailscale() -> None:
+    err = "연결 실패: visit https://login.tailscale.com/f/serve?node=abc then <b>x</b> https://evil.example/"
+    html, _ = phone_tab(PhoneState(True, True, TS), None, token="T", error=err)
+    assert '<a href="https://login.tailscale.com/f/serve?node=abc"' in html
+    assert 'href="https://evil.example/' not in html and "&lt;b&gt;x" in html

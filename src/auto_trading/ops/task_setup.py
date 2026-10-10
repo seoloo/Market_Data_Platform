@@ -223,7 +223,9 @@ def register_missing(
                 enabled.append(t.name)
             continue
         template = (repo / TEMPLATE_DIR / f"{t.name}.xml").read_text(encoding="utf-8")
-        xml = render_xml(template, repo)
+        # PowerShell 은 XML 을 글자(UTF-16)로 넘긴다 — 'encoding="UTF-8"' 선언이 있으면
+        # '인코딩을 전환할 수 없습니다' 로 등록이 거부돼서 선언 줄을 뺀다 (2026-10-11 실제 등록에서 확인)
+        xml = re.sub(r"^﻿?<\?xml[^>]*\?>\s*", "", render_xml(template, repo))
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-8") as f:
             f.write(xml)
             path = f.name

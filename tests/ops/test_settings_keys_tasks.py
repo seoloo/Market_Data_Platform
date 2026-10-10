@@ -127,3 +127,20 @@ def test_templates_are_clean() -> None:
 def test_render_xml_fills_user() -> None:
     out = task_setup.render_xml("<U>{USER}</U><R>{REPO}</R>", Path("C:/r"), user=r"PC\me&you")
     assert out == r"<U>PC\me&amp;you</U><R>" + str(Path("C:/r")) + "</R>"
+
+
+def test_register_strips_xml_declaration(tmp_path: Path) -> None:
+    tdir = tmp_path / task_setup.TEMPLATE_DIR
+    tdir.mkdir(parents=True)
+    head = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    (tdir / "AutoTrading_Dashboard.xml").write_text(head + "<Task/>", encoding="utf-8")
+    seen: list[str] = []
+
+    def runner(script: str) -> str:
+        if "Register-ScheduledTask" in script:
+            path = script.split("Get-Content -Raw -Encoding UTF8 '", 1)[1].split("'", 1)[0]
+            seen.append(Path(path).read_text(encoding="utf-8"))
+        return ""
+
+    task_setup.register_missing(tmp_path, ["phone"], {}, runner)
+    assert seen == ["<Task/>"]  # PowerShell 이 UTF-16 으로 넘겨서 UTF-8 선언이 있으면 거부된다

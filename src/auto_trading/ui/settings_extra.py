@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from html import escape
 from typing import Any
@@ -243,6 +244,16 @@ def tasks_tab(
     return tab, forms
 
 
+def _linkify(text: str) -> str:
+    """Tailscale 안내의 login.tailscale.com 링크만 눌러 열 수 있게 (나머지는 그대로 글자)."""
+    out = escape(text)
+    return re.sub(
+        r"(https://login\.tailscale\.com/[A-Za-z0-9/?=&;._-]+)",
+        r'<a href="\1" target="_blank" rel="noopener noreferrer">\1</a>',
+        out,
+    )
+
+
 def _badge(ok: bool, yes: str, no: str, *, warn: bool = False) -> str:
     cls = "on" if ok else ("warn" if warn else "off")
     return f'<span class="set-state {cls}">{escape(yes if ok else no)}</span>'
@@ -261,7 +272,7 @@ def phone_tab(
     if note:
         msg = f'<div class="set-note ok" role="status">{escape(note)}</div>'
     if error:
-        msg = f'<div class="set-note bad" role="alert">{escape(error)}</div>'
+        msg = f'<div class="set-note bad" role="alert">{_linkify(error)}</div>'
     pc_ok = ph.installed and ph.running
     pc_word = "로그인 필요" if ph.installed else "설치 안 됨"
     phone_ok = bool(ph.phones)
