@@ -68,6 +68,12 @@ def _t2() -> TrendConfig:
     return TrendConfig(long_only=True)
 
 
+CAP_AFTER_COST_FROM_MS = 1_791_763_200_000
+"""2026-10-12 00:00 UTC — 이 날부터 비용 포함 레버리지 상한.
+
+:attr:`OverlayConfig.cap_after_cost_from_ms` 참고."""
+
+
 @dataclass(frozen=True, slots=True)
 class OverlayConfig:
     trend: TrendConfig = field(default_factory=_t2)
@@ -102,6 +108,13 @@ class OverlayConfig:
     ``1 + (exposure − 1) × max(0, 1 − d / dd_throttle_zero)`` 로 줄인다.
     d = 0 이면 ``exposure``, d ≥ ``dd_throttle_zero`` 면 1.0 (현물만).
     ``None``(기본)이면 없음 — 기존 설정과 비트 단위로 같다."""
+    cap_after_cost_from_ms: int | None = CAP_AFTER_COST_FROM_MS
+    """선물 레버리지 상한을 **축소 거래 비용을 뺀 뒤 지갑** 기준으로 지키기 시작하는 날(UTC ms).
+
+    예전 계산은 상한(L × 지갑)으로 축소 수량을 정한 뒤 그 비용을 지갑에서 빼서, 최종 명목 / 지갑이
+    L 을 아주 조금 넘었다(AG-CR 3.0005 배 · AG-CR4 4.0014 배, 2026-10-11 외부 분석에서 발견).
+    저장된 Paper 원장 · 과거 연구 재생이 그대로 나오도록 이 날 이전은 예전 계산을 쓴다.
+    ``None`` 이면 언제나 예전 계산."""
 
 
 T2_ALONE = OverlayConfig(exposure=1.0, daily_loss_limit=math.inf, halt_drawdown=1.0)
@@ -249,6 +262,21 @@ class OverlayDayOutcome:
     """그날 바뀐 포지션: 종목·현물/선물 수량 전후·비용·사유."""
 
 
+def _deleverage_scale(
+    notional: float, wallet: float, cfg: OverlayConfig, perp_cost: float, day: int
+) -> float:
+    """선물 명목을 줄일 비율.
+
+    예전(전환일 전): ``L × 지갑 / 명목`` — 축소 비용을 뺀 뒤엔 L 을 아주 조금 넘는다.
+    전환일부터: 축소 뒤 ``명목 × s ≤ L × (지갑 − (1 − s) × 명목 × 비용)`` 을 푼
+    ``s = L × (지갑 − 명목 × 비용) / (명목 × (1 − L × 비용))`` (0 아래면 0).
+    """
+    lev = cfg.max_futures_leverage
+    if cfg.cap_after_cost_from_ms is None or day < cfg.cap_after_cost_from_ms:
+        return lev * max(wallet, 0.0) / notional
+    return max(0.0, lev * (wallet - notional * perp_cost) / (notional * (1 - lev * perp_cost)))
+
+
 def step_overlay_day(
     state: OverlayState,
     day: int,
@@ -391,7 +419,7 @@ def step_overlay_day(
         notional = sum(fq[s] * perp_px[s] for s in symbols)
         cap = cfg.max_futures_leverage * max(wallet, 0.0)
         if notional > cap + 1e-9:
-            scale = cap / notional
+            scale = _deleverage_scale(notional, wallet, cfg, tc.perp_cost, day)
             for s in symbols:
                 cost = fq[s] * (1 - scale) * perp_px[s] * tc.perp_cost
                 tally.costs += cost

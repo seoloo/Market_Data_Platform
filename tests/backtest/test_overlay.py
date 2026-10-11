@@ -416,3 +416,51 @@ class TestDrawdownThrottle:
         e = 1.0 + (H2_DDLEV.exposure - 1.0) * max(0.0, 1 - 0.05 / (H2_DDLEV.dd_throttle_zero or 1))
         assert e == pytest.approx(1.75)
         assert H2_DDLEV.halt_drawdown == 0.30 and H2_DDLEV.catastrophe_stop == 0.20
+
+
+class TestCapAfterCost:
+    """비중 축소 비용을 뺀 뒤에도 선물 명목 / 지갑 ≤ L.
+
+    2026-10-11 외부 분석에서 발견, 전환일(2026-10-12)부터 적용.
+    """
+
+    COSTED = TrendConfig(long_only=True)  # 실제 비용 (무비용 시험은 이 경계를 못 잡았다)
+
+    def _cfg(self, cutover: int | None) -> OverlayConfig:
+        return OverlayConfig(
+            trend=self.COSTED,
+            exposure=3.0,
+            max_futures_leverage=3.0,
+            halt_drawdown=1.0,
+            catastrophe_stop=0.20,
+            cap_after_cost_from_ms=cutover,
+        )
+
+    def test_cap_holds_after_costs_from_cutover(self) -> None:
+        closes = {"AUSDT": zigzag(700), "BUSDT": wave(700, 0.003, wobble=0.03)}
+        new = run(closes, self._cfg(0))
+        old = run(closes, self._cfg(None))
+        assert new.max_futures_leverage <= 3.0 + 1e-12
+        assert old.max_futures_leverage > 3.0  # 예전 계산은 비용만큼 아주 조금 넘는다
+        assert old.max_futures_leverage < 3.01
+
+    def test_days_before_cutover_keep_old_result_bitwise(self) -> None:
+        closes = {"AUSDT": zigzag(500)}
+        far_future = START + 10_000 * D
+        assert run(closes, self._cfg(far_future)).equity == run(closes, self._cfg(None)).equity
+
+    def test_default_cutover_is_after_all_research_data(self) -> None:
+        from auto_trading.backtest.overlay import CAP_AFTER_COST_FROM_MS
+
+        assert OverlayConfig().cap_after_cost_from_ms == CAP_AFTER_COST_FROM_MS
+        assert CAP_AFTER_COST_FROM_MS == 1_791_763_200_000  # 2026-10-12 00:00 UTC
+
+    def test_scale_solves_cap_with_cost(self) -> None:
+        from auto_trading.backtest.overlay import _deleverage_scale
+
+        cfg = self._cfg(0)
+        n, w, c = 31_000.0, 10_000.0, 0.00095
+        s = _deleverage_scale(n, w, cfg, c, day=1)
+        assert n * s == pytest.approx(3.0 * (w - (1 - s) * n * c), rel=1e-12)
+        assert _deleverage_scale(n, w, self._cfg(None), c, day=1) == pytest.approx(3.0 * w / n)
+        assert _deleverage_scale(n, -5.0, cfg, c, day=1) == 0.0

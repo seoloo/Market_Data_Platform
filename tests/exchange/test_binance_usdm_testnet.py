@@ -10,6 +10,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Callable
 from decimal import Decimal
+from typing import ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -102,8 +103,8 @@ class TestOrders:
         r = api.place_market_order(
             "BTCUSDT", "BUY", Decimal("2E-3"), "tn-1-BTCUSDT-OB", reduce_only=False
         )
-        p = params(seen[-1])
-        assert seen[-1].method == "POST"
+        sent = [q for q in seen if q.method == "POST" and q.url.path == "/fapi/v1/order"]
+        p = params(sent[-1])
         assert p["type"] == "MARKET" and p["quantity"] == "0.002"  # 지수 표기 아님
         assert p["reduceOnly"] == "false" and p["newOrderRespType"] == "RESULT"
         assert p["newClientOrderId"] == "tn-1-BTCUSDT-OB"
@@ -348,8 +349,119 @@ def test_limit_ioc_sends_price_capped_immediate_or_cancel() -> None:
     r = api.place_limit_ioc(
         "BTCUSDT", "SELL", Decimal("0.002"), Decimal("84250.0"), "tn-1-BTCUSDT-RS", reduce_only=True
     )
-    p = params(seen[-1])
+    sent = [q for q in seen if q.method == "POST" and q.url.path == "/fapi/v1/order"]
+    p = params(sent[-1])
     assert (p["type"], p["timeInForce"], p["reduceOnly"]) == ("LIMIT", "IOC", "true")
     assert p["quantity"] == "0.002" and p["price"] == "84250"
     assert r.status is OrderStatus.EXPIRED and r.executed_qty == Decimal("0.001")
     assert r.order_type is FuturesOrderType.LIMIT and r.limit_price == Decimal("84250.0")
+
+
+def _trade(qty: str, price: str, commission: str, asset: str = "USDT") -> dict[str, object]:
+    q, px = Decimal(qty), Decimal(price)
+    return {
+        "price": price,
+        "qty": qty,
+        "quoteQty": str(q * px),
+        "commission": commission,
+        "commissionAsset": asset,
+        "maker": False,
+        "realizedPnl": "0",
+    }
+
+
+class TestFillDetails:
+    """체결 뒤 평균가 · 수수료 보완.
+
+    데모 실측 2026-10-10: 지정가 IOC 체결이 평균가 0 · 수수료 0 으로 기록됨.
+    """
+
+    IOC_ZERO: ClassVar[dict[str, object]] = {
+        **FILLED,
+        "type": "LIMIT",
+        "side": "SELL",
+        "avgPrice": "0",
+        "price": "2488.25",
+        "symbol": "ETHUSDT",
+        "origQty": "0.154",
+        "executedQty": "0.154",
+    }
+
+    def test_limit_ioc_zero_avg_price_and_fee_come_from_user_trades(self) -> None:
+        trades = [_trade("0.100", "2490.00", "0.0996"), _trade("0.054", "2489.00", "0.05376")]
+        api, seen = adapter(
+            {
+                ("POST", "/fapi/v1/order"): httpx.Response(200, json=self.IOC_ZERO),
+                ("GET", "/fapi/v1/userTrades"): httpx.Response(200, json=trades),
+            }
+        )
+        r = api.place_limit_ioc(
+            "ETHUSDT", "SELL", Decimal("0.154"), Decimal("2488.25"), "x", reduce_only=True
+        )
+        assert r.avg_price == (Decimal("249.000") + Decimal("134.406")) / Decimal("0.154")
+        assert r.fee == Decimal("0.15336") and r.fee_asset == "USDT"
+        assert (
+            params(next(q for q in seen if q.url.path == "/fapi/v1/userTrades"))["orderId"] == "11"
+        )
+
+    def test_market_order_fee_from_user_trades_keeps_reported_avg(self) -> None:
+        trades = [_trade("0.002", "84010.0", "0.067208")]
+        api, _ = adapter(
+            {
+                ("POST", "/fapi/v1/order"): httpx.Response(200, json=FILLED),
+                ("GET", "/fapi/v1/userTrades"): httpx.Response(200, json=trades),
+            }
+        )
+        r = api.place_market_order("BTCUSDT", "BUY", Decimal("0.002"), "x", reduce_only=False)
+        assert r.avg_price == Decimal(84_000)  # 응답 평균가가 있으면 그대로
+        assert r.fee == Decimal("0.067208") and r.fee_asset == "USDT"
+
+    def test_incomplete_trades_mark_fee_unknown_and_look_up_avg(self) -> None:
+        trades = [_trade("0.100", "2490.00", "0.0996")]  # 체결 내역이 아직 덜 모임
+        looked = {**self.IOC_ZERO, "avgPrice": "2489.65"}
+        api, _ = adapter(
+            {
+                ("POST", "/fapi/v1/order"): httpx.Response(200, json=self.IOC_ZERO),
+                ("GET", "/fapi/v1/userTrades"): httpx.Response(200, json=trades),
+                ("GET", "/fapi/v1/order"): httpx.Response(200, json=looked),
+            }
+        )
+        r = api.place_limit_ioc(
+            "ETHUSDT", "SELL", Decimal("0.154"), Decimal("2488.25"), "x", reduce_only=True
+        )
+        assert r.avg_price == Decimal("2489.65")
+        assert r.fee == 0 and r.fee_asset == "UNKNOWN"  # 0 은 무료가 아니라 미확인
+
+    def test_lookup_failures_do_not_raise_after_order_was_sent(self) -> None:
+        api, _ = adapter(
+            {
+                ("POST", "/fapi/v1/order"): httpx.Response(200, json=self.IOC_ZERO),
+                ("GET", "/fapi/v1/userTrades"): error(-1000, status=500),
+                ("GET", "/fapi/v1/order"): error(-1000, status=500),
+            }
+        )
+        r = api.place_limit_ioc(
+            "ETHUSDT", "SELL", Decimal("0.154"), Decimal("2488.25"), "x", reduce_only=True
+        )
+        assert r.executed_qty == Decimal("0.154") and r.status is OrderStatus.FILLED
+        assert r.avg_price == 0 and r.fee_asset == "UNKNOWN"
+
+    def test_unfilled_ioc_skips_lookups(self) -> None:
+        body = {**self.IOC_ZERO, "status": "EXPIRED", "executedQty": "0"}
+        api, seen = adapter({("POST", "/fapi/v1/order"): httpx.Response(200, json=body)})
+        r = api.place_limit_ioc(
+            "ETHUSDT", "SELL", Decimal("0.154"), Decimal("2488.25"), "x", reduce_only=True
+        )
+        assert r.executed_qty == 0 and r.fee_asset == "USDT"
+        assert [q.url.path for q in seen if q.url.path != "/fapi/v1/time"] == ["/fapi/v1/order"]
+
+    def test_non_usdt_commission_is_marked(self) -> None:
+        trades = [_trade("0.001", "84000.0", "0.0001", "BNB"), _trade("0.001", "84000.0", "0.0336")]
+        api, _ = adapter(
+            {
+                ("POST", "/fapi/v1/order"): httpx.Response(200, json=FILLED),
+                ("GET", "/fapi/v1/userTrades"): httpx.Response(200, json=trades),
+            }
+        )
+        r = api.place_market_order("BTCUSDT", "BUY", Decimal("0.002"), "x", reduce_only=False)
+        assert r.fee_asset == "MIXED"

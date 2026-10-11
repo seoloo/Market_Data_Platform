@@ -103,17 +103,7 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
                 "newOrderRespType": "RESULT",
             },
         )
-        result = self._order(data)
-        if result.executed_qty and not result.avg_price:
-            # 응답에 평균가가 없으면(테스트넷 실측) 조회로 채운다.
-            # 조회에 실패해도 체결 사실은 바뀌지 않으므로 그대로 둔다.
-            try:
-                looked = self.get_order(symbol, client_order_id)
-            except ExchangeError:
-                looked = None
-            if looked is not None and looked.avg_price:
-                result = replace(result, avg_price=looked.avg_price)
-        return result
+        return self._with_fills(self._order(data), symbol, client_order_id)
 
     def place_limit_ioc(
         self,
@@ -141,7 +131,47 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
                 "newOrderRespType": "RESULT",
             },
         )
-        return self._order(data)
+        return self._with_fills(self._order(data), symbol, client_order_id)
+
+    def _with_fills(
+        self, result: FuturesOrderResult, symbol: str, client_order_id: str
+    ) -> FuturesOrderResult:
+        """체결이 있으면 체결 내역(userTrades)으로 평균가 · 수수료를 채운다.
+
+        주문 응답 · 조회에는 수수료가 없고, 지정가 IOC 응답은 평균가가 0 일 때가 있다
+        (데모 실측 2026-10-10). 체결 내역의 수량 합이 체결 수량과 같을 때만 수수료를 확정한다.
+        못 읽거나 덜 모였으면 평균가는 주문 조회로 채우고, 수수료 자산을 ``UNKNOWN`` 으로
+        남긴다 — 0 을 무료 체결로 읽지 않게. 주문은 이미 거래소에 들어갔으므로 여기서의
+        실패는 결과를 바꾸지 않는다(예외를 올리지 않는다).
+        """
+        if not result.executed_qty:
+            return result
+        try:
+            fills = (
+                self.trade_fills(symbol, result.exchange_order_id)
+                if result.exchange_order_id
+                else []
+            )
+        except Exception:
+            fills = []
+        qty = sum((f["qty"] for f in fills), Decimal(0))
+        if fills and qty == result.executed_qty:
+            quote = sum((f["quote"] for f in fills), Decimal(0))
+            assets = {f["commission_asset"] for f in fills}
+            return replace(
+                result,
+                avg_price=result.avg_price or quote / qty,
+                fee=sum((f["commission"] for f in fills), Decimal(0)),
+                fee_asset=assets.pop() if len(assets) == 1 else "MIXED",
+            )
+        if not result.avg_price:
+            try:
+                looked = self.get_order(symbol, client_order_id)
+            except Exception:
+                looked = None
+            if looked is not None and looked.avg_price:
+                result = replace(result, avg_price=looked.avg_price)
+        return replace(result, fee=Decimal(0), fee_asset="UNKNOWN")
 
     def place_stop_market(
         self,
