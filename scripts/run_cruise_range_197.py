@@ -20,6 +20,7 @@ import math
 import random
 import sys
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from datetime import UTC, date, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
@@ -92,6 +93,7 @@ def simulate_cruise(
     lag: int = 0,
     stop: str | None = None,
     signal_px: Mapping[str, Mapping[str, float]] | None = None,
+    buy_block: Mapping[str, AbstractSet[str]] | None = None,
 ) -> dict[str, Any]:
     """일간 모의 Cruise 계좌 (순수). ``lag`` 1 이면 종가 d 목표를 종가 d+1 에 체결(190 틀 점검용).
 
@@ -99,6 +101,8 @@ def simulate_cruise(
     ``"never"`` 안 풂 · ``"days30"`` · ``"days90"`` 그만큼 지나면 · ``"trend"`` BTC 종가가 20 · 60 · 120 일
     전보다 모두 높은 첫날. 풀 때 NAV 를 새 고점으로. ``None`` 이면 정지 없음(197 그대로).
     ``signal_px`` (200 진단): 비중 신호를 이 가격으로 계산하고 체결 · 평가는 ``px`` 로. 없으면 ``px``.
+    ``buy_block`` (222 김프 대기): 코인 → 사지 않는 날 묶음. 그날 그 코인은 매수만 건너뛴다(매도는 그대로).
+    ``None`` 이면 197 그대로.
     """
     coins = list(px)
     qty = dict.fromkeys(coins, 0.0)
@@ -190,6 +194,8 @@ def simulate_cruise(
                     cash += proceeds
                 else:
                     if stopped:
+                        continue
+                    if buy_block is not None and d in buy_block.get(c, ()):
                         continue
                     krw = min((want - cur) * eq, cash)
                     if krw < MIN_KRW:
