@@ -1,8 +1,19 @@
-# 개인 자동매매 · 적립 프로젝트 — 연구 요약 (2026-10-10 기준, Glide · Cruise 실거래 반영)
+# 개인 자동매매 · 적립 프로젝트 — 연구 요약 (2026-10-11 기준, Glide · Cruise 실거래 반영)
 
 > 다른 AI(GPT 등)와 대화할 때 **이 파일 전체를 붙여 넣는** 요약이다. 키·계좌 잔고·개인 정보는 넣지 않는다.
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
+
+## 신규 독립 연구 209 — 승자 추가 진입 감사 (2026-10-11)
+
+T/v2 롱 허용에서 작은 선물 진입 후 고정ATR +2A/+4A에서 최초 수량50%/25%를 추가하는
+노출 배분 가설. 추가 진입만 제거한 동일 전략B와 전체C를 비교할 질문은 미검증이나,
+**Phase0 DATA_INSUFFICIENT / 최종사전등록·성과백테스트 없음**이다.
+전체과거 OFF→ON BTC67·ETH69회; 역사TEST2024~2026-08 합66(경계까지68)<실제OOS100건.
+기존 BTC·ETH 자료는 이미 열람, paired Sharpe차80%검정력 미확인, funding mark 각7125행NULL.
+이것을 손실 REJECT나 신규 PASS로 인계하지 않는다. 성과 검정 횟수0.
+[209 근거](research/209-t2-pyramiding-phase0.md) · [복사 전달TXT](research/PYRAMIDING_209_RESULT_FOR_LLM.txt).
+연구208·해당자료·백그라운드 작업과 기존T/O/Paper/Live/예약/한도 변경 없음.
 
 ## 0. 지금 실제 돈이 도는 것 (2026-10-10)
 

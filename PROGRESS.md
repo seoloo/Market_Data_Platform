@@ -1,7 +1,16 @@
 # 작업 현황
 
-최종 갱신: 2026-10-10 · 작성: Claude · Codex.
+최종 갱신: 2026-10-11 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
+
+## 2026-10-11 — 209 T/v2 승자 추가 진입 Phase 0 (Codex)
+
+- 사용자 프롬프트의 BTC·ETH 선물 롱 피라미딩을 기존 T/O/KB/후속26과 대조했다. 같은 진입·손절·재진입에서 추가 진입만 켠 C/끈 B 비교는 미검증 질문이며 새 수익원은 아니다.
+- **DATA_INSUFFICIENT / NOT_PREREGISTERED / NOT_BACKTESTED**: 2020-03~2026-08 T/v2 OFF→ON은 BTC67·ETH69회. 역사 TEST(2024~2026-08) 66회, 경계 포지션까지 낙관적으로 세도68회로 실제 OOS100건 기준 미달. 이미 본 가격이므로 미사용 OOS 아님. paired Sharpe차의80% 검정력도 미확인(0%로 보고하지 않음).
+- DB mode=ro/query_only: 현물 일봉 각3302·선물 공통 일봉 각2375·funding 각7125, 날짜/정산 gap0. funding mark는 각7125행 전부NULL; 시각 지터는 coverage 진단에만 여유를 두고 원시각은 유지. ETH 분봉 ZIP 후보 존재는 체결/무결성 검증 완료가 아님.
+- [설계·감사](docs/research/209-t2-pyramiding-phase0.md), [다른 AI 전달 TXT](docs/research/PYRAMIDING_209_RESULT_FOR_LLM.txt), 독립 감사 `scripts/audit_pyramiding_209.py`와 합성/누출 테스트만 추가. 신규 전략 성과·거래·정지 횟수 미계산, 파라미터 탐색·신규 원장/예약 없음.
+- **S&P 편입 연구208와 자료 폴더 제외**, 백그라운드 수집/운영/T/v2·O/v1·O/v2·Paper·Live·위험 설정 변경 없음. 다음은 Phase0 검정력/독립 calibration 자료 또는 설명용 파일럿의 명시적 예외 승인 검토이며, 이번에 자동 진행하지 않는다.
+- 검증: 신규6·전체pytest3255·leakage97·mypy571파일·ruff check/format847파일 통과(ruff는208 제외), 링크/diff 확인. **전체검증 통과 아님:** 기존 `ui.server→ops.conn_test→exchange.upbit`의 UI 의존성 계약1건 위반(4계약 유지), 해당 파일 수정 없음. Phase 승격 없이 감사 변경만 커밋하고 기존 오류는 별도 정리 대상.
 
 ## 2026-10-10 밤 — 오르빗 설정 화면 · 토스 적립 종목 추가/빼기 · 국내 적립 · 파이어 보고 (Claude)
 
