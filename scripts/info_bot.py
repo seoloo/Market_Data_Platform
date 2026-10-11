@@ -228,38 +228,51 @@ _LAYA_Q = {
 _LAYA_KO = {"good": "호재", "bad": "악재", "neutral": "중립"}
 
 
-def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, str], float]:
-    """영어 기사만 (사용자: 영어가 더 빠름) 기사별 호재/악재 — 기사 번호 → 판단, 평균 ms.
+LAYA_URL = "https://api.laya-ai.com"
+"""공식 Laya API (console.laya-ai.com 에서 키 발급, 2026-10-11 확인).
 
-    ``LAYA_BASE_URL`` · ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값. 답에는 보이지 않는다."""
+``LAYA_BASE_URL`` 로 바꿀 수 있다. 무료는 가입 때 20 회 · 그 뒤 입력 100 만 토큰당 $0.05."""
+
+
+def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, str], float]:
+    """영어 기사만 (사용자: 영어가 더 빠름) 기사별 호재/악재 — 기사 번호 → 판단, 호출 시간 ms.
+
+    질문 하나에 **한 번**만 부른다(``/v1/systemone/batch`` — 기사 여러 개를 한 요청에, 영어 모델).
+    ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값. 답에는 보이지 않는다(그림자 기록)."""
     env = read_env_file(root / ".env")
-    key, base = env.get("LAYA_API_KEY", "").strip(), env.get("LAYA_BASE_URL", "").strip()
-    if not key or not base:
+    key = env.get("LAYA_API_KEY", "").strip()
+    if not key or env.get("LAYA_OFF", "").strip().lower() == "true":
         return {}, 0.0
-    model = env.get("LAYA_MODEL", "").strip()
+    base = env.get("LAYA_BASE_URL", "").strip() or LAYA_URL
+    picked = [(i, it) for i, it in enumerate(items, 1) if it.source.endswith("_en")][:LAYA_ITEMS]
+    if not picked:
+        return {}, 0.0
+    body: dict[str, Any] = {
+        "states": [it.title for _, it in picked],
+        "questions": _LAYA_Q,
+        "model": "english",
+    }
+    t0 = time.monotonic()
+    try:
+        r = httpx.post(
+            f"{base.rstrip('/')}/v1/systemone/batch",
+            json=body,
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+        results = r.json()["results"] if r.status_code == 200 else []
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        results = []
+    ms = (time.monotonic() - t0) * 1000
     out: dict[str, str] = {}
-    times: list[float] = []
-    for i, it in enumerate(items, 1):
-        if len(out) >= LAYA_ITEMS or not it.source.endswith("_en"):
-            continue
-        body: dict[str, Any] = {"state": it.title, "questions": _LAYA_Q}
-        if model:
-            body["model"] = model
-        t0 = time.monotonic()
+    for (i, _it), res in zip(picked, results, strict=False):
         try:
-            r = httpx.post(
-                f"{base.rstrip('/')}/v1/systemone",
-                json=body,
-                headers={"Authorization": f"Bearer {key}"},
-                timeout=10,
-            )
-            choice = r.json()["answers"]["impact"]["choice"] if r.status_code == 200 else ""
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
-            choice = ""
+            choice = str(res["answers"]["impact"]["choice"])
+        except (KeyError, TypeError):
+            continue
         if choice in _LAYA_KO:
             out[f"N{i}"] = _LAYA_KO[choice]
-            times.append((time.monotonic() - t0) * 1000)
-    return out, (sum(times) / len(times) if times else 0.0)
+    return out, (ms if out else 0.0)
 
 
 # ------------------------------------------------------------------ 답

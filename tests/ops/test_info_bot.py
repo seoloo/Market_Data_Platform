@@ -29,30 +29,33 @@ def _items() -> list[NewsItem]:
     ]
 
 
-def test_laya_skipped_without_base_url(tmp_path: Path) -> None:
-    (tmp_path / ".env").write_text("LAYA_API_KEY=abc\n", encoding="utf-8")
+def test_laya_skipped_without_key_or_when_off(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("OTHER=1\n", encoding="utf-8")
+    assert info_bot.laya_labels(_items(), tmp_path) == ({}, 0.0)
+    (tmp_path / ".env").write_text("LAYA_API_KEY=abc\nLAYA_OFF=true\n", encoding="utf-8")
     assert info_bot.laya_labels(_items(), tmp_path) == ({}, 0.0)
 
 
-def test_laya_sends_english_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    (tmp_path / ".env").write_text(
-        "LAYA_API_KEY=abc\nLAYA_BASE_URL=https://laya.example/\n", encoding="utf-8"
-    )
-    seen: list[dict[str, Any]] = []
+def test_laya_one_batch_call_english_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".env").write_text("LAYA_API_KEY=abc\n", encoding="utf-8")
+    seen: list[tuple[str, dict[str, Any]]] = []
 
     def post(url: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float) -> Any:
-        assert (
-            url == "https://laya.example/v1/systemone" and headers["Authorization"] == "Bearer abc"
-        )
-        seen.append(json)
-        choice = "good" if "jumps" in json["state"] else "bad"
-        return httpx.Response(200, json={"answers": {"impact": {"choice": choice}}})
+        assert headers["Authorization"] == "Bearer abc"
+        seen.append((url, json))
+        res = [
+            {"answers": {"impact": {"choice": "good" if "jumps" in s else "bad"}}}
+            for s in json["states"]
+        ]
+        return httpx.Response(200, json={"results": res, "total_usage": {"input_tokens": 9}})
 
     monkeypatch.setattr("scripts.info_bot.httpx.post", post)
     labels, ms = info_bot.laya_labels(_items(), tmp_path)
     assert labels == {"N2": "호재", "N3": "악재"} and ms >= 0
-    assert [s["state"] for s in seen] == [
+    assert len(seen) == 1  # 질문 하나에 한 번만 (무료 횟수 아끼기)
+    url, body = seen[0]
+    assert url == "https://api.laya-ai.com/v1/systemone/batch" and body["model"] == "english"
+    assert body["states"] == [
         "IREN jumps on Microsoft deal - Reuters",
         "IREN misses revenue estimates",
     ]  # 한국어 기사는 보내지 않음
-    assert "impact" in seen[0]["questions"] and "model" not in seen[0]

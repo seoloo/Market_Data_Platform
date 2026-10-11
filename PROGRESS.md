@@ -8,7 +8,8 @@
 - 사용자: 'iren' 같은 종목 뉴스에 링크 · 더 알찬 내용 · 매수 추천 확률 → Laya 활용 아이디어. 합의: 링크 · 내용 보강 → 추세 상태 · 과거 통계 · 성적표 → Laya 는 기사별 호재/악재를 시험(영어 기사만, 사용자 "영어가 더 빠르다").
 - `ops/stock_news.py`: HTML 답(근거 링크), tone(호재/악재), AI 의견(근거 기사 있어야 · '검증 안 됨'), 쓸모없는 항목 거르기, `trend_stats`(오늘 T/v2 상태 + 과거 같은 상태 뒤 20 거래일 — 미래 정보 없음 시험), `price_block`. `ops/stock_calls.py`: 기록(`data/info_bot/calls.jsonl`, 같은 날 같은 종목 한 번) · 20 거래일 뒤 채점 · '성적' · '라야' 비교. `notify/channels.send_html`(거부되면 태그 지운 글로).
 - **AI 확률은 만들지 않음** — 검증 안 된 숫자라서. 대신 우리 규칙의 과거 통계 + 실제 채점으로 맞은 비율을 쌓는다.
-- **Laya 키 문제:** `.env` 의 `LAYA_API_KEY`(sk_ 로 시작, 35 자)가 RapidAPI(구독 안 됨 403) · Runware · Laya Studio(lsk_) · Vercel 어디에도 맞지 않음. Laya 는 여러 곳이 올려 주는 공개 모델(Apache 2.0)이라 **키를 받은 곳 주소가 필요** → `LAYA_BASE_URL` 를 넣으면 켜진다(`/v1/systemone`, Jev 호환 형식). 그 전엔 건너뜀.
+- **Laya 연결(같은 날 뒤):** 사용자 키는 공식 console.laya-ai.com 발급 → `api.laya-ai.com/v1/systemone/batch` 로 질문당 1 회(영어 기사 최대 8 개 · `model=english`). 실제 1 회 시험: 호재 제목 good 0.87 · 악재 제목 bad 0.98, 1.4 초. 무료 20 회 뒤 유료($0.05/백만 입력 토큰) — `LAYA_OFF=true` 로 끌 수 있음.
+- (앞서) **Laya 키 문제:** `.env` 의 `LAYA_API_KEY`(sk_ 로 시작, 35 자)가 RapidAPI(구독 안 됨 403) · Runware · Laya Studio(lsk_) · Vercel 어디에도 맞지 않음. Laya 는 여러 곳이 올려 주는 공개 모델(Apache 2.0)이라 **키를 받은 곳 주소가 필요** → `LAYA_BASE_URL` 를 넣으면 켜진다(`/v1/systemone`, Jev 호환 형식). 그 전엔 건너뜀.
 - 확인: `ask iren` 실제 답(링크 · 호재/악재 · 약세 의견 · 추세 꺼짐 · 과거 같은 상태 57% vs 전체 53%).
 
 ## 2026-10-11 밤 — '전부 정리' (보유 팔기) 버튼: 텔레그램 · 오르빗 (Claude)
