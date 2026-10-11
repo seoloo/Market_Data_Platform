@@ -322,3 +322,47 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
     finally:
         server.shutdown()  # type: ignore[attr-defined]
         server.server_close()  # type: ignore[attr-defined]
+
+
+def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
+    """'전부 정리': 확인 창 · 토큰 · 범위 검사 · 실행기만 띄움 · 그룹 정지 풀기 · 휴대폰 거부."""
+    server = make_server(tmp_path, port=0, catchup=None)
+    calls: list[list[str]] = []
+    server.liq_runner = calls.append
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/settings") as r:
+            page = r.read().decode()
+        token = re.search(r'name="token" value="([^"]+)"', page)
+        assert token and 'id="set-liquidate"' in page and "그룹 정지 없음" in page
+        assert page.count('action="/settings/liquidate"') == 4  # 전부 · Cruise · Glide · 적립
+        assert "정말 Cruise(업비트 BTC · ETH · SOL)를 정리할까요?" in page
+        post = TestServer._post
+        tok = token.group(1)
+        assert post(base, "/settings/liquidate", {"token": "x", "scope": "all"})[0] == 403
+        assert post(base, "/settings/liquidate", {"token": tok, "scope": "nope"})[0] == 400
+        assert post(base, "/settings/liquidate", {"token": tok, "scope": "cruise"})[0] == 303
+        assert calls == [["start", "cruise", "오르빗"]]
+        halt = tmp_path / "data" / "HALT_cruise"
+        halt.parent.mkdir(parents=True, exist_ok=True)
+        halt.write_text("전부 정리(Cruise 만) · 오르빗\n", encoding="utf-8")
+        with urllib.request.urlopen(base + "/settings?liq=1") as r:
+            after = r.read().decode()
+        assert "정리를 시작했어요" in after and "Cruise 정지 중" in after
+        assert 'action="/settings/unhalt"' in after
+        assert post(base, "/settings/unhalt", {"token": tok, "group": "bad"})[0] == 400
+        assert post(base, "/settings/unhalt", {"token": tok, "group": "cruise"})[0] == 303
+        assert not halt.exists()
+        request = urllib.request.Request(
+            base + "/settings/liquidate",
+            data=urllib.parse.urlencode({"token": tok, "scope": "all"}).encode(),
+            method="POST",
+            headers={"Origin": base, "X-Forwarded-For": "100.64.0.2"},
+        )
+        with pytest.raises(urllib.error.HTTPError) as err:
+            urllib.request.urlopen(request)
+        assert err.value.code == 403 and calls == [["start", "cruise", "오르빗"]]
+    finally:
+        server.shutdown()
+        server.server_close()

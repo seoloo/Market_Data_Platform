@@ -100,3 +100,16 @@ def test_fetch_reads_button_presses_and_replies() -> None:
         "",
     )
     assert (msgs[1].text, msgs[1].reply_to, msgs[1].data) == ("2", 30, "")
+
+
+def test_liquidation_words_and_buttons_go_to_bot_not_glide() -> None:
+    from auto_trading.notify.inbox import InboxMessage, is_command, is_liquidation
+
+    def m(text: str = "", data: str = "") -> InboxMessage:
+        return InboxMessage(1, 0, text, data=data)
+
+    for t in ("정리", "전부 매도", "/liquidate", "정지풀기"):
+        assert is_liquidation(m(t)) and is_command(m(t))
+    assert is_liquidation(m(data="liq:ab12:all")) and is_command(m(data="unh:ab12:cruise"))
+    assert is_command(m("현황")) and not is_liquidation(m("현황"))
+    assert not is_command(m("30만")) and not is_command(m(data="p1:all"))  # Glide 몫

@@ -131,9 +131,27 @@ def parse_krw(text: str) -> float | None:
 COMMANDS = frozenset({"현황", "/현황", "수익", "/수익", "잔고", "/status", "status"})
 """'현황' 봇이 답하는 글. 나머지 글 · 버튼은 Glide 대화 몫."""
 
+LIQ_WORDS = frozenset({"정리", "/정리", "전부정리", "전부매도", "청산", "/liquidate"})
+"""'전부 정리' 요청 (2026-10-11) — 미리 보기와 범위 버튼으로 답한다."""
+UNHALT_WORDS = frozenset({"정지풀기", "/정지풀기", "/unhalt"})
+LIQ_DATA = ("liq:", "unh:")
+"""정리 · 정지 풀기 버튼의 callback_data 머리."""
+
+
+def _word(msg: InboxMessage) -> str:
+    return msg.text.strip().lower().replace(" ", "")
+
+
+def is_liquidation(msg: InboxMessage) -> bool:
+    """'전부 정리' · '정지풀기' 글 또는 그 버튼."""
+    if msg.data:
+        return msg.data.startswith(LIQ_DATA)
+    return _word(msg) in LIQ_WORDS | UNHALT_WORDS
+
 
 def is_command(msg: InboxMessage) -> bool:
-    return not msg.data and msg.text.strip().lower().replace(" ", "") in COMMANDS
+    """봇(scripts/telegram_bot.py) 몫 — '현황' 류와 '전부 정리' 류. 나머지는 Glide 대화 몫."""
+    return is_liquidation(msg) or (not msg.data and _word(msg) in COMMANDS)
 
 
 KEEP_S = 86_400

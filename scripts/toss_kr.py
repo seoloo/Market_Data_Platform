@@ -28,7 +28,7 @@ from auto_trading.exchange.toss import TossApiError, TossTokenCache, TossTrader
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops import user_settings
-from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.kr_accumulate import KrOrder, KrState, advise, settle
 
 REPO = Path(__file__).resolve().parent.parent
@@ -146,7 +146,7 @@ def run(*, dry: bool = False) -> int:
         prices = {k: float(v) for k, v in trader.prices(sorted(active)).items()}
         power = float(trader.buying_power("KRW"))
         enabled = trader.credentials.trading_enabled
-        halted = halted_reason(HALT)
+        halted = halted_for(HALT, "acc")  # 전체 정지 또는 토스 적립 정지
         for x in items:
             sym = str(x["sym"])
             st = states[sym]

@@ -225,8 +225,11 @@ def render_settings(
     holdings: Mapping[str, str] | None = None,
     halt_note: str = "",
     extra_tabs: Mapping[str, tuple[str, str]] | None = None,
+    liquidate: tuple[str, str] = ("", ""),
 ) -> str:
     """``halt_note``: 비상 정지 파일에 적힌 이유(켜져 있을 때 보여 준다).
+
+    ``liquidate``: '전부 정리' 칸 (칸 HTML, 큰 폼 밖에 둘 작은 폼) — ui/liquidate_panel.
 
     ``extra_tabs``: '연결 · 키' · '자동 실행' 쪽 (쪽 HTML, 큰 폼 밖에 둘 작은 폼) — settings_extra.
     """
@@ -530,8 +533,7 @@ def render_settings(
         '<div><button type="button" popovertarget="halt-ask" popovertargetaction="hide">취소'
         '</button><button type="submit" form="halt-f" class="set-danger-btn">'
         f"{'풀기' if halted else '켜기'}</button></div></div>"
-        "</section>"
-        '<section class="set-card"><h2>변경 기록</h2>'
+        "</section>" + liquidate[0] + '<section class="set-card"><h2>변경 기록</h2>'
         f'<div class="set-log">{log_rows}</div></section>'
     )
     parts = {
@@ -570,7 +572,9 @@ def render_settings(
         + "".join(v[1] for v in extra_tabs.values())
         + '<form id="halt-f" method="post" action="/settings/halt">'
         f'<input type="hidden" name="token" value="{escape(token)}">'
-        f'<input type="hidden" name="action" value="{"off" if halted else "on"}"></form>' + "</div>"
+        f'<input type="hidden" name="action" value="{"off" if halted else "on"}"></form>'
+        + liquidate[1]
+        + "</div>"
     )
 
 

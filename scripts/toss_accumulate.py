@@ -55,7 +55,7 @@ from auto_trading.exchange.toss import (
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops import user_settings
-from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.m3_guard import (
     DIV_STEPS_KRW,
     STAGE_SHARE,
@@ -1527,7 +1527,8 @@ def run(telegram: bool = True) -> int:
             ctx = day.qs_prepare(qs, datetime.now(tz=UTC))
             _save_qs(qs)
         enabled = trader.credentials.trading_enabled
-        halted = halted_reason(HALT)
+        halted = halted_for(HALT, "acc")  # 적립 · QS: 전체 정지 또는 토스 적립 정지
+        halted_glide = halted_for(HALT, "glide")  # Glide: 전체 정지 또는 Glide 정지
         accrued_qndx = 0.0
         for plan in _plans():
             state = states.get(plan.symbol)
@@ -1644,7 +1645,7 @@ def run(telegram: bool = True) -> int:
             lines = head + ([SUB + qline] if qline else []) + ["", RULE] + lines
         if M3_ENABLED:
             _m3_poll(today, telegram)
-            m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted, telegram=telegram)
+            m3_lines = _m3_run(day, trader, enabled=enabled, halted=halted_glide, telegram=telegram)
             if m3_lines:
                 lines = [*m3_lines, *(["", RULE] if lines else []), *lines]
     except (AutoTradingError, TossApiError) as exc:
@@ -1702,7 +1703,7 @@ def m3_only(telegram: bool = True) -> int:
             day,
             trader,
             enabled=trader.credentials.trading_enabled,
-            halted=halted_reason(HALT),
+            halted=halted_for(HALT, "glide"),
             brake=False,
         )
     except (AutoTradingError, TossApiError) as exc:

@@ -220,3 +220,67 @@ def test_stock_list_and_kr_calendar(tmp_path: Path) -> None:
     r = _make(tmp_path, routes, seen)
     assert r.stocks_all("KOSPI")[0]["name"] == "삼성전자"
     assert r.kr_open_today("2026-10-12") and not r.kr_open_today("2026-10-13")
+
+
+def test_liquidation_reads_and_cancel(tmp_path: Path) -> None:
+    """'전부 정리' 용: 미체결 · 판매 가능 · 미국 정규장 · 매수 호가 · 취소(관문)."""
+    seen: list[httpx.Request] = []
+    routes = {
+        "GET /api/v1/orders": {
+            "orders": [
+                {
+                    "orderId": "A1",
+                    "symbol": "btq",
+                    "side": "BUY",
+                    "status": "PENDING",
+                    "timeInForce": "CLS",
+                    "quantity": "1",
+                    "execution": {"filledQuantity": "0"},
+                }
+            ],
+            "nextCursor": None,
+            "hasNext": False,
+        },
+        "GET /api/v1/sellable-quantity": {"sellableQuantity": "2.5"},
+        "GET /api/v1/market-calendar/US": {
+            "today": {
+                "date": "2026-10-12",
+                "regularMarket": {
+                    "startTime": "2026-10-12T22:30:00+09:00",
+                    "endTime": "2026-10-13T05:00:00+09:00",
+                },
+            }
+        },
+        "GET /api/v1/orderbook": {
+            "bids": [{"price": "50.1", "volume": "3"}, {"price": "0", "volume": "1"}]
+        },
+        "POST /api/v1/orders/A1/cancel": {"orderId": "C1"},
+    }
+    t = _make(tmp_path, routes, seen)
+    o = t.open_orders()[0]
+    assert (o.order_id, o.symbol, o.side) == ("A1", "BTQ", "BUY")
+    assert (o.qty, o.filled_qty) == (Decimal(1), Decimal(0))
+    assert seen[-1].url.params["status"] == "OPEN"
+    assert t.sellable("TQQQ") == Decimal("2.5")
+    assert t.us_regular_session("2026-10-12") == (
+        "2026-10-12T22:30:00+09:00",
+        "2026-10-13T05:00:00+09:00",
+    )
+    assert t.us_regular_session("2026-10-13") is None  # 날짜가 다르면(휴장 등) 없음
+    assert t.bids("TQQQ") == [(Decimal("50.1"), Decimal("3"))]
+    res = t.cancel("A1")
+    assert res.accepted and res.code == "C1"
+    assert seen[-1].headers["X-Tossinvest-Account"] == "1"
+    with pytest.raises(TradingDisabledError):
+        _make(tmp_path, routes, [], enabled=False).cancel("A1")
+    bad = _make(tmp_path, {"POST /api/v1/orders/A1/cancel": httpx.Response(503)}, [])
+    with pytest.raises(OrderStateUnknownError):
+        bad.cancel("A1")
+
+
+def test_under_one_dollar_price_has_four_decimals(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    t = _make(tmp_path, {"POST /api/v1/orders": {"orderId": "X"}}, seen)
+    t.order("TQQQ", "SELL", 1, Decimal("0.9876"), client_order_id="c", time_in_force="DAY")
+    body = json.loads(seen[-1].content)
+    assert body["price"] == "0.9876" and body["timeInForce"] == "DAY"

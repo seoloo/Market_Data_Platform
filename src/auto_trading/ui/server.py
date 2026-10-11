@@ -10,6 +10,10 @@
 * **예외 하나** (사용자 요청 2026-10-02): ``POST /catchup`` — 놓친 예약 작업을 작업 스케줄러로
   다시 시작한다(ui/catchup.py). 받는 값은 화면에 심은 토큰뿐이고, 무엇을 돌릴지는 서버가 정한다.
   같은 출처(Origin·Host)와 프로세스마다 새로 만든 토큰이 맞아야 한다. PUT·DELETE 등은 501.
+* **예외 셋째** (사용자 2026-10-11 '전부 정리'): ``POST /settings/liquidate`` — 확인 창을 거쳐
+  정리 실행기(``python -m scripts.liquidate start <범위> 오르빗``)를 따로 띄운다. 서버는 키를 읽거나
+  주문하지 않는다. ``POST /settings/unhalt`` 는 그룹 정지 파일(``data/HALT_<그룹>``)만 지운다.
+  둘 다 설정과 같은 토큰 · 같은 출처 검사, 휴대폰에서는 안 받는다.
 * 외부 노출 금지: 127.0.0.1·localhost 만 바인딩한다.
 * API 키를 읽지 않는다. 거래소는 실거래 홈의 **공개 시세**(키 없음 · 60 초 캐시)만
   부른다(2026-10-09).
@@ -24,6 +28,8 @@ from __future__ import annotations
 
 import json
 import secrets
+import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -35,9 +41,12 @@ from urllib.parse import parse_qs
 
 from auto_trading.ops import env_keys, phone_link, task_setup, user_settings
 from auto_trading.ops.conn_test import run_test
+from auto_trading.ops.kill_switch import GROUPS, group_path, halted_reason
 from auto_trading.ops.kr_accumulate import read_universe
+from auto_trading.ops.liquidate import SCOPES, Store, job_text
 from auto_trading.ui.catchup import CatchupRunner
 from auto_trading.ui.data import DashboardData, load_dashboard
+from auto_trading.ui.liquidate_panel import liquidate_panel
 from auto_trading.ui.orbit_home import layout as orbit_layout
 from auto_trading.ui.orbit_icons import ICON_ASSETS
 from auto_trading.ui.render import PAGES, render_page
@@ -143,6 +152,8 @@ class DashboardServer(ThreadingHTTPServer):
         self.phone_runner: phone_link.Runner | None = None
         """시험에서 tailscale 대신 끼운다."""
         self.phone_note: tuple[str, str] = ("", "")
+        self.liq_runner: Callable[[list[str]], None] = _spawn
+        """'전부 정리' 실행기를 띄운다 (시험에서 바꿔 끼운다)."""
         super().__init__(address, _Handler)
 
     def task_states(self, *, fresh: bool = False) -> dict[str, task_setup.TaskState] | None:
@@ -204,6 +215,10 @@ class _Handler(BaseHTTPRequestHandler):
             query = parse_qs(self.path.partition("?")[2])
             saved_n = (query.get("saved") or [""])[0]
             notice = f"저장했어요 · 바뀐 값 {saved_n}개" if saved_n.isdigit() else ""
+            if (query.get("liq") or [""])[0] == "1":
+                notice = "정리를 시작했어요 — 결과는 텔레그램으로 와요 (잠시 뒤 새로 고침)"
+            if (query.get("unhalt") or [""])[0] == "1":
+                notice = "그룹 정지를 풀었어요 — 다음 실행부터 그 전략이 자기 규칙대로 다시 사요"
             keys_n = (query.get("keys") or [""])[0]
             if keys_n.isdigit():
                 notice = f"키 {keys_n}개를 .env 에 저장했어요 (화면에는 다시 보이지 않아요)"
@@ -332,6 +347,7 @@ class _Handler(BaseHTTPRequestHandler):
             notice=notice,
             log=user_settings.read_log(root),
             halt_note=_halt_note(root),
+            liquidate=_liq_panel(root, self.server.settings_token),
             extra_tabs={
                 "keys": keys_tab(
                     status,
@@ -452,6 +468,26 @@ class _Handler(BaseHTTPRequestHandler):
                 self.server.task_states(fresh=True)
             self._redirect("/settings#set-tasks")
             return
+        if self.path == "/settings/liquidate":  # '정말 … 정리할까요?' 창에서 이미 확인함
+            scope = form.get("scope", "")
+            if scope not in SCOPES:
+                self._send(400, "<!doctype html><meta charset='utf-8'><p>모르는 범위</p>")
+                return
+            try:
+                self.server.liq_runner(["start", scope, "오르빗"])
+            except OSError as exc:
+                self._send(500, f"<!doctype html><meta charset='utf-8'><p>실행 실패: {exc}</p>")
+                return
+            self._redirect("/settings?liq=1#set-liquidate")
+            return
+        if self.path == "/settings/unhalt":
+            group = form.get("group", "")
+            if group not in GROUPS:
+                self._send(400, "<!doctype html><meta charset='utf-8'><p>모르는 그룹</p>")
+                return
+            group_path(root / "data" / "HALT", group).unlink(missing_ok=True)
+            self._redirect("/settings?unhalt=1#set-liquidate")
+            return
         current = user_settings.load(root)
         if self.path == "/settings/halt":  # 비상 정지는 확인 창을 거친 이 길로만 켜고 끈다
             want = form.get("action")
@@ -504,6 +540,8 @@ class _Handler(BaseHTTPRequestHandler):
             "/settings/save",
             "/settings/delete",
             "/settings/halt",
+            "/settings/liquidate",
+            "/settings/unhalt",
             "/settings/keys",
             "/settings/test",
             "/settings/tasks",
@@ -581,6 +619,34 @@ class _Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:
         return  # 접속 기록을 남기지 않는다 (콘솔 잡음)
+
+
+def _liq_panel(root: Path, token: str) -> tuple[str, str]:
+    halt = root / "data" / "HALT"
+    halts = {g: halted_reason(group_path(halt, g)) for g in GROUPS}
+    jobs = Store(root / "data" / "liquidate").jobs()
+    return liquidate_panel(token, halts, job_text(jobs[-1]) if jobs else "")
+
+
+def _spawn(args: list[str], root: Path | None = None) -> None:
+    """정리 실행기를 창 없이 따로 띄운다 (이 서버가 죽어도 이어 돈다). 출력은 reports/liquidate/."""
+    repo = root or Path(__file__).resolve().parents[3]
+    py = repo / ".venv" / "Scripts" / "python.exe"
+    exe = str(py) if py.exists() else sys.executable
+    out = repo / "reports" / "liquidate"
+    out.mkdir(parents=True, exist_ok=True)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+        subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+    )
+    with (out / "orbit_run.log").open("ab") as log:
+        subprocess.Popen(
+            [exe, "-m", "scripts.liquidate", *args],
+            cwd=repo,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            creationflags=flags,
+        )
 
 
 def _halt_note(root: Path) -> str:

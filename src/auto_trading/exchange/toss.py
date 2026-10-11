@@ -214,6 +214,25 @@ class TossReader:
         today = data.get("today") or {}
         return str(today.get("date")) == day and bool(today.get("integrated"))
 
+    def us_regular_session(self, us_date: str) -> tuple[str, str] | None:
+        """그 미국 날짜(YYYY-MM-DD)의 정규장 (시작, 끝) — KST ISO 문자열. 휴장이면 None."""
+        data = self._get("/api/v1/market-calendar/US", {"date": us_date}) or {}
+        today = data.get("today") or {}
+        reg = today.get("regularMarket") or {}
+        if str(today.get("date")) != us_date or not reg:
+            return None
+        return str(reg["startTime"]), str(reg["endTime"])
+
+    def bids(self, symbol: str) -> list[tuple[Decimal, Decimal]]:
+        """매수 호가 [(가격, 잔량)] 높은 가격 순. 없으면 빈 목록."""
+        data = self._get("/api/v1/orderbook", {"symbol": symbol}) or {}
+        out = []
+        for row in data.get("bids") or []:
+            px, vol = _dec(row.get("price")), _dec(row.get("volume"))
+            if px is not None and px > 0 and vol is not None and vol > 0:
+                out.append((px, vol))
+        return out
+
     def usd_krw(self) -> Decimal:
         row = self._get("/api/v1/exchange-rate", {"baseCurrency": "USD", "quoteCurrency": "KRW"})
         rate = _dec((row or {}).get("rate"))
@@ -262,6 +281,30 @@ class TossReader:
             if row.get("marketCountry") == "US":
                 return _dec(row.get("commissionRate"))
         return None
+
+    def sellable(self, symbol: str) -> Decimal:
+        """판매 가능 수량 (미체결 매도에 묶인 것은 빠진다). 미국은 소수점일 수 있다."""
+        data = self._get("/api/v1/sellable-quantity", {"symbol": symbol}, account=True) or {}
+        return _dec(data.get("sellableQuantity")) or Decimal(0)
+
+    def open_orders(self) -> list[TossOpenOrder]:
+        """진행 중 주문 전부 (체결 대기 · 부분 체결 · 취소/정정 대기)."""
+        data = self._get("/api/v1/orders", {"status": "OPEN"}, account=True) or {}
+        out = []
+        for o in data.get("orders") or []:
+            ex = o.get("execution") or {}
+            out.append(
+                TossOpenOrder(
+                    order_id=str(o.get("orderId") or ""),
+                    symbol=str(o.get("symbol") or "").upper(),
+                    side=str(o.get("side") or "").upper(),
+                    status=str(o.get("status") or ""),
+                    time_in_force=str(o.get("timeInForce") or ""),
+                    qty=_dec(o.get("quantity")) or Decimal(0),
+                    filled_qty=_dec(ex.get("filledQuantity")) or Decimal(0),
+                )
+            )
+        return out
 
     def order_status(self, order_id: str) -> TossOrderStatus:
         data = self._get(f"/api/v1/orders/{order_id}", account=True) or {}
@@ -314,6 +357,18 @@ class TossReader:
 
     def close(self) -> None:
         self.client.close()
+
+
+@dataclass(frozen=True, slots=True)
+class TossOpenOrder:
+    order_id: str
+    symbol: str
+    side: str
+    """BUY · SELL."""
+    status: str
+    time_in_force: str
+    qty: Decimal
+    filled_qty: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -385,7 +440,7 @@ class TossTrader(TossReader):
             "orderType": "LIMIT",
             "timeInForce": time_in_force,
             "quantity": str(qty),
-            "price": f"{int(limit)}" if kr else f"{limit:.2f}",
+            "price": f"{int(limit)}" if kr else (f"{limit:.2f}" if limit >= 1 else f"{limit:.4f}"),
         }
         try:
             response = self.client.post(
@@ -401,6 +456,32 @@ class TossTrader(TossReader):
         if response.status_code >= 500:
             raise OrderStateUnknownError(
                 f"토스 주문 서버 오류 {response.status_code} — 접수 여부 모름, 다시 보내지 않는다"
+            )
+        err = self._error(response)
+        return TossOrderResult(False, err.code, err.message)
+
+    def cancel(self, order_id: str) -> TossOrderResult:
+        """진행 중 주문 취소 (이미 체결된 것은 못 한다).
+
+        네트워크 · 5xx 는 결과 모름 — 다시 보내지 않는다."""
+        if not self.credentials.trading_enabled:
+            raise TradingDisabledError("TOSS_TRADING_ENABLED 가 true 가 아니다 — 취소하지 않는다")
+        try:
+            response = self.client.post(
+                f"{self.base_url}/api/v1/orders/{order_id}/cancel",
+                json={},
+                headers=self._headers(True),
+            )
+        except httpx.HTTPError as exc:
+            raise OrderStateUnknownError(
+                f"토스 취소 전송 결과 모름 ({type(exc).__name__}) — 조회로 확인"
+            ) from exc
+        if response.status_code == 200:
+            result = (response.json() or {}).get("result") or {}
+            return TossOrderResult(True, str(result.get("orderId") or ""), "취소 접수")
+        if response.status_code >= 500:
+            raise OrderStateUnknownError(
+                f"토스 취소 서버 오류 {response.status_code} — 조회로 확인"
             )
         err = self._error(response)
         return TossOrderResult(False, err.code, err.message)

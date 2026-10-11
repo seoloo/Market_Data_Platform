@@ -39,7 +39,7 @@ from auto_trading.exchange.upbit import UpbitClient, UpbitOrder
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops import user_settings
-from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.t2_upbit import (
     COINS,
     DD_STOP,
@@ -214,7 +214,7 @@ def _send(
 def run_cmd() -> int:
     now_ms = int(time.time() * 1000)
     st = _load()
-    halted = halted_reason(HALT)
+    halted = halted_for(HALT, "cruise")  # 전체 정지 또는 Cruise 정지(전부 정리 뒤)
     c = _client()
     lines: list[str] = []
     fill_lines: list[str] = []
