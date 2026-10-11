@@ -124,18 +124,22 @@ class Bundle:
     price_btc: float = 0.0
 
 
-def lot(exinfo: dict[str, Any], s: str) -> tuple[float, float]:
-    """(stepSize, 최소 명목). 폐지 종목은 (0, 5)."""
+def lot(exinfo: dict[str, Any], s: str) -> tuple[float, float, float]:
+    """(stepSize, minQty, 최소 명목) — 지금 거래소 규격(2026-10-11 받음). 폐지 종목은 (0, 0, 5).
+
+    당시 규격은 공개 자료로 복원할 수 없어 지금 값을 쓴다(문서 212 §11 한계).
+    """
     info = exinfo.get(s)
     if not info:
-        return 0.0, 5.0
-    step, mn = 0.0, 5.0
+        return 0.0, 0.0, 5.0
+    step, minq, mn = 0.0, 0.0, 5.0
     for f in info.get("filters", []):
         if f.get("filterType") == "LOT_SIZE":
             step = float(f.get("stepSize", 0) or 0)
+            minq = float(f.get("minQty", 0) or 0)
         if f.get("filterType") == "MIN_NOTIONAL":
             mn = float(f.get("notional", 5) or 5)
-    return step, mn
+    return step, minq, mn
 
 
 def floor_step(q: float, step: float) -> float:
@@ -211,12 +215,14 @@ class Sim:
         q = max(-cap, min(cap, want))
         if want < 0:
             q = max(want, -cap, -lg.qty)
-        step, mn = lot(self.ex, lg.symbol)
+        step, minq, mn = lot(self.ex, lg.symbol)
         q = math.copysign(floor_step(abs(q), step), q)
-        if abs(q) * price < mn and abs(want) * price >= mn:
-            return 0.0
         if q == 0:
             return 0.0
+        if want > 0 and (abs(q) < minq or abs(q) * price < mn):
+            return 0.0  # 늘리는 주문은 minQty · 최소 명목을 지켜야 한다 (212 감사 A1 고침)
+        if want < 0 and abs(q) < minq and abs(q) < lg.qty:
+            return 0.0  # 줄이는 주문: 전량 청산이 아니면 minQty 이상
         self._fill(b, lg, q, price)
         return q
 
@@ -291,6 +297,21 @@ class Sim:
             if gross + n * (1 + (sg.beta if self.p.hedge else 0)) > self.p.gross_cap * eq:
                 self.skips["총명목 1.5 배"] += 1
                 continue
+            # 진입 전 주문 수량 검사 (212 감사 A1): 단위로 내린 코인 · 헤지 수량이 규격을 지키고
+            # 헤지가 목표의 90% 이상인지 롱을 넣기 전에 본다. 예전 판은 이 검사 없이 들어가 헤지 실패로 정리됐다.
+            step_c, minq_c, mn_c = lot(self.ex, sg.symbol)
+            qc = floor_step(n / pc, step_c)
+            if qc <= 0 or qc < minq_c or qc * pc < mn_c:
+                self.skips["코인 수량 불가(사전 검사)"] += 1
+                continue
+            if self.p.hedge:
+                step_b, minq_b, mn_b = lot(self.ex, "BTCUSDT")
+                want_b = sg.beta * qc * pc
+                qh = floor_step(want_b / pb, step_b)
+                if qh < minq_b or qh * pb < mn_b or qh * pb < 0.9 * want_b:
+                    self.skips["헤지 수량 불가(사전 검사)"] += 1
+                    continue
+            n = qc * pc
             span = (t - DAY, t + HOLD + 6 * 3_600_000)
             coin = Leg(
                 sg.symbol, +1, target=n / pc, fev=self.it.funding_between(sg.symbol, *span)[0]

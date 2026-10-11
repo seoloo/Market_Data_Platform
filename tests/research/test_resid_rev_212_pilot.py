@@ -106,3 +106,34 @@ def test_halt_blocks_new_entries() -> None:
     sim.halted = "2022-01-01"
     sim.run(date(2022, 1, 2), date(2022, 1, 4))
     assert not sim.done and sim.skips["계좌 30% 정지"] == 1
+
+
+BTC_SPEC = {
+    "BTCUSDT": {
+        "filters": [
+            {"filterType": "LOT_SIZE", "stepSize": "0.001", "minQty": "0.001"},
+            {"filterType": "MIN_NOTIONAL", "notional": "50"},
+        ]
+    }
+}
+
+
+def test_pretrade_hedge_check_skips_unhedgeable() -> None:
+    """212 감사 A1: 단위로 내린 헤지가 목표 90% 미만이면 롱을 넣기 전에 생략."""
+    sig = Signal(
+        "2022-01-01", "AAAUSDT", -2.5, 1.5, 0.0, 1e6, 2.0, 5000.0
+    )  # BTC ATR 커서 묶음이 작음
+    fake = Fake(lambda s, t: 100.0 if s == "AAAUSDT" else 100_000.0)
+    sim = Sim(P(), [sig], fake, BTC_SPEC)  # type: ignore[arg-type]
+    sim.run(date(2022, 1, 2), date(2022, 1, 6))
+    assert not sim.done and sim.skips["헤지 수량 불가(사전 검사)"] == 1
+
+
+def test_pretrade_hedge_check_allows_feasible() -> None:
+    sig = Signal("2022-01-01", "AAAUSDT", -2.5, 1.5, 0.0, 1e6, 2.0, 50.0)
+    fake = Fake(lambda s, t: 100.0 if s == "AAAUSDT" else 100_000.0)
+    sim = Sim(P(), [sig], fake, BTC_SPEC)  # type: ignore[arg-type]
+    sim.run(date(2022, 1, 2), date(2022, 1, 8))
+    b = sim.done[0]
+    assert b.reason == "72 시간"
+    assert sim.skips.get("헤지 수량 불가(사전 검사)", 0) == 0
