@@ -67,3 +67,23 @@
 - CoinGecko changelog 2022-10 (global market_cap_chart 유료) — https://docs.coingecko.com/changelog/25102022
 - Coinranking, global market stats · historical data — https://coinranking.com/api/features/global-market-stats , https://coinranking.com/api/features/historical-crypto-data
 - crypto2 (CoinMarketCap 비공식 수집 R 패키지) — https://cloud.r-project.org/web/packages/crypto2/refman/crypto2.html
+
+## 5. 추가 탐색 (2026-10-11, 사용자 "다른 곳에서 더 한번 찾아봐")
+
+| 출처 | 무엇을 주나 | 4 시간 · 2020 ~ 2026 가능? | 비고 |
+|---|---|---|---|
+| **TradingView 차트 내보내기** | CRYPTOCAP:USDT.D · BTC.D · TOTAL 원래 정의 그대로 CSV | **유료 플랜만**(Essential 이상). 내보내기는 차트에 불러온 봉까지 — Essential · Plus 약 1 만 봉(4 시간 ≈ 4.6 년, 2022 ~), Premium 2 만 봉(≈ 9 년) | 사용자 본인 계정의 개인용 내보내기는 정당. **원래 가설을 검증할 수 있는 유일한 길** — 단 비용 발생(사용자 결정) |
+| **LiveCoinWatch API** | `/overview/history`(전체 시총 · BTC 도미넌스) · `/coins/single/history`(코인별 시총 — USDT) | **불확실.** 무료 키(가입 필요) · 하루 1 만 크레딧. 시간 간격 · 과거 깊이는 공식 문서를 확인 못 함(이 PC 에서 사이트 · API 접속 거부, 아카이브본은 스크립트로 그려져 내용 없음) | 전체 시총이 LiveCoinWatch 자체 범위라 TradingView TOTAL(상위 125)과 **다른 별도 지표**. 가입은 사용자만 할 수 있음 |
+| Messari API | 자산별 시총 시계열(시간 · 일), 무료 분당 20 회 | 무료 범위 불확실, **전체 시총(TOTAL) 없음** — 코인을 다 더해야 함 | 지금 구성으로 과거를 만드는 금지 방식이 됨 |
+| CoinPaprika | 무료: 일 단위 1 년, 시간 단위 1 일 | 불가 | |
+| CoinMarketCap 무료(Basic) | 일 단위 1 년 · 장중 1 개월 | 불가 | 과거 전체 지표는 유료 |
+| CryptoCompare(CoinDesk) | — | 불가 | 2026-05 무료 등급 폐지(제3자 비교) |
+| CoinLore | 지금 값 · 코인별 일 단위 1 년 | 불가 | |
+| Kaggle · GitHub | USDT 가격 · BTC 시세 데이터셋 | USDT.D · BTC.D 4 시간 데이터셋 못 찾음 | |
+| DefiLlama 스테이블코인 | USDT 유통량 | 일 단위 | 분자만 있고 TOTAL 없음 |
+
+**판단:** 결론은 그대로 `자료 부족`. 진행할 수 있는 길은 두 가지다(둘 다 사용자 결정 · 행동 필요).
+1. **TradingView 유료 플랜으로 직접 내보낸 CSV**(원래 정의 · 원래 가설) — 이 경우 2022 ~ 2026 공통 기간으로 감사부터 다시.
+2. **LiveCoinWatch 무료 키**(사용자 가입) — 먼저 키로 간격 · 깊이를 확인하고, 4 시간 이상 해상도로 2020 ~ 가 나오면 **'LiveCoinWatch 기준 별도 지표'** 로만 연구(원래 가설 검증이라고 부르지 않음).
+
+추가 출처: TradingView 내보내기 안내 https://www.tradingview.com/support/solutions/43000537255-how-to-export-chart-data/ · CoinPaprika 무료 과거 https://coinpaprika.com/pt/education/free-crypto-historical-data-api/ · Messari https://blockworks.com/products/api-mcp · pylivecoinwatch https://pypi.org/project/pylivecoinwatch/ · CMC 과거 자료 안내 https://coinmarketcap.com/api/resources/cmc-api-historical-data-whats-available-how-far-back-and-how-to-access-it/
