@@ -1166,9 +1166,16 @@ Learned: 편입 효과는 남아 있지만 발표일 종가 → 다음 날 시�
 Do not retry: 창 · 보유일 · 비용 · 사유 거르기 바꿔 같은 자료로 재판정. 애프터마켓 진입은 새 자료가 있을 때만 새 가설로.
 근거: [208](../research/208-sp500-index-events-preregistration.md). 자료 위키백과 판 1379179365 · Tiingo.
 
+## DOMINANCE — 후향 파일럿 불리 · C 대비 추가 가치 없음 (2026-10-11, 판정 아님 · 사용자 예외)
+
+요약: 완성 4 시간봉 USDT.D 하락 + BTC.D 상승(A) OFF→ON 에서 BTC USD-M 롱 24 시간(2ATR 보호 · 위험 0.25 % · 지정가), 비교 B 현물 4 시간 상승 · C TOTAL 상승 + BTC.D 상승. 처음엔 4 시간 자료를 무료로 못 구해 자료 부족 → 사용자가 TradingView 유료 계정에서 직접 내보낸 CSV(USDT.D · BTC.D 2025-01 부터)로 2025-01 ~ 2026-08(608 일).
+결과: 1 만 계좌 순 A −1,687 · B −2,171 · C −1,689 (Sharpe −2.8 · −3.4 · −2.8). A 비용 전 +78 → 수수료 −723 · funding −37 · 보호 비상 비용 −1,005. A − C 연 +0.016 %p, 14 일 블록 90 % [−0.51, +0.51], 반쪽 엇갈림 → 불리 · 추가 가치 없음(통계적 판단 불가 라벨). A · C 신호 일치 99.5 %(갈린 17 봉).
+Learned: Δln USDT.D = Δln USDT 시총 − Δln TOTAL 이고 4 시간 USDT 시총 변화(중앙 0.008 %)가 TOTAL 변화(0.41 %)보다 50 배 작아 'USDT 도미넌스 하락' 은 거의 'TOTAL 상승' 이다. 이후 24 시간 수익 계수는 A · B · C 모두 +22 ~ 24 bp(t ≈ 2) — 정보는 '그 4 시간 시장이 올랐다' 이고 비용(왕복 19 bp + 보호 비용)을 못 넘는다.
+Do not retry: 도미넌스 임계 · 보유 시간 · 보호 거리 · 스테이블 조합을 바꿔 같은 자료로. 다중 검정 이력: 새 가설 1 개.
+근거: [215 §6 계약 · §7 결과](../research/215-dominance-signal-data-audit.md).
+
 ## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
 
-- 도미넌스 신호(215, 2026-10-11, `DATA_INSUFFICIENT`): USDT.D 하락 + BTC.D 상승 → 24 시간 BTC 롱. TradingView CRYPTOCAP 과 같은 정의의 4 시간봉 과거 자료를 무료 · 정당하게 못 구함(TradingView 다운로드 API 없음 · CoinGecko 과거 전체 시총 유료 · 무료는 365 일 · 90 일 넘으면 일봉). 손익 미계산. 구조상 USDT.D 하락 ≈ TOTAL 상승이라 A ≈ C 일 공산. 사용자가 4 시간봉 파일을 직접 주면 다시. [문서](../research/215-dominance-signal-data-audit.md).
 - 하락 브리핑 정보 도구(IDEAS 29, Codex 초안, 수익 연구 아님): 2026-10-08 Phase 0 감사 → 사용자 결정(미국 먼저 · SEC 연락처 · SPY/QQQ 상위 10 · 텔레그램) → 미국 첫판 구현 · 첫 전송. 정확성 검산(앞으로 30 개) 전, 한국은 그 뒤. [감사](../research/BRIEFING_PHASE0_AUDIT.md).
 - **관찰 바구니(171, 2026-10-08 ~, 돈 없음)**: 160-23 ETF 순유입 LONG(W1) · PANIC-KQ(W2) 를 원 규칙 그대로 2026-09 이후 자료로 그림자 기록. W1 30 건 · W2 5 번에 판단(앞으로 평균 > 0 · 합친 2.24 SE 하한 > 0 → 소액 검토 자격). 원 판정(REJECT)은 그대로. [171](../research/171-watchlist-shadow-registration.md).
 - **점검 문서(2026-10-08, 판정 불변)**: [통과 다중검정](../research/PASS_FDR_AUDIT.md)(T/v2 · T · O/v1 만 BH q 0.10, QS t 1.41 · FLOW-KR t 0.77) · [기대 범위](../research/FORWARD_BAND.md)(전향 REVIEW · ALERT 기준) · [FLOW 자료 품질](../research/KR_FLOW_DATAQUALITY.md)(G-KR1 영향 없음) · [자료 열람 장부](../research/DATA_EXPOSURE_LEDGER.md)(2026-09-01 이후 = 전향 확인 구간).
