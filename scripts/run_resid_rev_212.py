@@ -8,6 +8,7 @@
     python -m scripts.run_resid_rev_212 universe    # 월별 상위 20 (생존 편향 없음) → members.json
     python -m scripts.run_resid_rev_212 fetch       # 구성 종목 기간의 5분봉 · funding · mark 1시간봉
     python -m scripts.run_resid_rev_212 threshold   # ③ 비용 전 효과 · 비용 문턱 (문서 212 §6)
+    python -m scripts.run_resid_rev_212 pilot       # ④ 실제 체결 · 위험 · funding 파일럿 (§5 · §7)
 
 규칙은 문서 212 에 고정. 2026-09-01 이후 자료는 읽지 않는다.
 """
@@ -34,6 +35,7 @@ from datetime import UTC, date, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "data" / "research" / "rr_212"
@@ -75,11 +77,13 @@ def _fetch(kind: str, symbol: str, month: str, interval: str = "") -> Path | Non
     """kind = klines · markPriceKlines · fundingRate. 체크섬 확인, 없으면(404) None."""
     if kind == "fundingRate":
         name = f"{symbol}-fundingRate-{month}.zip"
-        url = f"{BASE}/fundingRate/{symbol}/{name}"
+        url = f"{BASE}/fundingRate/{quote(symbol)}/{quote(name)}"
         target = VISION / "um_funding" / symbol / name
     else:
         name = f"{symbol}-{interval}-{month}.zip"
-        url = f"{BASE}/{kind}/{symbol}/{interval}/{name}"
+        url = (
+            f"{BASE}/{kind}/{quote(symbol)}/{interval}/{quote(name)}"  # 영문 아닌 이름 코인도 있다
+        )
         target = VISION / ("um" if kind == "klines" else "um_mark") / symbol / interval / name
     if target.is_file():
         return target
@@ -89,7 +93,7 @@ def _fetch(kind: str, symbol: str, month: str, interval: str = "") -> Path | Non
     payload = _get(url)
     if payload is None:
         return None
-    if hashlib.sha256(payload).hexdigest() != chk.decode("ascii").split()[0].lower():
+    if hashlib.sha256(payload).hexdigest() != chk.decode("utf-8").split()[0].lower():
         raise RuntimeError(f"체크섬 불일치: {name}")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(payload)
@@ -383,6 +387,10 @@ def main(argv: list[str]) -> int:
         "universe": cmd_universe,
         "fetch": cmd_fetch,
     }
+    if argv[:1] == ["pilot"]:
+        from scripts.run_resid_rev_212_pilot import cmd_pilot
+
+        return cmd_pilot()
     if argv[:1] == ["threshold"]:
         from scripts.run_resid_rev_212_threshold import cmd_threshold
 
