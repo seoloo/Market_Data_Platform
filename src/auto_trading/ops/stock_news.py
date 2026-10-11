@@ -363,7 +363,7 @@ def format_reply(
     ``record`` = 지난 AI 의견 채점 한 줄 (있으면).
     ``laya`` = 기사 번호 → (호재 · 악재 · 중립, 확률) (사용자 2026-10-11 요청으로 표시).
     ``laya_probs`` = 기사 번호 → {호재 · 악재 · 중립: 확률}. 있으면 줄의 판단 옆에 그 판단에
-    Laya 가 근거 기사들에서 준 확률의 평균을 붙인다(예: 🟢 호재 (Laya 62%))."""
+    Laya 가 근거 기사들에서 준 확률의 평균을 붙인다(예: 🟢 호재 (62%))."""
     laya = laya or {}
     laya_probs = laya_probs or {}
     from auto_trading.notify.style import RULE, sub
@@ -396,7 +396,7 @@ def format_reply(
         for k, p in enumerate(judged["points"]):
             tone = p.get("tone") or ""
             agree = [laya_probs[r][tone] for r in p["ids"] if tone in laya_probs.get(r, {})]
-            pct = f" (Laya {sum(agree) / len(agree):.0%})" if agree else ""
+            pct = f" ({sum(agree) / len(agree):.0%})" if agree else ""
             mark = f"{TONES[tone]} {tone}{pct} · " if tone else ""
             lines += ["", f"{nums[k]} {mark}{e(p['text'])}"]
             refs = []
@@ -414,9 +414,6 @@ def format_reply(
             count = {k: sum(1 for lab, _ in laya.values() if lab == k) for k in TONES}
             tally = " · ".join(f"{TONES[k]} {k} {n}" for k, n in count.items() if n)
             lines += ["", f"🧪 Laya 기사별 판단 (기사 {len(laya)}건): {tally}"]
-            if laya_probs:
-                lines.append(e(sub("판단 옆 % = 그 판단에 Laya 가 준 확률(근거 기사 평균)")))
-                lines.append(e(sub("한국어 기사는 Laya 정확도가 낮아요 — 참고만")))
         view = judged.get("view") or ""
         if view:
             lines += [

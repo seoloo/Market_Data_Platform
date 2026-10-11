@@ -185,8 +185,7 @@ def test_reply_puts_laya_probability_next_to_tone() -> None:
     items.append(NewsItem("gnews_ko", "기타 - x", "https://x.com/c", "", "", ""))
     judged["points"][2]["ids"] = ["N3"]
     text = format_reply(t, items, judged, [], None, "", laya, probs)
-    assert "🟢 호재 (Laya 37%) · 계약" in text  # (0.7 + 0.04) / 2 — 두 기사 평균
-    assert "🔴 악재 (Laya 90%) · 실적" in text
-    assert "중립 · 기타" in text and "중립 (Laya" not in text  # Laya 판단 없는 기사는 숫자 없음
-    assert "판단 옆 % = 그 판단에 Laya 가 준 확률(근거 기사 평균)" in text
-    assert "한국어 기사는 Laya 정확도가 낮아요" in text
+    assert "🟢 호재 (37%) · 계약" in text  # (0.7 + 0.04) / 2 — 두 기사 평균
+    assert "🔴 악재 (90%) · 실적" in text
+    assert "중립 · 기타" in text and "중립 (" not in text  # Laya 판단 없는 기사는 숫자 없음
+    assert "판단 옆 %" not in text and "정확도가 낮아요" not in text
