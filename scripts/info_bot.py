@@ -11,8 +11,9 @@
   바로 가는 링크는 기사 앞부분을 조금 읽는다. 요약 · 호재/악재 · AI 의견: Gemini.
   가격 · 추세 상태 · 과거 통계: 야후 일봉 10 년(우리 계산).
 * 2026-10-11: 줄마다 근거 기사 링크(HTML). AI 의견은 '검증 안 됨' 으로 보이고 기록 →
-  20 거래일 뒤 채점('성적'). Laya 는 영어 기사만 기사별 호재/악재를 판단해 근거 기사 옆에
-  확률과 함께 보인다('라야' 로 Gemini 와 비교). 키 ``LAYA_API_KEY``, 끄기 ``LAYA_OFF=true``.
+  20 거래일 뒤 채점('성적'). Laya 는 기사별 호재/악재를 판단해(영어 · 한국어)
+  호재 표시와 근거 기사 옆에 확률과 함께 보인다('라야' 로 Gemini 와 비교).
+  키 ``LAYA_API_KEY``, 끄기 ``LAYA_OFF=true``.
 * ``pin-help``: 사용법을 대화방 공지로 고정 + '/' 메뉴.
 * 주문 · 계좌 조회 없음. 정보용.
 """
@@ -72,7 +73,7 @@ HELP = """📌 정보 봇 사용법 — 이렇게 보내 보세요
 
 🗞 종목 이름이나 기호 (예: 삼성전자 · 005930 · 엔비디아 · NVDA · IREN)
   최근 7일 뉴스 요약 — 줄마다 🟢호재/🔴악재 + 근거 기사 링크
-  영어 기사는 Laya 판단도 같이 (예: 🟢Laya 호재 87%)
+  호재/악재 옆 % = 근거 기사에 Laya 가 준 확률 (한국어 기사는 덜 정확)
   아래에 가격 · 52주 고점 대비 · 우리 추세 규칙(켜짐/꺼짐)
   · 과거 같은 상태 뒤 20거래일에 오른 비율
   🤖 AI 의견(강세·중립·약세)은 검증 안 된 참고 — 20거래일 뒤 채점해요
@@ -246,47 +247,60 @@ LAYA_URL = "https://api.laya-ai.com"
 ``LAYA_BASE_URL`` 로 바꿀 수 있다. 무료는 가입 때 20 회 · 그 뒤 입력 100 만 토큰당 $0.05."""
 
 
-def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, tuple[str, float]], float]:
-    """영어 기사만 (사용자: 영어가 더 빠름) 기사별 호재/악재 — 기사 번호 → (판단, 확률), 호출 ms.
-
-    질문 하나에 **한 번**만 부른다(``/v1/systemone/batch`` — 기사 여러 개를 한 요청에, 영어 모델).
-    ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값. 답의 근거 기사 옆에 확률과 함께 보인다."""
-    env = read_env_file(root / ".env")
-    key = env.get("LAYA_API_KEY", "").strip()
-    if not key or env.get("LAYA_OFF", "").strip().lower() == "true":
-        return {}, 0.0
-    base = env.get("LAYA_BASE_URL", "").strip() or LAYA_URL
-    picked = [(i, it) for i, it in enumerate(items, 1) if it.source.endswith("_en")][:LAYA_ITEMS]
-    if not picked:
-        return {}, 0.0
-    body: dict[str, Any] = {
-        "states": [it.title for _, it in picked],
-        "questions": _LAYA_Q,
-        "model": "english",
-    }
-    t0 = time.monotonic()
+def _laya_call(base: str, key: str, picked: list[tuple[int, NewsItem]], model: str) -> list[Any]:
     try:
         r = httpx.post(
             f"{base.rstrip('/')}/v1/systemone/batch",
-            json=body,
+            json={"states": [it.title for _, it in picked], "questions": _LAYA_Q, "model": model},
             headers={"Authorization": f"Bearer {key}"},
             timeout=15,
         )
-        results = r.json()["results"] if r.status_code == 200 else []
+        return list(r.json()["results"]) if r.status_code == 200 else []
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
-        results = []
-    ms = (time.monotonic() - t0) * 1000
+        return []
+
+
+def laya_labels(
+    items: list[NewsItem], root: Path
+) -> tuple[dict[str, tuple[str, float]], float, dict[str, dict[str, float]]]:
+    """기사별 호재/악재.
+
+    돌려주는 값: 기사 번호 → (판단, 확률), 호출 ms, 기사 번호 → {호재 · 악재 · 중립: 확률}.
+    영어 기사는 영어 모델, 한국어 등 나머지는 다국어 모델
+    (사용자 2026-10-11: 한국 종목도 확률을 보고 싶다).
+    언어마다 **한 번**씩만 부른다(``/v1/systemone/batch`` — 기사 여러 개를 한 요청에).
+    한국어 시험(2026-10-11): 악재(파업)는 잘 잡지만 분명한 호재 제목을 악재 53 % 로 본
+    경우가 있어 덜 정확하다.
+    ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값."""
+    env = read_env_file(root / ".env")
+    key = env.get("LAYA_API_KEY", "").strip()
+    if not key or env.get("LAYA_OFF", "").strip().lower() == "true":
+        return {}, 0.0, {}
+    base = env.get("LAYA_BASE_URL", "").strip() or LAYA_URL
+    numbered = list(enumerate(items, 1))
+    groups = {
+        "english": [x for x in numbered if x[1].source.endswith("_en")][:LAYA_ITEMS],
+        "multilingual": [x for x in numbered if not x[1].source.endswith("_en")][:LAYA_ITEMS],
+    }
     out: dict[str, tuple[str, float]] = {}
-    for (i, _it), res in zip(picked, results, strict=False):
-        try:
-            ans = res["answers"]["impact"]
-            choice = str(ans["choice"])
-            prob = float(ans.get("probabilities", {}).get(choice, ans.get("answer_confidence", 0)))
-        except (KeyError, TypeError, ValueError, AttributeError):
+    probs: dict[str, dict[str, float]] = {}
+    t0 = time.monotonic()
+    for model, picked in groups.items():
+        if not picked:
             continue
-        if choice in _LAYA_KO:
-            out[f"N{i}"] = (_LAYA_KO[choice], prob)
-    return out, (ms if out else 0.0)
+        for (i, _it), res in zip(picked, _laya_call(base, key, picked, model), strict=False):
+            try:
+                ans = res["answers"]["impact"]
+                choice = str(ans["choice"])
+                dist = {str(k): float(v) for k, v in (ans.get("probabilities") or {}).items()}
+                prob = dist.get(choice, float(ans.get("answer_confidence", 0)))
+            except (KeyError, TypeError, ValueError, AttributeError):
+                continue
+            if choice in _LAYA_KO:
+                out[f"N{i}"] = (_LAYA_KO[choice], prob)
+                probs[f"N{i}"] = {_LAYA_KO[k]: v for k, v in dist.items() if k in _LAYA_KO}
+    ms = (time.monotonic() - t0) * 1000
+    return out, (ms if out else 0.0), probs
 
 
 # ------------------------------------------------------------------ 답
@@ -325,7 +339,7 @@ def answer(text: str, root: Path = REPO) -> str:
     stats = trend_stats(closes)
     path = calls_path(root)
     calls = load_calls(path)
-    laya, laya_ms = laya_labels(items, root)
+    laya, laya_ms, laya_probs = laya_labels(items, root)
     if rows and target.yahoo:
         if score(calls, {str(target.yahoo): rows}):
             save_calls(path, calls)
@@ -354,6 +368,7 @@ def answer(text: str, root: Path = REPO) -> str:
         stats,
         record_line(calls),
         laya,
+        laya_probs,
     )
 
 

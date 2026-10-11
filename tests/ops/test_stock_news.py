@@ -160,5 +160,33 @@ def test_reply_shows_laya_label_and_probability() -> None:
     text = format_reply(t, items, judged, [], None, "", laya)
     assert "Reuters: IREN signs deal</a> (🟢Laya 호재 87%)" in text
     assert "Yahoo: IREN misses estimates</a> (🔴Laya 악재 98%)" in text
-    assert "🧪 Laya 기사별 판단 (영어 기사 2건): 🟢 호재 1 · 🔴 악재 1" in text
+    assert "🧪 Laya 기사별 판단 (기사 2건): 🟢 호재 1 · 🔴 악재 1" in text
     assert "Laya" not in format_reply(t, items, judged, [])
+
+
+def test_reply_puts_laya_probability_next_to_tone() -> None:
+    t = resolve("IREN", KR)
+    items = [
+        NewsItem("gnews_ko", "아이렌 계약 - 한경", "https://h.com/a", "", "", ""),
+        NewsItem("yahoo_en", "IREN misses estimates", "https://y.com/b", "", "", ""),
+    ]
+    judged = {
+        "points": [
+            {"text": "계약", "ids": ["N1", "N2"], "tone": "호재"},
+            {"text": "실적", "ids": ["N2"], "tone": "악재"},
+            {"text": "기타", "ids": ["N9"], "tone": "중립"},
+        ]
+    }
+    laya = {"N1": ("호재", 0.7), "N2": ("악재", 0.9)}
+    probs = {
+        "N1": {"호재": 0.7, "악재": 0.2, "중립": 0.1},
+        "N2": {"호재": 0.04, "악재": 0.9, "중립": 0.06},
+    }
+    items.append(NewsItem("gnews_ko", "기타 - x", "https://x.com/c", "", "", ""))
+    judged["points"][2]["ids"] = ["N3"]
+    text = format_reply(t, items, judged, [], None, "", laya, probs)
+    assert "🟢 호재 (Laya 37%) · 계약" in text  # (0.7 + 0.04) / 2 — 두 기사 평균
+    assert "🔴 악재 (Laya 90%) · 실적" in text
+    assert "중립 · 기타" in text and "중립 (Laya" not in text  # Laya 판단 없는 기사는 숫자 없음
+    assert "판단 옆 % = 그 판단에 Laya 가 준 확률(근거 기사 평균)" in text
+    assert "한국어 기사는 Laya 정확도가 낮아요" in text
