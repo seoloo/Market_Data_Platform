@@ -158,10 +158,11 @@ def test_reply_shows_laya_label_and_probability() -> None:
     judged = {"points": [{"text": "계약", "ids": ["N1", "N2"], "tone": "호재"}]}
     laya = {"N1": ("호재", 0.87), "N2": ("악재", 0.98)}
     text = format_reply(t, items, judged, [], None, "", laya)
-    assert "Reuters: IREN signs deal</a> (🟢Laya 호재 87%)" in text
-    assert "Yahoo: IREN misses estimates</a> (🔴Laya 악재 98%)" in text
-    assert "🧪 Laya 기사별 판단 (기사 2건): 🟢 호재 1 · 🔴 악재 1" in text
-    assert "Laya" not in format_reply(t, items, judged, [])
+    assert "Reuters: IREN signs deal</a> (🟢호재 87%)" in text
+    assert "Yahoo: IREN misses estimates</a> (🔴악재 98%)" in text
+    assert "🧪 기사별 판단 (기사 2건): 🟢 호재 1 · 🔴 악재 1" in text
+    assert "Laya" not in text  # 답에는 Laya 라는 이름을 쓰지 않음 (사용자 2026-10-12)
+    assert "기사별 판단" not in format_reply(t, items, judged, [])
 
 
 def test_reply_puts_laya_probability_next_to_tone() -> None:

@@ -407,13 +407,13 @@ def format_reply(
                 ref_text = _a(it.link, f"{who}: {title[:40]}") or e(title[:40])
                 if ref in laya:
                     label, prob = laya[ref]
-                    ref_text += f" ({TONES[label]}Laya {label} {prob:.0%})"
+                    ref_text += f" ({TONES[label]}{label} {prob:.0%})"
                 refs.append(ref_text)
             lines.append("   📰 " + " · ".join(refs))
         if laya:
             count = {k: sum(1 for lab, _ in laya.values() if lab == k) for k in TONES}
             tally = " · ".join(f"{TONES[k]} {k} {n}" for k, n in count.items() if n)
-            lines += ["", f"🧪 Laya 기사별 판단 (기사 {len(laya)}건): {tally}"]
+            lines += ["", f"🧪 기사별 판단 (기사 {len(laya)}건): {tally}"]
         view = judged.get("view") or ""
         if view:
             lines += [
