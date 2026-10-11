@@ -25,7 +25,7 @@ def _data(lev: list[float], trend: list[bool | None]) -> tuple[dict[str, Any], d
 
 def _path() -> tuple[list[float], list[bool | None]]:
     lev = [100.0] * 25 + [90.0, 80.0, 65.0, 60.0, 62.0] + [70.0] * 30 + [80.0] * 25
-    trend = [True] * 26 + [False] * 30 + [True] * 29
+    trend: list[bool | None] = [*([True] * 26), *([False] * 30), *([True] * 29)]
     return lev, trend
 
 
