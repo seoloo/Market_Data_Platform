@@ -5,6 +5,8 @@
 
 ## 2026-10-11 — 209 T/v2 승자 추가 진입 Phase 0 (Codex)
 
+- **후속 예외 승인:** 사용자가 고정 B/C의 설명용 후향 회계 파일럿에 한해 80% 검정력 선행 게이트 예외를 허용. [파일럿 사전등록](docs/research/209-t2-pyramiding-pilot-registration.md)의 미정 체결/mark/회계/위험/스트레스 계약을 성과 전에 확정·커밋. 정식 채택 미검증, PASS 금지, 기존 운영/208/9월 이후 자료 제외. 아래는 승인 전 감사 기록.
+
 - 사용자 프롬프트의 BTC·ETH 선물 롱 피라미딩을 기존 T/O/KB/후속26과 대조했다. 같은 진입·손절·재진입에서 추가 진입만 켠 C/끈 B 비교는 미검증 질문이며 새 수익원은 아니다.
 - **DATA_INSUFFICIENT / NOT_PREREGISTERED / NOT_BACKTESTED**: 2020-03~2026-08 T/v2 OFF→ON은 BTC67·ETH69회. 역사 TEST(2024~2026-08) 66회, 경계 포지션까지 낙관적으로 세도68회로 실제 OOS100건 기준 미달. 이미 본 가격이므로 미사용 OOS 아님. paired Sharpe차의80% 검정력도 미확인(0%로 보고하지 않음).
 - DB mode=ro/query_only: 현물 일봉 각3302·선물 공통 일봉 각2375·funding 각7125, 날짜/정산 gap0. funding mark는 각7125행 전부NULL; 시각 지터는 coverage 진단에만 여유를 두고 원시각은 유지. ETH 분봉 ZIP 후보 존재는 체결/무결성 검증 완료가 아님.

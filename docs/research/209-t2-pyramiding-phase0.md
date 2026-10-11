@@ -2,7 +2,11 @@
 
 작성: 2026-10-11 · 사용자 제공 프롬프트 · ID: **T2-PYRAMID / draft-v1**
 
-**상태: DATA_INSUFFICIENT / NOT_PREREGISTERED / NOT_BACKTESTED.**
+**후속(2026-10-11): 사용자가 설명용 후향 회계 파일럿 예외를 승인했다.**
+[파일럿 사전등록](209-t2-pyramiding-pilot-registration.md)을 성과 계산 전에 확정·커밋한다.
+정식 채택은 미검증/자료·검정력 부족이며 아래 내용은 예외 승인 전 Phase0 감사 기록이다.
+
+**원 감사 상태: DATA_INSUFFICIENT / NOT_PREREGISTERED / NOT_BACKTESTED.**
 이 문서는 최종 사전등록이 아니다. 아래 표본·검정력 게이트가 열리기 전에는 성과 계산용
 사전등록·전략 구현·학습·수익 판정을 시작하지 않는다. 구현한 것은 **읽기 전용 Phase 0 감사 코드와 테스트뿐**이다.
 실거래·기존 T/v2·O/v1·O/v2·Paper·설정·예약 변경 없음.

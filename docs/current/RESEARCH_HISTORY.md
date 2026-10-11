@@ -9,6 +9,8 @@
 
 ## T2-PYRAMID (209) — DATA_INSUFFICIENT (2026-10-11, Phase 0)
 
+**후속 예외 승인:** 설명용 고정B/C 후향 회계 파일럿만 진행 가능. [별도 사전등록](../research/209-t2-pyramiding-pilot-registration.md)을 성과 전에 커밋. 정식 채택 미검증/PASS 금지/새OOS 없음. 아래는 승인 전 기록.
+
 요약: T/v2 롱 허용 OFF→ON에서 작은 선물 진입, 고정ATR20의 +2A/+4A에 최초 수량50%/25% 추가,
 2A 초기stop·3A trailing·같은 ON구간 stop후 재진입 금지. 주 질문은 **추가만 끈 B 대비 C의 위험조정 개선**이다.
 O/v1의 고정배율·KB의 박스 재돌파 추가와 다르며, KB 기각 결과를 숫자 변경해 재판정하지 않는다.
