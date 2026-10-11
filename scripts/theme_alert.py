@@ -23,7 +23,7 @@ from typing import Any
 from scripts.run_lt_kr import build_panel, members
 from scripts.run_lt_leaders import trend_up
 
-from auto_trading.ops import user_settings
+from auto_trading.ops import laya_client, laya_tags, user_settings
 from auto_trading.ops.theme_alert import (
     build_messages,
     diff_weeks,
@@ -145,6 +145,24 @@ def _send(texts: list[str], telegram: bool) -> list[str]:
     return errors
 
 
+def laya_themes(items: list[dict[str, str]]) -> dict[str, int]:
+    """미국 기사 제목(영어)을 Laya 로 테마별로 나눠 센다 (사용자 2026-10-11). 실패하면 빈 값."""
+    # 연준 보도자료(은행 승인 · 제재 등)는 시장 관심 테마가 아니라 뺀다
+    titles = [x["title"] for x in items if "federalreserve.gov" not in x.get("link", "")]
+    laya = laya_client.from_env(REPO)
+    if laya is None or not titles:
+        return {}
+    try:
+        res = laya.batch(titles, laya_tags.THEME_Q)
+    finally:
+        laya.close()
+    labels = []
+    for r in res:
+        c = laya_client.choice_of(r, "theme")
+        labels.append((c.label, c.prob) if c else None)
+    return laya_tags.theme_counts(labels)
+
+
 def weekly(telegram: bool = True) -> dict[str, Any]:
     today = _today()
     week = today.strftime("%Y-%m-%d")
@@ -176,10 +194,15 @@ def weekly(telegram: bool = True) -> dict[str, Any]:
             if attempt == 2:
                 _send([f"🔭 주간 테마 알림 실패: 답 형식 오류 2 번 ({exc})"], telegram)
                 return {"error": f"답 형식 오류: {exc}"}
-    last = _read(REPORTS / "latest.json").get("judged")
+    prev = _read(REPORTS / "latest.json")
+    last = prev.get("judged")
     facts = {"kr": kr_facts, "us": us_facts}
     diffs = {m: diff_weeks(judged, last, m) if last else None for m in ("kr", "us")}
     texts = [format_market(m, judged, headlines[m], facts[m], diffs[m], week) for m in ("kr", "us")]
+    themes = laya_themes(headlines["us"])
+    extra = laya_tags.theme_lines(themes, prev.get("laya_themes"), len(headlines["us"]))
+    if extra:
+        texts[1] = texts[1] + "\n\n" + "\n".join(extra)
     errors = _send(texts, telegram)
     report = {
         "week": week,
@@ -195,6 +218,7 @@ def weekly(telegram: bool = True) -> dict[str, Any]:
             for m in ("kr", "us")
         },
         "diffs": diffs,
+        "laya_themes": themes or None,
         "texts": texts,
         "send_errors": errors,
     }

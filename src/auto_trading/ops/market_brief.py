@@ -21,6 +21,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from auto_trading.ops.laya_tags import brief_line
+
 __all__ = [
     "OFFICIAL_KINDS",
     "Evidence",
@@ -400,6 +402,9 @@ def render_telegram(brief: Mapping[str, Any]) -> str:
                 lines.extend(f"• {x}" for x in items[:4])
         if ai.get("dropped"):
             lines += ["", f"(검사에서 뺀 AI 주장 {len(ai['dropped'])} 건 — 보고서 파일 참고)"]
+    mood = brief_line(brief.get("laya") or {})
+    if mood:
+        lines += ["", mood]
     after = brief.get("after_close") or []
     if after:
         lines += ["", RULE, "🕗 마감 뒤 소식 (다음 날 참고 · 원인 분석엔 안 씀)"]

@@ -42,7 +42,7 @@ from auto_trading.config.secrets import (  # noqa: E402
     read_env_file,
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier  # noqa: E402
-from auto_trading.ops import user_settings  # noqa: E402
+from auto_trading.ops import laya_client, laya_tags, user_settings  # noqa: E402
 from auto_trading.ops.market_brief import (  # noqa: E402
     JEV_PROMPT_VERSION,
     Evidence,
@@ -311,6 +311,37 @@ def ask_gemini(
     return None, attempts
 
 
+def laya_filter(
+    within: list[tuple[datetime, Evidence]], no_ai: bool
+) -> tuple[list[tuple[datetime, Evidence]], dict[str, Any]]:
+    """Laya 로 관계없는 기사를 빼고 호재 · 악재 수를 센다 (사용자 2026-10-11).
+
+    공식(SEC · Fed) 근거는 그대로 둔다. 키가 없거나 실패하면 그대로 돌려준다."""
+    laya = None if no_ai else laya_client.from_env(REPO)
+    news_idx = [i for i, (_, e) in enumerate(within) if e.kind == "news"]
+    if laya is None or not news_idx:
+        return within, {}
+    try:
+        res = laya.batch([within[i][1].title for i in news_idx], laya_tags.BRIEF_Q)
+        tokens, ms = laya.tokens, laya.last_ms
+    finally:
+        laya.close()
+    labels = []
+    for r in res:
+        rel, imp = laya_client.choice_of(r, "relevant"), laya_client.choice_of(r, "impact")
+        labels.append(
+            (
+                (rel.label, rel.prob) if rel else None,
+                (imp.label, imp.prob) if imp else None,
+            )
+        )
+    keep, tally = laya_tags.brief_tally(labels)
+    drop = {news_idx[k] for k, ok in enumerate(keep) if not ok}
+    tally |= {"tokens": tokens, "ms": round(ms)}
+    tally["dropped_titles"] = [within[i][1].title for i in sorted(drop)][:20]
+    return [x for i, x in enumerate(within) if i not in drop], tally
+
+
 def build(no_ai: bool = False) -> dict[str, Any]:
     now = datetime.now(UTC)
     since = now - timedelta(hours=WINDOW_H)
@@ -376,6 +407,7 @@ def build(no_ai: bool = False) -> dict[str, Any]:
         if t is not None and prev_at <= t <= close_at + timedelta(minutes=15)
     ]
     within.sort(key=lambda x: (x[1].kind != "sec", x[1].kind != "fed", -x[0].timestamp()))
+    within, brief["laya"] = laya_filter(within, no_ai)
     ev = [e for _, e in within[:MAX_EVIDENCE]]
     ev = [replace(e, id=f"E{i + 1}") for i, e in enumerate(ev)]
     brief["evidence"] = [asdict(e) for e in ev]

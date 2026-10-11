@@ -59,6 +59,7 @@ TASKS: tuple[TaskDef, ...] = (
     TaskDef("AutoTrading_Upbit_T2_Live", "cruise", "Cruise 매매", "매일 09:05"),
     TaskDef("AutoTrading_Upbit_T2_Weekly", "cruise", "Cruise 주간 요약", "토 09:30"),
     TaskDef("AutoTrading_Telegram_Bot", "common", "텔레그램 '현황' 봇", "2분마다"),
+    TaskDef("AutoTrading_Risk_News", "common", "보유 종목 위험 뉴스 감시 (Laya)", "매시 17분"),
     TaskDef("AutoTrading_Ledger_Sync", "common", "기록 DB · 그래프 기록", "매일 23:00"),
     TaskDef("AutoTrading_Fire_Report", "common", "파이어 진행 보고", "매달 1일 09:15"),
     TaskDef("AutoTrading_Backup", "extra", "상태 백업 (F: 디스크)", "매일 23:30"),
