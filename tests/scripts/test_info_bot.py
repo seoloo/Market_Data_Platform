@@ -40,13 +40,16 @@ def test_replies_to_each_message(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         def send(self, text: str) -> None:
             sent.append(text)
 
+        def send_html(self, text: str) -> None:
+            sent.append(text)
+
         def close(self) -> None:
             pass
 
     monkeypatch.setattr(mod, "TelegramInbox", FakeInbox)
     monkeypatch.setattr(mod, "TelegramNotifier", FakeBot)
     monkeypatch.setattr(mod, "fetch_news", lambda target: [])
-    monkeypatch.setattr(mod, "fetch_price", lambda target: "")
+    monkeypatch.setattr(mod, "fetch_series", lambda yahoo, span="10y": ([], ""))
     assert mod.run(tmp_path) == 0
     assert sent[0].startswith("🪐 정보 봇")
     assert "뉴스 찾는 중" in sent[1] and "찾지 못했어요" in sent[2]

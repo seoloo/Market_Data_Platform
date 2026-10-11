@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -84,6 +86,25 @@ class TelegramNotifier:
         if not response.is_success or not body.get("ok", False):
             desc = str(body.get("description", ""))[:200].replace(self._creds.bot_token, "***")
             raise NotifyError(f"텔레그램 전송 거부 {response.status_code}: {desc}")
+
+    def send_html(self, text: str) -> None:
+        """``parse_mode=HTML`` 로 보낸다 (링크를 글자에 건다, 미리 보기 끔).
+
+        부르는 쪽이 바깥 글을 이스케이프한다.
+        텔레그램이 태그를 거부하면 태그를 지운 글로 다시 보낸다.
+        """
+        try:
+            self._call(
+                "sendMessage",
+                {
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "link_preview_options": {"is_disabled": True},
+                },
+            )
+        except NotifyError:
+            plain = re.sub(r"<[^>]+>", "", text)
+            self.send(html.unescape(plain))
 
     # ------------------------------------------------------------ 버튼 · 고정 · 수정
 
