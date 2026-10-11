@@ -91,38 +91,101 @@ def _month_bounds(mo: str) -> tuple[int, int]:
     return a, b
 
 
+DAY_TOL = 0.005  # 하루 대조 허용 (정상 날 90 백분위 0.02 %)
+
+
+def day_check(ex: dict[str, Any], have: bytearray, vol: array[float]) -> dict[int, float]:
+    """날짜 ms → |aggTrades − 공식 1 분봉| / 1 분봉, 그날 매시 00 분 전체 체결 합으로."""
+    acc: dict[int, list[float]] = {}
+    for m, (v, _b, _n) in ex["check_min"].items():
+        if not (WARM <= m < END):
+            continue
+        i = (m - WARM) // MIN
+        if not have[i]:
+            continue
+        a = acc.setdefault(m // DAY * DAY, [0.0, 0.0])
+        a[0] += v
+        a[1] += vol[i]
+    return {d: abs(x - k) / k for d, (x, k) in acc.items() if k > 0}
+
+
+def _all_gaps(agg: dict[str, dict[str, Any]]) -> dict[str, list[tuple[int, int]]]:
+    """달 → id 빈 곳 (달 안 + 앞 달 마지막 id 와 이어지지 않는 달 경계)."""
+    out: dict[str, list[tuple[int, int]]] = {}
+    prev: dict[str, Any] | None = None
+    for mo in months():
+        ex = agg.get(mo)
+        if ex is None:
+            prev = None
+            continue
+        g = [(x[0], x[1]) for x in ex["gaps"]]
+        if prev is not None and ex["first_id"] != prev["last_id"] + 1:
+            g.append((prev["last_ts"], ex["first_ts"]))
+        out[mo] = sorted(g)
+        prev = ex
+    return out
+
+
+def suspect_days(agg: dict[str, dict[str, Any]], have: bytearray, vol: array[float]) -> list[int]:
+    """월 파일에서 검증 실패한 날: id 빈 곳이 걸치거나 하루 대조 차이 > 0.5 %."""
+    bad: set[int] = set()
+    gaps = _all_gaps(agg)
+    for mo, ex in agg.items():
+        for d, r in day_check(ex, have, vol).items():
+            if r > DAY_TOL:
+                bad.add(d)
+        for g0, g1 in gaps.get(mo, []):
+            bad.update(range(g0 // DAY * DAY, g1 // DAY * DAY + 1, DAY))
+    return sorted(d for d in bad if WARM <= d < END)
+
+
 def window_imbalance(
-    agg: dict[str, dict[str, Any]], have: bytearray
+    agg: dict[str, dict[str, Any]],
+    have: bytearray,
+    vol: array[float] | None = None,
+    daily: dict[int, dict[str, Any]] | None = None,
 ) -> tuple[dict[int, float | None], Counter[str]]:
     """매 5 분 경계 W → 첫 10 초 불균형 I, 불완전하면 None.
 
-    완전 조건: 그 달 파일 있음 · 앞 달 마지막 id + 1 = 이 달 첫 id · W 를 걸치는 id 빈 곳(빠짐 · 중복) 없음 · W 분의 공식 1 분봉 있음.
-    완전한데 체결이 없으면 I = 0.
+    완전 조건: 그날 자료가 검증됨(월 파일: id 빈 곳 없음 · 하루 대조 ≤ 0.5 %, 아니면 같은 기준을 통과한 일 파일로 교체)
+    · W 를 걸치는 id 빈 곳(빠짐 · 중복 · 달 경계 불연속) 없음 · W 분의 공식 1 분봉 있음. 완전한데 체결이 없으면 I = 0.
     """
+    daily = daily or {}
     out: dict[int, float | None] = {}
     why: Counter[str] = Counter()
-    prev_last: int | None = None
+    gaps_by_mo = _all_gaps(agg)
     for mo in months():
         a, b = _month_bounds(mo)
         ex = agg.get(mo)
-        cont = ex is not None and (prev_last is None or ex["first_id"] == prev_last + 1)
-        gaps = sorted((g[0], g[1]) for g in ex["gaps"]) if ex else []
-        g_lo = [g[0] for g in gaps]
+        mgaps = gaps_by_mo.get(mo, [])
+        dchk = day_check(ex, have, vol) if (ex is not None and vol is not None) else {}
         for w in range(a, b, 5 * MIN):
             if not (WARM <= w < END):
                 continue
-            if ex is None:
-                out[w] = None
-                why["월 파일 없음"] += 1
-                continue
-            if not cont:
-                out[w] = None
-                why["월 경계 id 불연속"] += 1
-                continue
-            k = bisect.bisect_left(
-                g_lo, w + WIN
-            )  # 앞 체결 시각 < W + 10 초 인 빈 곳들 중 뒤 체결 시각 > W 인 것
-            if any(gaps[j][1] > w for j in range(max(0, k - 50), k)):
+            d = w // DAY * DAY
+            src: dict[str, Any] | None
+            if d in daily:
+                src = daily[d]
+                if not src.get("verified"):
+                    out[w] = None
+                    why["일 파일도 검증 실패"] += 1
+                    continue
+                gaps = sorted((g[0], g[1]) for g in src["gaps"])
+            else:
+                src = ex
+                if src is None:
+                    out[w] = None
+                    why["월 파일 없음"] += 1
+                    continue
+                if dchk.get(d, 0.0) > DAY_TOL:
+                    out[w] = None
+                    why["하루 대조 실패 · 일 파일 없음"] += 1
+                    continue
+                gaps = mgaps
+            k = bisect.bisect_left([g[0] for g in gaps], w + WIN) if gaps else 0
+            if any(
+                gaps[j][1] > w for j in range(k)
+            ):  # 앞 체결 시각 < W + 10 초 이고 뒤 체결 시각 > W 인 빈 곳
                 out[w] = None
                 why["id 빈 곳 · 중복"] += 1
                 continue
@@ -130,17 +193,24 @@ def window_imbalance(
                 out[w] = None
                 why["1 분봉 없음"] += 1
                 continue
-            v = ex["windows"].get(w)
+            v = src["windows"].get(w)
             if not v or v[2] == 0:
                 out[w] = 0.0
                 why["완전 · 체결 없음"] += 1
                 continue
-            buy, sell = v[0], v[1]
-            out[w] = (buy - sell) / (buy + sell)
-            why["완전"] += 1
-        if ex is not None:
-            prev_last = ex["last_id"]
+            out[w] = (v[0] - v[1]) / (v[0] + v[1])
+            why["완전" if d not in daily else "완전(일 파일 교체)"] += 1
     return out, why
+
+
+def load_daily(symbol: str) -> dict[int, dict[str, Any]]:
+    out = {}
+    for f in sorted((STORE / "agg_daily").glob(f"{symbol}-*.pkl")):
+        d = date.fromisoformat(f.stem.split("-", 1)[1])
+        if _ms(d) < END:
+            with f.open("rb") as fh:
+                out[_ms(d)] = pickle.load(fh)
+    return out
 
 
 def scores(
@@ -351,7 +421,7 @@ def build() -> dict[str, Any]:
     for s in SYMBOLS:
         have, vol, tb = kline_arrays(s)
         agg = load_agg(s)
-        wi, why_w = window_imbalance(agg, have)
+        wi, why_w = window_imbalance(agg, have, vol, load_daily(s))
         sc = scores(wi, have, vol, tb)
         th = {k: thresholds(v) for k, v in sc.items()}
         sig = {}

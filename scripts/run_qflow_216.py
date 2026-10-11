@@ -339,6 +339,58 @@ def fetch(workers: int = 4) -> int:
     return 0
 
 
+def patch_one(symbol: str, day: str) -> str:
+    """월 파일 검증 실패한 날을 일 파일로 다시 집계 (같은 기준으로 검증)."""
+    from scripts.run_qflow_216_stage1 import DAY_TOL, day_check, kline_arrays
+
+    out = STORE / "agg_daily" / f"{symbol}-{day}.pkl"
+    if out.exists():
+        return f"{symbol} {day} 있음"
+    tmpdir = STORE / "tmp"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    name = f"{symbol}-aggTrades-{day}.zip"
+    url = f"{BASE_URL}/daily/aggTrades/{symbol}/{name}"
+    z = tmpdir / name
+    try:
+        _get(url, z)
+    except Exception as exc:
+        rec = {"verified": False, "error": str(exc)[:200], "gaps": [], "windows": {}}
+    else:
+        want = _checksum(url)
+        ex = extract(z)
+        z.unlink()
+        if ex.sha256 != want:
+            raise RuntimeError(f"{name} checksum 불일치")
+        rec = asdict(ex)
+        have, vol, _tb = _KL.setdefault(symbol, kline_arrays(symbol))
+        rel = day_check(rec, have, vol)
+        d_ms = _ms(date.fromisoformat(day))
+        rec["day_rel"] = rel.get(d_ms)
+        rec["verified"] = not ex.gaps and rec["day_rel"] is not None and rec["day_rel"] <= DAY_TOL
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("wb") as fh:
+        pickle.dump(rec, fh)
+    return f"{symbol} {day} 검증 {rec['verified']} 차 {rec.get('day_rel')} gaps {len(rec['gaps'])}"
+
+
+_KL: dict[str, Any] = {}
+
+
+def patch() -> int:
+    from scripts.run_qflow_216_stage1 import kline_arrays, load_agg, suspect_days
+
+    for s in SYMBOLS:
+        have, vol, tb = kline_arrays(s)
+        _KL[s] = (have, vol, tb)
+        days = suspect_days(load_agg(s), have, vol)
+        print(s, "의심일", len(days), flush=True)
+        for d in days:
+            print(
+                patch_one(s, datetime.fromtimestamp(d / 1000, UTC).date().isoformat()), flush=True
+            )
+    return 0
+
+
 # ------------------------------------------------------------------ 표본 검산
 
 
@@ -386,6 +438,8 @@ def main(argv: list[str]) -> int:
         return pilot()
     if cmd == ["fetch"]:
         return fetch(int(argv[1]) if len(argv) > 1 else 4)
+    if cmd == ["patch"]:
+        return patch()
     if cmd == ["audit"]:
         from scripts.run_qflow_216_stage1 import audit
 

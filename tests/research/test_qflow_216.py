@@ -134,3 +134,36 @@ def test_event_entry_after_60s_and_funding_sign() -> None:
     assert abs(lg["fee"] - COST * (1 + 1.10)) < 1e-12
     d5 = event(m, ft, t, 1, 5)
     assert d5 is not None and d5["p0"] == 100.0 and d5["p1"] == 100.0  # T+300초 진입은 T+5 분 시가
+
+
+def test_day_check_failure_and_daily_override() -> None:
+    have = bytearray(N_MIN)
+    vol = array("d", bytes(8 * N_MIN))
+    d0 = W // DAY * DAY
+    for h in range(24):
+        i = (d0 + h * 3_600_000 - WARM) // MIN
+        have[i], vol[i] = 1, 10.0
+    for k in range(-2, 3):
+        have[(W - WARM) // MIN + k] = 1
+    check = {d0 + h * 3_600_000: [10.0, 5.0, 3] for h in range(24)}
+    bad = dict(check)
+    bad[d0 + 5 * 3_600_000] = [1.0, 0.5, 1]  # 월 파일에서 한 시간 체결이 크게 빠짐 (id 는 이어짐)
+    agg = {
+        "2024-03": {
+            "first_id": 1,
+            "last_id": 9,
+            "first_ts": d0,
+            "last_ts": d0 + DAY - 1,
+            "gaps": [],
+            "windows": {W: [3.0, 1.0, 4]},
+            "check_min": bad,
+        }
+    }
+    wi, why = window_imbalance(agg, have, vol)
+    assert wi[W] is None and why["하루 대조 실패 · 일 파일 없음"] > 0
+    daily = {d0: {"verified": True, "gaps": [], "windows": {W: [1.0, 3.0, 4]}, "check_min": check}}
+    wi2, _ = window_imbalance(agg, have, vol, daily)
+    assert wi2[W] == -0.5  # 검증된 일 파일 값으로 교체
+    daily[d0]["verified"] = False
+    wi3, _ = window_imbalance(agg, have, vol, daily)
+    assert wi3[W] is None
