@@ -32,6 +32,7 @@ __all__ = [
     "random_signal",
     "replay",
     "simulate_trade",
+    "split_segments",
 ]
 
 DAY = 86_400_000
@@ -133,6 +134,24 @@ class Trade:
 
 
 # ------------------------------------------------------------------ 사건 · 신호
+
+
+def split_segments(bars: Sequence[Bar], suspend_days: int = 7) -> list[list[Bar]]:
+    """빠진 날이 ``suspend_days`` 이상인 곳(거래 중단 · 단위 변경 뒤 재상장)에서 끊는다.
+
+    끊긴 앞 조각은 '자료 끝(거래 중단)' 으로 끝나 마지막 종가 + 비상 비용으로 정리되고,
+    뒤 조각은 새 종목처럼 처음부터 다시 센다 (문서 217 §5 · §11).
+    """
+    out: list[list[Bar]] = []
+    cur: list[Bar] = []
+    for b in bars:
+        if cur and (b.t - cur[-1].t) // DAY - 1 >= suspend_days:
+            out.append(cur)
+            cur = []
+        cur.append(b)
+    if cur:
+        out.append(cur)
+    return out
 
 
 def find_episodes(

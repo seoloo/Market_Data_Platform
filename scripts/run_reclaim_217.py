@@ -50,6 +50,7 @@ from auto_trading.research.reclaim_217 import (
     random_signal,
     replay,
     simulate_trade,
+    split_segments,
 )
 
 REPO = Path(__file__).resolve().parent.parent
@@ -61,6 +62,7 @@ HALF_SPLIT = _ms(date(2023, 7, 1))
 ARMS = ("A", "I", "D", "T")
 CFG = Config()
 SEED = 217
+SUSPEND_DAYS = 7  # §11: 7 일 이상 빠진 곳 = 거래 중단 → 앞 조각은 '자료 끝' 규칙으로 정리 (v1.1)
 
 
 def _d(t: int) -> str:
@@ -88,10 +90,13 @@ def load() -> dict[str, Any]:
         cand.sort(key=lambda x: (-x[0], x[1]))
         members[m.isoformat()[:7]] = [s for _, s in cand[:TOP_N]]
     syms = sorted({s for v in members.values() for s in v})
-    bars = {
-        s: [Bar(t, x.o, x.h, x.lo, x.c, x.qv) for t, x in sorted(daily[s].items()) if t <= LAST_DAY]
-        for s in syms
-    }
+    bars: dict[str, list[Bar]] = {}
+    for s in syms:
+        full = [
+            Bar(t, x.o, x.h, x.lo, x.c, x.qv) for t, x in sorted(daily[s].items()) if t <= LAST_DAY
+        ]
+        for k, seg in enumerate(split_segments(full, SUSPEND_DAYS)):
+            bars[s if k == 0 else f"{s}#{k}"] = seg
     db = sqlite3.connect(f"file:{REPO / 'data' / 'trading.db'}?mode=ro", uri=True)
     funding: dict[str, list[tuple[int, float]]] = {}
     for s in syms:
@@ -105,6 +110,11 @@ def load() -> dict[str, Any]:
     return {"members": members, "bars": bars, "funding": funding, "exinfo": exinfo}
 
 
+def base(key: str) -> str:
+    """조각 이름(BNXUSDT#1) → 종목 이름."""
+    return key.split("#")[0]
+
+
 def member_fn(members: dict[str, list[str]], s: str) -> Any:
     sets = {k: set(v) for k, v in members.items()}
     return lambda t: s in sets.get(_d(t)[:7], set())
@@ -113,7 +123,7 @@ def member_fn(members: dict[str, list[str]], s: str) -> Any:
 def episodes_all(data: dict[str, Any]) -> list[tuple[Episode, list[Bar]]]:
     out = []
     for s, b in data["bars"].items():
-        for ep in find_episodes(s, b, member_fn(data["members"], s), CFG):
+        for ep in find_episodes(s, b, member_fn(data["members"], base(s)), CFG):
             out.append((ep, b))
     out.sort(key=lambda x: (x[1][x[0].i0].t, x[0].symbol))
     return out
@@ -156,8 +166,9 @@ def audit() -> dict[str, Any]:
         "months": len(data["members"]),
         "first_nonempty": next(k for k, v in data["members"].items() if v),
         "symbols": len(syms),
-        "delisted_now": sorted(s for s in syms if s not in data["exinfo"]),
-        "funding_missing": sorted(s for s in syms if not data["funding"][s]),
+        "delisted_now": sorted(s for s in syms if base(s) not in data["exinfo"]),
+        "funding_missing": sorted(s for s in syms if not data["funding"][base(s)]),
+        "suspension_segments": sorted(s for s in syms if "#" in s),
         "daily_gaps": {s: gaps(b) for s, b in syms.items() if gaps(b)},
         "episodes": len(eps),
         "episodes_by_year": dict(sorted(by_year.items())),
@@ -174,20 +185,20 @@ def _sim(data: dict[str, Any], cfg: Config) -> Any:
     fund_t = {s: [f[0] for f in v] for s, v in data["funding"].items()}
 
     def go(sig: Signal, equity: float) -> Trade | str:
-        s = sig.symbol
-        if not data["funding"][s]:
+        s, b0 = sig.symbol, base(sig.symbol)
+        if not data["funding"][b0]:
             return "funding_missing"
-        step, _minq, _mn = lot(data["exinfo"], s)
+        step, _minq, _mn = lot(data["exinfo"], b0)
         return simulate_trade(
             data["bars"][s],
             sig,
             equity,
             cfg,
             step=step,
-            funding=data["funding"][s],
+            funding=data["funding"][b0],
             last_eval_day=LAST_DAY,
             bar_t=bar_t[s],
-            fund_t=fund_t[s],
+            fund_t=fund_t[b0],
         )
 
     return go
@@ -378,7 +389,7 @@ def account(
 
 
 def run() -> dict[str, Any]:
-    target = REPORT / "result.json"
+    target = REPORT / "result_v1_1.json"  # v1(result.json) 은 §11 실행 결함 전 기록으로 남긴다
     if target.exists():
         raise SystemExit(f"이미 실행했다: {target}")
     data = load()
@@ -399,7 +410,7 @@ def run() -> dict[str, Any]:
     res["funding_gap_trades_diag"] = {
         a: sum(
             funding_gap(
-                data["funding"][t.symbol],
+                data["funding"][base(t.symbol)],
                 t.entry_t,
                 t.exit_t + DAY - 1 if t.open_at_end else t.exit_t + DAY // 2,
             )

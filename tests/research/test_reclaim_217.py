@@ -218,3 +218,17 @@ def test_cluster_bootstrap_deterministic() -> None:
     a = cluster_bootstrap(items, reps=200)
     b = cluster_bootstrap(items, reps=200)
     assert a == b and a[0] == pytest.approx(0.625) and a[1] <= a[0] <= a[2]
+
+
+def test_suspension_gap_splits_series_and_closes_as_data_end() -> None:
+    from auto_trading.research.reclaim_217 import split_segments
+
+    old = _flat(33, 85.0)
+    new = [Bar(old[-1].t + (22 + k) * DAY, 1.4, 1.5, 1.3, 1.4, QV) for k in range(10)]
+    segs = split_segments([*old, *new])
+    assert [len(x) for x in segs] == [33, 10]
+    assert split_segments(_flat(10)) == [_flat(10)]
+    short_gap = [*_flat(5), *[Bar(T0 + (5 + 3 + k) * DAY, 100, 101, 99, 100, QV) for k in range(3)]]
+    assert len(split_segments(short_gap)) == 1  # 2 ~ 3 일 빠짐은 끊지 않음
+    tr = simulate_trade(segs[0], _sig(segs[0], 29, 76.5), 1e4, CFG, last_eval_day=new[-1].t)
+    assert isinstance(tr, Trade) and tr.exit_reason == "delisted" and tr.exit_px == 85.0
