@@ -86,3 +86,41 @@ def test_unhalt_lists_only_halted_groups(fake: dict[str, list[Any]]) -> None:
     assert "Cruise" in text and len(buttons) == 2  # Cruise 풀기 + 취소
     tb.handle_liquidation(bot, _press(buttons[0][0]["callback_data"]))  # type: ignore[arg-type]
     assert fake["unhalt"] == [("cruise", "텔레그램")]
+
+
+def test_help_words_route_to_bot_and_pin_help(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.notify.inbox import is_command
+
+    for w in ("도움", "/help", "/start", "사용법"):
+        assert is_command(InboxMessage(1, 0, w))  # Glide 대화가 가져가지 않는다
+    assert "정리" in tb.HELP and "현황" in tb.HELP and "정지풀기" in tb.HELP
+
+    calls: list[Any] = []
+
+    class Bot:
+        def __init__(self, creds: object) -> None:
+            pass
+
+        def send_message(self, text: str, **_: Any) -> int:
+            calls.append(("send", text))
+            return 55
+
+        def unpin_all(self) -> None:
+            calls.append(("unpin_all",))
+
+        def pin(self, mid: int) -> None:
+            calls.append(("pin", mid))
+
+        def set_commands(self, commands: list[tuple[str, str]]) -> None:
+            calls.append(("menu", [c for c, _ in commands]))
+
+        def close(self) -> None:
+            pass
+
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=t\nTELEGRAM_CHAT_ID=1\n", encoding="utf-8")
+    monkeypatch.setattr(tb, "TelegramNotifier", Bot)
+    assert "고정" in tb.pin_help(tmp_path)
+    assert calls[0][0] == "send" and calls[1:3] == [("unpin_all",), ("pin", 55)]
+    assert calls[3] == ("menu", ["status", "liquidate", "unhalt", "help"])

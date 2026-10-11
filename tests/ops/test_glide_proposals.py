@@ -106,14 +106,14 @@ def test_december_harvest_notice_input_qty_sell_then_buy_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     mod, fake, bot, box = _setup(monkeypatch, tmp_path, _glide_state(done_month="2026-12"))
-    # 12-01(화) 09:00 아침 확인 → 공지 + 버튼 + 고정
+    # 12-01(화) 09:00 아침 확인 → 메시지 + 아래 버튼 (2026-10-11 부터 공지 고정 안 함)
     # 주당 이익 (81.07 − 50.1) × 1350 ≈ 41,810원 → 100,000원 안에서 2 주
     now = datetime(2026, 12, 1, 9, 0, tzinfo=UTC)
     mod._glide_morning(now, True)
     notice = bot.sent[-1]
     assert "공제 남은 100,000원" in notice["text"] and "TQQQ 2주" in notice["text"]
     assert [b["text"] for b in notice["buttons"][0]] == ["전부 진행", "직접입력", "이번엔 안 함"]
-    assert bot.pinned == [101]
+    assert bot.pinned == []
     mod._glide_morning(now, True)  # 다시 불러도 두 번 보내지 않는다
     assert len(bot.sent) == 1
     # [직접입력] → 입력칸 알림 → "1" → 접수 + [취소]

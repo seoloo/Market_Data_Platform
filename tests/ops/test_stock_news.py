@@ -147,3 +147,18 @@ def test_trend_stats_off_state_compares_same_state_days() -> None:
     wave = [100.0 + 30 * ((k // 150) % 2 == 0) - 0.05 * k for k in range(900)]
     s = trend_stats(wave)
     assert s is not None and s.n_same < s.n_all and 0.0 <= s.up_same <= 1.0
+
+
+def test_reply_shows_laya_label_and_probability() -> None:
+    t = resolve("IREN", KR)
+    items = [
+        NewsItem("gnews_en", "IREN signs deal - Reuters", "https://r.com/a", "", "", ""),
+        NewsItem("yahoo_en", "IREN misses estimates", "https://y.com/b", "", "", ""),
+    ]
+    judged = {"points": [{"text": "계약", "ids": ["N1", "N2"], "tone": "호재"}]}
+    laya = {"N1": ("호재", 0.87), "N2": ("악재", 0.98)}
+    text = format_reply(t, items, judged, [], None, "", laya)
+    assert "Reuters: IREN signs deal</a> (🟢Laya 호재 87%)" in text
+    assert "Yahoo: IREN misses estimates</a> (🔴Laya 악재 98%)" in text
+    assert "🧪 Laya 기사별 판단 (영어 기사 2건): 🟢 호재 1 · 🔴 악재 1" in text
+    assert "Laya" not in format_reply(t, items, judged, [])

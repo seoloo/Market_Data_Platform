@@ -355,10 +355,14 @@ def format_reply(
     price: Sequence[str],
     stats: TrendStats | None = None,
     record: str = "",
+    laya: Mapping[str, tuple[str, float]] | None = None,
 ) -> str:
     """텔레그램 HTML 답 (``parse_mode=HTML``). 바깥 글은 모두 이스케이프한다.
 
-    ``record`` = 지난 AI 의견 채점 한 줄 (있으면)."""
+    ``record`` = 지난 AI 의견 채점 한 줄 (있으면).
+    ``laya`` = 기사 번호 → (호재 · 악재 · 중립, 확률) — 영어 기사만
+    (사용자 2026-10-11 요청으로 표시)."""
+    laya = laya or {}
     from auto_trading.notify.style import RULE, sub
 
     e = html_escape
@@ -395,8 +399,16 @@ def format_reply(
                 it = items[int(ref[1:]) - 1]
                 title, src = _split_title(it)
                 who = src or ("Yahoo" if it.source.startswith("yahoo") else "기사")
-                refs.append(_a(it.link, f"{who}: {title[:40]}") or e(title[:40]))
+                ref_text = _a(it.link, f"{who}: {title[:40]}") or e(title[:40])
+                if ref in laya:
+                    label, prob = laya[ref]
+                    ref_text += f" ({TONES[label]}Laya {label} {prob:.0%})"
+                refs.append(ref_text)
             lines.append("   📰 " + " · ".join(refs))
+        if laya:
+            count = {k: sum(1 for lab, _ in laya.values() if lab == k) for k in TONES}
+            tally = " · ".join(f"{TONES[k]} {k} {n}" for k, n in count.items() if n)
+            lines += ["", f"🧪 Laya 기사별 판단 (영어 기사 {len(laya)}건): {tally}"]
         view = judged.get("view") or ""
         if view:
             lines += [

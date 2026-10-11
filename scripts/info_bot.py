@@ -8,14 +8,12 @@
 * ``TELEGRAM_INFO_BOT_TOKEN`` 의 봇만 읽는다. 없으면 아무것도 하지 않는다 —
   투자 봇의 글을 가져가면 Glide 금액 · 버튼 답이 사라진다.
 * 뉴스: 구글 뉴스 검색 RSS(키 없음) + 미국 종목은 야후 파이낸스 RSS.
-  바로 가는 링크는 기사 앞부분을
-  조금 읽는다. 요약 · 호재/악재 · AI 의견: Gemini.
+  바로 가는 링크는 기사 앞부분을 조금 읽는다. 요약 · 호재/악재 · AI 의견: Gemini.
   가격 · 추세 상태 · 과거 통계: 야후 일봉 10 년(우리 계산).
-* 2026-10-11: 줄마다 근거 기사 링크(HTML), AI 의견은 '검증 안 됨' 으로 보이고
-  기록 → 20 거래일 뒤 채점
-  ('성적' 명령). Laya 는 영어 기사만 기사별 호재/악재를 **그림자 기록**
-  (답에 안 보임, '라야' 명령으로 비교).
-  Laya 주소는 ``.env`` 의 ``LAYA_BASE_URL`` (없으면 건너뜀), 키 ``LAYA_API_KEY``.
+* 2026-10-11: 줄마다 근거 기사 링크(HTML). AI 의견은 '검증 안 됨' 으로 보이고 기록 →
+  20 거래일 뒤 채점('성적'). Laya 는 영어 기사만 기사별 호재/악재를 판단해 근거 기사 옆에
+  확률과 함께 보인다('라야' 로 Gemini 와 비교). 키 ``LAYA_API_KEY``, 끄기 ``LAYA_OFF=true``.
+* ``pin-help``: 사용법을 대화방 공지로 고정 + '/' 메뉴.
 * 주문 · 계좌 조회 없음. 정보용.
 """
 
@@ -70,14 +68,28 @@ from auto_trading.ops.stock_news import (
 REPO = Path(__file__).resolve().parent.parent
 PER_RUN = 3
 """한 번 실행에 답하는 글 수 (나머지는 다음 실행)."""
-HELP = (
-    "🪐 정보 봇\n"
-    "종목 이름이나 기호를 보내면 최근 7일 뉴스를 요약해 드려요 (근거 기사 링크 포함).\n"
-    "예: 삼성전자 · 005930 · 엔비디아 · NVDA · IREN\n"
-    "'성적' — AI 의견이 20거래일 뒤 맞았는지 채점표\n"
-    "'라야' — Laya(기사별 호재/악재) 시험 비교\n"
-    "주간 테마(토 09:00)와 시장 브리핑도 여기로 와요."
-)
+HELP = """📌 정보 봇 사용법 — 이렇게 보내 보세요
+
+🗞 종목 이름이나 기호 (예: 삼성전자 · 005930 · 엔비디아 · NVDA · IREN)
+  최근 7일 뉴스 요약 — 줄마다 🟢호재/🔴악재 + 근거 기사 링크
+  영어 기사는 Laya 판단도 같이 (예: 🟢Laya 호재 87%)
+  아래에 가격 · 52주 고점 대비 · 우리 추세 규칙(켜짐/꺼짐)
+  · 과거 같은 상태 뒤 20거래일에 오른 비율
+  🤖 AI 의견(강세·중립·약세)은 검증 안 된 참고 — 20거래일 뒤 채점해요
+
+🧾 성적 (또는 /score) — AI 의견이 실제로 맞은 비율
+🧪 라야 (또는 /laya) — Laya 와 Gemini 판단 비교
+❓ 도움 (또는 /help) — 이 안내
+
+자동으로 오는 것: 주간 테마(토 09:00) · 시장 브리핑(화~토 07:30)
+※ 정보용 · 매매 신호 아님"""
+COMMANDS_MENU = [
+    ("help", "사용법"),
+    ("score", "성적 — AI 의견 채점표"),
+    ("laya", "라야 — Laya 와 Gemini 비교"),
+]
+SCORE_WORDS = ("성적", "/성적", "성적표", "/score", "score")
+LAYA_WORDS = ("라야", "/라야", "laya", "/laya")
 HELP_WORDS = ("/start", "/help", "도움", "도움말", "help", "?")
 _UA = {"User-Agent": "Mozilla/5.0"}
 EXCERPTS = 4
@@ -234,11 +246,11 @@ LAYA_URL = "https://api.laya-ai.com"
 ``LAYA_BASE_URL`` 로 바꿀 수 있다. 무료는 가입 때 20 회 · 그 뒤 입력 100 만 토큰당 $0.05."""
 
 
-def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, str], float]:
-    """영어 기사만 (사용자: 영어가 더 빠름) 기사별 호재/악재 — 기사 번호 → 판단, 호출 시간 ms.
+def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, tuple[str, float]], float]:
+    """영어 기사만 (사용자: 영어가 더 빠름) 기사별 호재/악재 — 기사 번호 → (판단, 확률), 호출 ms.
 
     질문 하나에 **한 번**만 부른다(``/v1/systemone/batch`` — 기사 여러 개를 한 요청에, 영어 모델).
-    ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값. 답에는 보이지 않는다(그림자 기록)."""
+    ``LAYA_API_KEY`` 가 없거나 실패하면 빈 값. 답의 근거 기사 옆에 확률과 함께 보인다."""
     env = read_env_file(root / ".env")
     key = env.get("LAYA_API_KEY", "").strip()
     if not key or env.get("LAYA_OFF", "").strip().lower() == "true":
@@ -264,14 +276,16 @@ def laya_labels(items: list[NewsItem], root: Path) -> tuple[dict[str, str], floa
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         results = []
     ms = (time.monotonic() - t0) * 1000
-    out: dict[str, str] = {}
+    out: dict[str, tuple[str, float]] = {}
     for (i, _it), res in zip(picked, results, strict=False):
         try:
-            choice = str(res["answers"]["impact"]["choice"])
-        except (KeyError, TypeError):
+            ans = res["answers"]["impact"]
+            choice = str(ans["choice"])
+            prob = float(ans.get("probabilities", {}).get(choice, ans.get("answer_confidence", 0)))
+        except (KeyError, TypeError, ValueError, AttributeError):
             continue
         if choice in _LAYA_KO:
-            out[f"N{i}"] = _LAYA_KO[choice]
+            out[f"N{i}"] = (_LAYA_KO[choice], prob)
     return out, (ms if out else 0.0)
 
 
@@ -294,9 +308,9 @@ def answer(text: str, root: Path = REPO) -> str:
     t = text.strip()
     if t.lower() in HELP_WORDS:
         return escape(HELP)
-    if t in ("성적", "/성적", "성적표"):
+    if t.lower() in SCORE_WORDS:
         return escape(scorecard(root))
-    if t.lower() in ("라야", "/라야", "laya", "/laya"):
+    if t.lower() in LAYA_WORDS:
         return escape(laya_text(load_calls(calls_path(root))))
     if not user_settings.get(root, "alerts.news"):
         return escape("종목 뉴스 답이 꺼져 있어요 — 오르빗 설정 › 알림에서 켤 수 있어요")
@@ -311,10 +325,10 @@ def answer(text: str, root: Path = REPO) -> str:
     stats = trend_stats(closes)
     path = calls_path(root)
     calls = load_calls(path)
+    laya, laya_ms = laya_labels(items, root)
     if rows and target.yahoo:
         if score(calls, {str(target.yahoo): rows}):
             save_calls(path, calls)
-        laya, laya_ms = laya_labels(items, root)
         tones: dict[str, str] = {}
         for p in (judged or {}).get("points") or []:
             for ref in p["ids"]:
@@ -327,13 +341,19 @@ def answer(text: str, root: Path = REPO) -> str:
             trend_on=stats.on if stats else None,
             view=(judged or {}).get("view") or "",
             tones=tones,
-            laya=laya,
+            laya={k: v[0] for k, v in laya.items()},
             laya_ms=laya_ms,
         )
         if append_call(path, new):
             calls.append(new)
     return format_reply(
-        target, items, judged, price_block(closes, currency), stats, record_line(calls)
+        target,
+        items,
+        judged,
+        price_block(closes, currency),
+        stats,
+        record_line(calls),
+        laya,
     )
 
 
@@ -366,7 +386,7 @@ def run(root: Path = REPO) -> int:
             if (
                 user_settings.get(root, "alerts.news")
                 and word not in HELP_WORDS
-                and word not in ("성적", "/성적", "성적표", "라야", "/라야", "laya", "/laya")
+                and word not in SCORE_WORDS + LAYA_WORDS
             ):
                 bot.send(f"🔎 '{text.strip()[:30]}' 뉴스 찾는 중…")
             reply = answer(text, root)
@@ -386,13 +406,32 @@ def run(root: Path = REPO) -> int:
     return 0
 
 
+def pin_help(root: Path = REPO) -> str:
+    """사용법을 보내고 정보 봇 대화방 공지로 고정한다 (예전 고정은 모두 푼다) + '/' 메뉴."""
+    creds = info_credentials(root)
+    if creds is None:
+        return "정보 봇 토큰 없음"
+    bot = TelegramNotifier(creds)
+    try:
+        mid = bot.send_message(HELP)
+        bot.unpin_all()
+        bot.pin(mid)
+        bot.set_commands(COMMANDS_MENU)
+    finally:
+        bot.close()
+    return f"정보 봇 공지 고정 (메시지 {mid})"
+
+
 def main(argv: list[str]) -> int:
     if argv == ["run"]:
         return run()
+    if argv == ["pin-help"]:
+        print(pin_help())
+        return 0
     if len(argv) >= 2 and argv[0] == "ask":
         sys.stdout.write(answer(" ".join(argv[1:])) + "\n")
         return 0
-    raise SystemExit("usage: python -m scripts.info_bot run | ask <종목>")
+    raise SystemExit("usage: python -m scripts.info_bot run | ask <종목> | pin-help")
 
 
 if __name__ == "__main__":

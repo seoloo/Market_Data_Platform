@@ -174,6 +174,18 @@ class TelegramNotifier:
     def unpin(self, message_id: int) -> None:
         self._call("unpinChatMessage", {"message_id": message_id})
 
+    def unpin_all(self) -> None:
+        """이 대화방의 고정 메시지를 모두 푼다."""
+        self._call("unpinAllChatMessages", {})
+
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        """입력칸의 '/' 메뉴 — (영문 소문자 명령, 설명). 이 봇 전체에 적용."""
+        self._call(
+            "setMyCommands",
+            {"commands": [{"command": c, "description": d} for c, d in commands]},
+            chat=False,
+        )
+
     def answer_callback(self, callback_id: str, text: str = "") -> None:
         """버튼을 누른 쪽의 '불러오는 중' 표시를 끈다 (늦으면 텔레그램이 거부 — 무시해도 된다)."""
         self._call(

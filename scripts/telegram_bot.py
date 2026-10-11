@@ -26,6 +26,7 @@ from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
 from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import (
+    HELP_WORDS,
     LIQ_WORDS,
     UNHALT_WORDS,
     InboxMessage,
@@ -62,6 +63,54 @@ def report(root: Path = REPO) -> str:
     value = sum(b.value_krw for b in books)
     target = float(user_settings.get(root, "fire.target_krw"))
     return f"{text}\n🎯 파이어 목표 {target / 1e8:g}억까지 {value / target:.1%}"
+
+
+HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
+
+📊 현황 (또는 /status · 수익 · 잔고)
+  실거래 요약: Glide · Cruise · 토스 적립 + 파이어 목표까지 %
+
+🧯 정리 (또는 /liquidate · 청산 · 전부매도)
+  보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
+  [전부 정리] [Cruise 만] [Glide 만] [토스 적립만] [취소]
+  버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
+
+▶ 정지풀기 (또는 /unhalt)
+  정리 뒤 멈춘 그룹 다시 켜기 → 다음 실행부터 규칙대로 다시 사요
+
+💵 Glide 이번 달 금액
+  매달 매수일 아침 질문에 숫자로 답: 30만 · 500000 · 0(쉬기)
+
+🔘 제안 버튼 (배당 단계 · 12월 공제 실현)
+  메시지 아래 버튼으로 답해요
+
+❓ 도움 (또는 /help) — 이 안내
+
+이 방으로 오는 알림: Glide · Cruise · 토스 매매 결과, 환전 요청, 위험 알림
+종목 뉴스는 정보 봇에 물어보세요."""
+COMMANDS_MENU = [
+    ("status", "현황 — 실거래 요약"),
+    ("liquidate", "정리 — 보유 팔기 (미리 보기 + 버튼)"),
+    ("unhalt", "정지풀기 — 멈춘 그룹 다시 켜기"),
+    ("help", "사용법"),
+]
+"""입력칸 '/' 메뉴 (텔레그램 명령은 영문만)."""
+
+
+def pin_help(root: Path = REPO) -> str:
+    """사용법을 보내고 대화방 공지로 고정한다 (예전 고정은 모두 푼다) + '/' 메뉴."""
+    creds = load_telegram_credentials(root / ".env")
+    if creds is None:
+        return "텔레그램 설정 없음"
+    bot = TelegramNotifier(creds)
+    try:
+        mid = bot.send_message(HELP)
+        bot.unpin_all()
+        bot.pin(mid)
+        bot.set_commands(COMMANDS_MENU)
+    finally:
+        bot.close()
+    return f"투자 봇 공지 고정 (메시지 {mid})"
 
 
 LIQ_WAIT_S = 120
@@ -172,10 +221,13 @@ def run(root: Path = REPO) -> int:
     except NotifyError as exc:
         print(f"텔레그램 받기 실패: {exc}")
         return 1
-    status_cmds = [m for m in cmds if not is_liquidation(m)]
+    helps = [m for m in cmds if not m.data and m.text.strip().lower() in HELP_WORDS]
+    status_cmds = [m for m in cmds if not is_liquidation(m) and m not in helps]
     liq_msgs = [m for m in cmds if is_liquidation(m)]
     bot = TelegramNotifier(creds)
     try:
+        if helps:
+            bot.send(HELP)
         if status_cmds:
             text = report(root)  # 여러 번 보내도 답은 한 통
             bot.send(text)
@@ -210,10 +262,13 @@ def _resume_liquidation() -> None:
 def main(argv: list[str]) -> int:
     if argv == ["run"]:
         return run()
+    if argv == ["pin-help"]:
+        print(pin_help())
+        return 0
     if argv == ["show"]:
         sys.stdout.write(report() + "\n")
         return 0
-    raise SystemExit("usage: python -m scripts.telegram_bot run|show")
+    raise SystemExit("usage: python -m scripts.telegram_bot run|show|pin-help")
 
 
 if __name__ == "__main__":

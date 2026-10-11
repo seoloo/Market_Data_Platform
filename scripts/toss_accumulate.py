@@ -917,7 +917,11 @@ def _tg_send(
 
 
 def _refresh(bot: TelegramNotifier | None, p: Proposal) -> None:
-    """고정 공지 맨 아래 상태를 바꾸고(알림 없음), 끝난 제안은 고정을 푼다."""
+    """제안 메시지 맨 아래 상태를 바꾼다(알림 없음).
+
+    끝난 제안은 (예전에 고정했던 것이면) 고정을 푼다.
+
+    2026-10-11 부터 새 제안은 고정하지 않는다 — 공지 자리는 사용법 안내(pin-help)가 쓴다."""
     if bot is None or not p.message_id:
         return
     try:
@@ -1103,12 +1107,8 @@ def _glide_morning(now: datetime, telegram: bool) -> None:
             if want_harvest and (tax := _tax_summary(trader, m3)) is not None:
                 prop, text = _new_harvest(m3, today, prices, fx_rate, tax)
                 if prop.status == "open":
+                    # 공지로 고정하지 않는다 — 메시지 아래 버튼으로만 답한다 (사용자 2026-10-11)
                     prop.message_id = _tg_send(bot, text, buttons=proposal_buttons(prop))
-                    if bot is not None and prop.message_id:
-                        try:
-                            bot.pin(prop.message_id)
-                        except NotifyError as exc:
-                            print(f"공지 고정 실패: {exc}")
                 else:
                     _tg_send(bot, text)
                 props.append(prop)
@@ -1117,11 +1117,6 @@ def _glide_morning(now: datetime, telegram: bool) -> None:
                 dprop, dtext = _new_div_step(m3, today, prices, fx_rate, _dividend_events())
                 if dprop is not None and dtext is not None:
                     dprop.message_id = _tg_send(bot, dtext, buttons=proposal_buttons(dprop))
-                    if bot is not None and dprop.message_id:
-                        try:
-                            bot.pin(dprop.message_id)
-                        except NotifyError as exc:
-                            print(f"공지 고정 실패: {exc}")
                     props.append(dprop)
                     changed = True
                 elif dtext is not None:

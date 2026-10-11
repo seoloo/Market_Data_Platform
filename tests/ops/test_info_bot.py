@@ -44,14 +44,21 @@ def test_laya_one_batch_call_english_only(tmp_path: Path, monkeypatch: pytest.Mo
         assert headers["Authorization"] == "Bearer abc"
         seen.append((url, json))
         res = [
-            {"answers": {"impact": {"choice": "good" if "jumps" in s else "bad"}}}
+            {
+                "answers": {
+                    "impact": {
+                        "choice": "good" if "jumps" in s else "bad",
+                        "probabilities": {"good": 0.87, "bad": 0.98},
+                    }
+                }
+            }
             for s in json["states"]
         ]
         return httpx.Response(200, json={"results": res, "total_usage": {"input_tokens": 9}})
 
     monkeypatch.setattr("scripts.info_bot.httpx.post", post)
     labels, ms = info_bot.laya_labels(_items(), tmp_path)
-    assert labels == {"N2": "호재", "N3": "악재"} and ms >= 0
+    assert labels == {"N2": ("호재", 0.87), "N3": ("악재", 0.98)} and ms >= 0
     assert len(seen) == 1  # 질문 하나에 한 번만 (무료 횟수 아끼기)
     url, body = seen[0]
     assert url == "https://api.laya-ai.com/v1/systemone/batch" and body["model"] == "english"

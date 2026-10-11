@@ -177,3 +177,30 @@ def test_send_html_uses_parse_mode_and_falls_back_to_plain() -> None:
     assert sent[0]["parse_mode"] == "HTML"
     assert sent[0]["link_preview_options"] == {"is_disabled": True}
     assert sent[1]["text"] == "굵게 기사 & 끝" and "parse_mode" not in sent[1]
+
+
+def test_unpin_all_and_commands_menu() -> None:
+    import json as _json
+
+    import httpx as _httpx
+
+    from auto_trading.config.secrets import TelegramCredentials
+    from auto_trading.notify.channels import TelegramNotifier
+
+    seen: list[tuple[str, dict[str, object]]] = []
+
+    def handle(request: _httpx.Request) -> _httpx.Response:
+        seen.append((request.url.path.rsplit("/", 1)[-1], _json.loads(request.content)))
+        return _httpx.Response(200, json={"ok": True, "result": True})
+
+    bot = TelegramNotifier(
+        TelegramCredentials("T0K", "42"),
+        client=_httpx.Client(transport=_httpx.MockTransport(handle)),
+    )
+    bot.unpin_all()
+    bot.set_commands([("help", "사용법")])
+    assert seen[0] == ("unpinAllChatMessages", {"chat_id": "42"})
+    assert seen[1] == (
+        "setMyCommands",
+        {"commands": [{"command": "help", "description": "사용법"}]},
+    )
