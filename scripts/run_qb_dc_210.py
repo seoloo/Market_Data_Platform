@@ -570,9 +570,13 @@ def _load() -> dict[str, Market]:
 
 
 def summarize(
-    markets: dict[str, Market], sigs: dict[str, Signals], variant: str, p: Params
+    markets: dict[str, Market],
+    sigs: dict[str, Signals],
+    variant: str,
+    p: Params,
+    eval_start: int = EVAL_START,
 ) -> dict[str, Any]:
-    res = simulate(markets, sigs, variant, p)
+    res = simulate(markets, sigs, variant, p, eval_start=eval_start)
     daily = res["daily"]
     bk: Book = res["book"]
     assert isinstance(daily, list)
