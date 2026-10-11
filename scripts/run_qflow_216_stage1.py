@@ -126,6 +126,19 @@ def _all_gaps(agg: dict[str, dict[str, Any]]) -> dict[str, list[tuple[int, int]]
     return out
 
 
+def _merge(gaps: list[tuple[int, int]]) -> tuple[list[int], list[int]]:
+    """빈 곳 (앞 체결 ms, 뒤 체결 ms) 들을 겹치지 않는 구간으로 합친다 → (시작들, 끝들) 정렬."""
+    lo: list[int] = []
+    hi: list[int] = []
+    for a, b in sorted(gaps):
+        if lo and a <= hi[-1]:
+            hi[-1] = max(hi[-1], b)
+        else:
+            lo.append(a)
+            hi.append(b)
+    return lo, hi
+
+
 def suspect_days(agg: dict[str, dict[str, Any]], have: bytearray, vol: array[float]) -> list[int]:
     """월 파일에서 검증 실패한 날: id 빈 곳이 걸치거나 하루 대조 차이 > 0.5 %."""
     bad: set[int] = set()
@@ -157,7 +170,7 @@ def window_imbalance(
     for mo in months():
         a, b = _month_bounds(mo)
         ex = agg.get(mo)
-        mgaps = gaps_by_mo.get(mo, [])
+        mgaps = _merge(gaps_by_mo.get(mo, []))
         dchk = day_check(ex, have, vol) if (ex is not None and vol is not None) else {}
         for w in range(a, b, 5 * MIN):
             if not (WARM <= w < END):
@@ -170,7 +183,7 @@ def window_imbalance(
                     out[w] = None
                     why["일 파일도 검증 실패"] += 1
                     continue
-                gaps = sorted((g[0], g[1]) for g in src["gaps"])
+                gaps = _merge([(g[0], g[1]) for g in src["gaps"]])
             else:
                 src = ex
                 if src is None:
@@ -182,10 +195,12 @@ def window_imbalance(
                     why["하루 대조 실패 · 일 파일 없음"] += 1
                     continue
                 gaps = mgaps
-            k = bisect.bisect_left([g[0] for g in gaps], w + WIN) if gaps else 0
-            if any(
-                gaps[j][1] > w for j in range(k)
-            ):  # 앞 체결 시각 < W + 10 초 이고 뒤 체결 시각 > W 인 빈 곳
+            k = (
+                bisect.bisect_left(gaps[0], w + WIN) - 1
+            )  # 앞 체결 시각 < W + 10 초 인 마지막 빈 구간
+            if (
+                k >= 0 and gaps[1][k] >= w
+            ):  # 그 구간이 W 이후까지 이어지면 창 안에 빠진 체결이 있을 수 있다
                 out[w] = None
                 why["id 빈 곳 · 중복"] += 1
                 continue
