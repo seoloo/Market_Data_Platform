@@ -558,6 +558,12 @@ def cmd_cache() -> int:
 
 
 def _load() -> dict[str, Market]:
+    import __main__
+
+    if not hasattr(
+        __main__, "Market"
+    ):  # 캐시는 `-m` 실행(__main__)에서 만든다 — 다른 곳에서 읽을 때 같은 이름을 붙인다
+        __main__.Market = Market
     with CACHE.open("rb") as fh:
         out: dict[str, Market] = pickle.load(fh)
         return out
