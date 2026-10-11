@@ -243,6 +243,10 @@ class Params:
     stop_extra: float = 0.01  # 비상 스톱 추가 불리폭 1% (별도 보고)
     daily_loss: float = 0.02  # 그날 −2% 면 늘리기 금지 (줄이기 · 청산 허용)
     use_mark: bool = True  # funding 명목에 mark (False = 같은 분 거래가 근사)
+    decide_hours: int = 4  # 판단 간격 (24 = 매일 00:00 UTC 만 — 213 · T/v2 와 같은 하루 한 번)
+    sig_is_weight: bool = (
+        False  # True 면 신호 값이 이미 목표 비중 (213 — 현물 가격으로 계산한 T/v2 비중)
+    )
     equity0: float = 10_000.0
 
 
@@ -264,6 +268,9 @@ class Book:
     unfilled: int = 0
     loss_blocks: int = 0
     funding_proxy: int = 0
+    fill_log: list[tuple[str, int, float]] = field(
+        default_factory=list
+    )  # (종목, 분, 부호 있는 명목)
 
 
 def _vol_weight(dcl: Sequence[float], k: int, p: Params) -> float:
@@ -336,6 +343,7 @@ def simulate(
         bk.pnl_cost[s] -= notional * p.cost
         bk.stop_extra_cost += notional * extra
         bk.traded_notional += notional
+        bk.fill_log.append((s, i, q * px))
         if not bk.trade_open[s] and q > 0:
             bk.trade_open[s], bk.trade_cash[s] = True, 0.0
             bk.start[s] = i
@@ -384,7 +392,8 @@ def simulate(
             loss_block = True
         k = d_ms // DAY - WARM // DAY - 1
         orders: dict[str, float] = {}
-        for s in syms:
+        decide = (j * 4) % p.decide_hours == 0
+        for s in syms if decide else ():
             sig = sigs[s].by_j[variant][j]
             ps = prev_sig[s]
             if ps is not None and (sig > 0) != (ps > 0):
@@ -394,7 +403,7 @@ def simulate(
                 if sig <= 0:
                     bk.blocked[s] = False
                 sig = 0.0
-            w = _vol_weight(dcls[s], k, p) * sig
+            w = min(sig, p.max_weight) if p.sig_is_weight else _vol_weight(dcls[s], k, p) * sig
             ref = price(s, i0 - 1)
             cur_w = bk.qty[s] * ref / eq if eq > 0 else 0.0
             need = (
