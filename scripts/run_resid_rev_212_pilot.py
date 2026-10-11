@@ -70,12 +70,10 @@ class LruIntraday(Intraday):
             else {}
         )
         self.k5[key] = d  # type: ignore[assignment]
-        while len(self.k5) > 60:
-            oldest = next(iter(self.k5))
-            if oldest[0] == "BTCUSDT" and len(self.k5) < 200:
-                self.k5.move_to_end(oldest)  # type: ignore[attr-defined]
-                continue
-            self.k5.popitem(last=False)  # type: ignore[call-arg]
+        # BTC 달은 따로 둔다 (헤지라 계속 쓴다). 예전 판은 BTC 달이 60 개를 넘으면 여기서 끝없이 돌았다(2026-10-11 고침).
+        alts = [k for k in self.k5 if k[0] != "BTCUSDT"]
+        for k in alts[: max(0, len(alts) - 60)]:
+            del self.k5[k]
         return d
 
     def close_before(self, s: str, t: int) -> float | None:
@@ -440,6 +438,8 @@ class Sim:
                     t += M5
                 else:
                     break
+            if d.day == 1 and d.month == 1:
+                print(f"  … {d.isoformat()} 진행 (묶음 끝 {len(self.done)})", flush=True)
             d += timedelta(days=1)
         t_end = int(datetime(d1.year, d1.month, d1.day, tzinfo=UTC).timestamp() * 1000) + DAY
         for b in list(self.bundles):  # 자료 끝: 남은 묶음 정리
