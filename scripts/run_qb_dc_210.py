@@ -244,9 +244,9 @@ class Params:
     daily_loss: float = 0.02  # 그날 −2% 면 늘리기 금지 (줄이기 · 청산 허용)
     use_mark: bool = True  # funding 명목에 mark (False = 같은 분 거래가 근사)
     decide_hours: int = 4  # 판단 간격 (24 = 매일 00:00 UTC 만 — 213 · T/v2 와 같은 하루 한 번)
-    sig_is_weight: bool = (
-        False  # True 면 신호 값이 이미 목표 비중 (213 — 현물 가격으로 계산한 T/v2 비중)
-    )
+    sig_is_weight: bool = False  # True: 신호 값이 이미 목표 비중 (213 — 현물 T/v2 비중)
+    timing: str = "A"  # 214 매수 시점: A 즉시 · B 4 시간 뒤 · C 직전 완성 4 시간봉 수익 ≤ 0 이면(최대 24 시간)
+    max_wait_slots: int = 6  # C 최대 대기 = 4 시간 칸 6 개 (24 시간)
     equity0: float = 10_000.0
 
 
@@ -268,9 +268,10 @@ class Book:
     unfilled: int = 0
     loss_blocks: int = 0
     funding_proxy: int = 0
-    fill_log: list[tuple[str, int, float]] = field(
+    fill_log: list[tuple[str, int, float]] = field(default_factory=list)  # (종목, 분, 명목)
+    timing_log: list[dict[str, Any]] = field(
         default_factory=list
-    )  # (종목, 분, 부호 있는 명목)
+    )  # 214: 매수 필요마다 대기 · 실행 · 취소
 
 
 def _vol_weight(dcl: Sequence[float], k: int, p: Params) -> float:
@@ -311,6 +312,8 @@ def simulate(
     prev_sig: dict[str, float | None] = dict.fromkeys(syms, None)
     day_start = p.equity0
     loss_block = False
+    target_w: dict[str, float] = dict.fromkeys(syms, 0.0)  # 214: 기본 전략의 최신 목표 비중
+    pend: dict[str, dict[str, Any] | None] = dict.fromkeys(syms, None)  # 214: 대기 중인 매수
 
     def price(s: str, i: int) -> float:
         return float(markets[s].c[i])
@@ -404,6 +407,7 @@ def simulate(
                     bk.blocked[s] = False
                 sig = 0.0
             w = min(sig, p.max_weight) if p.sig_is_weight else _vol_weight(dcls[s], k, p) * sig
+            target_w[s] = w
             ref = price(s, i0 - 1)
             cur_w = bk.qty[s] * ref / eq if eq > 0 else 0.0
             need = (
@@ -412,9 +416,72 @@ def simulate(
             if not need:
                 continue
             dq = w * eq / ref - bk.qty[s]
+            if p.timing != "A" and dq > 0:
+                if pend[s] is None:  # 새 대기 시작 (이미 대기 중이면 시작 시각 유지)
+                    pend[s] = {
+                        "sym": s,
+                        "start_j": j,
+                        "start_i": i0,
+                        "start_px": float(markets[s].o[i0]),
+                    }
+                continue
+            if p.timing != "A" and pend[s] is not None:  # 줄이기 · 청산이 필요해지면 대기 매수 취소
+                bk.timing_log.append({**pend[s], "end_j": j, "result": "취소(줄이기로 바뀜)"})  # type: ignore[dict-item]
+                pend[s] = None
             if dq > 0 and loss_block:
                 continue
             orders[s] = dq
+            if p.timing == "A" and dq > 0:
+                bk.timing_log.append(
+                    {
+                        "sym": s,
+                        "start_j": j,
+                        "start_i": i0,
+                        "start_px": float(markets[s].o[i0]),
+                        "end_j": j,
+                        "result": "즉시",
+                        "exec_i": i0,
+                    }
+                )
+        # 214: 대기 매수 — 4 시간 칸마다 최신 목표 · 계좌로 다시 보고 실행 · 취소
+        for s in syms if p.timing != "A" else ():
+            pd = pend[s]
+            if pd is None:
+                continue
+            if bk.blocked[s] or target_w[s] <= 0:
+                bk.timing_log.append({**pd, "end_j": j, "result": "취소(목표 0 · 보호 뒤)"})
+                pend[s] = None
+                continue
+            ref = price(s, i0 - 1)
+            cur_w = bk.qty[s] * ref / eq if eq > 0 else 0.0
+            w = target_w[s]
+            if not ((bk.qty[s] == 0) or (w - cur_w > p.band)):
+                bk.timing_log.append({**pd, "end_j": j, "result": "취소(매수 필요 없어짐)"})
+                pend[s] = None
+                continue
+            waited = j - pd["start_j"]
+            if p.timing == "B":
+                ready, why = waited >= 1, "4 시간 뒤"
+            else:
+                r4 = markets[s].c[i0 - 1] / markets[s].c[i0 - 1 - step] - 1
+                if r4 <= 0:
+                    ready, why = True, ("즉시(4 시간봉 ≤ 0)" if waited == 0 else "조건 충족")
+                elif waited >= p.max_wait_slots:
+                    ready, why = True, "24 시간 만료"
+                else:
+                    ready, why = False, ""
+            if not ready:
+                continue
+            pend[s] = None
+            dq = w * eq / ref - bk.qty[s]
+            if dq <= 0:
+                bk.timing_log.append({**pd, "end_j": j, "result": "취소(매수 필요 없어짐)"})
+                continue
+            if loss_block:
+                bk.timing_log.append({**pd, "end_j": j, "result": "취소(일 손실 2%)"})
+                continue
+            orders[s] = dq
+            bk.timing_log.append({**pd, "end_j": j, "result": why, "exec_i": i0})
         # 주문 칸 (연속 분, IOC)
         for a in range(p.attempts):
             i = i0 + a
@@ -470,6 +537,9 @@ def simulate(
                 else:
                     pay_funding(s, end_i - 1)
                     break
+    for s in syms:
+        if pend[s] is not None:
+            bk.timing_log.append({**pend[s], "end_j": n_j, "result": "미완료(평가 끝)"})  # type: ignore[dict-item]
     eq_end = equity(n_min - 1)
     daily.append(
         (datetime.fromtimestamp((end_ms - DAY) / 1000, UTC).date().isoformat(), eq_end, 0.0)
