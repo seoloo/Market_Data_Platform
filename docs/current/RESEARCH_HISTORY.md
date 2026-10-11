@@ -1167,6 +1167,8 @@ Do not retry: 창 · 보유일 · 비용 · 사유 거르기 바꿔 같은 자�
 근거: [208](../research/208-sp500-index-events-preregistration.md). 자료 위키백과 판 1379179365 · Tiingo.
 
 ## 보류·진행 중 (판정 없음 — 개수에 넣지 않음)
+
+- 도미넌스 신호(215, 2026-10-11, `DATA_INSUFFICIENT`): USDT.D 하락 + BTC.D 상승 → 24 시간 BTC 롱. TradingView CRYPTOCAP 과 같은 정의의 4 시간봉 과거 자료를 무료 · 정당하게 못 구함(TradingView 다운로드 API 없음 · CoinGecko 과거 전체 시총 유료 · 무료는 365 일 · 90 일 넘으면 일봉). 손익 미계산. 구조상 USDT.D 하락 ≈ TOTAL 상승이라 A ≈ C 일 공산. 사용자가 4 시간봉 파일을 직접 주면 다시. [문서](../research/215-dominance-signal-data-audit.md).
 - 하락 브리핑 정보 도구(IDEAS 29, Codex 초안, 수익 연구 아님): 2026-10-08 Phase 0 감사 → 사용자 결정(미국 먼저 · SEC 연락처 · SPY/QQQ 상위 10 · 텔레그램) → 미국 첫판 구현 · 첫 전송. 정확성 검산(앞으로 30 개) 전, 한국은 그 뒤. [감사](../research/BRIEFING_PHASE0_AUDIT.md).
 - **관찰 바구니(171, 2026-10-08 ~, 돈 없음)**: 160-23 ETF 순유입 LONG(W1) · PANIC-KQ(W2) 를 원 규칙 그대로 2026-09 이후 자료로 그림자 기록. W1 30 건 · W2 5 번에 판단(앞으로 평균 > 0 · 합친 2.24 SE 하한 > 0 → 소액 검토 자격). 원 판정(REJECT)은 그대로. [171](../research/171-watchlist-shadow-registration.md).
 - **점검 문서(2026-10-08, 판정 불변)**: [통과 다중검정](../research/PASS_FDR_AUDIT.md)(T/v2 · T · O/v1 만 BH q 0.10, QS t 1.41 · FLOW-KR t 0.77) · [기대 범위](../research/FORWARD_BAND.md)(전향 REVIEW · ALERT 기준) · [FLOW 자료 품질](../research/KR_FLOW_DATAQUALITY.md)(G-KR1 영향 없음) · [자료 열람 장부](../research/DATA_EXPOSURE_LEDGER.md)(2026-09-01 이후 = 전향 확인 구간).
