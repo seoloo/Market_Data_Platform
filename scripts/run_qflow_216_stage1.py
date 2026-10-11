@@ -476,7 +476,9 @@ def audit(data: dict[str, Any] | None = None) -> dict[str, Any]:
             prev = ex["last_id"]
         gaps = [(mo, g) for mo, ex in agg.items() for g in ex["gaps"]]
         # 매시 00 분 전체 체결 vs 공식 1 분봉
-        rel_v, rel_b, day_v = [], [], {}
+        rel_v: list[float] = []
+        rel_b: list[float] = []
+        day_v: dict[int, list[float]] = {}
         for ex in agg.values():
             for mms, (v, b, _n) in ex["check_min"].items():
                 if not (WARM <= mms < END):
@@ -562,7 +564,7 @@ def audit(data: dict[str, Any] | None = None) -> dict[str, Any]:
         ]
         res[s]["corr_SA_SB_next"] = round(
             statistics.correlation([a for a, _ in pb], [b for _, b in pb]), 3
-        )  # type: ignore[misc]
+        )
         th = [v for v in d["th"]["A"].values() if v]
         res[s]["A_threshold_avg"] = [
             round(statistics.fmean(x[0] for x in th), 4),
@@ -708,4 +710,18 @@ def stage1() -> dict[str, Any]:
     return res
 
 
-__all__ = ["audit", "event", "pct", "scores", "signals", "stage1", "thresholds", "window_imbalance"]
+__all__ = [
+    "COST",
+    "DAY",
+    "EVAL_START",
+    "N_MIN",
+    "Q15",
+    "audit",
+    "event",
+    "pct",
+    "scores",
+    "signals",
+    "stage1",
+    "thresholds",
+    "window_imbalance",
+]

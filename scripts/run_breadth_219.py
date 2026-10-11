@@ -623,6 +623,11 @@ def load_all() -> tuple[dict[str, list[str]], list[Row]]:
     return members, participation(members, bars, btc)
 
 
+def _f(x: float | None) -> float:
+    assert x is not None
+    return x
+
+
 def audit() -> dict[str, Any]:
     members, rows = load_all()
     ok = [r for r in rows if r.b_cur is not None]
@@ -640,12 +645,12 @@ def audit() -> dict[str, Any]:
         last = r.t
     # 참여율이 BTC · 시장 평균 수익의 재표현인가 (손익 없음)
     full = [r for r in ok if r.mean_ret is not None and r.btc_ret is not None]
-    corr_bm = statistics.correlation([r.b_cur for r in full], [r.mean_ret for r in full])  # type: ignore[misc]
-    corr_bb = statistics.correlation([r.b_cur for r in full], [r.btc_ret for r in full])  # type: ignore[misc]
+    corr_bm = statistics.correlation([_f(r.b_cur) for r in full], [_f(r.mean_ret) for r in full])
+    corr_bb = statistics.correlation([_f(r.b_cur) for r in full], [_f(r.btc_ret) for r in full])
     # 시장 평균 수익이 A 사건 범위(A 의 10 ~ 90 백분위) 안인 B 시점 중 A 비율
     am = sorted(r.mean_ret for r in a if r.mean_ret is not None)
     lo, hi = am[int(0.1 * len(am))], am[int(0.9 * len(am))]
-    band = [r for r in full if lo <= r.mean_ret <= hi and r.btc_ret > 0]  # type: ignore[operator]
+    band = [r for r in full if lo <= _f(r.mean_ret) <= hi and _f(r.btc_ret) > 0]
     ctrl = match_controls(rows)
     cts = sorted({t for v in ctrl.values() for t in v})
     by_t = {r.t: r for r in rows}
@@ -664,11 +669,11 @@ def audit() -> dict[str, Any]:
             sorted(Counter(r.n_valid for r in rows if r.t >= _ms(date(2020, 9, 1))).items())
         ),
         "B_dist": {
-            q: round(sorted(r.b_cur for r in ok)[int(q / 100 * (len(ok) - 1))], 3)
+            q: round(sorted(_f(r.b_cur) for r in ok)[int(q / 100 * (len(ok) - 1))], 3)
             for q in (5, 25, 50, 75, 95)
-        },  # type: ignore[type-var]
-        "share_b_le_30": round(sum(1 for r in ok if r.b_cur <= B_LOW) / len(ok), 4),  # type: ignore[operator]
-        "share_b_ge_80": round(sum(1 for r in ok if r.b_cur >= B_HIGH) / len(ok), 4),  # type: ignore[operator]
+        },
+        "share_b_le_30": round(sum(1 for r in ok if _f(r.b_cur) <= B_LOW) / len(ok), 4),
+        "share_b_ge_80": round(sum(1 for r in ok if _f(r.b_cur) >= B_HIGH) / len(ok), 4),
         "A_signals": len(a),
         "A_by_year": dict(
             Counter(datetime.fromtimestamp(r.t / 1000, UTC).strftime("%Y") for r in a)
@@ -678,9 +683,7 @@ def audit() -> dict[str, Any]:
         "A_independent_clusters_24h": clusters,
         "A_weeks": len({week(r.t) for r in a}),
         "A_without_btc_condition": sum(
-            1
-            for r in ok
-            if r.b_prev is not None and r.b_prev <= B_LOW and r.b_cur >= B_HIGH  # type: ignore[operator]
+            1 for r in ok if r.b_prev is not None and r.b_prev <= B_LOW and _f(r.b_cur) >= B_HIGH
         ),
         "B_signals": len(b),
         "corr_B_vs_mean_ret": round(corr_bm, 3),
@@ -691,10 +694,10 @@ def audit() -> dict[str, Any]:
         if band
         else None,
         "share_of_those_with_B_ge_80": round(
-            sum(1 for r in band if r.b_cur >= B_HIGH) / len(band), 4
+            sum(1 for r in band if _f(r.b_cur) >= B_HIGH) / len(band), 4
         )
         if band
-        else None,  # type: ignore[operator]
+        else None,
         "C_controls_unique": len(cts),
         "C_balance_weighted": _balance(
             [by_t[t] for t in ctrl], [by_t[t] for v in ctrl.values() for t in v]
@@ -831,9 +834,10 @@ def run() -> dict[str, Any]:
                         "controls",
                     ]
                 )
-                for t, e in sorted(ea.items()):
-                    if e is None:
+                for t, row_e in sorted(ea.items()):
+                    if row_e is None:
                         continue
+                    e = row_e
                     w.writerow(
                         [
                             _iso(t),

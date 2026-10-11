@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from auto_trading.ops import phone_link, task_setup
+import auto_trading.ops.phone_link as phone_link
+import auto_trading.ops.task_setup as task_setup
 
 
 @pytest.fixture(autouse=True)

@@ -222,7 +222,7 @@ def extract_full(path: Path) -> Extract:
     ex = Extract()
     last: tuple[int, int] | None = None
     with zipfile.ZipFile(path) as zf, zf.open(zf.namelist()[0]) as fh:
-        for raw in io.BufferedReader(fh):  # type: ignore[arg-type]
+        for raw in fh:
             if not raw[:1].isdigit():
                 ex.header = True
                 continue
@@ -298,7 +298,7 @@ def fetch_klines(symbol: str) -> None:
 
 def _checksum(url: str) -> str:
     with urllib.request.urlopen(url + ".CHECKSUM", timeout=60) as r:
-        return r.read().decode("utf-8").split()[0]
+        return str(r.read().decode("utf-8").split()[0])
 
 
 def fetch_one(symbol: str, mo: str) -> str:
@@ -365,12 +365,14 @@ def patch_one(symbol: str, day: str) -> str:
         have, vol, _tb = _KL.setdefault(symbol, kline_arrays(symbol))
         rel = day_check(rec, have, vol)
         d_ms = _ms(date.fromisoformat(day))
-        rec["day_rel"] = rel.get(d_ms)
-        rec["verified"] = not ex.gaps and rec["day_rel"] is not None and rec["day_rel"] <= DAY_TOL
+        day_rel = rel.get(d_ms)
+        rec["day_rel"] = day_rel
+        rec["verified"] = not ex.gaps and day_rel is not None and day_rel <= DAY_TOL
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("wb") as fh:
         pickle.dump(rec, fh)
-    return f"{symbol} {day} 검증 {rec['verified']} 차 {rec.get('day_rel')} gaps {len(rec['gaps'])}"
+    gaps_n = len(rec["gaps"]) if isinstance(rec["gaps"], list) else 0
+    return f"{symbol} {day} 검증 {rec['verified']} 차 {rec.get('day_rel')} gaps {gaps_n}"
 
 
 _KL: dict[str, Any] = {}
