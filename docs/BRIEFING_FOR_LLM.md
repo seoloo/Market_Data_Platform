@@ -4,6 +4,17 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
+## 2026-10-13 후속 — 고정 숏 실행자료/Laya 비교 설계
+
+사용자 후속 완료/확장 요청 및 이번 연구 IOC/MARKET 가정 비교 승인. 실제 주문/운영 변경 없음.
+RSI7/70+R5와+Keltner 고정, 익명 Laya 1질문/0.60·OFF/ON/동일비용 주문 비교.
+같은 분봉 원천의canonical4h로통일, BTC legacy4h와14봉차이는별도경고/기존판정불변.
+분봉 부분체결·fundingmarkhour보완/bounds·공통coverage·무작위同수·Brier/순서·반복안정성 포함.
+후향 예외만, 미사용OOS0·모델학습cutoff미확인·PASS/새운영 승인없음.
+신규합성22개/전체pytest3553/누출110/타입629/스타일958 통과, 기존UI import계약1건불변.
+아직 Laya결정/PnL0. [설계](research/SHORT_EXECUTION_LAYA_VALIDATION_20261013.md).
+다음은자료/전체검증→수익전동결commit→제한Laya/1회비교→상세기록.
+
 ## 2026-10-13 추가 — 다른지표의역할별보완 A 연구 완료
 
 사용자후속: RSI/Stoch결과가약하면다이버전스·Elliott·BB·일목및미언급지표결합을연구.
