@@ -13,6 +13,7 @@ LT(문서 115)의 주도주 점수를 나스닥 100 에 쓰되,
 
 **SN20** (같은 날 사용자 추가): S&P 500 점수 상위 10 + 나스닥 100 점수 상위 10
 (겹치면 나스닥 쪽 다음 순위), 20 종목 각 5%. 판단일 · 손절은 같다 (:func:`combined_top`).
+**SN20-C**: SN20 + 판단일마다 10% 넘은 종목을 5% 로 덜고 5% 미만을 채운다 (:func:`cap_and_fill`).
 """
 
 from __future__ import annotations
@@ -105,10 +106,66 @@ def _sell(state: PaperState, sym: str, d: str, px: float, reason: str) -> dict[s
         "entry": pos.entry,
         "exit": d,
         "ret": round(proceeds / pos.cost - 1, 4),
+        "gain": round(proceeds - pos.cost, 6),
         "reason": reason,
     }
     state.trades.append(trade)
     return trade
+
+
+def cap_and_fill(
+    state: PaperState,
+    closes: Mapping[str, Closes],
+    t: int,
+    d: str,
+    order: Sequence[str],
+    slot: float,
+    cap: float,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """SN20-C: ``cap`` 을 넘은 종목은 ``slot`` 까지 덜고,
+    ``slot`` 보다 작은 종목을 ``order`` 순서로 채운다.
+
+    종목 수는 그대로다. 남은 돈은 다음 판단일까지 현금. 돌려주는 값: (덜어낸 기록, 채운 기록).
+    """
+    equity = _equity(state, closes, t)
+    trimmed: list[dict[str, Any]] = []
+    for sym in sorted(state.positions):
+        pos = state.positions[sym]
+        p = _px(closes[sym], t)
+        value = pos.qty * p
+        if value <= cap * equity:
+            continue
+        f = (value - slot * equity) / value
+        proceeds = value * f * (1 - FEE)
+        cost_part = pos.cost * f
+        pos.qty *= 1 - f
+        pos.cost -= cost_part
+        state.cash += proceeds
+        trade = {
+            "symbol": sym,
+            "entry": pos.entry,
+            "exit": d,
+            "ret": round(proceeds / cost_part - 1, 4),
+            "gain": round(proceeds - cost_part, 6),
+            "reason": "trim",
+        }
+        state.trades.append(trade)
+        trimmed.append(trade)
+    filled: list[dict[str, Any]] = []
+    for sym in [s for s in order if s in state.positions]:
+        if state.cash <= 0:
+            break
+        pos = state.positions[sym]
+        p = _px(closes[sym], t)
+        gap = slot * equity - pos.qty * p
+        if gap <= 0:
+            continue
+        amt = min(gap, state.cash)
+        pos.qty += amt * (1 - FEE) / p
+        pos.cost += amt
+        state.cash -= amt
+        filled.append({"symbol": sym, "usd": round(amt, 2)})
+    return trimmed, filled
 
 
 def step(
@@ -120,14 +177,23 @@ def step(
     *,
     pick: Picker | None = None,
     slot: float = SLOT,
+    cap: float | None = None,
 ) -> dict[str, Any]:
     """하루(t ≥ 1)를 처리한다. ``rebalance`` 면 어제 종가 순위로 오늘 종가에 갈아탄다.
 
     ``pick`` 이 없으면 ``closes`` 전체의 점수 상위 10 (NQ).
     SN20 은 두 종목군을 섞는 ``pick`` 과 ``slot=0.05``.
+    ``cap`` 이 있으면 판단일 끝에 :func:`cap_and_fill`.
     """
     d = days[t]
-    actions: dict[str, Any] = {"date": d, "rebalance": rebalance, "sold": [], "bought": []}
+    actions: dict[str, Any] = {
+        "date": d,
+        "rebalance": rebalance,
+        "sold": [],
+        "bought": [],
+        "trimmed": [],
+        "filled": [],
+    }
     # 1) 어제 추세가 꺼져 정해 둔 매도
     for sym, reason in sorted(state.pending_sell.items()):
         if sym in state.positions:
@@ -151,6 +217,10 @@ def step(
             state.positions[sym] = Position(amt * (1 - FEE) / p, amt, p, d)
             state.cash -= amt
             actions["bought"].append({"symbol": sym, "usd": round(amt, 2), "price": p})
+        if cap is not None:
+            actions["trimmed"], actions["filled"] = cap_and_fill(
+                state, closes, t, d, top, slot, cap
+            )
         state.started = True
     # 3) 오늘 종가로 추세가 꺼진 종목은 내일 판다 (T/v2 신호)
     for sym, pos in state.positions.items():

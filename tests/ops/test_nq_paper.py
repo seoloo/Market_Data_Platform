@@ -110,3 +110,23 @@ def test_sn20_skips_overlap_and_buys_twenty_at_five_percent() -> None:
     state = PaperState(cash=1_000.0)
     a = step(state, days, merged, 199, False, pick=lambda t: combined_top(sp, nq, t), slot=0.05)
     assert len(a["bought"]) == 20 and all(abs(b["usd"] - 50.0) < 1e-6 for b in a["bought"])
+
+
+def test_cap_trims_big_winner_and_fills_small_ones() -> None:
+    from auto_trading.ops.lt_paper import Position
+    from auto_trading.ops.nq_paper import cap_and_fill
+
+    closes: dict[str, list[float | None]] = {"A": [300.0], "B": [100.0], "C": [50.0]}
+    state = PaperState(cash=0.0)
+    state.positions = {
+        "A": Position(1.0, 100.0, 300.0, "d0"),  # 300 → 자산 450 의 67%
+        "B": Position(1.0, 100.0, 100.0, "d0"),
+        "C": Position(1.0, 100.0, 50.0, "d0"),
+    }
+    trimmed, filled = cap_and_fill(state, closes, 0, "d1", ["A", "B", "C"], slot=0.2, cap=0.4)
+    assert [x["symbol"] for x in trimmed] == ["A"] and trimmed[0]["reason"] == "trim"
+    assert abs(state.positions["A"].qty * 300 - 90.0) < 1e-6  # 자산 450 × 20%
+    assert trimmed[0]["gain"] > 0
+    # B(100) 는 이미 20%(90) 넘음 → 안 채움, C(50) 는 90 까지 채움
+    assert [x["symbol"] for x in filled] == ["C"]
+    assert abs(state.positions["C"].qty * 50 - 50.0 - 40.0 * (1 - 0.0025)) < 1e-6
