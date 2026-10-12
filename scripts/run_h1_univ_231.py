@@ -222,7 +222,7 @@ def main() -> int:
         b = load_4h(s)
         if len(b.t) < 60:
             continue
-        bars = list(zip(b.t, b.o, b.h, b.lo, b.c, b.v, strict=True))
+        bars = list(zip(b.t, b.o, b.h, b.low, b.c, b.v, strict=True))
         coins.append(build_coin(s, bars, []))
     print(f"코인 {len(coins)} 개 읽음", flush=True)
     res: dict[str, Any] = {"coins_loaded": len(coins), "size_per_coin": SIZE}
