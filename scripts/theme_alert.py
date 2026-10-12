@@ -163,6 +163,20 @@ def laya_themes(items: list[dict[str, str]]) -> dict[str, int]:
     return laya_tags.theme_counts(labels)
 
 
+RETRY_NOTE = (
+    "\n\n[다시 묻기] 앞의 답은 JSON 형식이 깨져 읽지 못했다. "
+    "같은 내용을 **올바른 JSON 객체 하나만**으로 답하라 — 설명 · 코드 블록 표시 없이, "
+    '문자열 안의 큰따옴표는 \\" 로 쓴다.'
+)
+
+
+def _retry_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """두 번째 질문: 같은 질문 + 형식 경고. 온도 0 이라 같은 질문이면 같은 깨진 답이 올 수 있다."""
+    out = [dict(m) for m in messages]
+    out[-1]["content"] = out[-1]["content"] + RETRY_NOTE
+    return out
+
+
 def weekly(telegram: bool = True) -> dict[str, Any]:
     today = _today()
     week = today.strftime("%Y-%m-%d")
@@ -176,7 +190,8 @@ def weekly(telegram: bool = True) -> dict[str, Any]:
     messages = build_messages(week, headlines, universes)
     # AI 가 JSON 모드에서도 가끔 깨진 답을 준다(2026-10-10) — 한 번 더 묻고, 깨진 답은 남긴다
     for attempt in (1, 2):
-        answer = _ask(messages)
+        ask = messages if attempt == 1 else _retry_messages(messages)
+        answer = _ask(ask)
         if "error" in answer:
             _send(
                 [f"🔭 주간 테마 알림 실패: {answer.get('error')} {answer.get('message', '')}"],

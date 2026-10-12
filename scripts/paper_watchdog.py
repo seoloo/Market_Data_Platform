@@ -70,6 +70,8 @@ DRILLS = REPO / "reports" / "testnet"
 SHADOW = REPO / "reports" / "shadow" / "t2"
 DEMO_T2 = REPO / "reports" / "demo_t2"
 DEMO_EW = REPO / "reports" / "demo_ew"
+DEMO_EW_TASK = "AutoTrading_Demo_EW"
+"""이 작업을 꺼 두면(사용자 결정) Elliott 데모는 멈춘 것으로 보고 경고하지 않는다."""
 DEMO_O2 = REPO / "reports" / "demo_o2"
 O2_LEDGER = "o2_stop"
 """O/v2 별도 원장 (docs/research/28). ``run_paper_o1.py --ledger o2``."""
@@ -204,11 +206,37 @@ def demo_t2_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return check_demo_t2(report, int(unresolved), now_ms)
 
 
+def _task_disabled(name: str) -> bool:
+    """예약 작업을 꺼 뒀는가 (윈도우 · 읽기만). 모르면 False — 평소처럼 본다."""
+    if sys.platform != "win32":
+        return False
+    try:
+        done = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"[string](Get-ScheduledTask -TaskName '{name}').State",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.stdout.strip() == "Disabled"
+
+
 def demo_ew_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     """Elliott BTC 선물 데모 상주 실행기 (docs/research/56) 상태·사건."""
     state_path = DEMO_EW / "state.json"
+    stopped = _task_disabled(DEMO_EW_TASK)
     if not state_path.exists():
-        return check_demo_ew(None, [], now_ms)
+        return check_demo_ew(None, [], now_ms, stopped=stopped)
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
         events_path = DEMO_EW / "events.jsonl"
@@ -219,7 +247,7 @@ def demo_ew_status(now_ms: int) -> tuple[list[str], list[Finding]]:
         )
     except (OSError, ValueError):
         return [], [Finding("WARN", "데모 Elliott", "상태·사건 기록을 읽을 수 없다")]
-    return check_demo_ew(state, events, now_ms)
+    return check_demo_ew(state, events, now_ms, stopped=stopped)
 
 
 def demo_o2_status(now_ms: int) -> tuple[list[str], list[Finding]]:

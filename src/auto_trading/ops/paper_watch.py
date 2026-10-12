@@ -409,13 +409,20 @@ def check_demo_t2(
 
 
 def check_demo_ew(
-    state: Mapping[str, Any] | None, events: Sequence[Mapping[str, Any]], now_ms: int
+    state: Mapping[str, Any] | None,
+    events: Sequence[Mapping[str, Any]],
+    now_ms: int,
+    *,
+    stopped: bool = False,
 ) -> tuple[list[str], list[Finding]]:
     """Elliott BTC 선물 데모 상주 실행기 상태 한 줄과 판정 (docs/research/56).
 
-    데모라 WARN 까지만 올린다.
+    데모라 WARN 까지만 올린다. ``stopped`` 면 예약 작업을 꺼 둔 것(사용자 결정)이라 경고하지 않는다.
     """
     ledger = "데모 Elliott"
+    if stopped:
+        when = _date(int(state.get("last_scan_ms") or 0)) if state else "기록 없음"
+        return [f"데모 Elliott BTC: 멈춤 (예약 작업 꺼짐 · 사용자 결정) · 마지막 스캔 {when}"], []
     if state is None:
         return [], [Finding("INFO", ledger, "Elliott 데모 기록이 아직 없다")]
     findings: list[Finding] = []

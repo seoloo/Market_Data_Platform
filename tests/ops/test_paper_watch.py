@@ -447,3 +447,13 @@ def test_demo_o2_line_and_fired_stop_warning() -> None:
     fired = {**report, "report": {**report["report"], "fired_stops": ["ETHUSDT PS 2149 → 0.236"]}}
     _, findings = check_demo_o2(fired, now)
     assert findings[0].level == "WARN" and "비상 스톱" in findings[0].message
+
+
+def test_demo_ew_stopped_by_user_is_not_a_warning() -> None:
+    from auto_trading.ops.paper_watch import check_demo_ew
+
+    old = {"phase": "IDLE", "last_scan_ms": 1_791_519_530_813}  # 10/09
+    lines, findings = check_demo_ew(old, [], 1_791_784_000_000, stopped=True)
+    assert findings == [] and "멈춤" in lines[0] and "사용자 결정" in lines[0]
+    _, still = check_demo_ew(old, [], 1_791_784_000_000)
+    assert any(f.level == "WARN" for f in still)  # 꺼 두지 않았으면 그대로 경고

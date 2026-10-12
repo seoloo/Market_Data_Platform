@@ -330,14 +330,22 @@ class Drill:
         )
         print(f"  관찰  청산 뒤 스톱: {self.observations['close_position_stop_after_flat']}")
         report = self.recover()
+        pos_after, stops_after = self.position(), self.api.open_stops(SYMBOL)
+        # 조건마다 값을 남긴다 — 2026-10-11 실패는 어느 조건인지 기록이 없었다
+        detail = (
+            f"청산 {closed.state if closed else '없음'} · 포지션 {pos_after} · "
+            f"스톱 {len(stops_after)} · {report.state}"
+        )
+        if report.actions:
+            detail += " · " + "; ".join(report.actions)
         self.check(
             "평탄·스톱 없음·RUNNING",
             closed is not None
             and closed.state == "FILLED"
-            and self.position() == 0
-            and not self.api.open_stops(SYMBOL)
+            and pos_after == 0
+            and not stops_after
             and report.state == "RUNNING",
-            "; ".join(report.actions) or "조치 없음",
+            detail,
         )
 
         print("10. 원인 불명 포지션")

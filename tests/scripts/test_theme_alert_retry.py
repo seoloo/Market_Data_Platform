@@ -45,3 +45,21 @@ def test_gives_up_after_two_broken_answers(monkeypatch: pytest.MonkeyPatch, tmp_
     out = mod.weekly(telegram=False)
     assert "답 형식 오류" in out["error"] and "2 번" in sent[0]
     assert len(list(tmp_path.glob("bad-answer-*.txt"))) == 2
+
+
+def test_second_question_adds_format_warning(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _stub(monkeypatch, tmp_path, [])
+    asked: list[list[dict[str, str]]] = []
+    answers = ["bad", "good"]
+
+    def ask(messages: list[dict[str, str]]) -> dict[str, Any]:
+        asked.append(messages)
+        return {"text": answers.pop(0), "model": "m"}
+
+    monkeypatch.setattr(mod, "_ask", ask)
+    assert "error" not in mod.weekly(telegram=False)
+    assert mod.RETRY_NOTE not in asked[0][-1]["content"]
+    assert asked[1][-1]["content"].endswith(mod.RETRY_NOTE)
+    assert asked[0][0] == asked[1][0]  # 시스템 지시는 그대로
