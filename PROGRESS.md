@@ -12,6 +12,11 @@
 - (해결, 같은 날 뒤) 토스 적립 시험 6 개는 시계 둘(가짜 `_kst_now` · 진짜 `datetime.now`)이 어긋난 시한폭탄이었다 → 시계 하나로 고치고 복구. Glide T 브레이크의 늦은 실행 장중 봉 빈틈도 고침(OPERATIONS). MF Paper 에 GBG(Glide 핵심 60 · 채권 20 · 금 20) 추가.
 - 알려진 것(당시): `tests/ops/test_toss_accumulate.py` 6 개가 HEAD(이번 변경 전)에서도 실패(`FakeToss` 에 `stocks_all` 없음 — 10/10 ~ 11 토스 적립 종목 추가 작업 뒤). lint-imports 의 'UI 는 매매 로직을 import 하지 않는다' 깨짐(`ui.server → ops.conn_test → exchange.upbit`)도 이번 변경 전부터.
 
+## 2026-10-12 저녁 — 228 롱 배율 + 짧은 숏 (Claude)
+
+- 사용자: "롱 2 ~ 4 배, 숏 1 배 짧게." → 사전 고정 `a3f8a81` 뒤 1 회.
+- 결과 **불리**: 짧은 숏 1 일 총 −20.6%(뒤 반쪽 −30%). 롱에 더하면 모든 배율에서 샤프 ↓ · MDD ↑. 롱만 3 배 CAGR 46.5% · MDD 44.9%, 4 배 55.8% · 58.7%(한 경로, 참고).
+
 ## 2026-10-12 저녁 — 227 Laya 확률 BTC 숏 (Claude)
 
 - 사용자: "숏 한 번만 더, jev 나 laya 확률로 던지고 네가 판단." → 사전 고정 `445428a` · 코드 `0bb4d4d` 뒤 1 회.
