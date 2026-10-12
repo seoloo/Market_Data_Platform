@@ -93,3 +93,20 @@ def test_next_rebalance_projects_past_known_days() -> None:
     assert next_rebalance(days, days.index("2026-09-30")) == "2026-10-01"
     later = business_days("2026-10-01", 12)  # 10/1 ~ 10/16
     assert next_rebalance(later, len(later) - 1) == "2026-11-02"
+
+
+def test_sn20_skips_overlap_and_buys_twenty_at_five_percent() -> None:
+    from auto_trading.ops.nq_paper import combined_top
+
+    days = business_days("2026-01-01", 200)
+    sp = growth_panel(200, 30)  # S29 ~ S20 이 상위
+    nq = {k: v for k, v in growth_panel(200, 30).items() if k >= "S15"}  # 겹치는 종목군
+    nq.update({f"N{i:02d}": [100.0 * (1 + 1e-5) ** t for t in range(200)] for i in range(10)})
+    top = combined_top(sp, nq, 199)
+    names = [s for s, _ in top]
+    assert names[:10] == [f"S{i:02d}" for i in range(29, 19, -1)]
+    assert len(set(names)) == 20 and names[10:15] == [f"S{i:02d}" for i in range(19, 14, -1)]
+    merged = {**sp, **nq}
+    state = PaperState(cash=1_000.0)
+    a = step(state, days, merged, 199, False, pick=lambda t: combined_top(sp, nq, t), slot=0.05)
+    assert len(a["bought"]) == 20 and all(abs(b["usd"] - 50.0) < 1e-6 for b in a["bought"])

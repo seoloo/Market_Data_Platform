@@ -10,11 +10,14 @@ LT(문서 115)의 주도주 점수를 나스닥 100 에 쓰되,
   계속 상위 10 인 종목은 그대로 둔다(다시 맞추지 않음). 추세가 꺼진 종목은 사지 않는다.
 * 손절: T/v2 와 같은 추세 신호 — 매일 종가로 20 · 60 · 120 거래일 수익 부호의 합이 0 이하이면
   다음 거래일 종가에 판다. 판 돈은 다음 판단일까지 현금으로 둔다.
+
+**SN20** (같은 날 사용자 추가): S&P 500 점수 상위 10 + 나스닥 100 점수 상위 10
+(겹치면 나스닥 쪽 다음 순위), 20 종목 각 5%. 판단일 · 손절은 같다 (:func:`combined_top`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, timedelta
 from typing import Any
 
@@ -23,6 +26,9 @@ from auto_trading.ops.lt_paper import FEE, LOOKS, Closes, PaperState, Position, 
 TOP_N = 10
 SLOT = 1 / TOP_N
 SECOND_CHECK_DAYS = 14
+
+Picker = Callable[[int], list[tuple[str, float]]]
+"""t 종가로 살 종목 [(종목, 점수)] 을 돌려준다 (순서 = 우선순위)."""
 
 
 def rebalance_days(days: Sequence[str]) -> set[int]:
@@ -74,6 +80,18 @@ def ranking(closes: Mapping[str, Closes], t: int) -> list[tuple[str, float]]:
     return sorted(((s, round(v, 4)) for s, v in score.items()), key=lambda x: (-x[1], x[0]))
 
 
+def combined_top(
+    first: Mapping[str, Closes], second: Mapping[str, Closes], t: int, n_each: int = TOP_N
+) -> list[tuple[str, float]]:
+    """SN20: ``first`` 순위 상위 ``n_each`` +
+    ``second`` 순위에서 이미 고른 종목을 건너뛴 다음 ``n_each``.
+    """
+    a = ranking(first, t)[:n_each]
+    chosen = {s for s, _ in a}
+    b = [x for x in ranking(second, t) if x[0] not in chosen][:n_each]
+    return a + b
+
+
 def _equity(state: PaperState, closes: Mapping[str, Closes], t: int) -> float:
     return state.cash + sum(p.qty * _px(closes[s], t) for s, p in state.positions.items())
 
@@ -99,8 +117,15 @@ def step(
     closes: Mapping[str, Closes],
     t: int,
     rebalance: bool,
+    *,
+    pick: Picker | None = None,
+    slot: float = SLOT,
 ) -> dict[str, Any]:
-    """하루(t ≥ 1)를 처리한다. ``rebalance`` 면 어제 종가 순위로 오늘 종가에 갈아탄다."""
+    """하루(t ≥ 1)를 처리한다. ``rebalance`` 면 어제 종가 순위로 오늘 종가에 갈아탄다.
+
+    ``pick`` 이 없으면 ``closes`` 전체의 점수 상위 10 (NQ).
+    SN20 은 두 종목군을 섞는 ``pick`` 과 ``slot=0.05``.
+    """
     d = days[t]
     actions: dict[str, Any] = {"date": d, "rebalance": rebalance, "sold": [], "bought": []}
     # 1) 어제 추세가 꺼져 정해 둔 매도
@@ -108,11 +133,11 @@ def step(
         if sym in state.positions:
             actions["sold"].append(_sell(state, sym, d, _px(closes[sym], t), reason))
     state.pending_sell = {}
-    # 2) 판단일: 상위 10 밖은 팔고, 새로 든 종목은 자산의 10% 씩
-    rank = ranking(closes, t - 1)
-    top = [s for s, _ in rank[:TOP_N]]
+    # 2) 판단일: 고른 목록 밖은 팔고, 새로 든 종목은 자산의 ``slot`` 씩
+    chosen = pick(t - 1) if pick else ranking(closes, t - 1)[:TOP_N]
+    top = [s for s, _ in chosen]
     actions["ranking_as_of"] = days[t - 1]
-    actions["top"] = rank[:TOP_N]
+    actions["top"] = chosen
     if (rebalance or not state.started) and top:
         for sym in sorted(state.positions):
             if sym not in top:
@@ -121,7 +146,7 @@ def step(
         for sym in top:
             if sym in state.positions or trend_off(closes[sym], t - 1) or state.cash <= 0:
                 continue
-            amt = min(SLOT * equity, state.cash)
+            amt = min(slot * equity, state.cash)
             p = _px(closes[sym], t)
             state.positions[sym] = Position(amt * (1 - FEE) / p, amt, p, d)
             state.cash -= amt
