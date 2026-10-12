@@ -4,21 +4,32 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
-## 2026-10-13 추가 — 다른지표의역할별보완 A 고정등록·구현
+## 2026-10-13 추가 — 다른지표의역할별보완 A 연구 완료
 
 사용자후속: RSI/Stoch결과가약하면다이버전스·Elliott·BB·일목및미언급지표결합을연구.
 기존46/34종감사/229/230/231/DIV/MJ/EW/207근거와구현을다시확인했다.
 최대3후보비교뒤위임에따라A(고정진입의추세/확인/참여/반등위험보완)를주질문으로선택.
 3840설정 전부 고정, 역할제거/단독/TRAIN노출근사/피한손실vs놓친수익대조.
 추가 예외 설명 뒤 사용자의2026-10-13 “진행해줘 등록 구현 검증 해줘”를 이번 유한 후향 실행 승인으로 기록.
-**REGISTERED_EXPLANATORY_PILOT/신규성과0**, 미사용OOS0. 정식 검정력/PASS/운영 기준은 유지.
-신규 feature/runner/합성23개 구현·통과, 실제 자료는 품질 감사만. 전체pytest3531·누출109·
-mypy627·ruff955 통과, 기존 UI import 계약1건 불변. 다음은 수익 전 고정 commit 뒤1회 계산.
+`71cf8c1` 고정 후3840개1회/계좌192개 완료. 미사용OOS0, 정식 검정력/PASS/운영 기준 유지.
+신규 feature/runner/합성23개 구현·통과, 실제 자료 감사 뒤 고정계산 완료. 전체pytest3531·누출109·
+mypy627·ruff955 통과, 기존 UI import 계약1건 불변.
+전체양수1170·세구간양수271·TRAIN100이상9(통과수가아님). TRAIN 대표는
+RSI7/70+일봉ADX하락+4h Keltner 반등위치, volume/divergence 역할NONE.
+ALL net+3303.94USDT/CAGR4.67%/Sharpe0.763/MDD10.28%/177거래.
+비용2배CAGR2.79%,4h지연2.63%. 기존RSI 대비net+866.42, 평균노출은오히려감소.
+하지만 Keltner 증분은확인+272.58/후반−147.78USDT·후반MDD+1.33%p.
+**전체A의무국면단독대비후향유리/새Keltner증분혼재/정식UNVERIFIED**.
+확인구간지연BTC손실·후반18건·2022편중·보정p1.0·노출매칭불완전으로 채택/새Paper 권하지 않음.
+계좌192개 최대잔차3e-23USDT/종료포지션0, 이전RSI/H1 참조3민감도 기존필드 차이0.
 Elliott는진입/veto/사이징영향없이복수시나리오Shadow분석만, D22제외/기존판정유지.
-근거: [후속초안](research/MULTI_INDICATOR_COMPLEMENT_DRAFT_20261012.md).
+근거: [고정등록·결과](research/MULTI_INDICATOR_COMPLEMENT_DRAFT_20261012.md).
+상세결과는§12, [인계TXT](research/MULTI_INDICATOR_RESULT_FOR_LLM_20261013.txt).
 40번의일봉요약vs원문4h표기는초안에미해결로기록했으며기존숫자/판정은고치지않았다.
 기존 운영/208/9월이후자료/예약/기존 연구 코드 변경 없음. Elliott 경로/하위 구조가 없어
 이번 loader에서는 NOT_AVAILABLE을 기록하고 파동별 수익/완성5파를 발명하지 않는다.
+다음 제안은 고정RSI+R5와+Keltner의 지정가/mark자료 감사·80%/미사용표본 계획만.
+숫자 재튜닝·새운영Shadow/Paper/Live·O/AG성과재결합은 하지 않았다.
 
 ## 2026-10-12 후속 — RSI·스토캐스틱 조합 탐색 완료
 

@@ -7,6 +7,32 @@
 지금 쓰는 전략: **QS 실거래(토스)** · T/v2(Paper, 실거래 1단계 후보) · O/v1·O/v2(Paper, O/v2 는 2단계 후보) · AG(Paper) · FLOW-KR(그림자 기록). 스테이킹 캐리는 예치와 비슷해 운영하지 않는다.
 살아남은 것은 거의 모두 **몇 달 단위 추세 보유**다. 며칠 이하 단기 신호(패턴·지표·엘리엇·다이버전스·이벤트)는 비용을 넘지 못했다. 한 항목에 여러 가설을 묶은 곳이 있어 제목 수와 가설 수는 다르다. EXEC-L240(지정가 체결)은 실행 방식 채택이라 수익 가설 개수에 넣지 않았다.
 
+## 역할별 지표 보완3,840조합 — UNVERIFIED (2026-10-13)
+
+추가 설명용 후향 예외의 범위 설명 뒤 사용자 “진행해줘 등록 구현 검증 해줘”.
+이번 유한 A 실행 승인으로 기록. 정식80%/미사용OOS/PASS/운영 기준 면제 아님.
+성과 전`71cf8c1` 고정, BTC/ETH USD-M2020-06~2026-08의3840조합1회/계좌192개.
+RSI/Stoch/MACD/EMA/CCI/MFI 계기에 HTF/BB·Keltner·일목/CMF·OBV·RVOL/confirmed구조·
+regular/hidden상승divergence 회피 등을 역할별로 결합. 이전 연구 판정을 뒤집지 않음.
+
+전체양수1170/3840·세구간양수271·TRAIN100이상9(통과수가아님).
+TRAIN 대표 `RSI7_70:R5:KELTNER:NONE:NONE` ALL net+3303.94USDT,
+CAGR4.67%/Sharpe0.763/MDD10.28%/177거래. 비용2배2.79%,4h지연2.63%.
+기존RSI 대표 대비net+866.42·CAGR+1.12%p·평균노출 감소.
+하지만 새Keltner 역할의 확인증분+272.58/후반−147.78USDT·후반MDD+1.33%p.
+**A의무국면단독대비후향유리/추가확인의증분혼재/정식채택UNVERIFIED**.
+
+독립OOS0·보정p1.0·2022편중·확인구간지연BTC손실·후반18거래·노출근사매칭불완전.
+fundingmark 전부NULL/실제호가·부분체결·분봉stop/mark청산·G5/G6 parity 미검증.
+Elliott는 이번 loader의 minute-path/하위degree 증거 부재로 NOT_AVAILABLE, 파동별 성과 미실행.
+192계좌 최대회계잔차3e-23USDT·종료포지션0, 이전RSI/H1 참조 결과 필드 차이0.
+전체pytest3531/누출109/타입627/스타일955 통과, 기존UI import 계약1개위반 불변.
+기존230/231/D22/208·9월이후자료·Paper/Live/주문/예약·위험한도 불변.
+후속제안은 고정두버전의 지정가/mark자료 감사·검정력/미사용표본 계획만,
+재튜닝·새운영 관찰 활성화·O/AG성과재결합 미실행.
+근거: [고정설계·상세결과](../research/MULTI_INDICATOR_COMPLEMENT_DRAFT_20261012.md)§12,
+[인계TXT](../research/MULTI_INDICATOR_RESULT_FOR_LLM_20261013.txt).
+
 ## RSI·Stochastic 후향9,234조합 — UNVERIFIED (2026-10-12)
 
 사용자 위임 및 **설명용 후향 조합 탐색만80% 검정력 선행 예외** 승인.

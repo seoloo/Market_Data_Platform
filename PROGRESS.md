@@ -3,7 +3,7 @@
 최종 갱신: 2026-10-13 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
-## 2026-10-13 — 역할별보완 A 설명용후향 사전등록·구현 (Codex)
+## 2026-10-13 — 역할별보완 A 등록·구현·후향 계산 완료 (Codex)
 
 - 사용자: 앞선 예외 범위 설명 후 “진행해줘 등록 구현 검증 해줘”. 이번 A의 유한 후향 실행으로 한정,
   정식80%·미사용OOS·PASS·운영 승인은 유지. [고정 등록](docs/research/MULTI_INDICATOR_COMPLEMENT_DRAFT_20261012.md).
@@ -17,7 +17,18 @@
 - Elliott는1m 경로/하위구조 증거가 없는 이번 loader에서 NOT_AVAILABLE, 신호/사이징 영향 없음.
 - 전체pytest3,531·누출109·mypy627·ruff955 통과. 기존 UI→ops.conn_test→exchange.toss
   import 계약 위반1건은 그대로, 전체 검증 PASS로 부르지 않음. 문서 링크285개 정상.
-- 다음: 수익 전 고정 commit→1회 계산→상세결과/TXT. 현재 신규 성과0, 미사용OOS0.
+- `71cf8c1` 성과 전 고정 뒤3,840개1회/계좌192개 완료. TRAIN대표
+  `RSI7_70:R5:KELTNER:NONE:NONE`, 전체양수1170/3840·세구간양수271·TRAIN100이상9.
+  선택 대표 ALL net+3303.94USDT/CAGR4.67%/Sharpe0.763/MDD10.28%/177거래.
+  비용2배CAGR2.79%,4h지연2.63%. 이전RSI 대비net+866.42, 평균노출은3.009→2.815%.
+- **A의무국면단독대비후향유리/새Keltner증분혼재/정식채택UNVERIFIED**.
+  Keltner 확인2024~2025 net증분+272.58, 후반2026-01~08−147.78·MDD+1.33%p.
+  확인지연BTC손실/후반18거래/2022편중/보정p1.0/노출매칭불완전. 독립OOS0·PASS없음.
+- 계좌 최대잔차3e-23USDT·종료포지션0. 이전RSI/H1 참조3민감도 기존계좌필드 차이0.
+  [상세결과](docs/research/MULTI_INDICATOR_COMPLEMENT_DRAFT_20261012.md)§12 ·
+  [다른AI용TXT](docs/research/MULTI_INDICATOR_RESULT_FOR_LLM_20261013.txt).
+- 다음: Phase0 고정두버전의 실제지정가/mark자료 감사와80%·미사용표본계획 설계 제안만.
+  결과후재튜닝/새운영Shadow/Paper/Live/O·AG성과결합은 미실행.
   208·그 자료·9월 이후 자료·Paper/Live/주문/예약·기존 판정은 보존.
 
 ## 2026-10-12 — 다른지표역할별보완 후속Phase0 감사·초안 (Codex)
