@@ -275,7 +275,14 @@ class Trade:
     stopped: bool
 
 
-def _trade(k: Coin, i: int, ex: str, sp: str) -> Trade | None:
+OPTIMISTIC = (0.0002, 0.0002, 0.0005, 0.0)
+"""낙관 비용(229 §5-1, 참고 줄): 지정가 진입 · 시간 청산 0.02%, 손절 0.05%, 손절 불리 0."""
+NORMAL = (FEE, FEE, FEE, STOP_SLIP)
+
+
+def _trade(
+    k: Coin, i: int, ex: str, sp: str, cost: tuple[float, float, float, float] = NORMAL
+) -> Trade | None:
     n = len(k.c)
     j = i + 1
     if j >= n or _isnan(k.ind["atr"][i]):
@@ -293,8 +300,8 @@ def _trade(k: Coin, i: int, ex: str, sp: str) -> Trade | None:
     low_close = entry
     for q in range(j, min(n, j + max_bars + 1)):
         if k.h[q] >= stop:
-            px = max(k.o[q], stop) * (1 + STOP_SLIP)
-            return _finish(k, i, j, q, entry, px, k.t[q] + H4, True)
+            px = max(k.o[q], stop) * (1 + cost[3])
+            return _finish(k, i, j, q, entry, px, k.t[q] + H4, True, cost[0], cost[2])
         held = q - j + 1
         done = held >= max_bars
         if ex == "E3":
@@ -308,29 +315,39 @@ def _trade(k: Coin, i: int, ex: str, sp: str) -> Trade | None:
         if done:
             if q + 1 >= n:
                 return None
-            return _finish(k, i, j, q + 1, entry, k.o[q + 1], k.t[q + 1], False)
+            return _finish(k, i, j, q + 1, entry, k.o[q + 1], k.t[q + 1], False, cost[0], cost[1])
     return None
 
 
 def _finish(
-    k: Coin, i: int, j: int, q: int, entry: float, px: float, exit_t: int, stopped: bool
+    k: Coin,
+    i: int,
+    j: int,
+    q: int,
+    entry: float,
+    px: float,
+    exit_t: int,
+    stopped: bool,
+    fee_in: float = FEE,
+    fee_out: float = FEE,
 ) -> Trade:
     lo = bisect.bisect_left(k.fund_t, k.t[j])
     hi = bisect.bisect_left(k.fund_t, exit_t)
     fund = sum(k.fund_r[lo:hi])
-    r = (entry - px) / entry + fund - FEE - FEE * px / entry
+    r = (entry - px) / entry + fund - fee_in - fee_out * px / entry
     return Trade(k.name, i, k.t[j], exit_t, q, SIZE * r, stopped)
 
 
 class TradeCache:
-    def __init__(self, coins: Sequence[Coin]) -> None:
+    def __init__(self, coins: Sequence[Coin], *, optimistic: bool = False) -> None:
         self.coins = {k.name: k for k in coins}
+        self.cost = OPTIMISTIC if optimistic else NORMAL
         self.cache: dict[tuple[str, int, str, str], Trade | None] = {}
 
     def get(self, coin: str, i: int, ex: str, sp: str) -> Trade | None:
         key = (coin, i, ex, sp)
         if key not in self.cache:
-            self.cache[key] = _trade(self.coins[coin], i, ex, sp)
+            self.cache[key] = _trade(self.coins[coin], i, ex, sp, self.cost)
         return self.cache[key]
 
 

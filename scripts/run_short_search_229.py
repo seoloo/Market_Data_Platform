@@ -321,7 +321,70 @@ def oos() -> int:
         verdict = "지지"
     else:
         verdict = "불명"
-    res = {"final": out, "random_rep": random_info, "positives_of_5": positives, "verdict": verdict}
+    # ---- §5-1 낙관 참고 줄 (판정 아님)
+    opt_cache = TradeCache(coins, optimistic=True)
+
+    def keep_for(f: dict[str, Any]):  # type: ignore[no-untyped-def]
+        th, veto = f.get("laya"), f.get("veto", False)
+
+        def keep(c: str, i: int) -> bool:
+            if th is not None and p_good(c, i) < th:
+                return False
+            return not (veto and claude_veto(cache.coins[c], i))
+
+        return keep
+
+    optimistic_final = [
+        _summ(run_config(opt_cache, *f["cfg"], *OOS, keep=keep_for(f))) for f in sel["final"]
+    ]
+    top20_oos = [
+        {
+            "cfg": r["cfg"],
+            "normal": total(run_config(cache, *r["cfg"], *OOS)),
+            "optimistic": total(run_config(opt_cache, *r["cfg"], *OOS)),
+        }
+        for r in sel["top20_train"]
+    ]
+    all_oos = []
+    for reg in REGIMES:
+        for trg in TRIGGERS:
+            for ex in EXITS:
+                for sp in STOPS:
+                    trn = run_config(cache, reg, trg, ex, sp, *OOS)
+                    tro = run_config(opt_cache, reg, trg, ex, sp, *OOS)
+                    if len(trn) >= 20:
+                        all_oos.append(
+                            {
+                                "cfg": [reg, trg, ex, sp],
+                                "n": len(trn),
+                                "normal": total(trn),
+                                "optimistic": total(tro),
+                            }
+                        )
+    best_n = max(all_oos, key=lambda r: r["normal"]) if all_oos else None
+    best_o = max(all_oos, key=lambda r: r["optimistic"]) if all_oos else None
+    optimism = {
+        "final5_optimistic_cost": optimistic_final,
+        "top20_oos": top20_oos,
+        "all_configs_oos": {
+            "count": len(all_oos),
+            "share_positive_normal": sum(r["normal"] > 0 for r in all_oos) / len(all_oos)
+            if all_oos
+            else None,
+            "share_positive_optimistic": sum(r["optimistic"] > 0 for r in all_oos) / len(all_oos)
+            if all_oos
+            else None,
+            "best_normal_hindsight": best_n,
+            "best_optimistic_hindsight": best_o,
+        },
+    }
+    res = {
+        "final": out,
+        "random_rep": random_info,
+        "positives_of_5": positives,
+        "verdict": verdict,
+        "optimistic_reference(판정 아님)": optimism,
+    }
     (OUT / "oos.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(res, ensure_ascii=False, indent=1))
     return 0
