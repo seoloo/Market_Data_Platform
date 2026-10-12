@@ -7,7 +7,8 @@
     python -m scripts.lt_paper run      # 처리 안 한 거래일을 엔진으로 처리, 보고서
     python -m scripts.lt_paper news     # 무료 RSS 뉴스 제목 모으기 (주도주·보유 종목 포함)
     python -m scripts.lt_paper ai       # 그날 뉴스로 ChatGPT 판단 기록 (키 없으면 건너뜀)
-    python -m scripts.lt_paper daily    # update + run + news + ai (예약 작업용)
+    python -m scripts.lt_paper daily    # update + run + news + ai + NQ Paper (예약 작업용)
+    python -m scripts.lt_paper rebuild  # 시세를 고친 뒤 같은 시작일부터 다시 계산
     python -m scripts.lt_paper status
 
 자료 ``data/lt_paper/bars/<SYM>.csv`` (111 연구 자료는 그대로), 상태 ``data/lt_paper/state.json``,
@@ -27,6 +28,7 @@ from typing import Any
 
 from auto_trading.ops.lt_paper import PaperState, step, trend_up
 from auto_trading.ops.news_rss import FEEDS, YAHOO_TICKER, NewsItem, dedupe, parse_feed
+from auto_trading.ops.us_daily_bars import Merge, last_settled_day, merge, settled, to_row
 
 REPO = Path(__file__).resolve().parent.parent
 RESEARCH = REPO / "data" / "research" / "stocks"
@@ -41,8 +43,7 @@ UA = "AutoTradingResearch/1.0 (https://github.com/seoloo; personal research) htt
 START_CASH = 1_000.0
 FULL_SINCE = "2007-08-01"
 OVERLAP_DAYS = 30
-MISMATCH = 0.005
-"""겹치는 날 종가가 0.5% 넘게 다르면 수정주가가 바뀐 것으로 보고 그 종목 전체를 다시 받는다."""
+"""최근 30 일을 겹쳐 받아 끝난 날만 합친다 (auto_trading.ops.us_daily_bars)."""
 
 
 def _read(path: Path) -> list[dict[str, str]]:
@@ -92,58 +93,56 @@ def update() -> dict[str, object]:
     broker = KisOverseasReadOnly(
         load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
     )
-    appended = refetched = failed = 0
+    last_ok = last_settled_day()
+    appended = repaired = refetched = failed = 0
     try:
         for sym, excd in sorted(meta["exchanges"].items()):
             path = BARS / f"{sym}.csv"
-            rows = _read(path) if path.exists() else []
-            last = rows[-1]["date"] if rows else FULL_SINCE
-            since = (date.fromisoformat(last) - timedelta(days=OVERLAP_DAYS)).isoformat()
             try:
-                bars = broker.daily_history(
-                    sym.replace(".", "/"), since=since, exchange=excd, adjusted=True
-                )
+                m = fetch_merge(broker, sym.replace(".", "/"), excd, path, last_ok)
             except Exception:
                 failed += 1
                 continue
-            fresh = {
-                datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d"): b for b in bars
-            }
-            old = {r["date"]: float(r["close"]) for r in rows}
-            mismatch = any(
-                abs(float(b.close) / old[d] - 1) > MISMATCH
-                for d, b in fresh.items()
-                if d in old and old[d] > 0
-            )
-            if mismatch:
-                bars = broker.daily_history(
-                    sym.replace(".", "/"), since=FULL_SINCE, exchange=excd, adjusted=True
-                )
-                rows = []
-                fresh = {
-                    datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d"): b
-                    for b in bars
-                }
-                refetched += 1
-            have = {r["date"] for r in rows}
-            new = [
-                {
-                    "date": d,
-                    "open": str(b.open),
-                    "high": str(b.high),
-                    "low": str(b.low),
-                    "close": str(b.close),
-                    "volume": str(b.volume),
-                }
-                for d, b in sorted(fresh.items())
-                if d not in have
-            ]
-            if new:
-                _write(path, rows + new)
-                appended += 1
+            appended += m.appended > 0
+            repaired += m.repaired > 0 or m.dropped_unsettled > 0
+            refetched += m.needs_full
     finally:
         broker.close()
-    return {"appended_symbols": appended, "refetched_symbols": refetched, "failed": failed}
+    return {
+        "settled_through": last_ok,
+        "appended_symbols": appended,
+        "repaired_symbols": repaired,
+        "refetched_symbols": refetched,
+        "failed": failed,
+    }
+
+
+def fetch_merge(
+    broker: Any, symbol: str, excd: str, path: Path, last_ok: str, since_if_empty: str = ""
+) -> Merge:
+    """한 종목: 최근 ``OVERLAP_DAYS`` 를 겹쳐 받아 끝난 날만 합친다.
+
+    수정주가가 바뀌었으면 전체를 다시 받는다.
+
+    ``needs_full`` 이 참인 결과는 '전체를 다시 받아 썼다' 는 뜻이다.
+    """
+    rows = _read(path) if path.exists() else []
+    full_since = since_if_empty or FULL_SINCE
+    if rows:
+        since = (date.fromisoformat(rows[-1]["date"]) - timedelta(days=OVERLAP_DAYS)).isoformat()
+    else:
+        since = full_since
+    bars = broker.daily_history(symbol, since=since, exchange=excd, adjusted=True)
+    m = merge(rows, settled(bars, last_ok), last_ok)
+    if m.needs_full:
+        full = settled(
+            broker.daily_history(symbol, since=full_since, exchange=excd, adjusted=True), last_ok
+        )
+        rows = [to_row(d, b) for d, b in sorted(full.items())]
+        m = Merge(rows, len(rows), 0, 0, True)
+    if m.appended or m.repaired or m.dropped_unsettled or m.needs_full:
+        _write(path, m.rows)
+    return m
 
 
 def _panel() -> tuple[list[str], dict[str, list[float | None]], list[float | None], dict[str, str]]:
@@ -160,23 +159,34 @@ def _panel() -> tuple[list[str], dict[str, list[float | None]], list[float | Non
     return days, closes, spy, meta["sectors"]
 
 
-def run() -> dict[str, object]:
-    state = PaperState.from_json(json.loads(STATE.read_text(encoding="utf-8")))
+def run(*, rebuild_from: str | None = None) -> dict[str, object]:
+    """처리 안 한 거래일을 처리한다. ``rebuild_from`` 이면 빈 계좌로 그날부터 다시 계산한다.
+
+    다시 계산할 때 날짜별 보고서의 뉴스 · AI 기록(``news_shadow``)은 그대로 옮긴다.
+    """
     days, closes, spy, sectors = _panel()
-    if state.last_date is None:
-        todo = [
-            len(days) - 1
-        ]  # 첫 실행: 가장 최근 거래일 하나 (어제 종가 주도주를 오늘 종가에 산다)
+    if rebuild_from:
+        state = PaperState(cash=START_CASH)
+        todo = [i for i, d in enumerate(days) if d >= rebuild_from]
     else:
-        todo = [i for i, d in enumerate(days) if d > state.last_date]
+        state = PaperState.from_json(json.loads(STATE.read_text(encoding="utf-8")))
+        if state.last_date is None:
+            todo = [
+                len(days) - 1
+            ]  # 첫 실행: 가장 최근 거래일 하나 (어제 종가 주도주를 오늘 종가에 산다)
+        else:
+            todo = [i for i, d in enumerate(days) if d > state.last_date]
     REPORTS.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {}
     for t in todo:
         actions = step(state, days, closes, spy, sectors, t)
         report = _report(state, actions, days, closes, t)
-        (REPORTS / f"{days[t]}.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8"
-        )
+        dated = REPORTS / f"{days[t]}.json"
+        if rebuild_from and dated.exists():
+            kept = json.loads(dated.read_text(encoding="utf-8")).get("news_shadow")
+            if kept:
+                report["news_shadow"] = kept
+        dated.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     STATE.write_text(json.dumps(state.to_json(), indent=1), encoding="utf-8")
     if report:
         (REPORTS / "latest.json").write_text(
@@ -469,6 +479,16 @@ def ai() -> dict[str, object]:
     return {"ok": True, "market_room": judgement["market_room"], "leaders": summary["leaders"]}
 
 
+def rebuild() -> dict[str, object]:
+    """시세를 고친 뒤: 같은 시작일부터 빈 계좌로 다시 계산 (2026-10-12 미완성 일봉 결함)."""
+    old = PaperState.from_json(json.loads(STATE.read_text(encoding="utf-8")))
+    if not old.equity:
+        raise SystemExit("다시 계산할 기록이 없다")
+    before = old.equity[-1]
+    out = run(rebuild_from=old.equity[0][0])
+    return {"from": old.equity[0][0], "before": list(before), **out}
+
+
 def status() -> dict[str, object]:
     latest = REPORTS / "latest.json"
     return (
@@ -478,6 +498,19 @@ def status() -> dict[str, object]:
     )
 
 
+def _nq_daily() -> dict[str, object]:
+    """같은 예약 작업 안에서 NQ Paper(나스닥 100 상위 10 교체판)도 하루 진행한다.
+
+    실패해도 LT 는 그대로 끝난다.
+    """
+    try:
+        from scripts import nq_paper
+
+        return {"update": nq_paper.update(), "run": nq_paper.run()}
+    except Exception as exc:  # NQ 문제로 LT 작업을 실패시키지 않는다
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def main(argv: list[str]) -> int:
     commands = {
         "init": init,
@@ -485,15 +518,18 @@ def main(argv: list[str]) -> int:
         "run": run,
         "news": news,
         "ai": ai,
+        "rebuild": rebuild,
         "status": status,
     }
     if argv == ["daily"]:
         result: dict[str, object] = {"update": update(), "run": run(), "news": news(), "ai": ai()}
+        result["nq"] = _nq_daily()
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:
         raise SystemExit(
-            "usage: python -m scripts.lt_paper init | update | run | news | ai | daily | status"
+            "usage: python -m scripts.lt_paper "
+            "init | update | run | news | ai | daily | rebuild | status"
         )
     sys.stdout.write(json.dumps(result, ensure_ascii=True, indent=1) + "\n")
     return 0

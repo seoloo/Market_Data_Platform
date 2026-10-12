@@ -118,6 +118,7 @@ def check_stock_papers(root: Path, now_kst: datetime) -> tuple[list[str], list[F
         ("LT", "lt_paper", 4),
         ("QS", "qs_paper", 4),
         ("AG", "ag_paper", 2),
+        ("NQ", "nq_paper", 4),
     ):
         latest = _read(root / "reports" / folder / "latest.json")
         if latest is None:

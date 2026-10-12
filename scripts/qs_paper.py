@@ -6,6 +6,7 @@
     python -m scripts.qs_paper update   # 한국투자증권에서 QQQ·TQQQ 최근 일봉 (읽기 전용)
     python -m scripts.qs_paper run      # 처리 안 한 거래일을 엔진으로 처리, 보고서
     python -m scripts.qs_paper daily    # update + run (예약 작업용)
+    python -m scripts.qs_paper rebuild  # 시세를 고친 뒤 같은 시작일부터 다시 계산
     python -m scripts.qs_paper status
 
 자료 ``data/qs_paper/bars/{QQQ,TQQQ}.csv`` (110 연구 자료는 그대로),
@@ -18,13 +19,14 @@ from __future__ import annotations
 import json
 import shutil
 import sys
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.lt_paper import MISMATCH, OVERLAP_DAYS, _read, _write
+from scripts.lt_paper import _read, fetch_merge
 
 from auto_trading.ops.qs_paper import LOOKBACKS, QsState, settle_year, step, trend_on
+from auto_trading.ops.us_daily_bars import last_settled_day
 
 REPO = Path(__file__).resolve().parent.parent
 RESEARCH = REPO / "data" / "research" / "tradfi"
@@ -56,47 +58,18 @@ def update() -> dict[str, object]:
     broker = KisOverseasReadOnly(
         load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
     )
-    out: dict[str, object] = {}
+    last_ok = last_settled_day()
+    out: dict[str, object] = {"settled_through": last_ok}
     try:
         for sym in SYMBOLS:
-            path = BARS / f"{sym}.csv"
-            rows = _read(path)
-            since = (
-                date.fromisoformat(rows[-1]["date"]) - timedelta(days=OVERLAP_DAYS)
-            ).isoformat()
-            bars = broker.daily_history(sym, since=since, exchange="NAS", adjusted=True)
-            fresh = {
-                datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d"): b for b in bars
+            m = fetch_merge(broker, sym, "NAS", BARS / f"{sym}.csv", last_ok)
+            out[sym] = {
+                "appended": m.appended,
+                "repaired": m.repaired,
+                "dropped_unsettled": m.dropped_unsettled,
+                "refetched": m.needs_full,
+                "last": m.rows[-1]["date"],
             }
-            old = {r["date"]: float(r["close"]) for r in rows}
-            if any(
-                abs(float(b.close) / old[d] - 1) > MISMATCH
-                for d, b in fresh.items()
-                if d in old and old[d] > 0
-            ):
-                bars = broker.daily_history(sym, since=FULL_SINCE, exchange="NAS", adjusted=True)
-                fresh = {
-                    datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d"): b
-                    for b in bars
-                }
-                rows = []
-                out[f"{sym}_refetched"] = True
-            have = {r["date"] for r in rows}
-            new = [
-                {
-                    "date": d,
-                    "open": str(b.open),
-                    "high": str(b.high),
-                    "low": str(b.low),
-                    "close": str(b.close),
-                    "volume": str(b.volume),
-                }
-                for d, b in sorted(fresh.items())
-                if d not in have
-            ]
-            if new:
-                _write(path, rows + new)
-            out[sym] = {"appended": len(new), "last": (rows + new)[-1]["date"]}
     finally:
         broker.close()
     return out
@@ -109,12 +82,15 @@ def _panel() -> tuple[list[str], list[float], list[float]]:
     return days, [q[d] for d in days], [tq[d] for d in days]
 
 
-def run() -> dict[str, object]:
+def run(*, rebuild_from: str | None = None) -> dict[str, object]:
+    """처리 안 한 거래일을 처리한다. ``rebuild_from`` 이면 새 장부로 그날부터 다시 계산한다."""
     raw = json.loads(STATE.read_text(encoding="utf-8"))
     started = raw.pop("started", None)
-    state = QsState.from_json(raw)
+    state = QsState.new(DEPOSIT) if rebuild_from else QsState.from_json(raw)
     days, qqq, tqqq = _panel()
-    if state.last_date is None:
+    if rebuild_from:
+        todo = [i for i, d in enumerate(days) if d >= rebuild_from]
+    elif state.last_date is None:
         todo = [len(days) - 1]  # 첫 실행: 가장 최근 거래일 (그달 입금 → 전날 추세로 처리)
     else:
         todo = [i for i, d in enumerate(days) if d > state.last_date]
@@ -199,6 +175,16 @@ def _report(
     }
 
 
+def rebuild() -> dict[str, object]:
+    """시세를 고친 뒤: 같은 시작일부터 새 장부로 다시 계산 (2026-10-12 미완성 일봉 결함)."""
+    raw = json.loads(STATE.read_text(encoding="utf-8"))
+    raw.pop("started", None)
+    old = QsState.from_json(raw)
+    first = old.books["QS"].equity[0][0]
+    before = {k: b.equity[-1][1] for k, b in old.books.items() if b.equity}
+    return {"from": first, "before": before, **run(rebuild_from=first)}
+
+
 def status() -> dict[str, object]:
     latest = REPORTS / "latest.json"
     return (
@@ -209,13 +195,21 @@ def status() -> dict[str, object]:
 
 
 def main(argv: list[str]) -> int:
-    commands = {"init": init, "update": update, "run": run, "status": status}
+    commands = {
+        "init": init,
+        "update": update,
+        "run": run,
+        "rebuild": rebuild,
+        "status": status,
+    }
     if argv == ["daily"]:
         result: dict[str, object] = {"update": update(), "run": run()}
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:
-        raise SystemExit("usage: python -m scripts.qs_paper init | update | run | daily | status")
+        raise SystemExit(
+            "usage: python -m scripts.qs_paper init | update | run | daily | rebuild | status"
+        )
     sys.stdout.write(json.dumps(result, ensure_ascii=True, indent=1) + "\n")
     return 0
 
