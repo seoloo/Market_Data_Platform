@@ -222,6 +222,13 @@ def run_cmd() -> int:
     try:
         p = _plan_today(c, st, now_ms)
         ns = p["nav"]
+        if st.get("last_decision") == p["day"]:
+            # 같은 날 다시 실행: 장부를 건드리지 않는다. 예전엔 여기서 입출금을 기록하고
+            # 단위를 늘린 뒤 '있어야 할 잔고'(expected)는 그대로 둬서, 다음 날 같은 차액을
+            # 또 입금으로 셌다(10-08 · 09 소액 569 원이 두 번 → 총 입금 301,139 원,
+            # 사용자 2026-10-12 발견).
+            print(f"{p['day']} 이미 실행함")
+            return 0
         deposits = st.setdefault("deposits", [])
         if Decimal(st["units"]) <= 0 and not deposits:
             deposits.append([p["day"], str(p["equity"])])  # 첫 실행: 그때 평가액 = 첫 입금
@@ -235,10 +242,6 @@ def run_cmd() -> int:
         st.update(
             units=str(ns.units), peak=str(ns.peak), stopped=p["stopped"], last_nav=str(ns.nav)
         )
-        if st.get("last_decision") == p["day"]:
-            _save(st)
-            print(f"{p['day']} 이미 실행함")
-            return 0
         if p["stopped"]:
             since = st.setdefault("stopped_since", p["day"])
             due = stop_reminder(since, p["day"], st.setdefault("stop_reminded", []))

@@ -131,6 +131,25 @@ def test_deposit_detected_without_nav_jump(
     assert any("입금" in x for x in sent)
 
 
+def test_same_day_rerun_does_not_double_count_a_deposit(
+    env: tuple[Any, FakeUpbit, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-08 · 09 실측: 같은 날 다시 실행 때 기록한 소액이 다음 날 또 입금으로 잡혔다."""
+    m, fake, _sent = env
+    m.main(["run"])
+    before = json.loads(m.STATE.read_text(encoding="utf-8"))
+    fake.krw += Decimal(569)  # 첫 실행 뒤 잔고에 소액이 보임
+    assert m.main(["run"]) == 0  # 같은 날 다시 → 장부 그대로
+    assert json.loads(m.STATE.read_text(encoding="utf-8")) == before
+    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
+    m.main(["run"])
+    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 302 * DAY / 1000 + 3600)
+    m.main(["run"])
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    paid = sum(Decimal(str(d[1])) for d in st["deposits"])
+    assert paid == Decimal(300_000) + Decimal(569)  # 한 번만
+
+
 def test_alert_has_deposit_and_pnl(env: tuple[Any, FakeUpbit, list[str]]) -> None:
     m, _fake, sent = env
     m.main(["run"])
