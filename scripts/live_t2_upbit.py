@@ -48,20 +48,18 @@ from auto_trading.ops.t2_upbit import (
     STEP,
     books,
     equity,
-    krw_price,
     nav_step,
-    next_lines,
     plan,
     reason,
+    score_calc,
     score_of,
     score_text,
-    short_size_text,
     signals,
-    size_text,
+    signs_of,
     stop_reminder,
     targets,
+    trend_arrows,
     trend_icons,
-    why_text,
 )
 
 REPO = Path(__file__).resolve().parent.parent
@@ -143,10 +141,8 @@ def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, An
     sig = signals(daily, dms)
     eq = equity(krw, hold, prices)
     intents = plan(w, hold, prices, eq, allow_buy=not stopped)
-    closes = {k: [x.close for x in daily[k] if x.close_ms <= dms] for k in COINS}
     return {
         "day": day,
-        "closes": closes,
         "krw": krw,
         "hold": hold,
         "prices": prices,
@@ -292,7 +288,6 @@ def run_cmd() -> int:
         adjust = adjust_lines(st, p, fills, ns.flow)
         krw, hold, prices = _snapshot(c)
         eq = equity(krw, hold, prices)
-        mix = coin_mix_line(p, krw, eq) if fills else []
         st["expected"] = {"KRW": str(krw), **{k: str(v) for k, v in hold.items()}}
         st["last_decision"] = p["day"]
         st["history"].append([p["day"], str(ns.nav), str(eq), str(ns.dd)])
@@ -321,16 +316,7 @@ def run_cmd() -> int:
             f"{TAG} · {kst_day(p['day'])}",
             RULE,
             *lines,
-            *(
-                [
-                    "",
-                    f"📋 오늘 비중 조절  ({p['day'][5:].replace('-', '/')} 마감 일봉 기준)",
-                    *mix,
-                    *adjust,
-                ]
-                if adjust
-                else []
-            ),
+            *(["", "📋 오늘 비중 조절", *adjust] if adjust else []),
             *(["", "🛒 체결", *[sub(x) for x in fill_lines]] if fill_lines else []),
             "",
             *pnl_lines(st, krw, hold, prices, eq, ns.dd),
@@ -354,16 +340,6 @@ def _sig_row(sg: Any) -> dict[str, Any]:
     }
 
 
-def coin_mix_line(p: dict[str, Any], krw_after: Decimal, eq_after: Decimal) -> list[str]:
-    """'📊 코인 합계 58.9% → 32.0% · 원화 41% → 68%' (매매한 날)."""
-    eq0 = p["equity"]
-    if eq0 <= 0 or eq_after <= 0:
-        return []
-    c0 = 1 - p["krw"] / eq0
-    c1 = 1 - krw_after / eq_after
-    return [f"📊 코인 합계 {c0:.1%} → {c1:.1%} · 원화 {1 - c0:.0%} → {1 - c1:.0%}"]
-
-
 def _prev_score(prev: dict[str, Any] | None) -> Decimal | None:
     if prev is None:
         return None
@@ -378,24 +354,22 @@ def _prev_score(prev: dict[str, Any] | None) -> Decimal | None:
 def adjust_lines(
     st: dict[str, Any], p: dict[str, Any], fills: dict[str, Decimal], flow: Decimal
 ) -> list[str]:
-    """코인마다 '지금 비중 → 목표 · 산 · 판 금액' + 왜 · 추세 · 크기 · (판 몫 손익) · 다음.
+    """코인마다 '지금 비중 → 목표 · 산 · 판 금액' + 추세 세 개 + 점수 계산.
 
-    이유는 그 코인을 **마지막으로 사고판 날**의 판단과 오늘을 비교한다(밴드 때문에 며칠 쌓인 변화).
-    매매 안 한 코인은 추세 한 줄, '다음' 은 목표가 5 %p 이상 바뀔 수 있을 때만(사용자 2026-10-12).
+    사용자 2026-10-12 시안 B (C+ 는 너무 길어 되돌림).
+
+    점수가 그대로인데 매매했으면(변동성 · 합 100 % · 입출금 · 가격 이동) 그 까닭 한 줄을 더한다.
+    점수 변화는 그 코인을 **마지막으로 사고판 날**의 판단과 비교한다(밴드 때문에 며칠 쌓인 변화).
     """
     last = st.setdefault("last_trade_signals", {})
     eq = p["equity"]
-    closes = p.get("closes") or {}
-    today = [o for o in st.get("orders", []) if str(o.get("id", "")).startswith(f"t2u-{p['day']}-")]
-    before_bk = books([o for o in st.get("orders", []) if o not in today])
-    after_bk = books(st.get("orders", []))
     out: list[str] = []
     for k in COINS:
         sg = p["signals"].get(k)
         cur = p["hold"][k] * p["prices"][k] / eq if eq > 0 else Decimal(0)
         if sg is None:
             continue
-        cl = closes.get(k) or []
+        sc = score_of(signs_of(sg))
         if k in fills:
             prev = last.get(k)
             icon, why = reason(k, sg, prev, cur, flow=flow)
@@ -404,46 +378,20 @@ def adjust_lines(
             out.append(
                 f"{icon} {k} {cur:.1%} → {sg.weight:.1%} · {word}{full} {abs(fills[k]):,.0f}원"
             )
-            prev_parts = [Decimal(x) for x in prev["parts"]] if prev and prev.get("parts") else None
-            detail = why_text(cl, sg, prev_parts) if len(cl) > 121 else None
-            out.append(sub(f"왜: {detail or why}"))
-            sc = score_of([1 if x > 0 else -1 if x < 0 else 0 for x in sg.parts])
+            out.append(sub(f"추세: {trend_icons(sg)}"))
             ps = _prev_score(prev)
-            score_part = (
-                f"점수 {score_text(ps)} → {score_text(sc)}"
-                if ps is not None
-                else f"점수 {score_text(sc)}"
-            )
-            out.append(sub(f"추세: {trend_icons(sg)} → {score_part}"))
-            out.append(sub(f"크기: {size_text(sg)}"))
-            if fills[k] < 0:
-                b0, b1 = before_bk[k], after_bk[k]
-                avg = b0.cost / b0.qty if b0.qty > 0 else Decimal(0)
-                sold = [o for o in today if str(o.get("id", "")).endswith(f"-{k}-S")]
-                vol = sum((Decimal(str(o.get("executed_volume") or "0")) for o in sold), Decimal(0))
-                funds = sum((Decimal(str(o.get("funds") or "0")) for o in sold), Decimal(0))
-                if vol > 0 and avg > 0:
-                    out.append(
-                        sub(
-                            f"이번 매도: 평단 {krw_price(avg)} → 판 값 {krw_price(funds / vol)}"
-                            f" · 실현 {b1.realized - b0.realized:+,.0f}원 (수수료 뺌)"
-                        )
-                    )
-            if len(cl) > 121:
-                out.extend(sub(x) for x in next_lines(cl, sg, only_big=False))
+            if ps is not None and ps == sc:
+                out.append(sub(why))
+            out.append(sub(score_calc(sg, ps)))
             last[k] = _sig_row(sg)
         else:
             out.append(
-                f"➖ {k} {cur:.1%} 그대로 (목표 {sg.weight:.1%} · 차이 {abs(sg.weight - cur):.1%}p)"
+                f"➖ {k} {cur:.1%} 그대로 · 추세 {trend_arrows(sg)} 점수 {score_text(sc)}"
+                f" · 목표와 차이 {abs(sg.weight - cur):.1%}p"
             )
-            sc = score_of([1 if x > 0 else -1 if x < 0 else 0 for x in sg.parts])
-            out.append(sub(f"추세 {trend_icons(sg)} → 점수 {score_text(sc)}"))
-            out.append(sub(f"크기: {short_size_text(sg)} × 점수 {score_text(sc)}"))
-            if len(cl) > 121:
-                out.extend(sub(x) for x in next_lines(cl, sg, only_big=True))
         last.setdefault(k, _sig_row(sg))
     if out:
-        out.append(sub("목표와 5%p 넘게 벌어질 때만 사고팔아요 · 하루 한 번(09:05) 판단"))
+        out.append(sub("목표와 5%p 넘게 벌어질 때만 사고팔아요"))
     return out
 
 
@@ -486,11 +434,9 @@ def weekly_cmd() -> int:
         now_ms = int(time.time() * 1000)
         dms, day = _decision(now_ms)
         krw, hold, prices = _snapshot(c)
-        daily = {k: c.closed_daily(MARKETS[k], dms) for k in COINS}
-        sig = signals(daily, dms)
+        sig = signals({k: c.closed_daily(MARKETS[k], dms) for k in COINS}, dms)
     finally:
         c.close()
-    closes = {k: [x.close for x in daily[k] if x.close_ms <= dms] for k in COINS}
     eq = equity(krw, hold, prices)
     end = date.fromisoformat(day)
     start = end - timedelta(days=6)
@@ -523,12 +469,14 @@ def weekly_cmd() -> int:
         if sg is None:
             continue
         held_w = hold[k] * prices[k] / eq if eq > 0 else Decimal(0)
-        sc = score_of([1 if x > 0 else -1 if x < 0 else 0 for x in sg.parts])
+        sc = score_of(signs_of(sg))
         icon = "🟢" if sc > 0 else "🔴"
-        rows.append(f"{icon} {k} 주간 {sg.week:+.1%} · 목표 {sg.weight:.1%} · 보유 {held_w:.1%}")
-        rows.append(sub(f"추세 {trend_icons(sg)} → 점수 {score_text(sc)}"))
-        if len(closes[k]) > 121:
-            rows.extend(sub(x) for x in next_lines(closes[k], sg, only_big=True))
+        rows.append(
+            sub(
+                f"{icon} {k} 주간 {sg.week:+.1%} · 추세 {trend_arrows(sg)} 점수 {score_text(sc)}"
+                f" · 목표 {sg.weight:.1%} · 보유 {held_w:.1%}"
+            )
+        )
     peak = Decimal(str(st.get("peak") or "0"))
     dd = max(Decimal(0), 1 - nav_now / peak) if peak > 0 else Decimal(0)
     text = "\n".join(
@@ -541,7 +489,7 @@ def weekly_cmd() -> int:
             f"🛒 이번 주 매매 {len(trades)}건" + (f": {trade_txt}" if trades else ""),
             kimp_line(prices["BTC"]),
             "",
-            "코인별 (주간 가격 · 목표 · 보유 · 추세 · 다음)",
+            "코인별 (주간 가격 · 추세 20·60·120일 · 목표 · 보유)",
             *rows,
             "",
             *pnl_lines(st, krw, hold, prices, eq, dd),

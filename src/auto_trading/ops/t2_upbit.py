@@ -252,18 +252,19 @@ def reason(
     )
 
 
-# ---------------------------------------------- 알림 설명 (2026-10-12 사용자 시안 C+)
+# ---------------------------------------------- 알림 설명 (2026-10-12 사용자 시안 B)
 
 LOOKBACKS = (20, 60, 120)
-LOOK_NAME = {20: "짧은", 60: "중간", 120: "긴"}
 TARGET_VOL = Decimal("0.15")
 MAX_WEIGHT = Decimal("0.5")
-BAND = Decimal("0.05")
-"""목표와 지금 비중이 이만큼 벌어질 때만 사고판다 (SpotTrendConfig.band)."""
 
 
 def _sign(x: Decimal) -> int:
     return 1 if x > 0 else -1 if x < 0 else 0
+
+
+def signs_of(sg: CoinSignal) -> list[int]:
+    return [_sign(p) for p in sg.parts]
 
 
 def max_weight(vol: Decimal) -> Decimal:
@@ -281,122 +282,33 @@ def score_text(score: Decimal) -> str:
     return "0" if n == 0 else f"{n}/3"
 
 
-def krw_price(x: Decimal) -> str:
-    """1억 넘으면 '1억 1,565만', 1천만 넘으면 '9,919만', 아니면 '3,695,000'."""
-    if x >= 100_000_000:
-        eok = int(x // 100_000_000)
-        man = int(((x - eok * 100_000_000) / 10_000).to_integral_value())
-        if man >= 10_000:
-            eok, man = eok + 1, man - 10_000
-        return f"{eok}억 {man:,}만" if man else f"{eok}억"
-    if x >= 10_000_000:
-        return f"{int((x / 10_000).to_integral_value()):,}만"
-    return f"{x:,.0f}"
-
-
-@dataclass(frozen=True, slots=True)
-class Flip:
-    """내일 마감가가 ``price`` 를 넘으면(켜짐) / 밑돌면(꺼짐) 바뀌는 추세 하나."""
-
-    lookback: int
-    turns_on: bool
-    price: Decimal
-    change: Decimal
-    """price ÷ 오늘 마감가 − 1."""
-    new_weight: Decimal
-    """변동성이 그대로라고 볼 때 새 목표(세 코인 합 100 % 축소 전)."""
-
-
-def next_flips(closes: Sequence[Decimal], sg: CoinSignal) -> tuple[Flip | None, Flip | None]:
-    """(가장 가까운 '켜짐', 가장 가까운 '꺼짐') — 내일 판단 기준 (순수).
-
-    내일의 n 일 수익 = 내일 마감 ÷ ``closes[-n]`` − 1 (기준 날이 하루 밀린다).
-    """
-    last = closes[-1]
-    signs = [_sign(p) for p in sg.parts]
-    cap = max_weight(sg.vol)
-    up: Flip | None = None
-    down: Flip | None = None
-    for i, n in enumerate(LOOKBACKS):
-        ref = closes[-n]
-        if signs[i] <= 0:
-            new = [*signs[:i], 1, *signs[i + 1 :]]
-            w = max(score_of(new), _ZERO) * cap
-            f = Flip(n, True, ref, ref / last - 1, w)
-            if up is None or ref < up.price:
-                up = f
-        if signs[i] >= 0:
-            new = [*signs[:i], -1, *signs[i + 1 :]]
-            w = max(score_of(new), _ZERO) * cap
-            f = Flip(n, False, ref, ref / last - 1, w)
-            if down is None or ref > down.price:
-                down = f
-    return up, down
-
-
-def flip_text(f: Flip) -> str:
-    word = "위로" if f.turns_on else "아래로"
-    state = "켜져" if f.turns_on else "꺼져"
-    after = "0% (전량 매도)" if f.new_weight <= 0 else f"약 {f.new_weight:.0%}"
-    return (
-        f"{'🔺' if f.turns_on else '🔻'} {krw_price(f.price)} 원({f.change:+.1%}) {word} 마감"
-        f" → {f.lookback}일 추세 {state} {after}"
-    )
-
-
-def next_lines(closes: Sequence[Decimal], sg: CoinSignal, *, only_big: bool) -> list[str]:
-    """'다음' 줄들 (오르는 쪽 · 내리는 쪽). ``only_big`` 이면 목표가 5 %p 이상 바뀌는 쪽만
-    (매매 안 한 코인 · 주간 요약, 사용자 2026-10-12)."""
-    out = []
-    for f in next_flips(closes, sg):
-        if f is None:
-            continue
-        if only_big and abs(f.new_weight - sg.weight) < BAND:
-            continue
-        out.append(f"다음 {flip_text(f)}")
-    return out
-
-
-def short_size_text(sg: CoinSignal) -> str:
-    return f"변동성 {sg.vol:.1%} → 최대 {max_weight(sg.vol):.1%}"
-
-
 def trend_icons(sg: CoinSignal) -> str:
+    """'20일 🔻-3.2% · 60일 🔺+26.5% · 120일 🔺+16.3%'."""
     return " · ".join(
         f"{n}일 {'🔺' if p > 0 else '🔻' if p < 0 else '➖'}{p:+.1%}"
         for n, p in zip(LOOKBACKS, sg.parts, strict=True)
     )
 
 
-def size_text(sg: CoinSignal) -> str:
-    cap = max_weight(sg.vol)
-    sc = score_of([_sign(p) for p in sg.parts])
-    head = f"60일 변동성 {sg.vol:.1%} → 최대 비중 15% ÷ {sg.vol:.1%} = {cap:.1%}"
+def trend_arrows(sg: CoinSignal) -> str:
+    """'🔻🔺🔺' (20 · 60 · 120 일 순서)."""
+    return "".join("🔺" if p > 0 else "🔻" if p < 0 else "➖" for p in sg.parts)
+
+
+def score_calc(sg: CoinSignal, prev: Decimal | None = None) -> str:
+    """'점수 3/3 → 1/3 (오름 2 − 내림 1) × 최대 비중 40.8% = 13.6%'."""
+    signs = signs_of(sg)
+    sc = score_of(signs)
+    head = (
+        f"점수 {score_text(prev)} → {score_text(sc)}"
+        if prev is not None and prev != sc
+        else f"점수 {score_text(sc)}"
+    )
+    head += f" (오름 {signs.count(1)} − 내림 {signs.count(-1)})"
     if sc <= 0:
-        tail = f" → 점수 {score_text(sc)} (롱만이라 0) = 0%"
-    else:
-        tail = f" → × 점수 {score_text(sc)} = {sc * cap:.1%}"
+        return head + " → 롱만이라 0%"
+    cap = max_weight(sg.vol)
+    out = head + f" × 최대 비중 {cap:.1%} = {sc * cap:.1%}"
     if sg.weight < sg.raw - Decimal("0.005"):
-        tail += f" → 세 코인 합 100% 넘어 {sg.weight:.1%}"
-    return head + tail
-
-
-def why_text(
-    closes: Sequence[Decimal], sg: CoinSignal, prev_parts: Sequence[Decimal] | None
-) -> str | None:
-    """바뀐 추세를 가격으로 — '20일 전 1억 1,712만 → 어제 1억 1,336만 (-3.2%) — 짧은 추세가 꺼짐'.
-
-    지난 매매 때의 세 추세(``prev_parts``)와 부호가 달라진 것만. 없으면 None."""
-    if prev_parts is None or len(prev_parts) != 3:
-        return None
-    out = []
-    for i, n in enumerate(LOOKBACKS):
-        before, now = _sign(prev_parts[i]), _sign(sg.parts[i])
-        if before == now:
-            continue
-        state = "켜짐" if now > 0 else "꺼짐" if now < 0 else "평평해짐"
-        out.append(
-            f"{n}일 전 {krw_price(closes[-1 - n])} → 어제 {krw_price(closes[-1])}"
-            f" ({sg.parts[i]:+.1%}) — {LOOK_NAME[n]} 추세가 {state}"
-        )
-    return " · ".join(out) if out else None
+        out += f" → 세 코인 합 100% 넘어 {sg.weight:.1%}"
+    return out
