@@ -445,3 +445,20 @@ def laya_text(k: Coin, i: int) -> str:
         f"Daily trend score from 20/60/120-day returns: {num(k.trend_score[i], 2)} "
         "(from -1 to 1)."
     )
+
+
+def claude_veto(k: Coin, i: int) -> bool:
+    """229 §4-1 — Laya 가 좋다고 해도 거부할 상황 (True 면 거부)."""
+    ix = k.ind
+    c = k.c
+    r = ix["rsi"][i]
+    e50 = ix["e50"][i]
+    f = ix["fund_last"][i]
+    ts = k.trend_score[i]
+    return (
+        (not math.isnan(r) and r <= 35)
+        or (i >= 42 and c[i] / c[i - 42] - 1 <= -0.15)
+        or (not math.isnan(f) and f < 0)
+        or (not math.isnan(e50) and c[i] / e50 - 1 < -0.08)
+        or (not math.isnan(ts) and ts > 0)
+    )

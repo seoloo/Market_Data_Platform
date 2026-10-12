@@ -3,6 +3,7 @@
 사용 예::
 
     python -m scripts.run_short_search_229 train   # TRAIN 탐색 → Laya → 최종 5 개 고정
+    python -m scripts.run_short_search_229 refine  # §4-1 Claude 거부 규칙 더해 다시 고정
     python -m scripts.run_short_search_229 oos     # 봉인 구간 1 회 (selection.json 커밋 뒤)
 """
 
@@ -32,6 +33,7 @@ from auto_trading.research.short_search_229 import (  # noqa: E402
     Coin,
     TradeCache,
     build_coin,
+    claude_veto,
     laya_text,
     random_totals,
     run_config,
@@ -231,6 +233,49 @@ def train() -> int:
     return 0
 
 
+def refine() -> int:
+    """229 §4-1 — 상위 20 × Laya 문턱 4 × Claude 거부 끔/켬 중 TRAIN t 최대 (Laya 재호출 없음)."""
+    path = OUT / "selection.json"
+    sel = json.loads(path.read_text(encoding="utf-8"))
+    (OUT / "selection_laya_only.json").write_text(
+        json.dumps(sel, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    coins = load()
+    cache = TradeCache(coins)
+    answers = json.loads((RAW / "laya_answers.json").read_text(encoding="utf-8"))
+
+    def p_good(coin: str, i: int) -> float:
+        a = answers.get(_key(laya_text(cache.coins[coin], i)))
+        return float((a or {}).get("probabilities", {}).get("good", 0.0)) if a else 0.0
+
+    chosen = []
+    for r in sel["top20_train"]:
+        best = None
+        for th in LAYA_TH:
+            for veto in (False, True):
+
+                def keep(c: str, i: int, th: float | None = th, veto: bool = veto) -> bool:
+                    if th is not None and p_good(c, i) < th:
+                        return False
+                    return not (veto and claude_veto(cache.coins[c], i))
+
+                tr = run_config(cache, *r["cfg"], *TRAIN, keep=keep)
+                s = _summ(tr)
+                need = MIN_TRAIN if th is None and not veto else MIN_TRAIN_LAYA
+                if s["n"] < need or s["t"] != s["t"]:
+                    continue
+                if best is None or s["t"] > best["train"]["t"]:
+                    best = {"cfg": r["cfg"], "laya": th, "veto": veto, "train": s}
+        if best is not None:
+            chosen.append(best)
+    chosen.sort(key=lambda b: -b["train"]["t"])
+    sel["final"] = chosen[:FINAL]
+    sel["refined_at"] = datetime.now(UTC).isoformat()
+    path.write_text(json.dumps(sel, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(sel["final"], ensure_ascii=False, indent=1))
+    return 0
+
+
 def oos() -> int:
     sel = json.loads((OUT / "selection.json").read_text(encoding="utf-8"))
     coins = load()
@@ -243,12 +288,17 @@ def oos() -> int:
 
     out = []
     for f in sel["final"]:
-        th = f["laya"]
-        keep = None if th is None else (lambda c, i, th=th: p_good(c, i) >= th)
+        th, veto = f["laya"], f.get("veto", False)
+
+        def keep(c: str, i: int, th: float | None = th, veto: bool = veto) -> bool:
+            if th is not None and p_good(c, i) < th:
+                return False
+            return not (veto and claude_veto(cache.coins[c], i))
+
         tr = run_config(cache, *f["cfg"], *OOS, keep=keep)
         s = _summ(tr)
         s["by_coin"] = {c: total([x for x in tr if x.coin == c]) for c in COINS}
-        out.append({"cfg": f["cfg"], "laya": th, "train": f["train"], "oos": s})
+        out.append({"cfg": f["cfg"], "laya": th, "veto": veto, "train": f["train"], "oos": s})
     rep = out[0]
     rnd = (
         random_totals(cache, rep["oos"]["n"], rep["cfg"][2], rep["cfg"][3], *OOS)
@@ -281,6 +331,8 @@ def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else ""
     if cmd == "train":
         return train()
+    if cmd == "refine":
+        return refine()
     if cmd == "oos":
         return oos()
     print(__doc__)
