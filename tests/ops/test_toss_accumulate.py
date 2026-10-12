@@ -63,6 +63,9 @@ class FakeToss:
     def order_status(self, order_id: str) -> TossOrderStatus:
         return self.statuses[order_id]
 
+    def stocks_all(self, market: str) -> list[dict[str, Any]]:
+        return []
+
     def order(
         self,
         symbol: str,

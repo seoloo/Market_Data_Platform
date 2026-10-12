@@ -194,3 +194,35 @@ def test_retry_command_does_not_run_brake(monkeypatch: pytest.MonkeyPatch, tmp_p
     st2 = _state(tmp_path)
     assert not [o for o in st2["orders"] if o["kind"]]  # 매달 맞추기만, 브레이크 주문 없음
     assert not st2["brake"]  # 브레이크 판단 자체를 하지 않았다
+
+
+def test_late_run_after_midnight_ignores_unfinished_us_bar(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """21:00 작업이 자정 넘어(미국 장중) 늦게 돌아도
+    그날 진행 중인 TQQQ 봉으로 브레이크를 걸지 않는다.
+    """
+    mod, fake, ctl, _msgs = _setup(monkeypatch, tmp_path)
+    # 10-05 종가 97 (고점 100 대비 −3%) · 10-06 은 장중 60 (끝나지 않은 봉)
+    ctl["tqqq"] = [*TQQQ_CLOSES[:3], ("2026-10-05", 97.0), ("2026-10-06", 60.0)]
+    # 한국 10-07 00:30 = 뉴욕 10-06 11:30 (장중)
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 0, 30, tzinfo=UTC))
+    assert mod.run(telegram=False) == 0
+    assert not [o for o in fake.sent if o[0] == "TQQQ" and o[1] == "SELL"]
+    assert _state(tmp_path)["brake"]["stage"] == 0
+    report = json.loads(
+        (tmp_path / "reports" / "M3_BRAKE" / "2026-10-07.json").read_text(encoding="utf-8")
+    )
+    assert any("TQQQ 2026-10-05 종가" in x for x in report["lines"])
+
+
+def test_morning_catch_up_uses_finished_us_bar(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """한국 다음 날 아침(뉴욕 장 마감 뒤)에 돌면 끝난 봉은 쓴다."""
+    mod, fake, ctl, _msgs = _setup(monkeypatch, tmp_path)
+    ctl["tqqq"] = [*TQQQ_CLOSES[:3], ("2026-10-05", 97.0), ("2026-10-06", 60.0)]
+    # 한국 10-07 10:00 = 뉴욕 10-06 21:00 (마감 뒤)
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 10, 0, tzinfo=UTC))
+    assert mod.run(telegram=False) == 0
+    assert [o[2] for o in fake.sent if o[0] == "TQQQ" and o[1] == "SELL"] == [10]

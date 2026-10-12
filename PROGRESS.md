@@ -9,7 +9,8 @@
 - 사용자: LT 를 순위 교체판으로 — 나스닥 100 상위 10 · 각 10% · 그달 첫 거래일과 2 주 뒤 판단 · 손절은 T/v2 방식 → **NQ Paper** (Paper 만, 새 예약 작업 없이 LT daily 안에서). 10/09 기준 1,020.03(+2.0%, 같은 기간 QQQ +1.55%), 다음 판단일 10/15.
 - 이어서: LT 다시 연구 224(그 시점 명단 자료 감사) `DATA_INSUFFICIENT` → 225(2018 ~ 2026 검정력) `UNDERPOWERED`(추적 오차 연 17.5%, 연 3%p 를 가리려면 약 386 년) — 10 종목 모멘텀은 유료 자료 · Paper 로도 우위를 증명할 수 없음. 사용자 추가 **SN20 Paper**(S&P 500 상위 10 + 나스닥 100 상위 10, 겹치면 다음 순위, 각 5%) — 10/09 기준 1,033.75(+3.4%, QQQ +1.55%), 실행 확인용.
 - 비슷한 연구: 122 고전 모멘텀(MOM 10 월 교체, 학습 문턱 미달 기각) — 같은 S&P 500 자료로 재판정하지 않고 앞으로의 기록으로 본다.
-- 알려진 것: `tests/ops/test_toss_accumulate.py` 6 개가 HEAD(이번 변경 전)에서도 실패(`FakeToss` 에 `stocks_all` 없음 — 10/10 ~ 11 토스 적립 종목 추가 작업 뒤). lint-imports 의 'UI 는 매매 로직을 import 하지 않는다' 깨짐(`ui.server → ops.conn_test → exchange.upbit`)도 이번 변경 전부터.
+- (해결, 같은 날 뒤) 토스 적립 시험 6 개는 시계 둘(가짜 `_kst_now` · 진짜 `datetime.now`)이 어긋난 시한폭탄이었다 → 시계 하나로 고치고 복구. Glide T 브레이크의 늦은 실행 장중 봉 빈틈도 고침(OPERATIONS). MF Paper 에 GBG(Glide 핵심 60 · 채권 20 · 금 20) 추가.
+- 알려진 것(당시): `tests/ops/test_toss_accumulate.py` 6 개가 HEAD(이번 변경 전)에서도 실패(`FakeToss` 에 `stocks_all` 없음 — 10/10 ~ 11 토스 적립 종목 추가 작업 뒤). lint-imports 의 'UI 는 매매 로직을 import 하지 않는다' 깨짐(`ui.server → ops.conn_test → exchange.upbit`)도 이번 변경 전부터.
 
 ## 2026-10-12 새벽 — 통과 연구 다시 보기 · 기각 연구와 결합 221 ~ 223 (Claude)
 

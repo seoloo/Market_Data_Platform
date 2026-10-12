@@ -134,6 +134,7 @@ from auto_trading.ops.qs_live import (
 )
 from auto_trading.ops.qs_paper import trend_on
 from auto_trading.ops.us_capital_gains import tax_lines
+from auto_trading.ops.us_daily_bars import last_settled_day
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "toss"
@@ -287,6 +288,11 @@ RETRYABLE_QS_BUY = frozenset({"insufficient-buying-power", "order-hours-closed"}
 
 def _kst_now() -> datetime:
     return datetime.now(tz=UTC) + timedelta(hours=9)
+
+
+def _utc_now() -> datetime:
+    """지금 시각(UTC). ``_kst_now`` 에서 만들어 시계를 하나로 쓴다(시험이 시계를 고정하게)."""
+    return _kst_now() - timedelta(hours=9)
 
 
 def _path(name: str) -> Path:
@@ -542,7 +548,14 @@ def _m3_brake(
     if first is None:
         m3.brake = b.to_dict()
         return alerts, [*report, "TQQQ 산 적 없음 — 브레이크 대기"]
-    closes = [(d, float(px)) for d, px in day.reader.daily_closes(LEV, 40) if d < day.today]
+    # 끝난 미국 거래일만 — 21:00 이 자정 넘어 늦게 돌아도
+    # 장중 봉을 어제 종가로 쓰지 않는다 (2026-10-12)
+    settled = last_settled_day(day.at)
+    closes = [
+        (d, float(px))
+        for d, px in day.reader.daily_closes(LEV, 40)
+        if d < day.today and d <= settled
+    ]
     for d, px in closes:
         if d >= max(first, b.last_day) and (d > b.last_day or b.lev_peak == 0):
             b.lev_peak = max(b.lev_peak, px)
@@ -578,7 +591,7 @@ def _m3_brake(
     elif b.stage > 0 and b.sales:
         on: bool | None = None
         try:
-            on, as_of, _ = qs_signal(day.reader, datetime.now(tz=UTC))
+            on, as_of, _ = qs_signal(day.reader, _utc_now())
             report.append(f"QQQ 추세 {'켜짐' if on else '꺼짐'} ({as_of} 종가)")
         except AutoTradingError as exc:
             alerts.append(f"⚠ Glide 브레이크 추세 확인 실패: {exc}")
@@ -745,7 +758,7 @@ def _m3_preview(now: datetime, *, title: str = "") -> str:
         tax = _tax_summary(trader, before)
         states, qs = copy.deepcopy(states), copy.deepcopy(qs)
         if qs is not None:
-            day.qs_prepare(qs, datetime.now(tz=UTC))
+            day.qs_prepare(qs, _utc_now())
         needs = _needs(day, states, qs)
     finally:
         trader.close()
@@ -1246,9 +1259,13 @@ def qs_signal(reader: TossReader, now_utc: datetime) -> tuple[bool, str, dict[st
 class Day:
     """하루치 시세·잔고·상태를 모아 판단한다. ``dry`` 면 상태를 저장하지 않는다."""
 
-    def __init__(self, reader: TossReader, now: datetime, *, dry: bool) -> None:
+    def __init__(
+        self, reader: TossReader, now: datetime, *, dry: bool, at: datetime | None = None
+    ) -> None:
         self.reader, self.now, self.dry = reader, now, dry
         self.today = now.strftime("%Y-%m-%d")
+        self.at = at if at is not None else now - timedelta(hours=9)
+        """실제 지금 시각(UTC). ``now`` 는 업무 날짜용(자정 넘은 재시도는 전날)이라 따로 둔다."""
         self.notes: list[str] = []
         self.holdings: dict[str, TossPosition] = reader.holdings()
         self.prices = {
@@ -1361,7 +1378,7 @@ def start() -> int:
     reader = _trader()
     try:
         holdings = reader.holdings()
-        on, as_of, parts = qs_signal(reader, datetime.now(tz=UTC))
+        on, as_of, parts = qs_signal(reader, _utc_now())
     finally:
         reader.close()
     lines = [f"토스 적립 + QS 시작 {today}"]
@@ -1406,7 +1423,7 @@ def fx(telegram: bool = True) -> int:
         day = Day(reader, now, dry=True)
         states, qs = copy.deepcopy(states), copy.deepcopy(qs)
         if qs is not None:
-            day.qs_prepare(qs, datetime.now(tz=UTC))
+            day.qs_prepare(qs, _utc_now())
         needs = _needs(day, states, qs)
     finally:
         reader.close()
@@ -1519,7 +1536,7 @@ def run(telegram: bool = True) -> int:
         day = Day(trader, now, dry=False)
         ctx: dict[str, Any] | None = None
         if qs is not None:
-            ctx = day.qs_prepare(qs, datetime.now(tz=UTC))
+            ctx = day.qs_prepare(qs, _utc_now())
             _save_qs(qs)
         enabled = trader.credentials.trading_enabled
         halted = halted_for(HALT, "acc")  # 적립 · QS: 전체 정지 또는 토스 적립 정지
@@ -1680,7 +1697,7 @@ def run(telegram: bool = True) -> int:
 
 def m3_only(telegram: bool = True) -> int:
     """M3 만 (재시도 예약 23:40 · 03:30 KST). 이번 달이 끝났으면 아무것도 하지 않는다."""
-    now = _kst_now()
+    now = real = _kst_now()
     if now.hour < 12:  # 자정 넘은 재시도(03:30)는 전날 밤(미국 같은 거래일)의 일이다
         now -= timedelta(days=1)
     today = now.strftime("%Y-%m-%d")
@@ -1693,7 +1710,7 @@ def m3_only(telegram: bool = True) -> int:
     _m3_poll(today, telegram)
     trader = _trader()
     try:
-        day = Day(trader, now, dry=False)
+        day = Day(trader, now, dry=False, at=real - timedelta(hours=9))
         lines = _m3_run(
             day,
             trader,
@@ -1729,7 +1746,7 @@ def preview() -> int:
             q, a = day.qty_avg(TQQQ)
             qs = QsLiveState(today, q, q, q * a)
         states, qs = copy.deepcopy(states), copy.deepcopy(qs)
-        ctx = day.qs_prepare(qs, datetime.now(tz=UTC)) if qs is not None else None
+        ctx = day.qs_prepare(qs, _utc_now()) if qs is not None else None
         needs = _needs(day, states, qs)
         advices = [
             day.plan_advice(p, states[p.symbol], qs)
