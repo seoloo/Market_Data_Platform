@@ -18,6 +18,11 @@
   - M3 변동성 맞춤: QQQ 20 일 변동성이 20% 를 넘으면 TQQQ 60% × 0.20/σ.
   - 몫은 직전 달 말 정보로 정해 매달 첫 거래일에 맞춘다.
   - M3 는 182 에서 REJECT 였지만 사용자 결정(2026-10-09 "m2 m3 로 해줘")으로 기록한다.
+* GBG = Glide 핵심 60% + IEF 20% + GLDM 20%
+  (사용자 2026-10-12, 참고 계산 'Glide 60 · 채권 20 · 금 20').
+  Glide 몫 안은 LD_M3 와 같은 변동성 맞춤(TQQQ 60% × min(1, 0.20/σ), 나머지 SCHD)
+  — T 브레이크는 없다.
+  비교 상대는 LD_M3 (같은 Glide 핵심 100%).
 * 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도: 미국 ETF 0.15%(수수료 0.10% + 환전 0.05%) ·
   국내 ETF(ISA) 0.02%.
 * 상태 ``data/mf_paper/state.json`` · 보고 ``reports/mf_paper/latest.json``.
@@ -76,6 +81,19 @@ for _name, _rule in (("LD_M0", "M0"), ("LD_M2", "M2"), ("LD_M3", "M3")):
         "ccy": "USD",
         "rule": _rule,
     }
+GBG_SLEEVE = 0.6
+BOOKS["GBG"] = {
+    "targets": {
+        "TQQQ": GBG_SLEEVE * LEV_MAX,
+        "SCHD": GBG_SLEEVE * (1 - LEV_MAX),
+        "IEF": 0.2,
+        "GLDM": 0.2,
+    },
+    "capital": CAPITAL,
+    "cost": COST,
+    "ccy": "USD",
+    "rule": "M3BG",
+}
 SIGNAL = "QQQ"
 FIRST_START = "2026-10-08"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
@@ -134,13 +152,20 @@ def targets_for(
 ) -> dict[str, float]:
     """182 장부: ``day`` 가 든 달 직전 달 말까지의 정보로 레버리지 몫을 정한다. 다른 장부는 고정."""
     rule = cfg.get("rule")
-    if rule not in ("M2", "M3"):
+    if rule not in ("M2", "M3", "M3BG"):
         return dict(cfg["targets"])
     if rule == "M2":
         share = lev_share_dd(month_end_values(book.history if book else [], day))
     else:
         closes = [qqq[d] for d in sorted(qqq) if d[:7] < day[:7]]
         share = lev_share_vol(realized_vol(closes))
+    if rule == "M3BG":  # Glide 몫(60%) 안에서만 변동성 맞춤, 채권 · 금은 고정
+        return {
+            "TQQQ": GBG_SLEEVE * share,
+            "SCHD": GBG_SLEEVE * (1 - share),
+            "IEF": 0.2,
+            "GLDM": 0.2,
+        }
     return {"TQQQ": share, "SCHD": 1 - share}
 
 
