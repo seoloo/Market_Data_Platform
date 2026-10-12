@@ -1,7 +1,8 @@
 # 고정 숏 — 호가·체결 증거·계좌 일치성 검증 계약
 
 작성: 2026-10-13 Codex. 운영 Phase6 유지, 신규 연구 Phase0 / UNVERIFIED.
-상태: **DESIGN_FROZEN / NO_NEW_PERFORMANCE**. 아래 §1~7은 구현 전 설계, §8은 완료 기록용.
+상태: **IMPLEMENTED / REAL_EXECUTION_NOT_VALIDATED / NO_NEW_PERFORMANCE**.
+구현 전 설계 commit `3b3cbea`. 아래 §1~7은 고정 설계, §8은 그 뒤의 구현·시험 기록이다.
 
 ## 1. 범위와 질문
 
@@ -99,4 +100,101 @@ quote-only 12개월도 수익우위/실제fill률/80%검정력 통과가 아니�
 
 ## 8. 완료 기록
 
-구현·합성 결과·공개 단발 시험/실패·검사 수·자료/코드hash는 완료 후 이 절에만 추가한다.
+### 8.1 구현과 실제로 하지 않은 일
+
+신규 순수 모듈 `src/auto_trading/research/execution_evidence_20261013.py`,
+단발 runner `scripts/audit_short_execution_evidence_20261013.py`,
+테스트 `tests/research/test_execution_evidence_20261013.py`를 추가했다.
+기존 운영 코드/config/DB/migration/예약은 변경하지 않았다. 현재 공개 호가 구조 시험만 했고
+계좌·사용자 체결 API·실제 주문·Laya·과거시장자료 읽기·새 수익 계산은0회다.
+파일럿 규칙/수익/기각·UNVERIFIED 판정과 이전 result는 그대로다.
+
+호가와 mark 모두 **수신 시각뿐 아니라 거래소 발생 시각**도 확인한다.
+지금 받은 cached mark라도 발생 시각이 오래됐으면 거부한다. 조회 성공을 신선함으로 대신하지 않는다.
+합성 시험에서 발견한 순서 오류(같은ms BUY/SELL의 사전 모호성 검사)를 신규 코드 안에서 보완했다.
+
+### 8.2 합성 회계·멱등성
+
+고정 손계산: SELL0.05BTC×50000, BUY0.02×48000, 총fee1.73USDT,
+확인된 fundingcash+0.50, 마지막mark49000, 초기cash10000.
+
+| 항목 | 검산 결과 |
+|---|---:|
+| 남은SHORT수량 | 0.03BTC |
+| 평균진입가 | 50000 |
+| 실현gross | +40.00USDT |
+| 미실현손익 | +30.00USDT |
+| cash | 10038.77USDT |
+| equity | 10068.77USDT |
+| 손계산 대비 잔차 | 0.00USDT |
+
+동일 체결 재전송을 포함해도1회만 집계했다. 이는 **합성 회계 기대값**이지 투자 성과가 아니다.
+EXPIRED부분체결·미확인fee·scope충돌·동일ID다른값·주문합계/원래의도초과·
+UNKNOWN·부분청산·미래호가/체결/funding·cached mark·순서모호 반례를 포함했다.
+신규39개 중누출3개, Hypothesis중복재생 불변성 포함. 실제 개인정보/주문ID는 사용하지 않았다.
+
+### 8.3 기존 manager 재설정 한도 반례
+
+Fake+기존manager+인메모리DB로 다음 고정 합성 예를 재현했다.
+최초mark50000, SELL희망0.008BTC, 각시도50%부분체결, 이후mark를매번1%낮췄다.
+
+| 시도 | 새mark/체결가 | 체결수량 |
+|---|---:|---:|
+| 1 | 50000 | 0.004BTC |
+| 2 | 49500 | 0.002BTC |
+| 3 | 49005 | 0.001BTC |
+
+총0.007체결/0.001잔여, 평균진입49715, 수수료0.1740025USDT.
+최초mark의30bps 하한은49850이지만 일부 체결과 평균은그보다낮다.
+각 주문은 **재조회된mark의한도**를 지켰으므로 현행 규칙 위반/실제 사고라고 단정하지 않는다.
+하지만 최초가격의총손실한도를지킨다는해석은틀리며 직전봉고정한도 연구와 운영의 조건 차이가 있다.
+장부수량/평균진입/cash는Fake와정확히일치, 모든일반주문은LIMIT이었다.
+보호주문/first-fill시각/실제호가/청산tier를검증한시험은아니다. 운영수정은하지않았다.
+
+### 8.4 키 없는 단발 공개 구조 시험
+
+2026-10-13 **08:11:26 KST** 시작, GET6회/모두HTTP200, 반복·재시도0.
+서버시각 midpoint offset+25ms, 불확실성34ms는이번한번측정치일뿐정밀시계동기화보장이아니다.
+현재BTC/ETH100레벨depth/mark/필터를확인했고고정품질조건을만족했다.
+
+| 공개 자료 | BTCUSDT | ETHUSDT |
+|---|---:|---:|
+| tick | 0.10USDT | 0.01USDT |
+| step/minQty | 0.001BTC | 0.001ETH |
+| minNotional | 50USDT | 20USDT |
+| 당시spread | 약0.0122bps | 약0.0406bps |
+| 희망명목2500/수량내림 | 0.030BTC | 1.016ETH |
+
+이시점에서는BUY/SELL×가시호가100%/25%의8표 모두희망수량까지표시할수있었다.
+이수량은 `indicative_qty`, 실제fill0/체결률미측정이다. 호가 취소·경쟁·전송지연·시장충격 때문에
+실제수량하한이아니며 모든과거신호에서도충분했다는뜻도아니다.
+현재필터는역사적필터를입증하지않는다. 장기관찰·호가OOS·실거래가능성PASS를부여하지않았다.
+
+`reports/short_execution_evidence_20261013/`의probe_raw/probe/synthetic JSON은로컬Git제외보존.
+개인키·계좌정보없음. 기존보존시장자료/208폴더/DB는읽거나수정하지않았다.
+
+### 8.5 재현 식별자·검사·한계
+
+- module SHA256 `154c4b696b3ae1d49f431840b00f7cc6a8de222ac3564e98b36403e59fa25d0d`.
+- runner SHA256 `ecc9cb449ac6d050003a4451de8decee6d33e33e6f68f06c7d0c952b925ffa72`.
+- test SHA256 `b196b15d66cb0fd01df67318a345bbb792c3964906bc261c27105b384dda0297`.
+- probe_raw 파일 SHA256 `c1ce713f9598e90635371be560585f25f6432d11e13713beaf1552f1ac0f9681`.
+- probe summary SHA256 `44515c0fce29091feedc30bb54b1a05b4173a0276fc87293488a5beebaa98438`.
+- synthetic SHA256 `748563d9cbbef4c0aca0825699d04173448b3fced32840eb4fba80525dd7cd02`.
+- raw JSON 정규화내용hash `62fa34b16166fd10f0364b7424c8bde31d89dfbfd3a6663b3dee589e91441115`는
+  파일bytehash와다르며두값을혼용하지않는다.
+
+신규39/전체pytest3592(238.10초)/누출113/엄격타입632/스타일961 정상.
+완료 문서 로컬링크485개/누락0, diff공백 검사 정상, 기존 execution/exchange/storage/config 변경0.
+이전 Laya 비교 result의SHA `fe8175ea...1dee7`도 그대로이며 재계산하지 않았다.
+import계약4유지/1기존UI위반(`ui.server→ops.conn_test→exchange.upbit`)은그대로다.
+합성일치·공개호가GET성공을전체검증통과/Phase5·6통과/수익PASS로부르지않는다.
+
+다음에 필요한 것은 실제 시점별 증거이며, **quote-only와 실제 체결·보호·회계 대조를 구분**해야한다.
+실제 체결은 인증된개인자료, 보호는첫체결/거래소등록시각, PnL은실측fee/정산/계좌스냅숏이필요하다.
+현재는그자료없음/계좌접속미실행으로 `REAL_EXECUTION_NOT_VALIDATED` 유지.
+최초가격고정총한도나감시기교체 등운영정책 변경은별도설계/승인범위이며이번에는적용하지않았다.
+감사객체 자체는 공급자 원문의 진위 인증이 아니다. 실제 이벤트의 출처/원문/수신로그/digest를
+연결하는 장기 보존·사설체결 수집 경로는 이번 구현에 포함하지 않았다.
+
+[다른 AI용 인계 TXT](SHORT_EXECUTION_EVIDENCE_FOR_LLM_20261013.txt).

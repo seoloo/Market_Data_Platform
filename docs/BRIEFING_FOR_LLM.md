@@ -4,6 +4,23 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
+## 2026-10-13 후속 — 호가·체결 증거·계좌 일치성 감사 구현
+
+사용자 다음작업은 실행 검증 설계 후속, 수익/Paper/Live/실주문 승인 아님.
+`3b3cbea` 설계동결 뒤 순수감사/단발runner/합성39개(누출3)/기존Fake대조 구현.
+scope별 체결중복/충돌·누적량/원래의도상한·fee불명·UNKNOWN·부분청산·funding·UPnL을 검사.
+합성 equity10068.77/손계산잔차0, 실제성과 아님. 가시호가100%/25%는INDICATIVE_ONLY.
+기존manager 매시도mark재설정 때문에 최초30bps한도보다멀리체결되는합성반례:
+50000→49500→49005, .004/.002/.001BTC, 평균49715<49850. 현행매시도규칙위반은아님.
+Fake qty/평균/cash 정확일치, 실제보호/호가체결/전체Risk parity 인증아님, 기존코드수정없음.
+08:11:26KST 키없는현재공개GET6회 성공/자료품질확인, 재시도·계좌·실주문0.
+당시 BTC/ETH 가시호가가시험량에충분했으나 actualfill0/새OOS0/새성과계산0.
+전체pytest3592/누출113/타입632/스타일961 정상, 기존UI import계약1위반 유지.
+기존 운영/208·보존시장자료·환경·숏판정/Laya필터는불변. 새관찰/수집/Paper활성화없음.
+상태REAL_EXECUTION_NOT_VALIDATED/UNVERIFIED. 실제 first-fill/보호·fee·계좌증거는미확보.
+근거: [고정계약·구현결과](research/SHORT_EXECUTION_EVIDENCE_CONTRACT_20261013.md)§8.
+[인계TXT](research/SHORT_EXECUTION_EVIDENCE_FOR_LLM_20261013.txt).
+
 ## 2026-10-13 후속 — 고정 숏 실행자료/Laya·시장가 비교 완료
 
 사용자 후속 완료/확장 요청 및 이번 연구 IOC/MARKET 가정 비교 승인. 실제 주문/운영 변경 없음.

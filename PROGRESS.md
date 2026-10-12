@@ -3,6 +3,27 @@
 최종 갱신: 2026-10-13 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-13 — 고정 숏 호가·체결 증거 계약 구현 (Codex)
+
+- 사용자 “좋아 다음 작업해줘”: 실제 호가/부분체결/계좌 일치성 검증 설계의 후속.
+  [고정 계약](docs/research/SHORT_EXECUTION_EVIDENCE_CONTRACT_20261013.md) `3b3cbea` 뒤 신규 순수감사/runner/시험 구현.
+  기존규칙·PnL·운영/Paper/Live·주문/예약·환경설정·208/그자료·보존시장자료 불변.
+- 호가/mark 발생·수신시각/clock/stale·정렬/precision·가격한도·depth부족 검사.
+  가시수량100%/25%는 INDICATIVE_ONLY, 실제fill/체결률·새OOS·수익검정 아님.
+- 체결scope/ID중복·충돌/누적량/원래의도상한/fee불명·자산/UNKNOWN·terminal부분·
+  SHORT부분청산·signed fundingcash·UPnL·누출·Hypothesis 시험39개 통과.
+  합성 장부 equity10068.77USDT/손계산 잔차0, 실제투자수익 아님.
+- 기존Fake/manager 대조: mark50000→49500→49005에서부분수량.004/.002/.001,
+  평균49715<최초30bps하한49850. 매시도 새mark한도는지켰으므로규칙위반/실사고단정아님.
+  최초가격총한도 보장과후향고정봉한도는서로다름. Fake장부qty/entry/cash 정확일치/운영수정없음.
+- 08:11:26KST 공개GET6회/HTTP200, 키·계좌·실주문·유료호출·재시도0.
+  BTC/ETH현재필터/100레벨depth/mark품질확인, 당시시험량의호가충분. 실제체결검증 아님.
+  raw/summary/synthetic은연구reports에보존, 수익재계산/장기관찰·새Shadow/Paper활성화없음.
+- 신규39/전체pytest3592/누출113/타입632/스타일961 정상. 기존UI import계약1위반은불변.
+  정식상태REAL_EXECUTION_NOT_VALIDATED/UNVERIFIED, Phase6 유지.
+  [인계 TXT](docs/research/SHORT_EXECUTION_EVIDENCE_FOR_LLM_20261013.txt).
+  다음은 별도승인 범위의시점별증거 확보/보호·실측fee·계좌대조 계획, 수익재튜닝 아님.
+
 ## 2026-10-13 — 고정 숏 실행자료·Laya/시장가 비교 완료 (Codex)
 
 - 사용자: 검증설계/완료까지 진행, Laya 사용/미사용 비교·연구 확장 허용.

@@ -7,6 +7,25 @@
 지금 쓰는 전략: **QS 실거래(토스)** · T/v2(Paper, 실거래 1단계 후보) · O/v1·O/v2(Paper, O/v2 는 2단계 후보) · AG(Paper) · FLOW-KR(그림자 기록). 스테이킹 캐리는 예치와 비슷해 운영하지 않는다.
 살아남은 것은 거의 모두 **몇 달 단위 추세 보유**다. 며칠 이하 단기 신호(패턴·지표·엘리엇·다이버전스·이벤트)는 비용을 넘지 못했다. 한 항목에 여러 가설을 묶은 곳이 있어 제목 수와 가설 수는 다르다. EXEC-L240(지정가 체결)은 실행 방식 채택이라 수익 가설 개수에 넣지 않았다.
 
+## 고정 숏 호가·체결 증거 감사 — REAL_EXECUTION_NOT_VALIDATED (2026-10-13)
+
+실제호가/부분체결/계좌일치성 검증 설계의 다음작업. 수익가설재판정/신규OOS/PASS 아님.
+`3b3cbea` 설계동결 뒤 신규순수모듈/단발runner/합성39개 구현, 이전성과/규칙/운영은불변.
+fill scope/ID멱등·충돌/누적량·원래의도상한/fee불명·asset/UNKNOWN·terminal부분/
+SHORT부분청산·fundingcash·UPnL 및 미래입력검사. 합성손계산 equity10068.77/잔차0.
+기존Fake+manager+인메모리DB 대조에서각재시도mark한도와최초가격총한도차이를재현:
+50000→49500→49005, 평균49715<최초하한49850. 현행매시도한도위반/실제사고증거는아님.
+Fake qty/entry/cash 정확일치이며보호시각·청산tier·실측호가체결·위험계층전체 검증아님.
+
+2026-10-13 08:11:26KST 키없는공개GET6회/HTTP200, 현재BTC/ETH필터·depth/mark구조확인.
+가시호가100%/25% 사용의8개시험량표는충분했지만INDICATIVE_ONLY, actualfill0/새OOS0.
+현재한시점호가≠역사적자료/실제fill률/수익증거. 계좌/주문/유료API·재시도0.
+합성39·전체pytest3592·누출113·타입632·스타일961 정상, 기존UI import계약1위반은미해결.
+모듈/자료hash와raw는 [계약·완료기록](../research/SHORT_EXECUTION_EVIDENCE_CONTRACT_20261013.md)§8.
+실제보호/체결·fee·계좌증거는미확보, 수익재계산/새Shadow/Paper/Live·예약·기존코드변경없음.
+208/그자료·9월이후보존시장자료·기존기각/UNVERIFIED 판정은유지한다.
+[다른 AI용 TXT](../research/SHORT_EXECUTION_EVIDENCE_FOR_LLM_20261013.txt).
+
 ## 고정 숏 실행자료·Laya·시장가 비교 — UNVERIFIED (2026-10-13)
 
 사용자 후속 완료/확장 및 시장가 비교 승인은 설명용 후향 체결 가정에 한정.

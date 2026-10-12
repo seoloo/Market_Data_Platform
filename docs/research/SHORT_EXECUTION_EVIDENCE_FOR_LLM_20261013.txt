@@ -1,0 +1,72 @@
+ORBIT — 고정 숏 실행 증거 검증 인계 (2026-10-13)
+
+1. 이번 범위
+사용자 "좋아 다음 작업해줘"는 직전 실제 호가·부분체결·계좌 일치성 검증 설계의 후속.
+운영 Phase6 유지, 신규 연구 UNVERIFIED / REAL_EXECUTION_NOT_VALIDATED.
+설계 동결 3b3cbea, 구현/합성/키 없는 단발 현재 공개 호가 구조 시험만 수행.
+숏 규칙/기존 후향성과/Laya 질문·문턱/기존 운영·주문·예약·환경변수는 변경하지 않았다.
+208/그 자료·9월 이후 보존 시장자료는 열지 않았다. 계좌·개인 체결 API·실제 주문 없음.
+이번 현재 공개 호가를 역사적 가격/OOS/PnL 재계산에 사용하지 않는다.
+
+2. 추가 파일
+docs/research/SHORT_EXECUTION_EVIDENCE_CONTRACT_20261013.md: §1~7 고정 설계, §8 완료 기록.
+src/auto_trading/research/execution_evidence_20261013.py: I/O/시계 없는 순수 감사.
+scripts/audit_short_execution_evidence_20261013.py: synthetic / probe, 재실행·덮어쓰기 금지.
+tests/research/test_execution_evidence_20261013.py: 합성39, 누출3, Hypothesis/Fake 대조.
+기존 execution/exchange/storage/config/DB/migration 수정 없음.
+
+3. 호가의 의미
+received_ms와 거래소 발생 시각을 검사하고 clock offset/uncertainty를 구분한다.
+age1000ms/불확실성250ms/mark-depth수신차1000ms/spread10bps/가격한도30bps 고정.
+tick/step/minQty/minNotional은 실제 필터에서, precision 숫자를 단위로 대신하지 않는다.
+BUY limit내림/SELL올림, qty step내림. depth 가시 수량100%/25%는 INDICATIVE_ONLY.
+25%가 실제체결 하한도 아니고 100%가 확정 체결 상한도 아니다. 실제 fill0/체결률미측정.
+오래된 cached mark를 지금 받았다는 이유로 신선하다고 통과시키지 않는다.
+
+4. 체결·회계 감사
+venue/strategy/symbol 경계와 order/trade ID를 사용한다. 같은 체결 재전송은 1번만 반영.
+동일 ID의 경제값 충돌은 오류, 다른 시장의 같은 ID는 별도. 미래 수신 사건은 사용하지 않는다.
+체결 합=주문 누적량, 각 주문 및 원래 의도 수량 상한을 검사한다.
+fee=None/비USDT를 0으로 바꾸지 않는다. UNKNOWN·체결 목록 누락은 INCOMPLETE.
+EXPIRED/CANCELED부분체결은 남은 포지션이며 terminal=FLAT으로 해석하지 않는다.
+SHORT SELL가중평균/BUY부분청산/실현·미실현/fee/확인된 signed fundingcash를 분리한다.
+같은 ms BUY/SELL 순서모호·과잉축소/반전은 거부한다. 보호·강제청산·전체Risk 엔진이 아니다.
+
+5. 손계산 합성 예
+초기10000USDT, SELL0.05BTC@50000, BUY0.02@48000, 총fee1.73, fundingcash+0.50,
+평가mark49000 -> 남은SHORT0.03BTC/평균50000/realized+40/UPnL+30,
+cash10038.77/equity10068.77/손계산 잔차0.00. 투자 성과가 아닌 회계 예제다.
+
+6. 기존 Fake/manager 대조와 중요한 차이
+기존 IOC는 매번 mark를 다시 읽어 ±0.3% 한도를 정한다. 최초 mark의 총한도 보장이 아니다.
+합성: 최초50000, 다음49500,49005, SELL0.008 희망/매번50%부분량 -> .004/.002/.001체결,
+총.007/잔여.001, 평균49715, fee0.1740025. 최초하한49850보다 일부 체결과 평균이 낮다.
+새 mark 기준 각한도는지켰으므로 현행 규칙위반/실제사고로 주장하지 않는다.
+후향 직전봉 고정한도와 운영 재설정한도의 조건 차이만 확인했다. 운영코드는 수정하지 않았다.
+감사 ledger의수량/평균/cash가Fake와정확일치, 일반주문모두LIMIT.
+보호first-fill/스톱공백/호가queue/실제청산tier 검증은 아니다.
+
+7. 단발 공개 자료
+2026-10-13 08:11:26KST, 서버시각/필터/각종목mark·100레벨depth의6GET, 모두HTTP200.
+키·서명·계좌·주문·유료API·재시도0. clock midpoint offset+25ms/불확실성34ms.
+BTC tick0.10/step.001/minQty.001/minNotional50USDT.
+ETH tick0.01/step.001/minQty.001/minNotional20USDT.
+당시spread BTC약.0122bps/ETH약.0406bps, 희망명목2500 내림qty BTC.030/ETH1.016.
+BUY/SELL×가시수량100%/25% 모두 시험량 표시가능했으나 actualfill0.
+현재 한 시점에서 충분한 호가≠모든 과거 진입 체결 가능/실전 수익 증거.
+raw/probe/synthetic JSON: reports/short_execution_evidence_20261013/ (Git제외/로컬보존).
+이익 좋은 시간 선택·수익 재계산·새 관찰/Paper/Live·예약 활성화 없음.
+
+8. 재현과 다음 경계
+module SHA256 154c4b696b3ae1d49f431840b00f7cc6a8de222ac3564e98b36403e59fa25d0d.
+runner SHA256 ecc9cb449ac6d050003a4451de8decee6d33e33e6f68f06c7d0c952b925ffa72.
+test SHA256 b196b15d66cb0fd01df67318a345bbb792c3964906bc261c27105b384dda0297.
+probe_raw 파일 SHA256 c1ce713f9598e90635371be560585f25f6432d11e13713beaf1552f1ac0f9681.
+probe 파일 SHA256 44515c0fce29091feedc30bb54b1a05b4173a0276fc87293488a5beebaa98438.
+synthetic 파일 SHA256 748563d9cbbef4c0aca0825699d04173448b3fced32840eb4fba80525dd7cd02.
+raw 정규화내용 SHA256 62fa34b16166fd10f0364b7424c8bde31d89dfbfd3a6663b3dee589e91441115,
+파일 bytes hash와 서로다르므로 혼용하지 않는다.
+전체pytest3592(238.10초)/누출113/타입632/스타일961 정상, 기존 UI import계약1위반은남음.
+실제 개인 체결/수수료/보호first-fill/계좌 스냅숏은 미확보, 전체검증·수익PASS 아님.
+다음: 시점별 evidence 확보·실측fee/보호/계좌 대조의 별도 승인 설계.
+최초가격 고정총한도 도입·운영 manager 변경·실계좌/테스트넷/새Paper 연결을 자동 진행하지 말 것.
