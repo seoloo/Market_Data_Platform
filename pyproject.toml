@@ -68,6 +68,8 @@ ignore = [
 "tests/**" = ["T20"]
 # 실행 스크립트는 콘솔 출력이 본래 목적이다.
 "scripts/**" = ["T20"]
+# 포트폴리오 보고서 생성기 — 한국어 문단 · HTML · SVG 문자열이 대부분이라 줄 길이 · 짧은 이름 규칙을 보지 않는다.
+"scripts/portfolio/**" = ["T20", "E501", "N802", "N806", "N812"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["auto_trading"]
