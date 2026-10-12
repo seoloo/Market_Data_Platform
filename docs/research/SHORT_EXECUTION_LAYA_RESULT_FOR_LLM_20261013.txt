@@ -1,0 +1,99 @@
+ORBIT — 고정 숏 실행자료/Laya/시장가 비교 인계 (2026-10-13)
+
+완료 범위: 설계·자료감사·신규구현·합성/전체검증·고정 후향 비교·전향 표본계획.
+실제 미래 관찰이나 Phase4/OOS/PASS 완료 아님. 운영Phase6/기존전략/Paper/Live/주문/예약 불변.
+
+1. 승인/등록
+사용자 후속 연구완료·Laya 비교·연구확장 허용, 추가 "시장가로 해도돼 그것도 같이 비교해줘".
+이번 설명용 후향 실행/시장가 체결 가정만 승인으로 기록. 실제 시장가 주문 없음.
+수익 전 동결 commit b5950ac.
+설계: docs/research/SHORT_EXECUTION_LAYA_VALIDATION_20261013.md §1~10. 결과는 §11.
+신규 module: src/auto_trading/research/short_validation_20261013.py.
+runner: scripts/run_short_validation_20261013.py.
+tests: tests/scripts/test_short_validation_20261013.py.
+기존 208/그자료·2026-09-01 이후시장자료·환경변수·다른연구 코드/판정 보존.
+
+2. 고정 설계
+BTC/ETH USD-M2020-06~2026-08, 마감4h+완성일봉.
+RSI7 직전>=70→현재<70 + 일봉ADX14>25/-DI>+DI.
+다른버전은같은규칙에4h EMA20<=close<=EMA20+2ATR20만 추가.
+SHORT/48h/stop3%, 재튜닝 없음. Laya OFF/ON×IOC/MARKET, FULL baseline은coverage감사.
+12대상×기본/비용2배/4h지연×4기간=144 계좌, 고정1회.
+순손익·수수료·불리체결·funding·공유자본·1%위험·DD30%·일손실2%·연패cooldown 유지.
+기존 G5/G6전부/강제청산tier/계좌parity는 미검증.
+
+3. 자료
+BTC/ETH 각3,287,520분, 시점누락0. 기존DB4h와BTC14/ETH15봉 차이.
+공식다른TF ZIP에도차이를확인, 이번은같은1m로canonical4h를만들어통일.
+내부재집계차이0은원천일관성이지독립적가격진실인증아님. 원본DB/과거판정은고치지않음.
+각6,849 funding중실제정산mark3,107, 나머지3,742는hour시가대리/고저비용bounds.
+mark누락36hour는무료공식REST로연구전용보완. 같은정산시각/rate 일치확인.
+source SHA256 3a27e3091012641fcae1cb78aa232433d38cd28e52fcdc76bb3932e9914a7e6a.
+code SHA256 4046e616bb479361da4b238f6274b053d64e8fbc1a6ed8f6f75f0d4fea74bcdf.
+응답 SHA256 bae1af61528ccdd5a2b780e044f33171331bfaf720f4a35d5f210a30ce5a8943.
+result SHA256 fe8175ea2001db0ef24e2c0b1415cd0853eb25f79c7bbf93e870d05270f1dee7.
+Raw: reports/short_validation_laya_20261013/ (Git제외·로컬보존).
+
+4. Laya
+호스팅api.laya-ai.com, english 명시,응답모델laya-rl-agent.
+익명수익률/지표/거래량/funding/완성일봉맥락만. 날짜/심볼/절대가격/향후수익/계좌 없음.
+48h/3%stop/비용후positive vs nonpositive 1질문, positive>=0.60 고정.
+학습cutoff/불변weightdigest불명, 오늘모델로과거상태를물었으므로새OOS/당시예측아님.
+230본기회+32필드순서+16반복=278결정. 예상API비용0.0139USD, 실제청구액은미확인.
+230본기회 모두유효. Ppositive0.132~0.2767/평균0.1986 -> 모두거부, 거래0.
+문턱을낮추거나질문/모델을다시탐색하지않았다.
+
+5. 공동계좌 ALL 결과 (초기10000USDT, IOC/MARKET동일)
+RSI OFF: net+2437.64/CAGR3.55%/Sharpe0.573/MDD11.87%/193거래.
+Keltner OFF: +3304.03/4.67%/0.763/10.28%/177.
+ON은둘다거래0/net0/현금, API추정비용을빼면미세음수. MDD0을방어성공이라하지않음.
+OFF 비용2배/4h지연 net:
+RSI+985.11/+1206.78, Keltner+1881.46/+1762.26USDT.
+OFF 기본 기간별net(각기간초기10000):
+RSI TRAIN+1063.12/확인+516.64/후반+737.62.
+Keltner+1685.53/+789.22/+589.84.
+Keltner후반증분은여전히약-147.78USDT로혼재.
+
+6. Laya 증분/확률
+고정단위기회 ALL 피한손실/놓친이익:
+RSI26498.59/36027.97bps, 평균증분-49.38bps.
+Keltner23015.47/35159.20, 평균증분-68.61bps.
+확인/후반 평균증분: RSI-35.53/-146.53, Keltner-59.68/-131.53.
+Brier(낮을수록좋음) ALL Laya vs TRAIN상수:
+RSI0.3366 vs0.2529, Keltner0.3504 vs0.2512. 단순상수보다나쁨.
+순서32 gate변경0지만최대확률차8.13%p. 반복16확률차0.
+batchlatency2.50~7.43초/평균6.94초. per-state로16나누면안됨.
+같은수무작위1000회는retained0으로percentile N/A. 무작위우위주장없음.
+
+7. 시장가/IOC
+모든같은설정의계좌/분봉결과필드차이0. 이시료에서는±0.3%가격한도가차이를만들지않음.
+IOC도공격적인taker대리, post-only아님. 실제호가/스프레드/충격/queue없어실전동등주장금지.
+운영시장가허용으로확대하지않고실제주문없음.
+
+8. 분봉 부속감사 (희망기회명목2500USDT, 복리계좌 아님)
+신호마감+1분, prev완성1m volume0.1%상한/.001내림/부분진입취소/48h부분청산분할재시도.
+BTC/ETH고정FULL기회, 모델ON은전부생략. IOC/MARKET동일.
+RSI193기회 net+2473.07/평균체결명목2434.75/명목당net54.90bps.
+Keltner177 +3038.97/2426.18/72.66bps.
+부분진입22/22, 분할청산27/24,최대청산지연4분. 미해결/자료누락/미체결0(조건부모형).
+비용2배 net RSI1084.04/Keltner1763.39,지연4h1179.51/1757.14.
+markbounds net RSI2472.57~2473.52/Keltner3038.47~3039.41.
+분봉Keltner후반증분도-136.93USDT. 새분봉CAGR/Sharpe/전체Risk엔진PASS로쓰지말것.
+
+9. 검증 계획
+최초가능새관찰경계2026-10-14 UTC, 다른연구노출도감사. 이번에는수집/운영을켜지않음.
+최소실제OOS100건+paired80%,고정질문/weight/실제호가/부분체결/latency/mark/cost와Phase4모든조건.
+후향TRAINpairedSD479.62/486.34bps, 목표+25bps(참효과근거아님),z2.6/80%:
+필요baseline기회4360/4483,100기회detectable165.07/167.38bps.
+기존빈도31.3/29.3기회/년이면100기회3.2/3.4년,수천기회약140~153년(정상성예측아닌비현실성경고).
+현재ON0거래,데이터독립성/동시성조정하면더부족. 12개월Paper로수익검증끝난다는설계금지.
+
+10. 최종 판단
+이번 Laya 필터 후향증분불리 + 거래표본0. 정식채택UNVERIFIED,새OOS/PASS/운영승인없음.
+고정NoLaya규칙은조건부실행후향양수,새Keltner기여는후반혼재.
+새조합/새모델/문턱낮추기보다실제호가·부분체결·계좌parity의자료감사를별도로제안.
+시장가변경/새Shadow/Paper/Live/알트확장/질문재튜닝을자동진행하지말것.
+합성22/전체pytest3553/누출110/mypy629/ruff958통과,계좌144최대잔차1e-25·종료0.
+기존UI import계약1개위반·40번시간대표기차이·실전G5G6/tier/호가미확인 유지.
+결과기록전전체시험재실행3553통과(224.46초),기록후신규22재검산/로컬링크519누락0.
+동결이후코드/설정차이0·IOC/MARKET72계좌쌍/6분봉쌍·FULL/OFF차이0, 추가API/성과재계산없음.

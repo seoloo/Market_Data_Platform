@@ -4,16 +4,27 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
-## 2026-10-13 후속 — 고정 숏 실행자료/Laya 비교 설계
+## 2026-10-13 후속 — 고정 숏 실행자료/Laya·시장가 비교 완료
 
 사용자 후속 완료/확장 요청 및 이번 연구 IOC/MARKET 가정 비교 승인. 실제 주문/운영 변경 없음.
 RSI7/70+R5와+Keltner 고정, 익명 Laya 1질문/0.60·OFF/ON/동일비용 주문 비교.
-같은 분봉 원천의canonical4h로통일, BTC legacy4h와14봉차이는별도경고/기존판정불변.
-분봉 부분체결·fundingmarkhour보완/bounds·공통coverage·무작위同수·Brier/순서·반복안정성 포함.
+같은 분봉 원천의canonical4h로통일, legacy4h와BTC14/ETH15봉차이는별도경고/기존판정불변.
+분봉 부분체결·fundingmarkhour보완/bounds·공통coverage·같은 수 무작위 대조·Brier/순서·반복안정성 포함.
 후향 예외만, 미사용OOS0·모델학습cutoff미확인·PASS/새운영 승인없음.
 신규합성22개/전체pytest3553/누출110/타입629/스타일958 통과, 기존UI import계약1건불변.
-아직 Laya결정/PnL0. [설계](research/SHORT_EXECUTION_LAYA_VALIDATION_20261013.md).
-다음은자료/전체검증→수익전동결commit→제한Laya/1회비교→상세기록.
+성과 전`b5950ac` 동결 뒤278결정(본230/순서32/반복16)·144공동계좌·분봉 부속감사 고정1회 완료.
+230유효기회 Ppositive0.132~0.2767<0.60→전부거부/ON 거래0, **후향 Laya증분불리/정식UNVERIFIED**.
+OFF 공동계좌 RSI net+2437.64/CAGR3.55%/Sharpe0.573/MDD11.87%/193거래,
++Keltner+3304.03/4.67%/0.763/10.28%/177. IOC/MARKET차이0, 실전동등 증명아님.
+분봉 희망명목2500/기회 감사 net+2473.07/+3038.97, 부분진입22/22·분할청산27/24,
+미해결0. 복리계좌아님, Keltner 후반증분−136.93USDT로혼재.
+Brier Laya0.3366/0.3504 vs TRAIN상수0.2529/0.2512, 피한손실보다놓친이익이더큼.
+순서변경 gate0/32지만 최대확률차8.13%p, 반복16차이0. 예상API0.0139USD/청구액미확인.
+전향계획만완료: 후향SD/목표25bps로IID4360/4483기회 필요, 현재빈도에서비현실적.
+새관찰/수집/Shadow/Paper/Live는켜지않음. 결과후질문·문턱·규칙변경없음.
+근거: [설계·결과](research/SHORT_EXECUTION_LAYA_VALIDATION_20261013.md)§11,
+[인계TXT](research/SHORT_EXECUTION_LAYA_RESULT_FOR_LLM_20261013.txt).
+다음 제안은 실제호가/부분체결/시간·계좌parity 자료감사만, Laya필터나운영시장가변경근거없음.
 
 ## 2026-10-13 추가 — 다른지표의역할별보완 A 연구 완료
 
