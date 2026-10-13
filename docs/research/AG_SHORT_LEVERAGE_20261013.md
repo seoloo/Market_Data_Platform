@@ -1,7 +1,7 @@
 # AG-CR3·4 × 고정 RSI 숏 — 배율 비교 계약
 
 2026-10-13 Codex. 연구 Phase 0, 기존 운영 Phase 6 불변.
-상태: IMPLEMENTATION_VERIFIED / READY_FOR_APPROVED_PILOT / ADOPTION_UNVERIFIED.
+상태: INITIAL_PILOT_INVALID / CORRECTION_APPROVAL_PENDING / ADOPTION_UNVERIFIED.
 사용자는 이번 1x/최대3x·4x 비교에 설명용 후향 계산 예외를 승인했다.
 정식 PASS·새 OOS·Paper/Live 승인이 아니며 결과 후 튜닝/재계산은 금지한다.
 
@@ -97,6 +97,12 @@ funding은 동결rate/mark판본, 분내 stop과정산 선후불명 credit생략
 복귀/표본·자료한계로 불확정이면'판단불가'도명시한다. 결과후수치변경/추가검색/재실행0.
 
 ## 7. 실행 결과
+
+첫실행24계좌는 목표 갱신없음을결측으로오인한 신규 연결오류로 INVALID.
+[무효 기록/원본 보존](AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
+실행23:32:51~23:35:01 KST, 결과SHA8c50da541924739ffb3a154d3fb1562759f70a1fc193bd261d0279eea9ecd0e5.
+원장24개 합산일치는 입력의미 정확성을 인증하지 않는다. 금액/숏0을 최종배율성과로채택하지 않는다.
+오류교정/새판본1회계산 별도승인 요청. 아래는 성과 전 검증 기록이다.
 
 성과 전 구현 경계: AG 최초자본30%는4h 관측/다음 지정가 판단에 반영한다.
 가격변동 후 총한도 초과는 다음4h에서 비용후 축소를 요청하며 한도 미체결/부분잔량을 숨기지 않는다.

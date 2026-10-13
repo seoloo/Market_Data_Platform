@@ -6,7 +6,12 @@
 
 ## 2026-10-13 후속 — 실행 증거·지갑별 공동계좌 Phase 0 설계
 
-최신: [AG3/4 고정숏 배율 계약](research/AG_SHORT_LEVERAGE_20261013.md).
+최신AG배율: 첫24계좌는 신규 목표전달오류로 INVALID.
+[무효 기록](research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
+목표 갱신없음을결측으로오인, 첫결과8c50da54...ecd0e5 보존/최종성과사용금지.
+오류교정/새판본1회계산 별도승인 요청, 기존AG판정/운영불변. 아래는 성과 전 기록이다.
+
+이전: [AG3/4 고정숏 배율 계약](research/AG_SHORT_LEVERAGE_20261013.md).
 사용자AG3/4 각각 숏1x/최대3x·4x 비교와 설명용후향예외 승인,24계좌1회.
 숏증거금10%/개별위험1% 유지, AG공동 연구현금과 기존 분리지갑 연구를 구분한다.
 구현검증: 새52/전체3818/leakage134/mypy642/ruff·format977 정상, 기존UI import1위반 유지.

@@ -5,6 +5,12 @@
 
 ## 2026-10-13 — AG-CR3·4 고정 숏 배율 비교 (Codex)
 
+최신: 첫24계좌는 신규 목표전달오류로 INVALID. [무효 기록](docs/research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
+[인계TXT](docs/research/AG_SHORT_LEVERAGE_FOR_LLM_20261013.txt).
+목표 갱신없음을결측으로오인, 첫결과8c50da54...ecd0e5 보존/최종성과사용금지.
+같은 신호·배율·위험의 오류교정/새판본1회계산 승인 요청. CORRECTION_APPROVAL_PENDING.
+기존AG판정/운영/208불변. 아래는 성과 전 기록이다.
+
 사용자 요청과 설명용 후향 예외 승인. [고정 계약](docs/research/AG_SHORT_LEVERAGE_20261013.md).
 AG3/4 각각 BASE/숏1x/숏최대3x·4x, 4민감도 총24계좌를 비교한다.
 숏증거금10%/개별위험1% 유지, 기존AG공동현금·현물+선물롱 구조와 분리지갑 연구를 구분한다.
