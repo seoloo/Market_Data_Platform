@@ -125,11 +125,15 @@ class _UFill:
     executed_volume: Decimal
     funds: Decimal
     paid_fee: Decimal
+    state: str = "done"
 
 
 class _Upbit:
-    def __init__(self, fills: list[Decimal], unknown_on: int = -1) -> None:
-        self.fills, self.unknown_on = fills, unknown_on
+    def __init__(
+        self, fills: list[Decimal], unknown_on: int = -1, *, ack_wait: bool = False
+    ) -> None:
+        self.fills, self.unknown_on, self.ack_wait = fills, unknown_on, ack_wait
+        self.empty = False
         self.sent: list[tuple[Decimal, Decimal, str]] = []
         self.known: dict[str, _UFill] = {}
         self.bids = [D(100_000_000) - D(1000) * k for k in range(10)]
@@ -141,13 +145,17 @@ class _Upbit:
         self, market: str, side: str, volume: Decimal, price: Decimal, identifier: str
     ) -> _UFill:
         assert side == "ask" and market == "KRW-BTC"
+        if self.empty:
+            raise ExchangeError('업비트 주문 거절 400: {"error":{"name":"insufficient_funds_ask"}}')
         n = len(self.sent)
         self.sent.append((volume, price, identifier))
         f = min(volume, self.fills[n])
         fill = _UFill(f, f * price, f * price * D("0.0005"))
+        self.known[identifier] = fill
         if n == self.unknown_on:
-            self.known[identifier] = fill
             raise OrderStateUnknownError("timeout")
+        if self.ack_wait:  # 실제 업비트: 주문 응답은 체결 전 상태(wait · 0)
+            return _UFill(D(0), D(0), D(0), "wait")
         return fill
 
     def get_order(self, identifier: str) -> _UFill | None:
@@ -163,6 +171,33 @@ def test_upbit_ioc_rounds_until_sold() -> None:
     assert len({s[2] for s in c.sent}) == 2  # 회차마다 새 identifier
     assert c.sent[0][1] == D(99_998_000) and c.sent[1][1] == D(99_996_000)  # 2 칸 → 4 칸
     assert "BTC 0.01 팜" in log[-1]
+
+
+def test_upbit_fill_read_from_order_query_not_ack() -> None:
+    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    c = _Upbit([D("0.01")], ack_wait=True)
+    run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
+    assert item.sold == D("0.01") and item.status == "done" and len(c.sent) == 1
+
+
+def test_upbit_old_zero_record_refreshed_without_new_order() -> None:
+    """2026-10-13: 첫 주문에 다 팔렸는데 0 으로 적혀 같은 수량을 다시 팔려 했다."""
+    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    c = _Upbit([D("0.01")], ack_wait=True)
+    c.known["liq-J-BTC-0"] = _UFill(D("0.01"), D(1_000_000), D(500))
+    item.orders.append(
+        Order("liq-J-BTC-0", "liq-J-BTC-0", D("0.01"), D(1), 0, closed=True, status="IOC")
+    )
+    run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
+    assert item.sold == D("0.01") and item.status == "done" and c.sent == []
+
+
+def test_upbit_no_balance_ends_item() -> None:
+    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    c = _Upbit([D(0)])
+    c.empty = True
+    log = run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
+    assert item.status == "done" and "잔고 없음" in log[0]
 
 
 def test_upbit_stops_with_leftover_after_rounds() -> None:

@@ -28,6 +28,7 @@ class _UFill:
     executed_volume: Decimal
     funds: Decimal
     paid_fee: Decimal
+    state: str = "done"
 
 
 class FakeUpbit:

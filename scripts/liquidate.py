@@ -275,6 +275,7 @@ def step(job: Job) -> list[str]:
                 try:
                     log += run_upbit_item(it, c, job.job_id, _now_ms, time.sleep)
                 except AutoTradingError as exc:
+                    it.status = "working"  # 업비트는 24 시간 — '장 열리면' 이 아니다
                     log.append(f"{it.symbol} 업비트 오류: {exc} — 다음 확인 때 다시")
         finally:
             c.close()

@@ -402,6 +402,8 @@ def upbit_level_price(bids: Sequence[Decimal], round_no: int) -> Decimal | None:
 
 class UpbitFill(Protocol):
     @property
+    def state(self) -> str: ...
+    @property
     def executed_volume(self) -> Decimal: ...
     @property
     def funds(self) -> Decimal: ...
@@ -428,9 +430,17 @@ def run_upbit_item(
 ) -> list[str]:
     """지정가 IOC 를 몇 번 — 회차마다 두 칸씩 더 깊게(1% 안).
 
-    다 팔거나 5,000 원 아래가 남으면 끝."""
+    다 팔거나 5,000 원 아래가 남으면 끝.
+
+    업비트 주문 응답은 IOC 가 처리되기 전 상태(wait · 체결 0)라, 체결은 주문 조회로 확인한다.
+    예전 기록도 다시 조회해 고친다 — 2026-10-13 첫 주문에 다 팔렸는데 0 으로 적혀 같은 수량을
+    다시 팔려다 '잔고 부족(insufficient_funds_ask)' 을 몇 분마다 되풀이했다(사용자 발견)."""
     log: list[str] = []
     market = f"KRW-{item.symbol}"
+    empty = False
+    for o in item.orders:
+        if o.status == "IOC" and (seen := client.get_order(o.order_id)) is not None:
+            o.filled, o.amount, o.fee = seen.executed_volume, seen.funds, seen.paid_fee
     start = len(item.orders)
     for r in range(rounds):
         _asks, bids = client.orderbook(market)
@@ -445,8 +455,19 @@ def run_upbit_item(
         try:
             got: UpbitFill | None = client.place_limit_ioc(market, "ask", rem, price, ident)
         except OrderStateUnknownError:
-            sleep(1.0)
-            got = client.get_order(ident)
+            got = None
+        except AutoTradingError as exc:
+            if "insufficient_funds_ask" not in str(exc):
+                raise
+            item.note = "업비트 잔고 없음 — 더 팔 것 없음"
+            log.append(f"{item.symbol} 업비트에 남은 잔고 없음 — 끝으로 봄")
+            empty = True
+            break
+        for _ in range(10):
+            if got is not None and got.state in ("done", "cancel"):
+                break
+            sleep(0.5)
+            got = client.get_order(ident) or got
         o = Order(ident, ident, rem, price, now_ms(), closed=True, status="IOC")
         if got is not None:
             o.filled, o.amount, o.fee = got.executed_volume, got.funds, got.paid_fee
@@ -456,7 +477,8 @@ def run_upbit_item(
         sleep(1.5)
     rest = item.remaining
     bid = item.orders[-1].price if item.orders else ZERO
-    item.status = "done" if rest * bid < UPBIT_MIN_KRW or rest <= 0 else "working"
+    done = empty or rest * bid < UPBIT_MIN_KRW or rest <= 0
+    item.status = "done" if done else "working"
     log.append(
         f"{item.symbol} {_n(item.sold)} 팜 · {item.amount:,.0f} 원"
         + (f" · 남음 {_n(rest)}" if item.status != "done" else "")
