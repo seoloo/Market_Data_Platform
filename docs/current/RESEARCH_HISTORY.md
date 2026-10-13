@@ -9,6 +9,17 @@
 
 ## 고정 숏의 T/v2 롱·현금 기여·복귀 — UNVERIFIED (2026-10-13)
 
+후속 독립 계획/롱 기회 진단: [계획](../research/SHORT_LONG_INDEPENDENT_PLAN_20261013.md),
+[롱 감사](../research/LONG_CAPTURE_AUDIT_20261013.md), [TXT](../research/SHORT_LONG_INDEPENDENT_FOR_LLM_20261013.txt).
+신규정책 성과0/80%예외확대없음, FEASIBILITY_DRAFT/NOT_REGISTERED/NOT_ACTIVATED.
+원래 롱목표전환BTC61/ETH68(초기 제외), 숏충돌9건과분모구분.
+복귀9/9·WAIT10/6/4취소를원래시각·지연·잔여와재구성일치,중첩8사건/독립성미확인.
+복귀우선9중7건은다음예정롱목표가마감자료로계산가능한뒤신규숏진입(전체신규숏8건).
+실제first-seen미확보/해당숏보류의손익미측정. 별도후향유래가설이며기존정책을고치지않았다.
+실행보존/예정목표공간예약/4h잠정Shadow 비교안3개만, 사용자선택전구현금지.
+기존TRAIN43월SD234.28/231.62bps, 작은효과월8.333bps IID/z2필요6383/6238월,
+POWER_NOT_READY/INDEPENDENT_DATA_NOT_READY. 기존정식UNVERIFIED/Paper·Live상태불변.
+
 사용자 확인요청/이번고정결합 설명용후향계산예외 승인. 설계ff6a6f1/구현ea46783 뒤60계좌1회.
 BASE 동일4h실행 T/v2참조 vs RSI/+Keltner, 복귀우선/48h대기·비용2배/지연·4기간.
 숏은같은종목롱이없을때만,60분청산후대기유지/공유현금·현재equity재투자.

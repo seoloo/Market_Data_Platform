@@ -4,6 +4,23 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
+## 2026-10-13 후속 — 독립 검증 계획·롱 기회 보존 진단
+
+사용자 계획진행/롱신호최대한파악 요청, [계획](research/SHORT_LONG_INDEPENDENT_PLAN_20261013.md)과
+[롱 감사](research/LONG_CAPTURE_AUDIT_20261013.md), [TXT](research/SHORT_LONG_INDEPENDENT_FOR_LLM_20261013.txt).
+FEASIBILITY_DRAFT/NOT_REGISTERED/NOT_ACTIVATED, 신규계좌손익0/미사용OOS0/새80%예외없음.
+T/v2는 보통20/60/120중2상승이면 작은롱. 세기간상승을추가요구하지않는다.
+초기제외 목표롱전환BTC61/ETH68, 숏과충돌한9건과 다른 분모다.
+원래 1일목표지연·60분대기/4h격자·잔량/체결지연을분리, 운영시간표자동변경없음.
+기존9/9·WAIT10/6/4취소를시각/지연/잔여까지재구성일치,중첩8사건·독립성미확인.
+복귀우선9중7건은 다음예정롱목표가마감자료로계산가능한뒤 신규숏진입, 해당신규숏8건.
+실제 first-seen시각미확보, 신규숏을생략했을때의손익계산없음. 새후향유래가설로만남김.
+A 확정신호실행보존/B 예정롱공간예약/C4h잠정Shadow 비교만, B후속우선제안/아직미선택.
+수익·방어·복귀각각단위/분모/판정, 독립T_lock/T0/120일warmup·80%·C2/C4/실행경계 설계.
+TRAIN43월 순차이SD234.28/231.62bps,월8.333bps참고효과 IID/z2필요6383/6238월.
+POWER_NOT_READY/INDEPENDENT_DATA_NOT_READY, 짧은Paper수익통과설계아님.
+전체3617/누출115/mypy633/ruff964정상, 기존UI import1위반유지. 기존소스/결과/208/9월후자료/운영불변.
+
 ## 2026-10-13 후속 — 고정 숏의 롱·현금 기여·복귀 비용 완료
 
 사용자확인요청/별도후향계산예외답변, 이번고정결합만80%선행게이트예외/PASS·운영승인없음.
