@@ -212,6 +212,11 @@ C11~C14, D01~D06·초기지갑UNSET/자료/80% 관문은 유지, 새동적성과
 
 ## 문서 정리 이력
 
+최신 추가계약 검증: 독립 원본304개/13,147,773행 감사·순수재생47시험, 동일1000회.
+전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
+SYNTHETIC_REPLAY_VERIFIED/HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY, 새시장손익0.
+아직 실제중단 경계/가용성 어댑터·운영parity 완료가 아니며 전체게이트 통과0.
+
 성과 전 [자료·실행 추가 설계](../research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md):
 현물 공식 중단·분봉 누락·무거래 행을 구분하고 stale 신규 차단/선물 축소 유지 방향을 고정.
 DATA_NOT_READY/어댑터 미완료, 새 시장성과0. 일반 주문·위험·운영 규칙 변경 없음.

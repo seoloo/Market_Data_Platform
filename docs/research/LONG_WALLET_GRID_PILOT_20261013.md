@@ -1,7 +1,7 @@
 # 지갑별 동적 계좌·롱 복귀 격자 — 설명용 후향 파일럿
 
 작성: 2026-10-13 Codex. 기존 운영 Phase6 유지, 연구 Phase0.
-상태 **PILOT_CONTRACT_FIXED / IMPLEMENTATION_PENDING / UNVERIFIED**.
+상태 **PILOT_CONTRACT_FIXED / SYNTHETIC_REPLAY_VERIFIED / DATA_NOT_READY / UNVERIFIED**.
 정식 전략 등록/80% 검정력/독립 OOS/실거래 승인 아님.
 
 ## 1. 이번 사용자 승인과 목적
@@ -127,6 +127,11 @@ COST2는모든fee/slip/stop추가비용2배, THIN은참여량0.00025, ACK5는확
 ## 9. 실행 결과
 
 성과 전0회. 완료 후 실제 자료/검증/근사·결과는 이 절에만 추가한다.
+
+추가 설계fb88148 뒤 원본304개/13,147,773행 감사·순수 재생/합성47개 검증.
+전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
+역사 재생 어댑터 미완료/실제 중단 경계와 원천 대조 미완료로 DATA_NOT_READY.
+36계좌 새시장손익0회, 결과 판정0. 세부 근거는 아래 추가 계약§8.
 
 ## 10. 성과 전 추가 설계
 

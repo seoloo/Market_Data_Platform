@@ -5,6 +5,17 @@
 
 ## 2026-10-13 — 지갑3비율·복귀 격자 동적 파일럿 승인/계약 고정 (Codex)
 
+최신 완료: 추가 설계fb88148 → 독립 자료 감사/순수 재생/합성47개 검증.
+304 ZIP/13,147,773행·중복0, 현물BTC1633/ETH1634분 공백·선물공백0. 가격 보간0.
+새모형 판본별3회 예산·비용후 cap·선물미실현손실 재원·종목별funding 귀속·스트레스 보완.
+동일 재생1000회/전체pytest3751/leakage128/mypy639/ruff·format972 정상.
+기존UI import규약1위반 유지. SYNTHETIC_REPLAY_VERIFIED/HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY.
+새 시장손익0, 운영/Paper/208/9월이후자료/기존결과 불변. 전체Phase 통과 아님.
+[실행 근거](docs/research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md),
+[다른AI TXT](docs/research/LONG_WALLET_AUDIT_FOR_LLM_20261013.txt).
+다음Phase0: 실제중단 경계·원천 대조/가용성 어댑터·재개 경계 검증부터, 완료 뒤 코드/입력 동결과36계좌1회.
+아래 항목은 앞선 설계 시점의 기록이다.
+
 - 성과 전 후속: [자료·실행 추가 설계](docs/research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md).
   전체300 ZIP 시각 조사: 현물 각11공백 BTC1633/ETH1634분, 선물공백0.
   공식 중단과 무거래 행이 섞여 있어 availability/평가 stale·선물 축소 유지 계약 추가.

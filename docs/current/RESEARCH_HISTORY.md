@@ -9,6 +9,12 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+최신검증: 304원본/13,147,773행 감사·47합성시험, 동일재생1000회 동일.
+전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
+SYNTHETIC_REPLAY_VERIFIED/HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY, 새성과0.
+[인계TXT](../research/LONG_WALLET_AUDIT_FOR_LLM_20261013.txt), 추가계약§8 참조.
+기존판정·운영단계 불변, 아래 문장은 이전 시점의 진행 기록이다.
+
 성과 전 [추가 설계](../research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md):
 전체300 ZIP 시각 조사, 현물 각11공백/선물0. 실제 중단·0거래량 행과 자료 누락 구분 필요.
 판본별 시도 예산·부분량 cap·funding 귀속·스트레스 보고 보완 중.

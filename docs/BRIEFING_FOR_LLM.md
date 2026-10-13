@@ -8,6 +8,13 @@
 
 ### 최신 승인: 지갑3비율 동적 격자 파일럿 계약 고정
 
+최신검증: 원본304개/13,147,773행 감사·새순수재생 합성47개, 동일입력1000회 동일.
+전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
+판본별3회/비용후cap/선물손실재원/funding종목귀속/분내스트레스 보완.
+HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY, 실제중단 경계와 어댑터 검증 전 새손익0.
+[다른AI TXT](research/LONG_WALLET_AUDIT_FOR_LLM_20261013.txt), 추가계약§8의 실제검증기록 참조.
+아래 “예정/대기” 문장은 이전 시점의 기록이며 전체 연구 완료를 뜻하지 않는다.
+
 성과 전 [추가 설계](research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md) 고정.
 300 ZIP 시각 조사에서 현물 각11공백(BTC1633/ETH1634분), 선물0.
 실제 중단·무거래 행을 구분하고 미래 가격 보간 체결 금지/선물 축소 유지 계약 추가.
