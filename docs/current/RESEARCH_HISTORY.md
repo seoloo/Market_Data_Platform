@@ -11,7 +11,8 @@
 
 후속별도승인: [AG3/4 고정숏 배율 계약](../research/AG_SHORT_LEVERAGE_20261013.md).
 AG3/4 각각BASE/숏1x/최대3x·4x,4민감도24계좌1회. 숏증거금10%/개별위험1% 유지.
-기존H1귀속/분리지갑 결과와 분리, CONTRACT_FIXED/IMPLEMENTATION_PENDING, 새성과0/운영불변.
+기존H1귀속/분리지갑 결과와 분리. 새52/전체3818/leakage134/mypy642/ruff977 정상.
+기존UI import1위반·정식미검증 유지. READY_FOR_APPROVED_PILOT, 코드동결 뒤24계좌1회/새성과0.
 
 최종 후향 파일럿 완료: 6493f1c 동결 후 36계좌 1회 계산, 원장36개 독립 검산 일치.
 [상세 결과](../research/LONG_WALLET_RESULTS_20261013.md),

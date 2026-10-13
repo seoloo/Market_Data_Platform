@@ -214,7 +214,8 @@ C11~C14, D01~D06·초기지갑UNSET/자료/80% 관문은 유지, 새동적성과
 
 2026-10-13 최신: [AG3/4 고정숏 배율 계약](../research/AG_SHORT_LEVERAGE_20261013.md).
 사용자 숏1x/최대3x·4x 비교와 설명용후향예외 승인,24계좌1회.
-숏증거금10%/개별위험1% 유지. CONTRACT_FIXED/IMPLEMENTATION_PENDING, 새성과0/운영불변.
+숏증거금10%/개별위험1% 유지. 새52/전체3818/leakage134/mypy642/ruff977 정상.
+기존UI import1위반 보존. READY_FOR_APPROVED_PILOT, 코드동결 뒤24계좌1회/새성과0/운영불변.
 
 최종2026-10-13: [지갑 복귀36계좌 결과](../research/LONG_WALLET_RESULTS_20261013.md).
 코드/입력6493f1c 동결 후 1회 계산·저장원장 독립검산 모두일치.

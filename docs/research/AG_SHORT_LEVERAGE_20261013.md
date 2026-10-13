@@ -1,7 +1,7 @@
 # AG-CR3·4 × 고정 RSI 숏 — 배율 비교 계약
 
 2026-10-13 Codex. 연구 Phase 0, 기존 운영 Phase 6 불변.
-상태: CONTRACT_FIXED / IMPLEMENTATION_PENDING / ADOPTION_UNVERIFIED.
+상태: IMPLEMENTATION_VERIFIED / READY_FOR_APPROVED_PILOT / ADOPTION_UNVERIFIED.
 사용자는 이번 1x/최대3x·4x 비교에 설명용 후향 계산 예외를 승인했다.
 정식 PASS·새 OOS·Paper/Live 승인이 아니며 결과 후 튜닝/재계산은 금지한다.
 
@@ -98,4 +98,22 @@ funding은 동결rate/mark판본, 분내 stop과정산 선후불명 credit생략
 
 ## 7. 실행 결과
 
+성과 전 구현 경계: AG 최초자본30%는4h 관측/다음 지정가 판단에 반영한다.
+가격변동 후 총한도 초과는 다음4h에서 비용후 축소를 요청하며 한도 미체결/부분잔량을 숨기지 않는다.
+숏margin10%는 합계현재시장명목/L, 개별risk1%는 진입비용 차감 후equity로 재검산한다.
+48h/보호 감시는 분봉, 일반목표 판단은4h이며 지난 일봉AG 실행 숫자를 재현한다고 주장하지 않는다.
+미래극값 합산 스트레스 대리는 실제동시tick경로/정확한MDD의 상하한 인증이 아니다.
+동결입력 재감사 완료/새성과0. AG기존시험40·새합성49 정상, 전체검증은 진행 중이다.
+
 아직 새 성과 계산0회. 실행 후 이 절과 결과 TXT에 별도 기록한다.
+
+## 8. 성과 전 검증 완료
+
+계약23410ba 뒤 순수엔진/분리실행기/새합성52개 구현. 결정론1000회·수익배수중복0 검산.
+진입첫분보호·분내나중funding의진입수량누출금지·전량확인60분·합계증거금10%/개별위험1% 검증.
+전체pytest3818 정상228.78초, leakage134 정상22.01초, strict mypy642파일 정상.
+ruff check/format977 정상. lint-imports 기존UI.server→ops.conn_test→exchange.upbit 1위반 유지.
+기존AG분배·Paper 시험40 정상. 이는 기존역사성과/실제운영안전성을 완전인증한것은 아니다.
+입력96dc9770...7235와원본해시 재감사, 기존H1/36계좌/이전복귀결과4SHA 불변.
+현재 새손익0. 코드/입력 커밋 뒤 승인된24계좌를1회 계산한다.
+실제계좌/주문·AG/Paper/예약·208·9월이후자료·기존코드 변경0.

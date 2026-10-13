@@ -9,7 +9,9 @@
 최신: [AG3/4 고정숏 배율 계약](research/AG_SHORT_LEVERAGE_20261013.md).
 사용자AG3/4 각각 숏1x/최대3x·4x 비교와 설명용후향예외 승인,24계좌1회.
 숏증거금10%/개별위험1% 유지, AG공동 연구현금과 기존 분리지갑 연구를 구분한다.
-CONTRACT_FIXED / IMPLEMENTATION_PENDING / ADOPTION_UNVERIFIED, 새성과0/운영불변.
+구현검증: 새52/전체3818/leakage134/mypy642/ruff·format977 정상, 기존UI import1위반 유지.
+입력/원본 재감사·기존결과4SHA 불변. READY_FOR_APPROVED_PILOT/정식UNVERIFIED.
+새성과0, 코드/입력 커밋 뒤24계좌1회. 기존운영/208·9월이후자료 불변.
 
 ### 최신 승인: 지갑3비율 동적 격자 파일럿 계약 고정
 

@@ -8,8 +8,10 @@
 사용자 요청과 설명용 후향 예외 승인. [고정 계약](docs/research/AG_SHORT_LEVERAGE_20261013.md).
 AG3/4 각각 BASE/숏1x/숏최대3x·4x, 4민감도 총24계좌를 비교한다.
 숏증거금10%/개별위험1% 유지, 기존AG공동현금·현물+선물롱 구조와 분리지갑 연구를 구분한다.
-CONTRACT_FIXED / IMPLEMENTATION_PENDING / ADOPTION_UNVERIFIED. 새성과0, 운영·208변경0.
-다음: 합성/전체검증·코드동결 후1회 계산, 결과·인계TXT·커밋까지 완료.
+구현검증 완료: 새합성52/결정론1000, 전체3818/leakage134/mypy642/ruff·format977 정상.
+기존UI import1위반 유지. 입력/원본 재감사·기존결과4SHA 불변.
+IMPLEMENTATION_VERIFIED / READY_FOR_APPROVED_PILOT / ADOPTION_UNVERIFIED. 새성과0/운영불변.
+코드/입력 커밋 뒤24계좌1회 계산, 결과·인계TXT·커밋까지 완료한다.
 
 ## 2026-10-13 — 지갑3비율·복귀 격자 동적 파일럿 승인/계약 고정 (Codex)
 
