@@ -356,3 +356,13 @@ def test_group_halts_and_text(tmp_path: Path) -> None:
     job = Job("J", "glide", "오르빗", 0, [Item("toss_us", "SCHD", ["glide"], D(3))])
     text = job_text(job)
     assert "Glide 만" in text and "토스 미국 SCHD 0/3" in text and "정지풀기" in text
+
+
+def test_toss_unknown_end_status_closes_order() -> None:
+    """장 마감에 만료된 당일 주문처럼 모르는 끝 상태도 끝난 주문 — 정리가 멈추지 않는다."""
+    item = Item("toss_us", "TQQQ", ["glide"], D(3), glide_part=D(3))
+    item.orders.append(Order("o0", "c0", D(3), D(50), 0))
+    t = _Toss()
+    t.orders["o0"] = _TStatus("EXPIRED", D(1), D(50), D("0.05"))
+    run_toss_item(item, t, "J", 1, session_open=False)
+    assert item.orders[0].closed and item.status == "waiting" and item.remaining == D(2)

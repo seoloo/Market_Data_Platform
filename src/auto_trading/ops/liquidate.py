@@ -522,7 +522,10 @@ class TossLike(Protocol):
     def cancel(self, order_id: str) -> TossResult: ...
 
 
-_CLOSED = {"FILLED", "CANCELED", "REJECTED", "REPLACED"}
+_OPEN = {"PENDING", "PENDING_CANCEL", "PENDING_REPLACE", "PARTIAL_FILLED"}
+"""토스 주문이 아직 살아 있는 상태. 이 밖의 값(FILLED · CANCELED · REJECTED · REPLACED, 장 마감에
+만료된 당일 주문 등)은 끝난 주문으로 본다 — 모르는 끝 상태 하나로 정리가 멈추지 않게
+(kr_accumulate 와 같은 기준). 빈 값은 모름이라 살아 있다고 본다."""
 
 
 def run_toss_item(
@@ -545,7 +548,7 @@ def run_toss_item(
         o.filled = st.filled_qty
         o.amount = st.filled_amount or ZERO
         o.fee = st.commission or ZERO
-        if st.status in _CLOSED:
+        if st.status and st.status not in _OPEN:
             o.closed = True
         elif session_open and now_ms - o.placed_ms >= TOSS_REPLACE_MS and o.filled < o.qty:
             res = trader.cancel(o.order_id)
