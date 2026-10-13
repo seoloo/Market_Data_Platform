@@ -6,6 +6,11 @@
 
 ## 2026-10-13 후속 — 실행 증거·지갑별 공동계좌 Phase 0 설계
 
+후속 [순수 합성 계약](research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)을 먼저 동결한다.
+연구 전용 증거/시간/지정가/지갑예약/claim 모형만 구현 예정, 실제 adapter/운영 연결 없음.
+지갑 fixture는 연구 자본 배분 승인이 아니며 동적 세 계좌 성과·80%/미사용 OOS는 미등록 유지.
+아래 내용은 이전 설계 시점의 기록이다. 후속 합성 구현을 실제 CAS/정전/보호 인증으로 확대하지 않는다.
+
 [설계](research/SHORT_LONG_EXECUTION_ACCOUNT_PLAN_20261013.md),
 [TXT](research/SHORT_LONG_NEXT_PHASE0_FOR_LLM_20261013.txt).
 사용자다음작업으로실행코드E01~E10감사/상태·청산증거·지갑회계/동적격자대조설계.

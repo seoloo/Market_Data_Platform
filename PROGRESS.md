@@ -5,6 +5,11 @@
 
 ## 2026-10-13 — 롱 복귀 실행 증거·지갑별 계좌 Phase 0 설계 (Codex)
 
+- 후속 사용자 “다음 작업”: [순수 합성 계약](docs/research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)을
+  성과 없는 검증 범위로 먼저 고정. 계약 커밋 뒤 분리 연구 모듈/시험만 구현할 예정.
+  초기 지갑 비율/동적 성과는 미등록·미계산, 실제 CAS/정전/주문/운영 연결 없음.
+  아래 항목은 이전 설계 완료 시점의 기록이며 후속 구현 결과와 구분한다.
+
 - 사용자 다음작업: 직전 제안의 실행 확인·UNKNOWN/보호·멱등 복귀와 동적 공동계좌 설계.
   [설계·코드감사](docs/research/SHORT_LONG_EXECUTION_ACCOUNT_PLAN_20261013.md),
   [다른 AI용 TXT](docs/research/SHORT_LONG_NEXT_PHASE0_FOR_LLM_20261013.txt).

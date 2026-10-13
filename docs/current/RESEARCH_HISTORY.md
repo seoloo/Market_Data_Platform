@@ -9,6 +9,10 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+후속 사용자 요청으로 [순수 합성 검증 계약](../research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)
+먼저 동결. 성과/시장 자료 없이 분리된 계약 모형과 시험을 구현할 예정이며,
+이는 정식 전략 등록/Phase 5/운영 CAS·정전·보호 인증이 아니다. 아래는 이전 설계 기록이다.
+
 사용자다음작업, [실행증거·계좌설계](../research/SHORT_LONG_EXECUTION_ACCOUNT_PLAN_20261013.md),
 [TXT](../research/SHORT_LONG_NEXT_PHASE0_FOR_LLM_20261013.txt).
 DESIGN_DRAFT/NOT_REGISTERED/NOT_IMPLEMENTED/NOT_ACTIVATED, 신규성과/코드0.
