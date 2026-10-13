@@ -1,6 +1,7 @@
 # 지갑·롱 복귀 파일럿 — 자료 공백·실행 예산 추가 설계
 
-작성: 2026-10-13 Codex. **DESIGN_FIXED / DATA_ADAPTER_PENDING / UNVERIFIED**.
+작성: 2026-10-13 Codex. 최종 **PILOT_COMPLETED / ADOPTION_UNVERIFIED**.
+계약과 아래 감사 기록은 성과 전 판본이다. 연결/계산 대기는 종료했고 최종 결과는 §11을 따른다.
 새 시장 손익 계산 0회. 계약 `e775040` 이후 자료·구현 검토에서 나온 보완이다.
 [본 계약](LONG_WALLET_GRID_PILOT_20261013.md)의 36계좌·신호·기간·비용·판정은 유지한다.
 기존 운영 Phase 6 유지, 이 연구는 Phase 0 설계 및 자료 감사 중이다.
@@ -217,3 +218,14 @@ funding 각6849개, 실제raw mark각3107개/1h대리각3742개. mark분봉·실
 입력ID 96dc97701d133ab3f4ec261534ed55c4129fd09507b535b884ff0e1c16107235.
 기록 reports/wallet_grid_20261013/aligned_manifest.json. 최종입력과 재생코드를 커밋한 뒤 계산한다.
 READY_FOR_APPROVED_EXPLANATORY_PILOT, 새성과0. 정식Phase게이트/PASS/OOS·운영상태 변경0.
+
+## 11. 고정 입력·코드 이후 실제 결과 완료
+
+6493f1cbfdf3b3246842bed2344dba2dcd530d81 동결 뒤 36계좌 후향 계산 1회 완료.
+22:06:51~22:10:19 KST. 원장36개 독립 재합산 모두일치, 오류0.
+결과 SHA c81737fdfb29742601991314967f0b4b92e7069f573a6ab93bdc8670f6f840e7.
+[상세 결과](LONG_WALLET_RESULTS_20261013.md), [결과 TXT](LONG_WALLET_RESULTS_FOR_LLM_20261013.txt).
+숏 추가는각12조건 기준선 대비 양수, 1M−4H는12조건 모두음수.
+한도/시도예산으로 1M의 빠른평가가 실제 빠른복귀를 보장하지 않는 저장사건을 확인했다.
+증거금 여유 경고·미확보실행자료/funding대리·복귀8사건·2022집중을 별도 한계로 유지한다.
+PILOT_COMPLETED / ADOPTION_UNVERIFIED. PASS/OOS·Paper/Live·최적비율 선택 없음.
