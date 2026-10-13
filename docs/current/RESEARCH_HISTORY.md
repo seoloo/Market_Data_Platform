@@ -9,6 +9,10 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+2026-10-14 AG후속: [목표전달교정](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md) 사용자진행승인.
+첫INVALID보존/신호·위험숫자불변,61회귀/전체3827/leakage135/mypy642/ruff977 정상.
+기존UI import1위반 유지. READY_FOR_APPROVED_RECALCULATION, 코드커밋뒤24계좌1회. 아래는 이전 기록이다.
+
 AG배율첫계산: [신규 목표전달오류/INVALID](../research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
 24계좌첫결과/원장 보존, 최종성과로사용금지·숏배율판단불가. 오류교정재계산 별도승인 요청.
 기존AG판정/운영 불변. 아래는 이전 진행 기록이다.

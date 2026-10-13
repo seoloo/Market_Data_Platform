@@ -354,6 +354,60 @@ def test_missing_targets_fail_closed():
     assert not p._new_allowed(a, minute(), short=True)
 
 
+@pytest.mark.parametrize("offset", [1, 2, 3, 4, 5])
+def test_no_update_preserves_confirmed_daily_target(offset):
+    a = account()
+    p._begin(a, block(), 20 * p.DAY)
+    prior = a.goals
+    at_ms = offset * p.H4
+    p._begin(a, replace(block(at_ms), targets=None), 20 * p.DAY)
+    assert a.targets_known and a.goals == prior
+    assert a.targets_updated_ms == 0
+    assert p._new_allowed(a, minute(at_ms), short=False)
+
+
+def test_zero_daily_goal_carry_allows_registered_short():
+    a = account()
+    p._begin(a, block(targets=(D(0), D(0))), 20 * p.DAY)
+    p._begin(a, replace(block(p.H4), targets=None, signals=(True, False)), 20 * p.DAY)
+    p._minute(a, minute(p.H4), ((), ()))
+    assert a.targets_known and a.positions[0].side == -1
+    assert a.counts["short_opened"] == 1
+
+
+def test_missing_next_daily_update_expires_without_rewriting_goal():
+    a = account()
+    p._begin(a, block(), 20 * p.DAY)
+    p._begin(a, replace(block(p.DAY), targets=None), 20 * p.DAY)
+    assert not a.targets_known and a.goals == (D("0.2"), D("0.2"))
+    assert not p._new_allowed(a, minute(p.DAY), short=False)
+    assert not p._new_allowed(a, minute(p.DAY), short=True)
+
+
+def test_next_day_refresh_replaces_previous_goal():
+    a = account()
+    p._begin(a, block(), 20 * p.DAY)
+    p._begin(a, block(p.DAY, targets=(D(0), D("0.1"))), 20 * p.DAY)
+    p._begin(a, replace(block(p.DAY + p.H4), targets=None), 20 * p.DAY)
+    assert a.targets_known and a.goals == (D(0), D("0.1"))
+    assert a.targets_updated_ms == p.DAY
+
+
+@pytest.mark.leakage
+def test_future_target_refresh_does_not_change_carried_prefix():
+    selected = (p.Case(3, "BASE", p.SCENARIOS[0]),)
+    prefix = [block(), replace(block(p.H4), targets=None)]
+    first = p.simulate([*prefix, block(2 * p.H4)], end_ms=3 * p.H4, selected=selected)
+    changed = p.simulate(
+        [*prefix, block(2 * p.H4, targets=(D(0), D(0)))], end_ms=3 * p.H4, selected=selected
+    )
+    key = selected[0].key
+    assert first[key]["trace"][:2] == changed[key]["trace"][:2]
+    assert [f for f in first[key]["fills"] if f["at_ms"] < 2 * p.H4] == [
+        f for f in changed[key]["fills"] if f["at_ms"] < 2 * p.H4
+    ]
+
+
 @pytest.mark.parametrize(
     "exposure,mode", [(3, "SHORT_1X"), (3, "SHORT_MAX"), (4, "SHORT_1X"), (4, "SHORT_MAX")]
 )

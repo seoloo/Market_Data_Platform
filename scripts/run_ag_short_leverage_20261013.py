@@ -21,12 +21,15 @@ from scripts import wallet_grid_data_20261013 as data
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "reports/wallet_grid_20261013"
-OUT = ROOT / "reports/ag_short_leverage_20261013"
+OUT = ROOT / "reports/ag_short_leverage_corrected_20261014"
+FIRST_OUT = ROOT / "reports/ag_short_leverage_20261013"
+FIRST_RESULT_SHA = "8c50da541924739ffb3a154d3fb1562759f70a1fc193bd261d0279eea9ecd0e5"
 START = int(datetime(2020, 6, 1, tzinfo=UTC).timestamp() * 1000)
 END = int(datetime(2026, 9, 1, tzinfo=UTC).timestamp() * 1000)
 INPUT_ID = "96dc97701d133ab3f4ec261534ed55c4129fd09507b535b884ff0e1c16107235"
 FILES = (
     "docs/research/AG_SHORT_LEVERAGE_20261013.md",
+    "docs/research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md",
     "src/auto_trading/research/ag_short_leverage_20261013.py",
     "scripts/run_ag_short_leverage_20261013.py",
     "tests/research/test_ag_short_leverage_20261013.py",
@@ -55,6 +58,8 @@ def save(name: str, value: Any) -> None:
 
 
 def source() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if digest(FIRST_OUT / "result.json") != FIRST_RESULT_SHA:
+        raise DataIntegrityError("initial invalid result must be preserved")
     manifest = json.loads((SOURCE / "aligned_manifest.json").read_text(encoding="utf8"))
     if (
         manifest["input_id"] != INPUT_ID
@@ -72,7 +77,14 @@ def source() -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
 
 def audit() -> None:
-    manifest, _ = source()
+    manifest, features = source()
+    updates = [f["at_ms"] for f in features if f["targets"] is not None]
+    if (
+        updates != list(range(START, END, p.DAY))
+        or len(features) != (END - START) // p.H4
+        or any(f["at_ms"] != START + i * p.H4 for i, f in enumerate(features))
+    ):
+        raise DataIntegrityError("daily event stream coverage/alignment")
     save(
         "audit.json",
         {
@@ -82,6 +94,13 @@ def audit() -> None:
             "performance_runs": 0,
             "actual_execution": "NOT_VERIFIED",
             "approved_retrospective_only": True,
+            "initial_invalid_result_sha256": FIRST_RESULT_SHA,
+            "goal_event_semantics": {
+                "updates": len(updates),
+                "no_update_blocks": len(features) - len(updates),
+                "confirmed_target_valid_ms": p.DAY,
+                "none_means": "NO_UPDATE_NOT_MISSING_CONFIRMED_DAILY_TARGET",
+            },
         },
     )
     print(
@@ -284,6 +303,8 @@ def pilot() -> None:
         "started_utc": datetime.now(UTC).isoformat(),
         "cases": len(p.cases()),
         "approved_retrospective_only": True,
+        "initial_invalid_result_sha256": FIRST_RESULT_SHA,
+        "correction_scope": "DAILY_GOAL_EVENT_CARRY_ONLY_PARAMETERS_UNCHANGED",
     }
     save("run_started.json", metadata)
     runs = p.simulate(
@@ -326,8 +347,15 @@ def pilot() -> None:
         ]
         for mode in ("1x", "max"):
             deltas = [r[f"{mode}_minus_base"] for r in rows]
+            label = "SHORT_1X" if mode == "1x" else "SHORT_MAX"
+            observed = sum(
+                summaries[f"AG{exposure}:{label}:{scenario}"]["short_roundtrips"]
+                for scenario in ("BASE", "COST2")
+            )
             verdicts[f"AG{exposure}:{mode}"] = (
-                "후향 기여 유리"
+                "판단불가_숏체결0"
+                if observed == 0
+                else "후향 기여 유리"
                 if all(d > 0 for d in deltas)
                 else "후향 기여 불리"
                 if all(d <= 0 for d in deltas)

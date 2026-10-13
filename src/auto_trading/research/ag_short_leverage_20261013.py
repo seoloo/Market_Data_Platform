@@ -116,6 +116,7 @@ class Account:
     orders: dict[tuple[int, str], Order] = field(default_factory=dict)
     goals: tuple[Decimal, Decimal] = (ZERO, ZERO)
     targets_known: bool = False
+    targets_updated_ms: int | None = None
     stop_refs: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
     rates: list[Decimal | None] = field(default_factory=lambda: [None, None])
     flat_ack: list[int] = field(default_factory=lambda: [-DAY, -DAY])
@@ -524,11 +525,22 @@ def _attempt(a: Account, i: int, order: Order, m: Minute) -> bool:
 
 def _begin(a: Account, b: Block, end_ms: int) -> None:
     a.orders.clear()
-    a.targets_known = b.targets is not None
     if b.targets is not None:
         if b.target_as_of_ms > b.at_ms or any(w < ZERO or w > D("0.5") for w in b.targets):
             raise CausalityError("future/invalid AG targets")
         a.goals = b.targets
+        a.targets_updated_ms = b.at_ms
+        a.counts["daily_target_updates"] += 1
+    # None is an absent update event, not a missing previously confirmed daily goal.
+    # Initial absence and a missing next daily update still fail closed.
+    a.targets_known = (
+        a.targets_updated_ms is not None
+        and a.targets_updated_ms <= b.at_ms < a.targets_updated_ms + DAY
+    )
+    if b.targets is None and a.targets_known:
+        a.counts["daily_target_carried_blocks"] += 1
+    elif not a.targets_known:
+        a.counts["daily_target_unknown_or_expired_blocks"] += 1
     equity = a.equity(b.spot, b.perp)
     if b.at_ms % DAY == 0:
         a.day_start = equity

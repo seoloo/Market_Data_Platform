@@ -1,7 +1,9 @@
 # AG-CR3·4 × 고정 RSI 숏 — 배율 비교 계약
 
 2026-10-13 Codex. 연구 Phase 0, 기존 운영 Phase 6 불변.
-상태: INITIAL_PILOT_INVALID / CORRECTION_APPROVAL_PENDING / ADOPTION_UNVERIFIED.
+상태: INITIAL_PILOT_INVALID / CORRECTION_IN_PROGRESS / ADOPTION_UNVERIFIED.
+2026-10-14 사용자 교정진행요청. [교정 계약](AG_SHORT_LEVERAGE_CORRECTION_20261014.md).
+첫판본보존/교정별도1회, 신호·위험숫자불변. 아래는 원계약과 역사기록이다.
 사용자는 이번 1x/최대3x·4x 비교에 설명용 후향 계산 예외를 승인했다.
 정식 PASS·새 OOS·Paper/Live 승인이 아니며 결과 후 튜닝/재계산은 금지한다.
 
@@ -111,7 +113,7 @@ funding은 동결rate/mark판본, 분내 stop과정산 선후불명 credit생략
 미래극값 합산 스트레스 대리는 실제동시tick경로/정확한MDD의 상하한 인증이 아니다.
 동결입력 재감사 완료/새성과0. AG기존시험40·새합성49 정상, 전체검증은 진행 중이다.
 
-아직 새 성과 계산0회. 실행 후 이 절과 결과 TXT에 별도 기록한다.
+이 문장은 첫계산 전 기록이다. 후속 결과는 교정 계약에 연결하며 별도AI 인계TXT를 만들지 않는다.
 
 ## 8. 성과 전 검증 완료
 

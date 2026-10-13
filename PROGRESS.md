@@ -1,12 +1,20 @@
 # 작업 현황
 
-최종 갱신: 2026-10-13 · 작성: Claude · Codex.
+최종 갱신: 2026-10-14 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
 ## 2026-10-13 — AG-CR3·4 고정 숏 배율 비교 (Codex)
 
+2026-10-14: 사용자가 오류교정과 유효계산 완료를 요청했다.
+[교정 계약](docs/research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md).
+일목표24h유지/최초미확보·다음날갱신누락차단, 신호·위험숫자 불변.
+첫INVALID보존/교정24계좌별도1회, 새회귀9+기존52=61 정상/전체검증대기.
+상세결과를 채팅에 설명한다. 요청하지않은AG 인계TXT1개삭제(Git복구가능)/새TXT없음.
+새61/전체3827/leakage135/mypy642/ruff977 정상, 기존UI import1위반 유지.
+원천갱신2283/유지11415 구간감사, 첫INVALID해시불변.
+CORRECTION_VERIFIED / READY_FOR_APPROVED_RECALCULATION, 코드커밋뒤24계좌1회. 아래는 이전 기록이다.
+
 최신: 첫24계좌는 신규 목표전달오류로 INVALID. [무효 기록](docs/research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
-[인계TXT](docs/research/AG_SHORT_LEVERAGE_FOR_LLM_20261013.txt).
 목표 갱신없음을결측으로오인, 첫결과8c50da54...ecd0e5 보존/최종성과사용금지.
 같은 신호·배율·위험의 오류교정/새판본1회계산 승인 요청. CORRECTION_APPROVAL_PENDING.
 기존AG판정/운영/208불변. 아래는 성과 전 기록이다.
@@ -17,7 +25,7 @@ AG3/4 각각 BASE/숏1x/숏최대3x·4x, 4민감도 총24계좌를 비교한다.
 구현검증 완료: 새합성52/결정론1000, 전체3818/leakage134/mypy642/ruff·format977 정상.
 기존UI import1위반 유지. 입력/원본 재감사·기존결과4SHA 불변.
 IMPLEMENTATION_VERIFIED / READY_FOR_APPROVED_PILOT / ADOPTION_UNVERIFIED. 새성과0/운영불변.
-코드/입력 커밋 뒤24계좌1회 계산, 결과·인계TXT·커밋까지 완료한다.
+코드/입력 커밋 뒤24계좌1회 계산, 결과·커밋까지 완료한다. 후속요청에 따라 새AI 인계TXT는 만들지 않는다.
 
 ## 2026-10-13 — 지갑3비율·복귀 격자 동적 파일럿 승인/계약 고정 (Codex)
 
