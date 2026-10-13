@@ -1,7 +1,9 @@
 # AG-CR3·4 × 고정 RSI 숏 — 배율 비교 계약
 
 2026-10-13 Codex. 연구 Phase 0, 기존 운영 Phase 6 불변.
-상태: INITIAL_PILOT_INVALID / CORRECTION_IN_PROGRESS / ADOPTION_UNVERIFIED.
+상태: INITIAL_PILOT_INVALID_PRESERVED / EXPLANATORY_RETROSPECTIVE_COMPLETED_ADOPTION_UNVERIFIED.
+교정 `c9f99b2` 뒤 24계좌 1회 완료. [교정 결과·해석](AG_SHORT_LEVERAGE_CORRECTION_20261014.md#교정-계산-결과와-해석).
+숏 체결 0으로 배율효과 판단불가, 8개 비교 증분 0/독립 OOS 0/새 Paper·Live 승인 없음.
 2026-10-14 사용자 교정진행요청. [교정 계약](AG_SHORT_LEVERAGE_CORRECTION_20261014.md).
 첫판본보존/교정별도1회, 신호·위험숫자불변. 아래는 원계약과 역사기록이다.
 사용자는 이번 1x/최대3x·4x 비교에 설명용 후향 계산 예외를 승인했다.
@@ -104,7 +106,8 @@ funding은 동결rate/mark판본, 분내 stop과정산 선후불명 credit생략
 [무효 기록/원본 보존](AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
 실행23:32:51~23:35:01 KST, 결과SHA8c50da541924739ffb3a154d3fb1562759f70a1fc193bd261d0279eea9ecd0e5.
 원장24개 합산일치는 입력의미 정확성을 인증하지 않는다. 금액/숏0을 최종배율성과로채택하지 않는다.
-오류교정/새판본1회계산 별도승인 요청. 아래는 성과 전 검증 기록이다.
+당시 오류교정/새판본1회계산 별도승인을 요청했고, 이후 사용자 승인에 따라 교정 계산을 완료했다.
+아래는 성과 전 검증 기록이다.
 
 성과 전 구현 경계: AG 최초자본30%는4h 관측/다음 지정가 판단에 반영한다.
 가격변동 후 총한도 초과는 다음4h에서 비용후 축소를 요청하며 한도 미체결/부분잔량을 숨기지 않는다.

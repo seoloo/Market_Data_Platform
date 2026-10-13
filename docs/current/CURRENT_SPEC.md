@@ -212,7 +212,18 @@ C11~C14, D01~D06·초기지갑UNSET/자료/80% 관문은 유지, 새동적성과
 
 ## 문서 정리 이력
 
-2026-10-14: [AG목표전달교정](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md) 사용자진행승인.
+최종 2026-10-14: [AG 교정 결과·해석](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md#교정-계산-결과와-해석).
+`c9f99b2` 동결 후 24계좌 1회 완료, 결과 `f53eb97a...8bf47` / 첫 INVALID 보존.
+230개 숏 신호 모두 공동계좌 equity DD25%의 숏 영구차단 기록 뒤 발생해 체결·복귀 0.
+BASE/1x/MAX의 8개 비교 증분 0은 배율 동등성/기각이 아니라 판단불가다.
+기본 AG3/4 순손익 +115637.14/+176270.96 USDT·4h MDD 43.18%/55.05%,
+새 지정가 설명용 롱 경로이며 옛 AG 성과/실행 parity 재인증이 아니다.
+저장 24원장 독립 재합산 최대차이 9E-22, 새 전략 재실행 0.
+EXPLANATORY_RETROSPECTIVE_COMPLETED_ADOPTION_UNVERIFIED, 독립 OOS·새 Paper/Live 승인 없음.
+이번에는 문서만 동기화하며 기존 운영 Phase 6·C11~C14·위험 규칙은 그대로다.
+아래는 이전 시점 기록이며 교정 계산 대기는 종료했다.
+
+2026-10-14 계산 전: [AG목표전달교정](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md) 사용자진행승인.
 신호/배율/위험숫자불변,61회귀/전체3827/leakage135/mypy642/ruff977 정상.
 기존UI import1위반 유지. 첫INVALID보존/코드커밋뒤교정24계좌별도1회.
 새운영승인 없음. 아래는 이전 기록이다.

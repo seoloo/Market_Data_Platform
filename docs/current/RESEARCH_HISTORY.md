@@ -9,7 +9,17 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
-2026-10-14 AG후속: [목표전달교정](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md) 사용자진행승인.
+AG 교정 최종: `c9f99b2` 뒤 24계좌 후향 계산 1회 완료(2026-10-14 07:16:31~07:18:30 KST).
+[교정 결과·상세 해석](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md#교정-계산-결과와-해석).
+숏 신호 230개는 모두 공동계좌 equity DD25% 숏 영구차단 기록 이후, 숏 체결·복귀 0.
+각 AG·민감도에서 BASE/1x/MAX의 손익·MDD 동일, 8개 비교 증분 0 → 배율효과 판단불가.
+기본 AG3/4 순손익 +115637.14/+176270.96 USDT·4h MDD 43.18%/55.05%는 롱 경로의 설명용 결과다.
+기존 AG 판정/성과와 다른 실행 모형이며 기존 판정 소급 변경·새 기각/채택 없음.
+24저장원장 독립 재합산 최대차이 9E-22, 결과 SHA `f53eb97a...8bf47`, 첫 INVALID 해시 불변.
+EXPLANATORY_RETROSPECTIVE_COMPLETED_ADOPTION_UNVERIFIED, 독립 OOS 0/새 Paper·Live 승인 없음.
+아래 계산 대기·승인 요청은 역사 기록이며 종료했다. 운영 Phase 6 유지.
+
+2026-10-14 AG 계산 전: [목표전달교정](../research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md) 사용자진행승인.
 첫INVALID보존/신호·위험숫자불변,61회귀/전체3827/leakage135/mypy642/ruff977 정상.
 기존UI import1위반 유지. READY_FOR_APPROVED_RECALCULATION, 코드커밋뒤24계좌1회. 아래는 이전 기록이다.
 

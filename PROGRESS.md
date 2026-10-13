@@ -5,7 +5,23 @@
 
 ## 2026-10-13 — AG-CR3·4 고정 숏 배율 비교 (Codex)
 
-2026-10-14: 사용자가 오류교정과 유효계산 완료를 요청했다.
+최종 2026-10-14: 교정코드 `c9f99b2` 동결 뒤 07:16:31~07:18:30 KST에 24계좌 1회 계산 완료.
+[교정 결과·상세 해석](docs/research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md#교정-계산-결과와-해석).
+결과 SHA `f53eb97a...8bf47`, 입력 `96dc9770...7235`, 첫 INVALID 결과는 그대로 보존했다.
+숏 신호 230개(BTC 103/ETH 127)는 모두 계좌 equity 기준 DD25% 숏 영구차단 기록 뒤 발생했다.
+숏 체결 0/복귀 0, 각 AG·민감도 안의 BASE/1x/MAX 손익·MDD가 동일하며 8개 비교의 증분은 모두 0.
+이는 숏 신호·배율의 기각/동등성 입증이 아니라 **실제 배율효과 판단불가**다.
+기본 누적 순손익 AG3 +115637.14/AG4 +176270.96 USDT, 4h MDD 43.18%/55.05%.
+새 4h 지정가 설명용 모형의 롱 손익이며 기존 AG 공식 성과/운영 parity 인증이 아니다.
+저장 24원장 체결·funding·잔량·종료reserve 독립 재합산 최대차이 9E-22 USDT, 전략 재실행 0.
+EXPLANATORY_RETROSPECTIVE_COMPLETED_ADOPTION_UNVERIFIED / 독립 OOS 0 / 새 Paper·Live 승인 없음.
+이번 후속은 결과 해석·문서 동기화만이며 코드/위험/운영·208/9월 이후 자료를 변경하거나 열지 않는다.
+후속 필수 검증: 전체 pytest 3827(227.19초)/leakage 135(21.91초)/strict mypy 642/
+ruff check·format 977 정상. lint-imports 4계약 유지·기존 UI→ops.conn_test→exchange.toss 1위반 유지.
+문서 6개 로컬 링크 593개 누락 0/결과·입력 56파일 통합 SHA 불변/코드·설정·CI 변경 0 확인.
+아래는 교정 계산 전 및 첫 무효 계산의 역사 기록으로, 재계산 승인·계산 대기는 종료했다.
+
+2026-10-14 계산 전: 사용자가 오류교정과 유효계산 완료를 요청했다.
 [교정 계약](docs/research/AG_SHORT_LEVERAGE_CORRECTION_20261014.md).
 일목표24h유지/최초미확보·다음날갱신누락차단, 신호·위험숫자 불변.
 첫INVALID보존/교정24계좌별도1회, 새회귀9+기존52=61 정상/전체검증대기.
@@ -14,7 +30,7 @@
 원천갱신2283/유지11415 구간감사, 첫INVALID해시불변.
 CORRECTION_VERIFIED / READY_FOR_APPROVED_RECALCULATION, 코드커밋뒤24계좌1회. 아래는 이전 기록이다.
 
-최신: 첫24계좌는 신규 목표전달오류로 INVALID. [무효 기록](docs/research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
+첫 계산 당시: 첫24계좌는 신규 목표전달오류로 INVALID. [무효 기록](docs/research/AG_SHORT_LEVERAGE_INITIAL_INVALID_20261013.md).
 목표 갱신없음을결측으로오인, 첫결과8c50da54...ecd0e5 보존/최종성과사용금지.
 같은 신호·배율·위험의 오류교정/새판본1회계산 승인 요청. CORRECTION_APPROVAL_PENDING.
 기존AG판정/운영/208불변. 아래는 성과 전 기록이다.
