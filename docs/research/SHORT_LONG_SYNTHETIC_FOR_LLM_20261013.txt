@@ -1,0 +1,62 @@
+ORBIT / 확정 롱 복귀 — 순수 합성 계약 검증 (2026-10-13)
+
+현재 운영 Phase 6 유지. 신규 작업은 Phase 0 feasibility/synthetic contract only.
+계약 동결 345e80a 뒤 연구 전용 순수 모형·시험을 구현했다.
+SYNTHETIC_MODEL_IMPLEMENTED / NOT_INTEGRATED / NOT_ACTIVATED.
+신규 수익 가설 사전등록 NOT_REGISTERED / POWER_NOT_READY.
+
+무엇을 했는가
+- 원격/로컬 signed 수량 정확0, 미해결 주문/claim/소유권/대조/보호 정리 증거를 요구.
+- 최소미만잔량이나 done/FILLED만으로 롱을 열지 않음.
+- 전량 확인·영속 기록 뒤60분. 같은증거 재평가가 시계를 계속 미루지 않음.
+- 자기현물 BUY pending 동안 중복전송0, 선물flat anchor는 유지.
+- 최신확정목표·유효시간·G1~G7·가격한도·지갑재원 모두 검사.
+- 일반 의도는 지정가 only. SHORT_CLOSE의 reduce_only=true, 실제 전송0.
+- 지갑별 cash/예약 분리. futures cash를 spot에 암묵 이체하지 않음.
+- 1x 숏 min-sizing의 margin10%/risk1%/1.5여유/노출/필터 cap을 합성 검증.
+- 직렬 immutable journal로 같은의도100평가/10복구 claim1, 중복/역순/late generation 차단.
+- 부분 매수 후 비용·예약 해제, fee 불명/다른자산·ID/파라미터 충돌 quarantine.
+- episode 기준가 재설정·부분 체결 평균가격으로 총한도 우회하는 반례 차단.
+- 미래/오래된 remote·quote·volume 및 시계 불명 신규 진입 차단.
+
+코드 / 시험
+src/auto_trading/research/long_return_contract_20261013.py
+tests/research/test_long_return_contract_20261013.py
+계약 / 결과
+docs/research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md
+
+검증
+새 합성55개 통과. leakage 마커5개, Hypothesis 속성2개 포함.
+strict mypy637/ruff check/format969 정상.
+최종 전체pytest3704 통과(225.89초), leakage123 통과(21.54초).
+가상환경 runtime Python3.14.5, mypy target3.11. 별도3.11 runtime 실행 인증은 아님.
+로컬 문서링크568 누락0, L01~L24 함수매핑24, 기존 결과2SHA 보존.
+lint-imports 기존UI.server→ops.conn_test→exchange 1위반 유지, 나머지4계약 유지.
+기존 UI/conn_test/거래소 코드는 수정하지 않았다. 전체 게이트 PASS 아님.
+
+손계산 fixture (실제 수익 아님)
+spot9000/futures1000 → BUY10×100+fee1 예약1001.
+예약 직후 equity10000, 체결 뒤 spot7999+futures1000+현물1000=9999.
+중복 응답을 넣어도 비용을 두 번 차감하지 않는다.
+E10000, 1x 증거금10%이면 숏 명목≤1000.
+futures available900일 때 1.5여유로 명목≤600, 다른 min 제한 추가.
+이 fixture를 동적 연구 초기 지갑90/10 승인으로 해석하지 말 것.
+
+아직 안 한 것
+- 실제 DB CAS/동시 프로세스/lease/정전 내구성/독립 watchdog 5초 보장.
+- 실제 보호교체·취소·원주문/수수료/이체·실시간 queue/체결 검증.
+- 실제 G1~G7/역할별 계좌손실/DD25%·30% 매핑 및 funding 정산ms 경계.
+- BASE_WALLET/PRIORITY_4H/PRIORITY_1M 새 동적 성과, 새 OOS/PASS/관찰 활성화.
+
+D01 초기지갑비율 UNSET. D02 시간창/재시도/종목순위 미확정.
+D03 역할별 실제위험 미완료. D04 C11~C13 실제 실행/내구성 미완료.
+D05 자료판본/ACK/mark/first-seen/C2/C4 미해결. D06 80%/독립자료 NOT_READY.
+L01~L24를 모형에 매핑했으나 실제 adapter 부분은 미완료다.
+기존 결과/매매·연구규칙/실거래/Paper/주문/예약/CI/208/9월이후자료는 불변.
+현재숏의 과거 수익이 새 엄격지갑/증거금 연구에도 그대로 나온다고 주장하지 말 것.
+기존 후향 예외는 새 동적 계산에 자동 확대되지 않는다.
+
+다음 방향
+현재 원격 확인/주문 소유권/세대·영속 claim을 실제 adapter에 붙이는 범위를 별도 확정.
+시장 성과 계산 전 D01~D06와 새 예외 또는 정식 검정력 관문부터 해결.
+기존 운영 manager나 DB에 바로 연결하거나 1분 예약을 켜지 않는다.

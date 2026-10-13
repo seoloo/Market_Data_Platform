@@ -9,6 +9,16 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+최신 후속: [순수 합성 계약/결과](../research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md),
+[TXT](../research/SHORT_LONG_SYNTHETIC_FOR_LLM_20261013.txt).
+345e80a 뒤 연구 모형/시험 구현, SYNTHETIC_MODEL_IMPLEMENTED/NOT_INTEGRATED/NOT_ACTIVATED.
+새시장성과0. exact-zero/60분·목표/지정가cap/지갑예약·1x margin10%/직렬claim·누적량 검증.
+같은의도100회/직렬복구10회 claim1·부분fee/예약 손계산·미래/중복/역순 반례.
+신규55/전체3704/leakage123/strict637/ruff·format969 정상, 기존UI import1위반 유지.
+L01~L24의 실제 DB/CAS/프로세스 경합/정전/보호교체/정산ms/이체는 미완료로 별도 표시.
+동적지갑비율/성과 NOT_REGISTERED/POWER_NOT_READY, 정식판정/운영 Phase6·C11~C14 불변.
+다음은 Phase0 D01~D06와 실제 안전 조정자 범위 확정. 아래 내용은 사전 계약/이전 설계 기록이다.
+
 후속 사용자 요청으로 [순수 합성 검증 계약](../research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)
 먼저 동결. 성과/시장 자료 없이 분리된 계약 모형과 시험을 구현할 예정이며,
 이는 정식 전략 등록/Phase 5/운영 CAS·정전·보호 인증이 아니다. 아래는 이전 설계 기록이다.

@@ -6,6 +6,21 @@
 
 ## 2026-10-13 후속 — 실행 증거·지갑별 공동계좌 Phase 0 설계
 
+### 최신 후속: 순수 합성 모형 구현 완료, 운영 연결/신규 성과 없음
+
+[계약/결과](research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md),
+[TXT](research/SHORT_LONG_SYNTHETIC_FOR_LLM_20261013.txt).
+345e80a 계약 고정 뒤 research/long_return_contract_20261013.py와 새시험 구현.
+SYNTHETIC_MODEL_IMPLEMENTED/NOT_INTEGRATED/NOT_ACTIVATED, 새성과 NOT_REGISTERED.
+exact-zero/미결·claim·보호/60분/최신목표·G1~G7·최초cap/지갑예약 계약의 순수 검증.
+같은증거 재평가·자기현물 pending은 완료된 청산 시계 재시작 없이 중복전송 차단.
+지갑 분리·1x 증거금10% min·부분체결fee/예약, 구세대·fee불명·누적감소 quarantine.
+같은의도100회/직렬복구모형10회 claim1. 실제 DB CAS/프로세스 경합·정전/5초 보호 인증 아님.
+L01~L24 순수 부분만 매핑하고 실제 adapter/취소/보호/정산ms/이체 미완료를 분리.
+새55/전체3704/leakage123/strict637/ruff·format969 정상, 기존UI import1위반 유지.
+동적지갑 비율 UNSET, D01~D06/80%/미사용OOS 미해결. 새시장성과/운영·208/9월이후자료 변경0.
+이하 계약 사전 고정·이전 설계 기록은 역사 시점이며 실제 운영 구현 완료를 뜻하지 않는다.
+
 후속 [순수 합성 계약](research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)을 먼저 동결한다.
 연구 전용 증거/시간/지정가/지갑예약/claim 모형만 구현 예정, 실제 adapter/운영 연결 없음.
 지갑 fixture는 연구 자본 배분 승인이 아니며 동적 세 계좌 성과·80%/미사용 OOS는 미등록 유지.

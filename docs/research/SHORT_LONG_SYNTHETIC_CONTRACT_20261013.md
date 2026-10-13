@@ -2,6 +2,7 @@
 
 작성: 2026-10-13 Codex. 단계 **Phase 0 / SYNTHETIC_CONTRACT_ONLY**.
 사전 상태: **CONTRACT_FIXED / IMPLEMENTATION_PENDING / NOT_ACTIVATED**.
+완료 상태: **SYNTHETIC_MODEL_IMPLEMENTED / NOT_INTEGRATED / NOT_ACTIVATED** (§6).
 동적 세 계좌 성과 사전등록은 여전히 **NOT_REGISTERED / POWER_NOT_READY**다.
 
 기준: [이전 설계](SHORT_LONG_EXECUTION_ACCOUNT_PLAN_20261013.md),
@@ -103,3 +104,73 @@ funding 대수는 `−signed_futures_qty × mark × rate`, 현물 funding 0.
 ## 6. 구현·검증 결과
 
 사전 계약 커밋 후 구현한다. 실제 완료 결과와 시험 수/범위는 이 절에만 추가한다.
+
+계약 동결 커밋 `345e80a` 뒤 다음 두 파일을 새로 구현했다.
+
+- [순수 모형](../../src/auto_trading/research/long_return_contract_20261013.py)
+- [합성 시험](../../tests/research/test_long_return_contract_20261013.py)
+
+상태: **SYNTHETIC_MODEL_IMPLEMENTED / NOT_INTEGRATED / NOT_ACTIVATED**.
+기존 전략·주문 관리자·DB·지갑·시장 자료·PnL 엔진은 수정하지 않았다.
+
+### 6.1 실제 확인한 계약과 남은 통합
+
+| 이전 ID | 이번 시험 / 확인 범위 | 아직 인증하지 않은 것 |
+|---|---|---|
+| L01 | `test_l01` exact-zero: 최소미만 signed 잔량도 롱 0 | 실제 최소수량 dust 청산 |
+| L02 | `test_l02` 로컬0/원격잔량 대조 차단 | 실제 REST/WS 수량 정합 |
+| L03 | `test_l03` 주문/claim/대조 미완료 3주입 | 진행 중 실제 POST 추적 |
+| L04 | `test_l04` 취소접수와 늦은OPEN 별개 입력 | 실제 취소 유실·늦은 체결·보호 조정 |
+| L05 | `test_l05` 59:59.999 차단/60:00.000 자격 | 실제 매수 체결/지연 |
+| L06 | `test_l06` 부분청산3단계에는 시계 없음 | 실거래 부분체결 순서 |
+| L07 | `test_l07` 100회 평가·직렬 복구10회 claim1/예약1 | 프로세스 kill/restart·durable 복구 |
+| L08 | `test_l08` UNKNOWN/조회부재는 예약 유지·새번호 우회 0 | 실제 원주문 조회 일관성 |
+| L09 | `test_l09` 중복 차감0/누적 감소 quarantine | 실제 trade ID/fee 복구·환산 |
+| L10 | `test_l10` 직렬 generation 충돌/늦은 결과 차단 | 실제 DB CAS·두 작업자 경합/lease |
+| L11 | `test_l11` commit 미확인 claim0/영속증거 없으면 BUY0 | DB lock/정전·독립 보호 개입 |
+| L12 | `test_l12` 숏잔량 때 보호취소 0, 원격0 뒤 자기 stop 정리 제안 | 실제 보호교체/스톱 경합 |
+| L13 | `test_l13` scope/소유권불명·다른종목미결 공통 차단 | 다중 전략 실제 계좌 소유권 |
+| L14 | `test_l14` 목표0/만료/미확정/미래 4주입, 위험축소 유지 | 자동 주문 취소 전송 |
+| L15 | `test_l15` 부분체결 비용/잔여예약 해제·축소목표 잔량 | 새 attempt 예산/adapter 재발행 |
+| L16 | `test_l16` 두종목 claim/현금 중복 소비 차단 | 실제 동시 transaction |
+| L17 | `test_l17` futures cash 충분/spot0 → BUY0 | 실제 이체/입금 |
+| L18 | `test_l18` 예약 차감/예상이체 미가산 | 실제 예약 소유권/이체 오류 |
+| L19 | `test_l19` E10000/1x → 명목1000, 선물가용900 → 명목600 | 전체G4/청산tier·역사필터 |
+| L20 | `test_l20` G3 실패/미정G1~G7/더긴대기 차단, 위험축소 허용 | 실제일손실/DD25%·30%/연패 계산 |
+| L21 | `test_l21` stale quote/총cap/거래량0·stale volume | 실제호가/queue/부분체결 모델 |
+| L22 | `test_l22` signed funding 대수/부호/flat0 | 실제정산ms/보유순서·중복funding 적용 |
+| L23 | `test_l23` 예약은equity비용 아님/spot fee·중복 응답 손계산 | 실제두지갑 equity 대조·동적 PnL |
+| L24 | `test_l24` 미래원격/호가/volume·시계실패 4주입, 과거결정 불변 | 실제일봉 first-seen/시계 드리프트 |
+
+위 24항목과 추가 경계/속성 시험의 parametrization 포함 **55개 시험 통과**.
+L01~L24 모두가 실제 통합 시험으로 끝났다는 뜻이 아니다. 오른쪽 열은 그대로 미완료다.
+
+추가 반례를 독립 합성 입력으로 고정했다.
+
+1. 같은 flat 증거를 매분 확인해도 최초 60분 시계가 뒤로 밀리지 않는다.
+2. 자기 현물 BUY가 pending인 동안 재전송은 막지만 완료된 선물 청산 anchor는 유지한다.
+3. 같은 episode의 다음 attempt에서 기준가를 올려 +0.3% 총한도를 우회하지 못한다.
+4. 먼저 싼 체결 뒤 비싼 체결을 붙여 평균가격만 한도 안으로 만드는 것도 거부한다.
+5. 미래 시각 또는 stale 거래량을 신규 진입 근거로 쓰지 않는다.
+6. 수수료 불명/다른 자산·같은 ID/다른 파라미터는 quarantine, 현금 예약 유지.
+
+합성 손계산: spot9000/futures1000에서 10개×100의 현물 BUY 예약1001을 만들면
+equity는10000 그대로다. 실제 합성 체결1000+fee1을 반영하면 spot7999/futures1000/
+현물평가1000, equity9999다. 중복 응답을 넣어도 9998로 다시 차감되지 않는다.
+이는 가격수익0/수수료1의 fixture이며 투자 성과가 아니다.
+
+### 6.2 최종 로컬 검증
+
+- 신규 합성55/strict mypy637/ruff check 및 format969 정상.
+- 최종 전체 pytest **3704개 통과**(225.89초), leakage **123개 통과**(21.54초).
+  프로젝트 가상환경 Python3.14.5 사용, mypy 목표 Python3.11. Python3.11 runtime 자체 실행 인증은 아니다.
+- lint-imports 4계약 유지/기존 UI 1위반. 같은 기존 UI.server→ops.conn_test→exchange
+  경로이며 변경 전에는 toss, 변경 후에는 upbit 경로가 대표 출력됐다. 두 기존 파일 변경0.
+  새 모형은 core.errors/core.money만 참조하며 운영 코드가 새 모형을 import하지 않는다.
+- 전체 게이트 PASS/수익 검증/실제 CAS/정전/5초 보호 보장으로 확대하지 않는다.
+- 문서 로컬 링크568개 누락0, L01~L24 함수 매핑24개, diff 공백 오류0.
+  기존 공동계좌 result SHA74089c37...650d52/전환사건 ad5bacfb...33ef91 불변.
+  운영 코드의 새 모형 import0, 기존 UI/manager/config/CI 변경0.
+  동적 세 계좌 성과는 계산하지 않았다.
+
+[다른 AI 전달용 TXT](SHORT_LONG_SYNTHETIC_FOR_LLM_20261013.txt).

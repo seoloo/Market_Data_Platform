@@ -3,6 +3,32 @@
 최종 갱신: 2026-10-13 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-13 — 롱 복귀 순수 합성 계약 구현·검증 (Codex)
+
+- 사용자 다음작업: 새 동적 성과 전에 미정 실행·지갑 계약을 합성으로 검증.
+  [계약/결과](docs/research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md),
+  [다른 AI TXT](docs/research/SHORT_LONG_SYNTHETIC_FOR_LLM_20261013.txt).
+- `345e80a`로 계약 먼저 동결 → 새 연구 모형/시험 구현.
+  SYNTHETIC_MODEL_IMPLEMENTED/NOT_INTEGRATED/NOT_ACTIVATED, 기존 운영 Phase6 유지.
+  새 동적 성과 사전등록 NOT_REGISTERED/POWER_NOT_READY, 새 시장손익 계산0.
+- exact-zero/두경로미결·소유권/보호정리·60분/최신목표·G1~G7 명시입력·총cap·지갑재원 검증.
+  반복 flat 확인/자기 현물 pending이 기존 대기 시계를 다시 시작하지 않게 함.
+- 순수 직렬 journal: 동일의도100회·복구모형10회 claim1, commit미확인0,
+  UNKNOWN 부재조회/다른번호 우회·구세대·누적감소·fee불명·ID충돌 차단.
+  실제 DB CAS/프로세스 경합·정전·원격전송 보장이 아님(C11~C13 유지).
+- spot/futures cash 분리·암묵이체0·부분체결 fee/예약 손계산.
+  1x margin10%/risk1%/1.5여유 min식, E10000→명목≤1000/가용900→≤600 합성.
+  총cap 기준가 재설정/평균가격으로 비싼 체결 숨김/미래·stale volume 거부 회귀 추가.
+- L01~L24를 새 모형55시험에 매핑. 실제 취소/보호교체/정산ms/이체/내구성 부분은 미완료로 명시.
+  신규55/전체3704/leakage123/strict mypy637/ruff check·format969 정상.
+  lint-imports 기존UI.server→ops.conn_test→exchange 1위반, 나머지4계약 유지; 기존파일 변경0.
+  전체 게이트 PASS/Phase5/독립OOS/새Paper·Live 승인으로 쓰지 않음.
+- 코드1/시험1/문서만, config/운영전략·manager·DB·CI·208/그자료·9월이후자료/기존PnL 불변.
+  문서링크568 누락0/L01~L24 매핑24/기존 결과2SHA 불변·운영import0·diff 공백오류0 확인.
+  초기 지갑 비율 UNSET, D01~D06 동적 성과 전 관문 유지.
+- 다음 Phase0: 동적 비율/기간·attempt/역할위험·자료/80% 관문 확정,
+  실제 adapter 연결은 안전 조정자/영속 claim 범위·검증을 별도 확정한 뒤.
+
 ## 2026-10-13 — 롱 복귀 실행 증거·지갑별 계좌 Phase 0 설계 (Codex)
 
 - 후속 사용자 “다음 작업”: [순수 합성 계약](docs/research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md)을
