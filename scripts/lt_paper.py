@@ -498,20 +498,6 @@ def status() -> dict[str, object]:
     )
 
 
-def _nq_daily() -> dict[str, object]:
-    """같은 예약 작업 안에서 NQ Paper(나스닥 100 상위 10)와
-    SN20 Paper(S&P 10 + 나스닥 10)도 진행한다.
-
-    실패해도 LT 는 그대로 끝난다.
-    """
-    try:
-        from scripts import nq_paper, sn20_paper
-
-        return {"update": nq_paper.update(), "run": nq_paper.run(), "sn20": sn20_paper.run()}
-    except Exception as exc:  # NQ 문제로 LT 작업을 실패시키지 않는다
-        return {"error": f"{type(exc).__name__}: {exc}"}
-
-
 def main(argv: list[str]) -> int:
     commands = {
         "init": init,
@@ -524,7 +510,6 @@ def main(argv: list[str]) -> int:
     }
     if argv == ["daily"]:
         result: dict[str, object] = {"update": update(), "run": run(), "news": news(), "ai": ai()}
-        result["nq"] = _nq_daily()
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:

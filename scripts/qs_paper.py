@@ -194,6 +194,24 @@ def status() -> dict[str, object]:
     )
 
 
+def _nq_daily() -> dict[str, object]:
+    """같은 예약 작업 안에서 NQ Paper(나스닥 100 상위 10)와
+    SN20 Paper(S&P 10 + 나스닥 10)도 진행한다.
+
+    두 장부의 날짜 축은 이 작업이 갱신하는 QQQ 일봉이라 QS 갱신 **뒤** 에 돈다.
+    예전엔 LT 작업(21:10) 안에서 돌아 QQQ(21:15 갱신)가 아직 전날까지라 늘 하루씩 밀렸다
+    (2026-10-13 발견: 10-12 일봉이 있는데 장부는 10-09).
+    SN20 이 쓰는 LT 일봉은 21:10 작업이 먼저 받는다.
+    실패해도 QS 는 그대로 끝난다.
+    """
+    try:
+        from scripts import nq_paper, sn20_paper
+
+        return {"update": nq_paper.update(), "run": nq_paper.run(), "sn20": sn20_paper.run()}
+    except Exception as exc:  # NQ 문제로 QS 작업을 실패시키지 않는다
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def main(argv: list[str]) -> int:
     commands = {
         "init": init,
@@ -204,6 +222,7 @@ def main(argv: list[str]) -> int:
     }
     if argv == ["daily"]:
         result: dict[str, object] = {"update": update(), "run": run()}
+        result["nq"] = _nq_daily()
     elif len(argv) == 1 and argv[0] in commands:
         result = commands[argv[0]]()
     else:
