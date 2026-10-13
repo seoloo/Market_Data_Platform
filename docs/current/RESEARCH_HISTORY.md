@@ -9,6 +9,11 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+최신 연결완료/성과전: 실제분봉 가용성·재생·월연/종목집계·저장원장검산 구현.
+입력96dc9770...7235, canonical선물가격차이0/현물1h집계24차이 별도기록.
+관련62/전체3766/leakage130/mypy640/ruff·format974 정상, 기존UI import1위반 유지.
+승인된36계좌후향1회 준비, 정식UNVERIFIED/새성과0. 아래는 이전 시점의 기록이다.
+
 최신검증: 304원본/13,147,773행 감사·47합성시험, 동일재생1000회 동일.
 전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
 SYNTHETIC_REPLAY_VERIFIED/HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY, 새성과0.

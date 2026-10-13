@@ -29,6 +29,7 @@ class Bar:
     low: Decimal
     c: Decimal
     volume: Decimal
+    observed: bool = True
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class Block:
     signal_as_of_ms: int
     funding: tuple[tuple[Funding, ...], tuple[Funding, ...]]
     minutes: MinuteProvider
+    spot_close_observed: tuple[bool, bool] = (True, True)
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,10 @@ class Return:
     buy_attempts: int = 0
     window_expired: bool = False
     versions: list[dict[str, Any]] = field(default_factory=list)
+    reasons: Counter[str] = field(default_factory=Counter)
+    request_perp_price: Decimal = ZERO
+    close_price_pnl: Decimal = ZERO
+    first_buy_raw_price: Decimal | None = None
 
 
 @dataclass
@@ -191,6 +197,14 @@ class Account:
     return_events: list[dict[str, Any]] = field(default_factory=list)
     fills: list[dict[str, Any]] = field(default_factory=list)
     last_rates: list[Decimal | None] = field(default_factory=lambda: [None, None])
+    coin_spot_flow: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_spot_fee: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_spot_slip: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_futures_gross: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_futures_fee: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_futures_slip: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    coin_funding: list[Decimal] = field(default_factory=lambda: [ZERO, ZERO])
+    funding_events: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.spot_cash = INITIAL * self.case.spot_ratio
@@ -220,6 +234,9 @@ class Account:
 
 
 def _allowed(a: Account, spot: tuple[Bar, Bar], perp: tuple[Bar, Bar], at_ms: int) -> bool:
+    if not all(b.observed for b in spot):
+        a.counts["stale_new_exposure_veto"] += 1
+        return False
     e = a.equity(spot, perp, "o")
     if e <= ZERO or e <= a.peak * D("0.75"):
         if not a.halted:
@@ -229,6 +246,29 @@ def _allowed(a: Account, spot: tuple[Bar, Bar], perp: tuple[Bar, Bar], at_ms: in
         a.counts["new_exposure_risk_veto"] += 1
         return False
     return True
+
+
+def _why(a: Account, i: int, reason: str) -> None:
+    if i in a.returns:
+        a.returns[i].reasons[reason] += 1
+
+
+def _coin_net(a: Account, spot: tuple[Bar, Bar], perp: tuple[Bar, Bar]) -> dict[str, Decimal]:
+    result = {}
+    for i, symbol in enumerate(SYMBOLS):
+        result[symbol] = (
+            a.coin_spot_flow[i]
+            + a.spot_qty[i] * spot[i].c
+            + a.coin_futures_gross[i]
+            + a.coin_funding[i]
+            - a.coin_spot_fee[i]
+            - a.coin_spot_slip[i]
+            - a.coin_futures_fee[i]
+            - a.coin_futures_slip[i]
+        )
+        if i in a.shorts:
+            result[symbol] += a.shorts[i].qty * (a.shorts[i].raw_entry - perp[i].c)
+    return result
 
 
 def _record_return(a: Account, i: int, reason: str) -> None:
@@ -243,6 +283,11 @@ def _record_return(a: Account, i: int, reason: str) -> None:
             "bought": r.bought,
             "last_goal_attempts": r.buy_attempts,
             "versions": r.versions,
+            "reasons": dict(r.reasons),
+            "short_close_price_pnl_after_request": r.close_price_pnl,
+            "first_buy_raw_price": r.first_buy_raw_price,
+            "short_remaining": a.shorts[i].qty if i in a.shorts else ZERO,
+            "flat_ack_ms": a.last_closed_ack[i],
             "status": reason,
         }
     )
@@ -309,6 +354,12 @@ def _close(a: Account, i: int, m: Minute, *, emergency: bool = False) -> bool:
     a.futures_gross += gross
     a.futures_fee += fee
     a.futures_slip += slip
+    a.coin_futures_gross[i] += gross
+    a.coin_futures_fee[i] += fee
+    a.coin_futures_slip[i] += slip
+    if i in a.returns:
+        r = a.returns[i]
+        r.close_price_pnl += qty * (r.request_perp_price - raw)
     a.turnover += qty * price
     p.gross += gross
     p.fees += fee
@@ -326,6 +377,8 @@ def _close(a: Account, i: int, m: Minute, *, emergency: bool = False) -> bool:
             "leg": reason,
             "qty": qty,
             "price": price,
+            "raw_price": raw,
+            "market_gross": gross,
             "fee": fee,
         }
     )
@@ -353,6 +406,8 @@ def _open(a: Account, i: int, m: Minute, end_ms: int) -> None:
         a.counts["short_long_or_overlap_veto"] += 1
         return
     if not _allowed(a, m.spot, m.perp, m.at_ms):
+        if a.halted:
+            a.orders.pop((i, "OPEN"), None)
         return
     rate = a.last_rates[i]
     if rate is None:
@@ -401,6 +456,8 @@ def _open(a: Account, i: int, m: Minute, end_ms: int) -> None:
     a.futures_fee += fee
     a.futures_slip += slip
     a.turnover += qty * price
+    a.coin_futures_fee[i] += fee
+    a.coin_futures_slip[i] += slip
     a.shorts[i] = Short(qty, price, bar.o, m.at_ms, qty, fees=fee, slips=slip)
     a.orders.pop((i, "OPEN"))
     a.counts["short_opened"] += 1
@@ -413,6 +470,7 @@ def _open(a: Account, i: int, m: Minute, end_ms: int) -> None:
             "leg": "OPEN_SHORT",
             "qty": qty,
             "price": price,
+            "raw_price": bar.o,
             "fee": fee,
             "equity_before": e,
             "margin_pct": qty * price / e,
@@ -428,11 +486,18 @@ def _spot(a: Account, i: int, m: Minute) -> None:
         a.counts["spot_buy_expired_or_canceled"] += 1
         if order.is_return and order.attempts >= 3:
             a.counts["return_attempt_exhausted"] += 1
+            _why(a, i, "ATTEMPT_EXHAUSTED")
+        return
+    if not m.spot[i].observed:
+        a.counts["spot_venue_closed"] += 1
+        _why(a, i, "VENUE_CLOSED")
         return
     if m.at_ms < a.busy_until_ms or m.at_ms < order.next_ms:
+        _why(a, i, "ACK_OR_RETRY_WAIT")
         return
     grid = a.case.return_grid_ms if order.is_return else MINUTE
     if order.is_return and m.at_ms % grid:
+        _why(a, i, "GRID_WAIT")
         return
     if buying and (
         i in a.shorts
@@ -440,6 +505,9 @@ def _spot(a: Account, i: int, m: Minute) -> None:
         or not _allowed(a, m.spot, m.perp, m.at_ms)
     ):
         a.counts["spot_buy_risk_or_short_veto"] += 1
+        _why(a, i, "SHORT_OR_RISK_OR_COOLDOWN")
+        if a.halted:
+            a.orders.pop((i, "SPOT"), None)
         return
     order.next_ms = m.at_ms + max(grid, scenario.ack_min * MINUTE)
     order.attempts += 1
@@ -454,6 +522,7 @@ def _spot(a: Account, i: int, m: Minute) -> None:
         not buying and price < order.reference * (ONE - CAP)
     ):
         a.counts["spot_buy_cap_miss" if buying else "spot_sell_cap_miss"] += 1
+        _why(a, i, "CAP_MISS")
         return
     qty = min(order.remaining, floor_to_step(previous.volume * scenario.participation, SPOT_STEP))
     fee_pct = D("0.001") * scenario.cost
@@ -475,8 +544,9 @@ def _spot(a: Account, i: int, m: Minute) -> None:
         qty = min(qty, a.spot_qty[i])
     if bar.volume == ZERO:
         qty = ZERO
-    if qty <= ZERO or (buying and qty * price < MIN_NOTIONAL):
+    if qty <= ZERO or qty * price < MIN_NOTIONAL:
         a.counts["spot_cash_liquidity_min_veto"] += 1
+        _why(a, i, "CASH_OR_VOLUME_OR_MINIMUM")
         return
     fee, slip = qty * price * fee_pct, qty * abs(price - bar.o)
     a.spot_cash += -qty * price - fee if buying else qty * price - fee
@@ -484,6 +554,9 @@ def _spot(a: Account, i: int, m: Minute) -> None:
     a.spot_raw_flow += -qty * bar.o if buying else qty * bar.o
     a.spot_fee += fee
     a.spot_slip += slip
+    a.coin_spot_flow[i] += -qty * bar.o if buying else qty * bar.o
+    a.coin_spot_fee[i] += fee
+    a.coin_spot_slip[i] += slip
     a.turnover += qty * price
     a.counts["spot_fills"] += 1
     a.counts["spot_partial"] += int(qty < order.remaining)
@@ -498,6 +571,7 @@ def _spot(a: Account, i: int, m: Minute) -> None:
             "leg": "BUY_SPOT" if buying else "SELL_SPOT",
             "qty": qty,
             "price": price,
+            "raw_price": bar.o,
             "fee": fee,
             "is_return": order.is_return,
         }
@@ -507,6 +581,7 @@ def _spot(a: Account, i: int, m: Minute) -> None:
         r.bought += qty
         if r.first_ms is None:
             r.first_ms = m.at_ms
+            r.first_buy_raw_price = bar.o
             a.counts["return_first_buy"] += 1
     if order.remaining == ZERO:
         a.orders.pop((i, "SPOT"))
@@ -551,7 +626,9 @@ def _begin(a: Account, b: Block) -> None:
     for i in range(2):
         if i in a.shorts and a.goals[i] > ZERO:
             if i not in a.returns:
-                a.returns[i] = Return(at, b.previous_spot[i].c, at // DAY * DAY)
+                a.returns[i] = Return(
+                    at, b.previous_spot[i].c, at // DAY * DAY, request_perp_price=b.perp[i].o
+                )
                 a.counts["return_requests"] += 1
             old = a.orders.get((i, "CLOSE"))
             a.orders[i, "CLOSE"] = Order(
@@ -572,14 +649,14 @@ def _begin(a: Account, b: Block) -> None:
         drift = abs(a.goals[i] - a.spot_qty[i] * b.spot[i].o / e) if e > ZERO else ONE
         if change < ZERO and (a.goals[i] == ZERO or drift > BAND):
             a.orders[i, "SPOT"] = Order("SELL", b.previous_spot[i].c, -change, at, at + H4)
-        elif change > ZERO and drift > BAND and i not in a.shorts:
+        elif change > ZERO and drift > BAND and i not in a.shorts and not a.halted:
             a.orders[i, "SPOT"] = Order("BUY", b.previous_spot[i].c, change, at, at + H4)
         else:
             a.orders.pop((i, "SPOT"), None)
         if b.signals[i] and a.case.mode != "BASE_WALLET":
             if b.signal_as_of_ms > at:
                 raise CausalityError("future RSI signal")
-            if a.goals[i] > ZERO or a.spot_qty[i] > ZERO or i in a.shorts:
+            if a.halted or a.goals[i] > ZERO or a.spot_qty[i] > ZERO or i in a.shorts:
                 a.counts["short_signal_conflict"] += 1
             else:
                 a.orders[i, "OPEN"] = Order("OPEN", b.previous_perp[i].c, ZERO, at, at + H4)
@@ -591,6 +668,20 @@ def _fund(a: Account, i: int, event: Funding, quantity: Decimal, stopped: bool) 
         amount = min(ZERO, amount)
     a.futures_cash += amount
     a.funding += amount
+    a.coin_funding[i] += amount
+    if quantity > ZERO:
+        a.funding_events.append(
+            {
+                "at_ms": event.at_ms,
+                "symbol": SYMBOLS[i],
+                "qty": quantity,
+                "mark": event.mark,
+                "rate": event.rate,
+                "amount": amount,
+                "stop_order_unknown": stopped,
+                "exact_mark": event.exact_mark,
+            }
+        )
     a.last_rates[i] = event.rate
     if quantity > ZERO and not event.exact_mark:
         a.counts["funding_proxy_applied"] += 1
@@ -648,7 +739,12 @@ def _minute(
             if m.at_ms >= until and not r.window_expired:
                 r.window_expired = True
                 a.counts["return_window_expired"] += 1
-            if eligible <= m.at_ms < until and r.buy_attempts < 3 and (i, "SPOT") not in a.orders:
+            if (
+                not a.halted
+                and eligible <= m.at_ms < until
+                and r.buy_attempts < 3
+                and (i, "SPOT") not in a.orders
+            ):
                 desired = floor_to_step(
                     a.goals[i] * max(ZERO, a.equity(m.spot, m.perp, "o")) / m.spot[i].o, SPOT_STEP
                 )
@@ -700,6 +796,7 @@ def _minute(
 
 
 def _checkpoint(a: Account, b: Block) -> None:
+    _stress(a, b.spot, b.perp)
     e = a.equity(b.spot, b.perp, "c")
     a.peak = max(a.peak, e)
     if e <= ZERO or e <= a.peak * D("0.75"):
@@ -726,8 +823,23 @@ def _checkpoint(a: Account, b: Block) -> None:
             "futures_qty": tuple(-a.shorts[i].qty if i in a.shorts else ZERO for i in range(2)),
             "exposure": exposure,
             "halted": a.halted,
+            "coin_net": _coin_net(a, b.spot, b.perp),
+            "spot_close_observed": b.spot_close_observed,
         }
     )
+
+
+def _active(a: Account, at_ms: int) -> bool:
+    if a.shorts or a.orders:
+        return True
+    if a.halted:
+        return False
+    for i, r in a.returns.items():
+        eligible = max(a.last_closed_ack[i] + 60 * MINUTE, r.goal_version_ms)
+        until = min(eligible + 240 * MINUTE, r.goal_version_ms + DAY)
+        if r.buy_attempts < 3 and at_ms >= eligible and (at_ms < until or not r.window_expired):
+            return True
+    return False
 
 
 def simulate(
@@ -775,7 +887,7 @@ def simulate(
                 by_minute.setdefault(at, [[], []])[i].append(event)
         for n in range(H4 // MINUTE):
             at = block.at_ms + n * MINUTE
-            active = [n for n, a in enumerate(accounts) if a.shorts or a.orders or a.returns]
+            active = [n for n, a in enumerate(accounts) if _active(a, at)]
             groups = by_minute.get(at, [[], []])
             events = (tuple(groups[0]), tuple(groups[1]))
             if active:
@@ -864,5 +976,18 @@ def simulate(
             "fills": a.fills,
             "returns": a.return_events,
             "operating_risk_parity": "NOT_VERIFIED",
+            "funding_events": a.funding_events,
+            "terminal_spot_prices": tuple(b.c for b in last.spot),
+            "terminal_perp_prices": tuple(b.c for b in last.perp),
+            "coin_net_before_reserve": _coin_net(a, last.spot, last.perp),
+            "coin_reserve": {
+                SYMBOLS[i]: a.spot_qty[i] * last.spot[i].c * D("0.0015") * scenario.cost
+                + (
+                    a.shorts[i].qty * last.perp[i].c * D("0.00095") * scenario.cost
+                    if i in a.shorts
+                    else ZERO
+                )
+                for i in range(2)
+            },
         }
     return result

@@ -212,6 +212,11 @@ C11~C14, D01~D06·초기지갑UNSET/자료/80% 관문은 유지, 새동적성과
 
 ## 문서 정리 이력
 
+최신 지갑복귀 실제자료 연결검증: 입력96dc9770...7235, canonical선물13698봉 가격차이0,
+현물1h집계24봉차이 별도/실행에는감사분봉사용. 실제중단체결0·stale신규차단/선물축소 유지.
+관련62/전체3766/leakage130/mypy640/ruff·format974 정상, 기존UI import1위반 유지.
+READY_FOR_APPROVED_EXPLANATORY_PILOT, 코드동결 뒤36계좌1회 예정. 정식게이트·운영단계 불변.
+
 최신 추가계약 검증: 독립 원본304개/13,147,773행 감사·순수재생47시험, 동일1000회.
 전체pytest3751/leakage128/mypy639/ruff·format972 정상, 기존UI import1위반 유지.
 SYNTHETIC_REPLAY_VERIFIED/HISTORICAL_ADAPTER_PENDING/DATA_NOT_READY, 새시장손익0.

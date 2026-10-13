@@ -7,12 +7,16 @@ import csv
 import hashlib
 import io
 import json
+import math
+import statistics
+import subprocess
 import sys
 import zipfile
 from array import array
 from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +25,7 @@ from auto_trading.research import wallet_grid_20261013 as pure
 from scripts import run_rsi_stoch_pilot_20261012 as base
 from scripts import run_short_long_return_20261013 as prior
 from scripts import run_short_validation_20261013 as previous
+from scripts import wallet_grid_data_20261013 as data
 
 ROOT = base.REPO
 OUT = ROOT / "reports/wallet_grid_20261013"
@@ -30,10 +35,149 @@ FILES = (
     "scripts/run_wallet_grid_20261013.py",
     "src/auto_trading/research/wallet_grid_20261013.py",
     "tests/research/test_wallet_grid_20261013.py",
+    "scripts/wallet_grid_data_20261013.py",
+    "tests/scripts/test_wallet_grid_data_20261013.py",
+    "docs/research/LONG_WALLET_DATA_EXECUTION_ADDENDUM_20261013.md",
 )
 START, END = base.START, base.END
 SCALE = 100_000_000
 Columns = tuple[array[int], array[int], array[int], array[int], array[int]]
+INVENTORY_ID = "4875010dc542af6e6d69110132afddc5495f56c4806c4b9ff4e6af80e20d8aab"
+
+
+def code_hash() -> str:
+    return data.payload_hash({f: digest(ROOT / f) for f in FILES})
+
+
+def prepare() -> None:
+    if any(
+        (OUT / f).exists() for f in ("aligned_manifest.json", "run_started.json", "result.json")
+    ):
+        raise DataIntegrityError("prepared/run state exists; no overwrite")
+    inventory_data = json.loads((OUT / "source_inventory.json").read_text(encoding="utf8"))
+    if (
+        inventory_data["source_sha256"] != INVENTORY_ID
+        or data.payload_hash({k: v for k, v in inventory_data.items() if k != "source_sha256"})
+        != INVENTORY_ID
+    ):
+        raise DataIntegrityError("source inventory changed")
+    frames, legacy = prior.load()
+    if legacy["source_sha256"] != prior.EXPECTED_INPUT:
+        raise DataIntegrityError("frozen legacy features changed")
+    features = json.loads((OUT / "features.json").read_text(encoding="utf8"))
+    raw_fund = json.loads((previous.OUT / "funding_rest.json").read_text(encoding="utf8"))
+    exact_flags = {
+        s: {
+            int(x["fundingTime"]): bool(x.get("markPrice") and Decimal(x["markPrice"]) > 0)
+            for x in raw_fund[s]
+        }
+        for s in pure.SYMBOLS
+    }
+    for feature, frame in zip(features, frames["RSI"], strict=True):
+        if feature["at_ms"] != frame.at_ms or feature["signals"] != sorted(frame.signals):
+            raise DataIntegrityError("frozen signal alignment")
+        weights = None if frame.targets is None else {s: str(w) for s, w in frame.targets.items()}
+        if (
+            feature["targets"] != weights
+            or feature["target_as_of_ms"] != frame.target_as_of_ms
+            or feature["signal_as_of_ms"] != frame.signal_as_of_ms
+        ):
+            raise DataIntegrityError("frozen target/time changed")
+        for s in pure.SYMBOLS:
+            if any(f["exact_mark"] != exact_flags[s][f["at_ms"]] for f in feature["funding"][s]):
+                raise DataIntegrityError("funding mark provenance changed")
+            actual = [
+                {"at_ms": x.at_ms, "rate": str(x.rate), "mark": str(x.mark)}
+                for x in frame.funding[s]
+            ]
+            if [
+                {k: v for k, v in f.items() if k != "exact_mark"} for f in feature["funding"][s]
+            ] != actual:
+                raise DataIntegrityError("frozen funding changed")
+    entries = []
+    for i, entry in enumerate(inventory_data["entries"]):
+        entries.append(data.cache_source(ROOT, OUT / "aligned", entry))
+        if i % 4 == 3:
+            print(
+                json.dumps({"aligned_month": entry["month"], "new_performance_runs": 0}), flush=True
+            )
+    manifest = {
+        "start_ms": START,
+        "end_ms": END,
+        "byteorder": sys.byteorder,
+        "entries": entries,
+        "features_sha256": digest(OUT / "features.json"),
+        "inventory_id": INVENTORY_ID,
+        "legacy_id": legacy["source_sha256"],
+        "closed_windows": data.CLOSED,
+        "legacy": legacy,
+    }
+    differences: dict[str, dict[str, Any]] = {
+        k: {"bars": 0, "max_price_delta": "0", "examples": []} for k in ("spot", "perp")
+    }
+    count = closed_open = closed_close = 0
+    for b, old in zip(data.blocks(OUT / "aligned", manifest, features), frames["RSI"], strict=True):
+        count += 1
+        closed_open += int(not all(x.observed for x in b.spot))
+        closed_close += int(not all(b.spot_close_observed))
+        for kind, bars, reference in (("spot", b.spot, old.spot), ("perp", b.perp, old.perp)):
+            for s, bar in zip(pure.SYMBOLS, bars, strict=True):
+                ref = reference[s]
+                delta = max(abs(getattr(bar, f) - getattr(ref, f)) for f in ("o", "h", "low", "c"))
+                if delta > Decimal("0.00000001"):
+                    diff = differences[kind]
+                    diff["bars"] += 1
+                    diff["max_price_delta"] = str(max(Decimal(diff["max_price_delta"]), delta))
+                    if len(diff["examples"]) < 12:
+                        diff["examples"].append(
+                            {"at_ms": b.at_ms, "symbol": s, "delta": str(delta)}
+                        )
+        if b.target_as_of_ms > b.at_ms or b.signal_as_of_ms > b.at_ms:
+            raise DataIntegrityError("future frozen feature")
+        for events in b.funding:
+            if any(x.at_ms >= y.at_ms for x, y in pairwise(events)) or any(
+                not b.at_ms <= x.at_ms < b.at_ms + pure.H4 for x in events
+            ):
+                raise DataIntegrityError("funding duplicate/boundary")
+    # Futures signals must use the exact same canonical market-price source.
+    if differences["perp"]["bars"]:
+        save(
+            "source_failure.json",
+            {
+                "status": "DATA_NOT_READY_CANONICAL_MISMATCH",
+                "differences": differences,
+                "performance_runs": 0,
+            },
+        )
+        raise DataIntegrityError("canonical futures price mismatch; performance blocked")
+    manifest["quality"] = {
+        "blocks": count,
+        "closed_open_blocks": closed_open,
+        "closed_close_blocks": closed_close,
+        "source_comparison": differences,
+        "spot_reference": (
+            "legacy 1h DB aggregation excluded from execution; fixed daily targets retained"
+        ),
+        "missing_rows": sum(e["missing_raw_rows"] for e in entries),
+        "closed_observed_rows": sum(e["closed_observed_rows"] for e in entries),
+        "funding_exact_counts": legacy["funding_exact_counts"],
+        "funding_counts": legacy["funding_counts"],
+        "actual_queue_ack_mark_minute": "MISSING_USER_APPROVED_EXPLANATORY_ONLY",
+    }
+    del raw_fund
+    manifest["input_id"] = data.payload_hash(manifest)
+    save("aligned_manifest.json", manifest)
+    print(
+        json.dumps(
+            {
+                "prepared": True,
+                "input_id": manifest["input_id"],
+                "quality": manifest["quality"],
+                "new_performance_runs": 0,
+            }
+        ),
+        flush=True,
+    )
 
 
 def digest(path: Path) -> str:
@@ -370,16 +514,319 @@ def audit() -> None:
     )
 
 
+def epoch_year(year: int) -> int:
+    return int(datetime(year, 1, 1, tzinfo=UTC).timestamp() * 1000)
+
+
+def metrics(run: dict[str, Any]) -> dict[str, Any]:
+    trace = run["trace"]
+    days = [pure.INITIAL, *(Decimal(x["equity"]) for x in trace if x["at_ms"] % pure.DAY == 0)]
+    days[-1] -= Decimal(run["terminal_cost_reserve"])
+    changes = [float(b / a - 1) for a, b in pairwise(days) if a > 0]
+    sd = statistics.stdev(changes) if len(changes) > 1 else 0
+    monthly: dict[str, dict[str, Any]] = {}
+    annual: dict[str, dict[str, Any]] = {}
+    periods: dict[str, dict[str, Any]] = {}
+    opening = yearly_open = pure.INITIAL
+    yearly_coin = {s: Decimal(0) for s in pure.SYMBOLS}
+    annual_coins = {}
+    for i, point in enumerate(trace):
+        month = stamp(point["at_ms"] - 1)[:7]
+        year = month[:4]
+        ending = Decimal(point["equity"])
+        coin = {s: Decimal(v) for s, v in point["coin_net"].items()}
+        if i == len(trace) - 1:
+            ending -= Decimal(run["terminal_cost_reserve"])
+            coin = {s: coin[s] - Decimal(run["coin_reserve"][s]) for s in pure.SYMBOLS}
+        following = stamp(trace[i + 1]["at_ms"] - 1)[:7] if i + 1 < len(trace) else None
+        if following != month:
+            monthly[month] = {
+                "pnl": ending - opening,
+                "return": float(ending / opening - 1) if opening > 0 else None,
+            }
+            opening = ending
+        if following is None or following[:4] != year:
+            annual[year] = {
+                "pnl": ending - yearly_open,
+                "return": float(ending / yearly_open - 1) if yearly_open > 0 else None,
+            }
+            annual_coins[year] = {s: coin[s] - yearly_coin[s] for s in pure.SYMBOLS}
+            yearly_open, yearly_coin = ending, coin
+    for label, lo, hi in (
+        ("2020-2023", START, epoch_year(2024)),
+        ("2024-2025", epoch_year(2024), epoch_year(2026)),
+        ("2026-01-08", epoch_year(2026), END),
+    ):
+        before = [x for x in trace if x["at_ms"] <= lo]
+        part = [x for x in trace if lo < x["at_ms"] <= hi]
+        begin = Decimal(before[-1]["equity"]) if before else pure.INITIAL
+        ending = Decimal(part[-1]["equity"])
+        if hi == END:
+            ending -= Decimal(run["terminal_cost_reserve"])
+        periods[label] = {
+            "pnl": ending - begin,
+            "return": float(ending / begin - 1),
+            "independent_oos": False,
+        }
+    summary = {
+        k: v
+        for k, v in run.items()
+        if k not in ("trace", "trades", "fills", "returns", "funding_events")
+    }
+    final = pure.INITIAL + Decimal(run["net"])
+    summary.update(
+        cagr=float(final / pure.INITIAL) ** (365.25 * pure.DAY / (END - START)) - 1
+        if final > 0
+        else None,
+        sharpe=statistics.fmean(changes) / sd * math.sqrt(365.25) if sd > 0 else None,
+        worst_month=min(monthly, key=lambda k: monthly[k]["return"]),
+        monthly=monthly,
+        annual=annual,
+        annual_coin_pnl=annual_coins,
+        periods=periods,
+        short_roundtrips=len(run["trades"]),
+        spot_fill_pieces=sum(f["leg"] in ("BUY_SPOT", "SELL_SPOT") for f in run["fills"]),
+        all_fill_pieces=len(run["fills"]),
+        turnover_initial=float(Decimal(run["turnover"]) / pure.INITIAL),
+        closed_short_net=sum((Decimal(t["net"]) for t in run["trades"]), Decimal(0)),
+        short_rebound_losses=sum(
+            (
+                -min(Decimal(0), Decimal(r["short_close_price_pnl_after_request"]))
+                for r in run["returns"]
+            ),
+            Decimal(0),
+        ),
+        return_requests=len(run["returns"]),
+        return_first_buys=sum(r["first_ms"] is not None for r in run["returns"]),
+        return_completed=sum(r["full_ms"] is not None for r in run["returns"]),
+        mean_first_buy_delay_min=statistics.fmean(
+            (r["first_ms"] - r["requested_ms"]) / pure.MINUTE
+            for r in run["returns"]
+            if r["first_ms"] is not None
+        )
+        if any(r["first_ms"] is not None for r in run["returns"])
+        else None,
+        minimum_spot_cash=min(Decimal(x["spot_cash"]) for x in trace),
+        minimum_futures_cash=min(Decimal(x["futures_cash"]) for x in trace),
+        halted_at_ms=next((x["at_ms"] for x in trace if x["halted"]), None),
+        stale_valuation_checkpoints=sum(not all(x["spot_close_observed"]) for x in trace),
+        liquidation_tier="NOT_MODELED_NOT_CERTIFIED",
+        independent_oos=0,
+        adoption="UNVERIFIED",
+    )
+    return summary
+
+
+def reconcile_ledger(run: dict[str, Any]) -> dict[str, Any]:
+    """Recompute saved fills/events independently; no strategy rerun."""
+    ratio = Decimal(run["case"]["spot_ratio"])
+    cash_spot, cash_future = pure.INITIAL * ratio, pure.INITIAL * (1 - ratio)
+    qty = {s: Decimal(0) for s in pure.SYMBOLS}
+    positions: dict[str, tuple[Decimal, Decimal, Decimal]] = {}
+    spot_fee = future_fee = spot_slip = future_slip = Decimal(0)
+    for f in run["fills"]:
+        s, q, price, raw, fee = (
+            f["symbol"],
+            Decimal(f["qty"]),
+            Decimal(f["price"]),
+            Decimal(f["raw_price"]),
+            Decimal(f["fee"]),
+        )
+        if f["leg"] in ("BUY_SPOT", "SELL_SPOT"):
+            sign = 1 if f["leg"] == "BUY_SPOT" else -1
+            qty[s] += sign * q
+            cash_spot -= sign * q * price + fee
+            spot_fee += fee
+            spot_slip += q * abs(price - raw)
+        elif f["leg"] == "OPEN_SHORT":
+            if s in positions:
+                raise DataIntegrityError("saved short overlap")
+            positions[s] = q, price, raw
+            cash_future -= fee
+            future_fee += fee
+            future_slip += q * (raw - price)
+        else:
+            old, entry, raw_entry = positions[s]
+            if q > old:
+                raise DataIntegrityError("saved close exceeds position")
+            cash_future += q * (entry - price) - fee
+            future_fee += fee
+            future_slip += q * (price - raw)
+            if q == old:
+                del positions[s]
+            else:
+                positions[s] = old - q, entry, raw_entry
+    funding = sum((Decimal(e["amount"]) for e in run["funding_events"]), Decimal(0))
+    for e in run["funding_events"]:
+        expected = Decimal(e["qty"]) * Decimal(e["mark"]) * Decimal(e["rate"])
+        if e["stop_order_unknown"] and e["at_ms"] % pure.MINUTE:
+            expected = min(Decimal(0), expected)
+        if Decimal(e["amount"]) != expected:
+            raise DataIntegrityError("saved funding arithmetic")
+    cash_future += funding
+    spot_prices = {
+        s: Decimal(v) for s, v in zip(pure.SYMBOLS, run["terminal_spot_prices"], strict=True)
+    }
+    perp_prices = {
+        s: Decimal(v) for s, v in zip(pure.SYMBOLS, run["terminal_perp_prices"], strict=True)
+    }
+    equity = (
+        cash_spot
+        + cash_future
+        + sum((qty[s] * spot_prices[s] for s in pure.SYMBOLS), Decimal(0))
+        + sum((q * (entry - perp_prices[s]) for s, (q, entry, _) in positions.items()), Decimal(0))
+    )
+    values = {
+        "terminal_spot_cash": cash_spot,
+        "terminal_futures_cash": cash_future,
+        "terminal_equity": equity,
+        "spot_fee": spot_fee,
+        "futures_fee": future_fee,
+        "spot_slip": spot_slip,
+        "futures_slip": future_slip,
+        "funding": funding,
+        "net": equity - pure.INITIAL - Decimal(run["terminal_cost_reserve"]),
+    }
+    errors = {
+        k: str(v - Decimal(run[k]))
+        for k, v in values.items()
+        if abs(v - Decimal(run[k])) > Decimal("1e-10")
+    }
+    if errors or tuple(qty[s] for s in pure.SYMBOLS) != tuple(
+        Decimal(q) for q in run["terminal_spot_qty"]
+    ):
+        raise DataIntegrityError(f"independent saved ledger mismatch: {errors}")
+    if abs(
+        sum((Decimal(x) for x in run["coin_net_before_reserve"].values()), Decimal(0))
+        - (equity - pure.INITIAL)
+    ) > Decimal("1e-10"):
+        raise DataIntegrityError("coin contribution mismatch")
+    return {
+        "saved_fill_reconciliation": "MATCH",
+        "max_error": max(abs(v - Decimal(run[k])) for k, v in values.items()),
+        "strategy_replays": 0,
+    }
+
+
+def pilot() -> None:
+    if any((OUT / f).exists() for f in ("run_started.json", "result.json")):
+        raise DataIntegrityError("one-shot run exists; no rerun")
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--", *FILES], cwd=ROOT, text=True
+    )
+    if dirty.strip():
+        raise DataIntegrityError("registered code/docs/tests must be committed before performance")
+    manifest = json.loads((OUT / "aligned_manifest.json").read_text(encoding="utf8"))
+    if manifest["input_id"] != data.payload_hash(
+        {k: v for k, v in manifest.items() if k != "input_id"}
+    ):
+        raise DataIntegrityError("prepared manifest changed")
+    if digest(OUT / "features.json") != manifest["features_sha256"]:
+        raise DataIntegrityError("frozen features changed")
+    for e in manifest["entries"]:
+        if digest(ROOT / e["raw_path"]) != e["raw_sha256"]:
+            raise DataIntegrityError("frozen source changed")
+    features = json.loads((OUT / "features.json").read_text(encoding="utf8"))
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    start = {
+        "code_commit": revision,
+        "code_sha256": code_hash(),
+        "input_id": manifest["input_id"],
+        "started_utc": datetime.now(UTC).isoformat(),
+        "cases": 36,
+        "approved_retrospective_only": True,
+    }
+    save("run_started.json", start)
+    runs = pure.simulate(
+        data.blocks(OUT / "aligned", manifest, features, progress=True), end_ms=END
+    )
+    summaries = {}
+    for key, run in runs.items():
+        name = "ledger_" + key.replace(":", "_") + ".json"
+        save(name, run)
+        saved = json.loads((OUT / name).read_text(encoding="utf8"))
+        reconciliation = reconcile_ledger(saved)
+        summaries[key] = {
+            **metrics(saved),
+            "ledger": name,
+            "ledger_sha256": digest(OUT / name),
+            "independent_accounting": reconciliation,
+        }
+    comparisons: list[dict[str, Any]] = []
+    for ratio in pure.RATIOS:
+        for scenario in pure.SCENARIOS:
+            base_run, slow, fast = (
+                summaries[f"{ratio}:{m}:{scenario.name}"]
+                for m in ("BASE_WALLET", "PRIORITY_4H", "PRIORITY_1M")
+            )
+            diff_month = [
+                float(
+                    Decimal(fast["monthly"][month]["pnl"]) - Decimal(slow["monthly"][month]["pnl"])
+                )
+                for month in fast["monthly"]
+            ]
+            comparisons.append(
+                {
+                    "spot_ratio": ratio,
+                    "scenario": scenario.name,
+                    "4h_minus_base": Decimal(slow["net"]) - Decimal(base_run["net"]),
+                    "1m_minus_base": Decimal(fast["net"]) - Decimal(base_run["net"]),
+                    "1m_minus_4h": Decimal(fast["net"]) - Decimal(slow["net"]),
+                    "1m_mdd_minus_4h": Decimal(fast["mdd"]) - Decimal(slow["mdd"]),
+                    "monthly_difference_sd_usdt": statistics.stdev(diff_month),
+                    "independent_oos": 0,
+                }
+            )
+    verdicts = {}
+    for ratio in pure.RATIOS:
+        rows = [r for r in comparisons if r["spot_ratio"] == ratio]
+        verdicts[str(ratio)] = (
+            "후향모형에서 유리"
+            if all(r["1m_minus_4h"] > 0 and r["1m_mdd_minus_4h"] <= 0 for r in rows)
+            else "후향모형에서 불리"
+            if all(r["1m_minus_4h"] <= 0 for r in rows)
+            else "혼재/판단불가"
+        )
+    result = {
+        **start,
+        "completed_utc": datetime.now(UTC).isoformat(),
+        "performance_runs": 1,
+        "status": "EXPLANATORY_RETROSPECTIVE_COMPLETED_ADOPTION_UNVERIFIED",
+        "quality": manifest["quality"],
+        "summaries": summaries,
+        "comparisons": comparisons,
+        "verdicts": verdicts,
+        "pass": False,
+        "independent_oos": 0,
+        "paper_live_approved": False,
+    }
+    save("result.json", result)
+    print(
+        json.dumps(
+            {
+                "completed": True,
+                "result_sha256": digest(OUT / "result.json"),
+                "cases": len(summaries),
+                "verdicts": verdicts,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("inventory", "audit", "pilot"))
+    parser.add_argument("mode", choices=("inventory", "audit", "prepare", "pilot"))
     args = parser.parse_args()
     if args.mode == "inventory":
         inventory()
     elif args.mode == "audit":
         audit()
+    elif args.mode == "prepare":
+        prepare()
     else:
-        raise DataIntegrityError("pilot implementation not frozen yet")
+        pilot()
 
 
 if __name__ == "__main__":
