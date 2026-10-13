@@ -195,6 +195,8 @@ def simulate(
                     floor_to_step(frame.previous_perp.volume * scenario.participation, FUT_STEP),
                 )
             )
+            if not emergency and frame.perp.volume == ZERO:
+                qty = ZERO
             if not emergency and price > event.short_reference * (1 + CAP):
                 counts["short_limit_miss"] += 1
             elif qty <= ZERO:
@@ -252,6 +254,8 @@ def simulate(
                     floor_to_step(frame.previous_spot.volume * scenario.participation, SPOT_STEP),
                     floor_to_step(max(ZERO, cash) / (price * (1 + spot_fee_rate)), SPOT_STEP),
                 )
+                if frame.spot.volume == ZERO:
+                    qty = ZERO
                 if qty * price < MIN_NOTIONAL:
                     counts["buy_minimum_or_liquidity"] += 1
                 else:
@@ -273,6 +277,8 @@ def simulate(
                 spot_qty,
                 floor_to_step(frame.previous_spot.volume * scenario.participation, SPOT_STEP),
             )
+            if frame.spot.volume == ZERO:
+                qty = ZERO
             if price < sell_floor:
                 counts["sell_limit_miss"] += 1
             elif qty * price < MIN_NOTIONAL:

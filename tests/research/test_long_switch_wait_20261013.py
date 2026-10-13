@@ -139,15 +139,36 @@ def test_cost_double_keeps_cap_and_ledgers_balanced() -> None:
 
 
 @pytest.mark.leakage
-def test_current_minute_volume_is_not_used_for_open_time_fill() -> None:
+def test_positive_current_volume_does_not_size_open_time_fill() -> None:
     event, frames = fixture()
     a = p.simulate(event, frames, wait_min=0, scenario=p.SCENARIOS[0])
     changed = [
-        replace(f, spot=replace(f.spot, volume=D(0)), perp=replace(f.perp, volume=D(0)))
+        replace(f, spot=replace(f.spot, volume=D(1)), perp=replace(f.perp, volume=D(1)))
         for f in frames
     ]
     b = p.simulate(event, changed, wait_min=0, scenario=p.SCENARIOS[0])
     assert a == b
+
+
+def test_realized_zero_perp_volume_does_not_fill_ordinary_close() -> None:
+    event, frames = fixture()
+    frames = [replace(f, perp=replace(f.perp, volume=D(0))) for f in frames]
+    result = p.simulate(event, frames, wait_min=0, scenario=p.SCENARIOS[0])
+    assert result["short_residual"] == 1
+    assert result["first_buy_ms"] is None
+
+
+def test_realized_zero_spot_volume_does_not_fill_buy_or_sell() -> None:
+    event, frames = fixture()
+    frames = [replace(f, spot=replace(f.spot, volume=D(0))) for f in frames]
+    result = p.simulate(event, frames, wait_min=0, scenario=p.SCENARIOS[0])
+    assert result["bought_qty"] == 0
+    frames = [
+        replace(f, spot=replace(f.spot, volume=D(0))) if i >= 90 else f
+        for i, f in enumerate(fixture()[1])
+    ]
+    result = p.simulate(event, frames, wait_min=0, scenario=p.SCENARIOS[0])
+    assert result["spot_residual"] == 1
 
 
 def test_stop_is_conservative_and_ack_after_bar() -> None:
