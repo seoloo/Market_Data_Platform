@@ -198,6 +198,7 @@ W01~W20은 시험 계획이며 구현/실행/통과 아님. 기존 보완 코드
 |---|---|---|
 | C12 | **독립 감시 동시성 계약 미검증:** 현재 `_reconcile`은 PENDING/UNKNOWN 원격 부재를 NOT_PLACED로 바꿈. 다른 프로세스의 POST가 아직 진행 중이면 조기 부재 확정 위험. ID UNIQUE·선기록은 있으나 별도 원자적 dispatch claim/세대/CAS 및 구 결과 덮어쓰기 방어 없음. 코드 읽기 근거, 실제 경합 사고 미확인 | 별도 안전 조정자 도입 전 진행 중 요청·lease 만료·늦은 응답·중복 CLOSE/stop 취소·동일 의도 100회 검증. 자동 POST 재전송 금지. [설계 §4](../research/O2_INDEPENDENT_WATCHDOG_DESIGN.md) |
 | C13 | **핵심 선기록 정전 내구성 미검증:** 기본 연결은 WAL/synchronous=NORMAL, busy_timeout 5,000ms. 프로세스 종료 복구와 정전/OS 장애의 커밋 보존은 같지 않음. DB 자체 실패/5초 lock 대기 때의 안전 조정 계약도 미확정. 실제 정전 손실 미확인 | 주문·정지·claim 쓰기의 FULL/짧은 transaction/대기 예산 및 복구 근거 검토. 기존 DB 설정·데이터 삭제·PC 정전 시험 임의 실행 없음. [설계 §2·4](../research/O2_INDEPENDENT_WATCHDOG_DESIGN.md) |
+| C14 | **고정 숏 공동계좌의 지갑·증거금 한도 parity 미검증 (2026-10-13):** 이전 설명용 `research/short_long_return_20261013.py`는 공유 cash·숏희망0.25equity/1x, min식에 현행 증거금10% cap이 없음. 0분/60분 사건 비교도 상속 수량/조건부 회계이지 새 사이징 인증이 아님. 실제 운영 위반/실사고 확인 아님 | 새 동적 연구 전에 현물/선물 가용현금·미체결예약·이체 없는 재원·증거금10%/1.5여유·역할별 현행 위험 mapping 확정. 기존 손익/판정·코드/자산배분 소급 수정 없음. [Phase 0 설계 §7~10](../research/SHORT_LONG_EXECUTION_ACCOUNT_PLAN_20261013.md), 미등록/미구현 유지 |
 
 ## 문서 정리 이력
 
