@@ -9,6 +9,13 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+최신별도승인: [지갑3비율·격자 파일럿 계약](../research/LONG_WALLET_GRID_PILOT_20261013.md).
+85:15/90:10/70:30×BASE/4H/1M, 4고정민감도 총36계좌 후향1회 예외.
+전체G6/실제호가·ACK/사전edge 미확보를 고지하고 설명용 회계모형을 별도 승인받음.
+기존운영Risk는 변경하지 않는다. 계약고정·자료감사/합성·코드동결 뒤 계산, 현재 성과0.
+같은신호·60분·지갑/증거금10%, 복귀다리 격자만 다름. 계좌관측4h 근사·DD25% 신규차단.
+독립OOS0/정식UNVERIFIED/최적비율선택0/새관찰0. 아래 기록은 이전 작업 시점이다.
+
 최신 후속: [순수 합성 계약/결과](../research/SHORT_LONG_SYNTHETIC_CONTRACT_20261013.md),
 [TXT](../research/SHORT_LONG_SYNTHETIC_FOR_LLM_20261013.txt).
 345e80a 뒤 연구 모형/시험 구현, SYNTHETIC_MODEL_IMPLEMENTED/NOT_INTEGRATED/NOT_ACTIVATED.
