@@ -9,6 +9,10 @@
 
 ## 확정 롱 실행·지갑별 공동계좌 — Phase 0 초안 / 미등록 (2026-10-13)
 
+후속별도승인: [AG3/4 고정숏 배율 계약](../research/AG_SHORT_LEVERAGE_20261013.md).
+AG3/4 각각BASE/숏1x/최대3x·4x,4민감도24계좌1회. 숏증거금10%/개별위험1% 유지.
+기존H1귀속/분리지갑 결과와 분리, CONTRACT_FIXED/IMPLEMENTATION_PENDING, 새성과0/운영불변.
+
 최종 후향 파일럿 완료: 6493f1c 동결 후 36계좌 1회 계산, 원장36개 독립 검산 일치.
 [상세 결과](../research/LONG_WALLET_RESULTS_20261013.md),
 [결과 TXT](../research/LONG_WALLET_RESULTS_FOR_LLM_20261013.txt).
