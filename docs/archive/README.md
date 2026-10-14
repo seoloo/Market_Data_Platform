@@ -53,7 +53,7 @@ AGENTS/PROGRESS/STRATEGY-CATALOG, 01/02/03/04/06/08/10/13/옛 색인의 분산�
 | `docs/phase0/28-btc-multitimeframe-strategy.md` | [원문](drafts/D22-btc-multitimeframe-strategy.md) |
 | `docs/phase0/README.md` | [원문](design/README.md) |
 | `AGENTS.md` | [원문](design/AGENTS.md) |
-| `PROGRESS.md` | [원문](design/PROGRESS.md) |
+| `PROGRESS.md` | [원문](design/PROGRESS.md) · 2026-09 기록 [PROGRESS_2026-09](PROGRESS_2026-09.md) |
 | `README.md` | [원문](design/ROOT-README.md) |
 | `CLAUDE.md` | [원문](design/CLAUDE.md) |
 | `docs/STRATEGY-CATALOG.md` | [원문](design/STRATEGY-CATALOG.md) |
