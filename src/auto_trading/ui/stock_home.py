@@ -12,15 +12,16 @@ from auto_trading.ui.data import DashboardData
 from auto_trading.ui.qndx_render import _read
 
 _BOOKS = {
-    "LD_M3": ("Glide 비교 · 변동성", "var(--o1)"),
-    "LD_M2": ("Glide 비교 · 브레이크", "var(--t2)"),
-    "LD_M0": ("TQQQ·SCHD 기준", "var(--hold)"),
-    "NBG": ("나스닥·채권·금", "var(--o2)"),
-    "MIX": ("나스닥·추세 ETF", "var(--o3)"),
-    "BASE": ("QNDX 기준", "var(--mute2)"),
-    "GBG": ("Glide·채권·금", "var(--warn)"),
-    "NBG_ISA": ("나스닥·채권·금 ISA (원화 ÷ 1,000)", "var(--ok)"),
+    "LD_M3": ("Glide 비교 · 변동성", "var(--c1)"),
+    "LD_M2": ("Glide 비교 · 브레이크", "var(--c2)"),
+    "LD_M0": ("TQQQ·SCHD 기준", "var(--c8)"),
+    "NBG": ("나스닥·채권·금", "var(--c3)"),
+    "MIX": ("나스닥·추세 ETF", "var(--c4)"),
+    "BASE": ("QNDX 기준", "var(--c6)"),
+    "GBG": ("Glide·채권·금", "var(--c5)"),
+    "NBG_ISA": ("나스닥·채권·금 ISA (원화 ÷ 1,000)", "var(--c7)"),
 }
+"""선마다 다른 색(dashboard.css 의 --c1 ~ --c8)."""
 _KRW_SCALE = {"NBG_ISA": 0.001}
 """원화 장부(100 만 원)를 USD 장부(1,000)와 같은 그래프에 놓을 때 나누는 값."""
 _DAY_MS = 86_400_000

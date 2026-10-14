@@ -73,8 +73,8 @@ _COLORS = {
     "o1": "var(--o1)",
     "o2": "var(--o2)",
     "o3": "var(--o3)",
-    "t2s": "var(--ok)",
-    "t2u": "var(--warn)",
+    "t2s": "var(--c7)",
+    "t2u": "var(--c5)",
     "hold": "var(--hold)",
 }
 PHASE7_FROM = datetime(2026, 9, 25, tzinfo=UTC)

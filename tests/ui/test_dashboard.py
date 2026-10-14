@@ -566,6 +566,35 @@ class TestRender:
         chart = html.split("평가액 (USD)", 1)[1].split("지금 들고 있는 것", 1)[0]
         assert "AGS1 · AG-CR + 숏 1 배" in chart and "AGS3 · AG-CR + 숏 3 배" not in chart
 
+    def test_toss_page_charts_held_symbols_without_qndx(self, root: Path) -> None:
+        import json
+
+        for sym, days in (("BTQ", ("2026-10-12", "2026-10-13")), ("QNDX", ("2026-10-13",))):
+            rep = root / "reports" / "toss" / sym
+            rep.mkdir(parents=True)
+            for k, day in enumerate(days):
+                (rep / f"{day}.json").write_text(
+                    json.dumps(
+                        {
+                            "date": day,
+                            "holding_qty": k + 1,
+                            "advice": {"currency": "USD", "price": 2.5, "fx_rate": 1340.0},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+        state = root / "data" / "toss"
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "BTQ.json").write_text(
+            json.dumps({"symbol": "BTQ", "buys": [{"cost_usd": 3.0, "fx_rate": 1300.0}]}),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
+        chart = html.split("적립 종목 평가액 (원)", 1)[1]
+        assert "6,700원" in chart and "넣은 원가 3,900원" in chart  # 2 주 × 2.5 × 1,340
+        drawn = chart.split('<div class="cards">', 1)[1].split("</svg>", 1)[0]
+        assert "QNDX" not in drawn  # 설명 문장에만 나오고 카드 · 선에는 없다
+
     def test_toss_page_reads_saved_reports(self, root: Path) -> None:
         import json
 

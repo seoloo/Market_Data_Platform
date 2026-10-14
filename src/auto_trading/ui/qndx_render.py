@@ -15,6 +15,8 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
+from auto_trading.ui.charts import Series, line_chart
+
 __all__ = ["toss_page"]
 
 _KST = timedelta(hours=9)
@@ -311,6 +313,56 @@ def _toss_fx(base: Path) -> str:
     )
 
 
+_CHART_SYMBOLS = (("BTQ", "var(--c3)"), ("QS", "var(--c2)"), ("WQTM", "var(--c5)"))
+"""그래프에 그리는 적립 종목. QNDX 는 지금 적립을 멈춰 뺀다(사용자 2026-10-14)."""
+
+
+def _toss_chart(root: Path) -> str:
+    """종목별 평가액(원) = 그날 보고서의 보유 수량 × 가격 × 환율.
+
+    보유가 없는 종목은 그리지 않는다.
+    """
+    series, cards = [], ""
+    for symbol, color in _CHART_SYMBOLS:
+        points: list[tuple[int, float]] = []
+        for path in sorted((root / "reports" / "toss" / symbol).glob("20*.json")):
+            r = _read(path)
+            advice = (r or {}).get("advice")
+            if not isinstance(r, dict) or not isinstance(advice, dict):
+                continue
+            qty, price = _number(r.get("holding_qty")), _number(advice.get("price"))
+            fx = _number(advice.get("fx_rate")) if advice.get("currency") == "USD" else 1.0
+            day = str(r.get("date") or path.stem)
+            try:
+                at = int(datetime.fromisoformat(day).replace(tzinfo=UTC).timestamp() * 1000)
+            except ValueError:
+                continue
+            if qty and price and fx and qty > 0:
+                points.append((at, qty * price * fx))
+        if not points:
+            continue
+        state = _read(root / "data" / "toss" / f"{symbol}.json") or {}
+        cost = 0.0
+        for b in state.get("buys") or []:
+            usd, rate = _number(b.get("cost_usd")), _number(b.get("fx_rate"))
+            if usd is not None and rate is not None:
+                cost += usd * rate
+        value = points[-1][1]
+        cards += (
+            f'<div class="card" style="border-left-color:{color}"><h3>{value:,.0f}원</h3>'
+            f'<div class="sub">{escape(symbol)} · 넣은 원가 {cost:,.0f}원</div></div>'
+        )
+        series.append(Series(symbol, color, tuple(points)))
+    if not series:
+        return ""
+    return (
+        '<div class="panel"><h2>적립 종목 평가액 (원)</h2>'
+        '<p class="mute">그날 밤 보고서의 보유 수량 × 가격 × 환율. 적립을 멈춘 QNDX 는 뺐다. '
+        "넣은 원가는 체결된 매수의 달러 금액 × 그날 환율 합.</p>"
+        f'<div class="cards">{cards}</div>{line_chart(series)}</div>'
+    )
+
+
 def toss_page(data: Any) -> str:
     """토스 적립 + QS (문서 118 §7) — ``reports/toss/`` · ``data/toss/`` 만 읽는다."""
     root = getattr(data, "root", None) or Path()
@@ -352,6 +404,7 @@ def toss_page(data: Any) -> str:
     return (
         intro
         + f'<div class="savings-grid">{tiles}</div>'
+        + _toss_chart(root)
         + '<div class="toss-support">'
         + _toss_qs(base)
         + _toss_fx(base)
