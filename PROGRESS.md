@@ -3,6 +3,24 @@
 최종 갱신: 2026-10-14 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-14 — 숏·롱 비교 재검토·주식 포함 롱 후보 3개 (Codex)
+
+사용자: Claude 설명 대조·숏과 롱 비교 누락·어울리는 기존 롱 찾기. 후속 주식/TQQQ·SQQQ도 포함.
+[검토·후보 표](docs/research/LONG_SHORT_CANDIDATE_REVIEW_20261014.md).
+REVIEW_COMPLETED/CANDIDATE_NOT_SELECTED/NOT_REGISTERED/NO_NEW_PERFORMANCE.
+기존 숏 단독 +2437.64/CAGR3.55%/MDD11.87%/193거래와 T/v2 지갑모형 롱 +26148.97/22.83%/15.69%를 구분했다.
+실행·사이징 판본이 달라 단독 숫자의 동일위험 우열은 미판정. 같은 지갑모형 T/v2+RSI는 DD25% 그대로142~148숏,
+4H기본 전체증분 +1161.93~2882.76 USDT/직접숏 +506.27~1396.29, 임계정지0·정식UNVERIFIED.
+AG의 숏0을 모든 조합으로 일반화하지 않으며 규칙 변경만이 숏 확인의 유일한 길이 아니다.
+Paper저장요약10/12·11일의AG3/4 −10.16%/−13.35% 확인, 첨부 '3주'는 불일치.
+후보 A T/v2현물(기존직접근거1순위) / B O/v2 / C AG-US나스닥추세+SQQQ검토, 사용자선택전새계산0.
+SQQQ 일일−3배/역방향 ETF는 별도 진입·예산/실제자료·80% 관문 미확정. 운용사설명만확인/새시장성과0.
+새TXT·코드·위험/운영변경0, 기존Phase6·판정·208/9월이후원시자료 유지.
+전체pytest3827(233.74초)/leakage135(23.24초)/strict mypy642/ruff check·format977 정상,
+lint-imports4계약유지/기존UI→ops.conn_test→exchange.toss1위반 유지. 전체게이트PASS아님.
+문서5개 링크606개 누락0/기존결과7파일 SHA불변/후보3개·새전략실행0 검증.
+다음Phase0: 후보1개 선택 뒤 동일조건 LONG_ONLY/SHORT_ONLY/LONG_SHORT와 자료·위험·검정력 계약부터.
+
 ## 2026-10-13 — AG-CR3·4 고정 숏 배율 비교 (Codex)
 
 최종 2026-10-14: 교정코드 `c9f99b2` 동결 뒤 07:16:31~07:18:30 KST에 24계좌 1회 계산 완료.
