@@ -86,7 +86,8 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 ❓ 도움 (또는 /help) — 이 안내
 
-이 방으로 오는 알림: Glide · Cruise · 토스 매매 결과, 환전 요청, 위험 알림
+이 방으로 오는 알림: Glide · Cruise · 토스 매매 결과, 환전 요청, 위험 알림,
+경제 일정 경고(CPI · 고용 · FOMC 등 큰 발표날 07:35 · 16:30)
 종목 뉴스는 정보 봇에 물어보세요."""
 COMMANDS_MENU = [
     ("status", "현황 — 실거래 요약"),
@@ -237,6 +238,7 @@ def run(root: Path = REPO) -> int:
     finally:
         bot.close()
     _resume_liquidation()
+    _event_alert(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
@@ -246,6 +248,18 @@ def run(root: Path = REPO) -> int:
         alert=bool(user_settings.get(root, "alerts.bot_down")),
     )
     return 0
+
+
+def _event_alert(root: Path) -> None:
+    """미국 주요 경제 일정 경고(아침 · 프리마켓 전). 실패해도 현황 봇은 그대로 끝난다."""
+    try:
+        from scripts import event_alert
+
+        sent = event_alert.maybe_send(root)
+        if sent:
+            print(f"일정 알림 보냄: {sent}")
+    except Exception as exc:  # 일정 알림 문제로 봇을 멈추지 않는다
+        print(f"일정 알림 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _resume_liquidation() -> None:
