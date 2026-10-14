@@ -86,3 +86,20 @@ def test_load_flows_converts_million_won_and_aligns_days(
     f = load_flows(_panel(days, ["AAA"], {"AAA": "IT"}))
     assert f.net["AAA"][1] == pytest.approx(2e6) and f.value["AAA"][1] == 5_000_000
     assert f.net["AAA"][0] == 0.0
+
+
+def test_load_flows_foreign_only_drops_institutions(tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from scripts.run_kr_flow import load_flows
+
+    (tmp_path / "000001.csv").write_text(
+        "date,frgn_ntby_tr_pbmn,orgn_ntby_tr_pbmn,prsn_ntby_tr_pbmn,acml_tr_pbmn\n"
+        "20261001,10,5,-15,1000\n",
+        encoding="utf-8",
+    )
+    panel = SimpleNamespace(days=["2026-10-01"])
+    both = load_flows(panel, tmp_path)  # type: ignore[arg-type]
+    frgn = load_flows(panel, tmp_path, who="foreign")  # type: ignore[arg-type]
+    assert both.net["000001"] == [15e6] and frgn.net["000001"] == [10e6]
+    assert frgn.value["000001"] == [1000.0]

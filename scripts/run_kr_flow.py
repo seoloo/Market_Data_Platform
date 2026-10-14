@@ -119,8 +119,14 @@ def flow_hash() -> tuple[str, int]:
     return h.hexdigest(), len(files)
 
 
-def load_flows(panel: KrPanel, folder: Path | None = None) -> Flows:
-    """``folder``(기본 142 수급 자료)의 종목별 수급을 판의 날짜에 맞춘다."""
+def load_flows(panel: KrPanel, folder: Path | None = None, who: str = "both") -> Flows:
+    """``folder``(기본 142 수급 자료)의 종목별 수급을 판의 날짜에 맞춘다.
+
+    ``who`` = "both"(외국인 + 기관, 142 연구) · "foreign"(외국인만 — 2026-10-15 사용자
+    '외국인만 많이 매수하는 것도 페이퍼에 넣어줄래', 국장 그림자 Paper 전용).
+    """
+    if who not in ("both", "foreign"):
+        raise ValueError(f"who: {who}")
     at = {d: i for i, d in enumerate(panel.days)}
     net: dict[str, list[float]] = {}
     value: dict[str, list[float]] = {}
@@ -132,7 +138,8 @@ def load_flows(panel: KrPanel, folder: Path | None = None) -> Flows:
             d, frgn, orgn, _prsn, tv = line.split(",")
             i = at.get(_iso(d))
             if i is not None:
-                ns[i] = (float(frgn) + float(orgn)) * 1e6  # 백만 원 → 원
+                buy = float(frgn) + (float(orgn) if who == "both" else 0.0)
+                ns[i] = buy * 1e6  # 백만 원 → 원
                 vs[i] = float(tv)
         net[sym], value[sym] = ns, vs
     return Flows(net, value)

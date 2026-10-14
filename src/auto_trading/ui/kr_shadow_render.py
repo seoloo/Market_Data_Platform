@@ -37,6 +37,7 @@ _FOLLOW = (
     ("price", "① 가격 주도주", "var(--t2)"),
     ("flow", "② 수급 주도주", "var(--o2)"),
     ("ai", "③ AI 판단", "var(--o3)"),
+    ("foreign", "④ 외국인 수급", "var(--o1)"),
 )
 
 
@@ -267,7 +268,7 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
             "KOSPI 가 200 일선 위일 때만 다음 거래일 종가에 산다.</p>"
             "</div>"
         )
-    lines: dict[str, list[tuple[int, float]]] = {"price": [], "flow": [], "ew": []}
+    lines: dict[str, list[tuple[int, float]]] = {"price": [], "flow": [], "foreign": [], "ew": []}
     for rep in history:
         p = rep.get("paper") or {}
         t = _ms(str(rep.get("date")))
@@ -276,6 +277,7 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
         for key, val in (
             ("price", (p.get("price_rule") or {}).get("value_krw")),
             ("flow", (p.get("flow_rule") or {}).get("value_krw")),
+            ("foreign", (p.get("foreign_rule") or {}).get("value_krw")),
             ("ew", p.get("equal_weight_krw")),
         ):
             if val is not None:
@@ -284,6 +286,7 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
         [
             Series("① 가격 규칙", "var(--t2)", tuple(lines["price"])),
             Series("② 수급 규칙", "var(--o2)", tuple(lines["flow"])),
+            Series("④ 외국인 규칙", "var(--o1)", tuple(lines["foreign"])),
             Series("고르게 들기", "var(--hold)", tuple(lines["ew"])),
         ]
     )
@@ -312,15 +315,22 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
 
     price = paper.get("price_rule") or {}
     flow = paper.get("flow_rule") or {}
+    frgn = paper.get("foreign_rule") or {}
     return (
         '<div class="panel"><h2>Paper (가상 1,000 만 원, '
         f"{escape(str(paper.get('start')))} 부터)</h2>"
         f"<div class='sub'>① 가격 규칙 {_won(price.get('value_krw'))} · ② 수급 규칙 "
-        f"{_won(flow.get('value_krw'))} · 고르게 들기 {_won(paper.get('equal_weight_krw'))}</div>"
+        f"{_won(flow.get('value_krw'))} · ④ 외국인 규칙 {_won(frgn.get('value_krw'))} · "
+        f"고르게 들기 {_won(paper.get('equal_weight_krw'))}</div>"
         f"{chart}</div>"
         '<div class="grid2"><div class="panel"><h2>① 가격 규칙 보유</h2>'
         f"{holds(price)}</div>"
         f'<div class="panel"><h2>② 수급 규칙 보유</h2>{holds(flow)}</div></div>'
+        + (
+            f'<div class="panel"><h2>④ 외국인 규칙 보유</h2>{holds(frgn)}</div>'
+            if paper.get("foreign_rule") is not None
+            else ""
+        )
     )
 
 
@@ -432,6 +442,18 @@ def kr_shadow_page(data: Any) -> str:
         )
         + "</div>"
     )
+    if latest.get("foreign_leaders") is not None:
+        lists += (
+            '<div class="grid2">'
+            + _leader_table(
+                "④ 외국인 순매수 주도주",
+                latest.get("foreign_leaders") or [],
+                "외국인 순매수 ÷ 거래대금(기관 빼고), 20·60 일 백분위 → 같은 두 단계. "
+                "2026-10-15 추가 — 연구로 검증한 적 없는 비교 목록.",
+            )
+            + _sectors("외국인 섹터 순위", latest.get("foreign_sectors") or [])
+            + "</div>"
+        )
     sectors = (
         '<div class="grid2">'
         + _sectors("가격 섹터 순위", latest.get("price_sectors") or [])

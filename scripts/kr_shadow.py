@@ -10,6 +10,7 @@
 
 1. **가격 주도주** — 141 LT-KR 의 점수(1·3·6 달 수익) · 섹터 3 · 종목 10.
 2. **수급 주도주** — 142 FLOW 의 점수(외국인 + 기관 순매수 ÷ 거래대금, 20·60 일).
+   같은 틀로 **외국인만** 본 목록 · Paper 도 함께(2026-10-15 사용자).
 3. **AI 판단** — 그날 모은 한국 경제 뉴스 제목과 종목군(코드·이름)만 주고 Gemini 에게
    주도 테마·주도주·KOSPI 여지를 묻는다. 기계 목록과 가격 지표는 주지 않는다(베끼면 비교가 안 됨).
 
@@ -311,11 +312,13 @@ def run() -> dict[str, object]:
     names = {c: str(v.get("name", c)) for c, v in info.items()}
     panel, index_ok = build_panel(ROOT, to="9999-12-31")
     f = load_flows(panel, FLOWS)
+    ff = load_flows(panel, FLOWS, who="foreign")  # 외국인만 (사용자 2026-10-15)
     t = len(panel.days) - 1
     day = panel.days[t]
     pool = members(panel, t)
     price = leaders_pit(panel, t, pool)
     flow = flow_picker(f)(panel, t, pool)
+    foreign = flow_picker(ff)(panel, t, pool)
     import statistics
 
     from scripts.run_lt_leaders import LOOKS
@@ -349,8 +352,10 @@ def run() -> dict[str, object]:
         "kospi_above_200d": index_ok[t],
         "price_leaders": listed(price),
         "flow_leaders": listed(flow),
+        "foreign_leaders": listed(foreign),
         "price_sectors": _sector_rank(dict(price_scores), panel.sector),
         "flow_sectors": _sector_rank(flow_scores(f, t, pool), panel.sector),
+        "foreign_sectors": _sector_rank(flow_scores(ff, t, pool), panel.sector),
         "flow_coverage": sum(1 for s in pool if s in f.net),
         "universe_median_6m": round(
             statistics.median(panel.close[s][t] / panel.close[s][t - 126] - 1 for s in pool),  # type: ignore[operator]
@@ -363,11 +368,15 @@ def run() -> dict[str, object]:
         fl = simulate_kr(
             panel, index_ok, flow_picker(f), start_date=PAPER_START, decide=biweekly_day
         )
+        fr = simulate_kr(
+            panel, index_ok, flow_picker(ff), start_date=PAPER_START, decide=biweekly_day
+        )
         ew = equal_weight_pit(panel, lt.universe_log, start_date=PAPER_START)
         report["paper"] = {
             "start": PAPER_START,
             "price_rule": _paper(lt, names),
             "flow_rule": _paper(fl, names),
+            "foreign_rule": _paper(fr, names),
             "equal_weight_krw": round(10_000_000 * ew[-1] / ew[0]),
         }
         report["accumulation"] = _accumulation(panel, lt, fl)
@@ -382,6 +391,7 @@ def run() -> dict[str, object]:
         "date": day,
         "price_leaders": [x["name"] for x in report["price_leaders"]],
         "flow_leaders": [x["name"] for x in report["flow_leaders"]],
+        "foreign_leaders": [x["name"] for x in report["foreign_leaders"]],
     }
 
 
