@@ -1596,7 +1596,7 @@ CASH는 모두 순손익 감소. 비용2배에도 순증분은양수지만 O2 MD
 근거: [고정 감사와 결과](../research/H1_O_AG_ACCOUNTING_AUDIT_20261012.md),
 [다른 AI용 인계](../research/H1_O_AG_AUDIT_FOR_LLM_20261012.txt).
 
-## AG-SHORT-OWN-GATE — AG3 1x · MAX · AG4 1x 후향 기여 유리 · AG4 MAX 혼재 (2026-10-15, 232 설명용)
+## AG-SHORT-OWN-GATE — AG3 1x · MAX · AG4 1x 후향 기여 유리 · AG4 MAX 혼재 (2026-10-14, 232 설명용)
 
 요약: Codex AG 숏 교정판(숏 0 건)의 엔진 · 자료를 그대로 두고 숏 영구 차단만 '계좌 전체 25% 낙폭' → '닫힌 숏 누적 손실 ≥ 계좌 고점 2.5%' 로 바꿔 AG 만과 비교. BASE 는 Codex 와 정확히 일치.
 결과: AG3 1x BASE +115,637 → +126,989(+11,352, MDD 43.2 → 40.1%, 숏 151 건 +3,034), AG3 MAX +15,063, AG4 1x +5,880, AG4 MAX +5,599 · COST2 −4,029(2021-06 숏 차단). THIN 1x 는 AG3 −1,458 · AG4 −468.

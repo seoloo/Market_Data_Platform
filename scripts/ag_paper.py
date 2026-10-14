@@ -8,6 +8,8 @@
     python -m scripts.ag_paper report   # 보고서만 다시 (원장은 그대로)
     python -m scripts.ag_paper status
 
+- daily 는 끝에 AGS Paper(``scripts/ags_paper.py``, AG-CR + 232 숏)도 진행한다.
+
 - AG-US 는 QS Paper(``data/qs_paper/state.json``)의 AG 장부를 읽는다
   — QS Paper 가 먼저 돌아야 그날 값이 들어간다.
 - AG-CR 은 오버레이 Paper 원장 ``ag_cr3`` (``run_paper_o1 --ledger ag`` 와 같은 실행기,
@@ -110,11 +112,25 @@ def status() -> dict[str, object]:
     return {"date": data.get("date"), "books": data.get("books")}
 
 
+def _ags() -> dict[str, object]:
+    """같은 예약 작업 안에서 AGS Paper(AG-CR + 232 숏 1 배 · 3 배)도 진행한다.
+
+    AG-CR 원장을 읽으므로 그 뒤에 돈다. 실패해도 AG Paper 는 그대로 끝난다.
+    """
+    try:
+        from scripts import ags_paper
+
+        books = ags_paper.daily()["books"]
+        return {k: v.get("equity") for k, v in books.items()}
+    except Exception as exc:  # AGS 문제로 AG 작업을 실패시키지 않는다
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def main(argv: list[str]) -> int:
     if argv == ["daily"]:
         codes = {name: run_overlay(LEDGERS[ledger]) for name, ledger, _ in CRYPTO}
         code = max(codes.values())
-        result: dict[str, object] = {"ledger_exit": codes, "report": report()}
+        result: dict[str, object] = {"ledger_exit": codes, "report": report(), "ags": _ags()}
     elif argv == ["report"]:
         result, code = report(), 0
     elif argv == ["status"]:

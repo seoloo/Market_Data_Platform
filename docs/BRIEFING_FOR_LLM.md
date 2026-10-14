@@ -4,12 +4,13 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
-## 2026-10-15 — 232 AG + 숏, 숏 차단을 숏 자기 손익 기준으로 (Claude, 설명용)
+## 2026-10-14 — 232 AG + 숏, 숏 차단을 숏 자기 손익 기준으로 (Claude, 설명용)
 
 사용자: "ag해서 숏 조합하고 그냥 ag랑 비교 해줘". Codex AG 숏 교정판은 계좌 전체 25% 낙폭 영구 차단 때문에 숏 0 건이었고,
 전환 연구는 코인 롱이 T/v2 였다. [232](research/232-ag-short-own-gate.md): 엔진 · 자료 그대로, 숏 차단만 숏 자기 손익(닫힌 숏 누적 손실 ≥ 계좌 고점 2.5%).
 사전 고정 `0701ab9` 뒤 1 회. BASE 는 Codex 와 정확히 일치. 판정 AG3 1x · MAX · AG4 1x 후향 기여 유리, AG4 MAX 혼재.
 AG3 1x BASE +11,352 USDT(MDD 43.2 → 40.1%, 숏 151 건 +3,034). 숏 이익은 2022 · 2026 상위 몇 건, THIN 1x 는 마이너스. 채택 · Paper 근거 아님.
+AGS Paper 등록: AGS1 = AG-CR + 숏 1 배, AGS3 = AG-CR + 숏 3 배(관찰용, 주문 없음, 4 시간봉 근사). `scripts/ags_paper.py`, AG Paper 예약 작업 안에서 진행. [232 §8](research/232-ag-short-own-gate.md).
 
 ## 2026-10-14 — 롱↔숏 전환 70:30·90:10 / SQQQ 설명용 완료
 
