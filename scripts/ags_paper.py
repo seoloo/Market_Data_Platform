@@ -5,6 +5,7 @@
 
 * AGS1 = AG-CR + 숏 1 배, AGS3 = AG-CR + 숏 3 배 (232 의 AG3 SHORT_1X · SHORT_MAX).
 * AG4S1 = AG-CR4 + 숏 1 배 (2026-10-15 사용자 'ag4 숏 1배 페이퍼 넣어줘', 234 에서 꾸준히 나은 쪽).
+* AG4S2 = AG-CR4 + 숏 2 배 (2026-10-15 사용자 '추가해줘', 235 에서 AG4 에 무난했던 배율).
 * 롱은 AG-CR · AG-CR4 Paper 원장을 읽기만 한다
   — ``ag_paper daily`` 가 먼저 돌아야 그날 값이 들어간다.
 * 매번 시작 시각부터 다시 계산한다(상태 파일 없음, 같은 입력이면 같은 결과).
@@ -41,11 +42,12 @@ REPORTS = REPO / "reports" / "ags_paper"
 START_MS = int(datetime(2026, 10, 14, 16, tzinfo=UTC).timestamp() * 1000)
 """첫 4 시간봉 (2026-10-15 01:00 KST). 사용자 2026-10-14 '장부를 만들어줘'."""
 START4_MS = int(datetime(2026, 10, 15, 0, tzinfo=UTC).timestamp() * 1000)
-"""AG4S1 첫 4 시간봉 (2026-10-15 09:00 KST)."""
+"""AG4S1 · AG4S2 첫 4 시간봉 (2026-10-15 09:00 KST)."""
 BOOKS = (
     ("AGS1", "ag", 1.0, START_MS),
     ("AGS3", "ag", 3.0, START_MS),
     ("AG4S1", "ag4", 1.0, START4_MS),
+    ("AG4S2", "ag4", 2.0, START4_MS),
 )
 """(이름, 롱 원장, 숏 배율, 시작)."""
 WARMUP_BARS = 300

@@ -52,6 +52,7 @@ _AGS_LINES = (
     ("AGS1", "AGS1 · AG-CR + 숏 1 배", "var(--warn)"),
     ("AGS3", "AGS3 · AG-CR + 숏 3 배", "var(--bad)"),
     ("AG4S1", "AG4S1 · AG-CR4 + 숏 1 배", "var(--c7)"),
+    ("AG4S2", "AG4S2 · AG-CR4 + 숏 2 배", "var(--c5)"),
 )
 """롱 원장과 같은 눈금(그 원장 첫날 = 1,000)으로 그래프에 겹친다.
 
@@ -67,7 +68,7 @@ _REASON = {"STOP": "손절", "48H": "48 시간", "LONG_PRIORITY": "롱 복귀"}
 
 
 def _ags_panel(root: Path) -> str:
-    """AGS1 · AGS3 · AG4S1 — AG-CR · AG-CR4 Paper 롱 + 232 숏 관찰 장부.
+    """AGS1 · AGS3 · AG4S1 · AG4S2 — AG-CR · AG-CR4 Paper 롱 + 232 숏 관찰 장부.
 
     시작 = 1,000 으로 맞춰 보인다.
     """
@@ -75,8 +76,9 @@ def _ags_panel(root: Path) -> str:
     head = (
         '<div class="panel"><h2>AGS · AG-CR + 숏 (관찰 장부)</h2>'
         '<p class="mute">AG-CR(코인 3 배) · AG-CR4(4 배) Paper 를 롱으로 그대로 쓰고, 롱이 꺼진 '
-        "코인에만 4 시간봉 RSI7 꺾임 숏을 붙인다(문서 232 · 234). AGS1 = AG-CR + 숏 1 배, "
-        "AGS3 = AG-CR + 숏 3 배, AG4S1 = AG-CR4 + 숏 1 배. 숏 손익은 롱 평가액에 더한다. "
+        "코인에만 4 시간봉 RSI7 꺾임 숏을 붙인다(문서 232 · 234 · 235). AGS1 = AG-CR + 숏 1 배, "
+        "AGS3 = AG-CR + 숏 3 배, AG4S1 · AG4S2 = AG-CR4 + 숏 1 · 2 배. "
+        "숏 손익은 롱 평가액에 더한다. "
         "실제 주문은 없다.</p>"
     )
     if r is None:
@@ -94,7 +96,7 @@ def _ags_panel(root: Path) -> str:
         cards += (
             f'<div class="card" style="border-left-color:var(--o3)">'
             f'<h3>{_pct(ag4.get("return_since_start"))}</h3><div class="sub">'
-            "AG-CR4 (숏 없음) · AG4S1 과 같은 시작부터</div></div>"
+            "AG-CR4 (숏 없음) · AG4S1 · AG4S2 와 같은 시작부터</div></div>"
         )
     rows = ""
     for name, b in (r.get("books") or {}).items():
