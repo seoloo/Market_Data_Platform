@@ -112,3 +112,5 @@ OWN 과 다르고 나머지 15 개는 같다 — OWN 차단은 그 한 계좌에
   **더하기만** 한다(숏 손익이 롱 크기에 다시 들어가지 않음), AG 장부의 남은 증거금은 일별 상태로 근사.
 * 코드 `src/auto_trading/ops/ag_short_paper.py` · `scripts/ags_paper.py`, 보고 `reports/ags_paper/latest.json`.
 * 시작 시점 AG-CR 롱 목표가 BTC 0.12 · ETH 0.08 로 둘 다 0 보다 커서, 롱이 꺼지기 전까지는 숏이 나지 않는다.
+* **AG4S1 추가 (2026-10-15 사용자 "ag4 숏 1배 페이퍼 넣어줘")** — AG-CR4 Paper 롱 + 숏 1 배, 첫 봉 2026-10-15 00:00 UTC.
+  [234](234-ag4-start-robustness.md)에서 AG4 + 숏(롱 그대로)이 시작 9 개 중 9 개(BASE)에서 Calmar 가 나았던 쪽이다.

@@ -4,7 +4,9 @@
     python -m scripts.ags_paper status
 
 * AGS1 = AG-CR + 숏 1 배, AGS3 = AG-CR + 숏 3 배 (232 의 AG3 SHORT_1X · SHORT_MAX).
-* 롱은 AG-CR Paper 원장을 읽기만 한다 — ``ag_paper daily`` 가 먼저 돌아야 그날 값이 들어간다.
+* AG4S1 = AG-CR4 + 숏 1 배 (2026-10-15 사용자 'ag4 숏 1배 페이퍼 넣어줘', 234 에서 꾸준히 나은 쪽).
+* 롱은 AG-CR · AG-CR4 Paper 원장을 읽기만 한다
+  — ``ag_paper daily`` 가 먼저 돌아야 그날 값이 들어간다.
 * 매번 시작 시각부터 다시 계산한다(상태 파일 없음, 같은 입력이면 같은 결과).
 보고 ``reports/ags_paper/<날짜>.json`` · ``latest.json``.
 """
@@ -38,7 +40,14 @@ REPO = Path(__file__).resolve().parent.parent
 REPORTS = REPO / "reports" / "ags_paper"
 START_MS = int(datetime(2026, 10, 14, 16, tzinfo=UTC).timestamp() * 1000)
 """첫 4 시간봉 (2026-10-15 01:00 KST). 사용자 2026-10-14 '장부를 만들어줘'."""
-BOOKS = (("AGS1", 1.0), ("AGS3", 3.0))
+START4_MS = int(datetime(2026, 10, 15, 0, tzinfo=UTC).timestamp() * 1000)
+"""AG4S1 첫 4 시간봉 (2026-10-15 09:00 KST)."""
+BOOKS = (
+    ("AGS1", "ag", 1.0, START_MS),
+    ("AGS3", "ag", 3.0, START_MS),
+    ("AG4S1", "ag4", 1.0, START4_MS),
+)
+"""(이름, 롱 원장, 숏 배율, 시작)."""
 WARMUP_BARS = 300
 
 
@@ -84,10 +93,10 @@ def _funding(api: BinanceUsdmPublic, symbol: str, now_ms: int) -> list[tuple[int
     return out
 
 
-def _ag_days() -> list[AgDay]:
+def _ag_days(ledger: str = "ag") -> list[AgDay]:
     conn = connect_read_only(DB)
     try:
-        rows = OverlayPaperDayRepository(conn).all(LEDGERS["ag"].strategy_id)
+        rows = OverlayPaperDayRepository(conn).all(LEDGERS[ledger].strategy_id)
     finally:
         conn.close()
     days = []
@@ -117,30 +126,44 @@ def daily() -> dict[str, Any]:
     finally:
         api.close()
     signals = {s: short_signals(bars[s], daily_bars[s]) for s in SYMBOLS}
-    ag_days = _ag_days()
-    ag_start = next((d.equity for d in ag_days if d.decision_ms >= START_MS - DAY), None)
-    ag_now = ag_days[-1] if ag_days else None
+    longs = {k: _ag_days(k) for k in ("ag", "ag4")}
+
+    def _long(ledger: str, start_ms: int) -> dict[str, Any]:
+        days = longs[ledger]
+        first = next((d.equity for d in days if d.decision_ms >= start_ms - DAY), None)
+        now = days[-1] if days else None
+        return {
+            "equity_at_start": first,
+            "equity_now": now.equity if now else None,
+            "return_since_start": (now.equity / first - 1) if now and first else None,
+            "long_target_now": dict(now.target) if now else None,
+        }
+
     books: dict[str, Any] = {}
-    for name, lev in BOOKS:
+    for name, ledger, lev, start_ms in BOOKS:
+        ag_days = longs[ledger]
+        ag_start = _long(ledger, start_ms)["equity_at_start"]
         b = replay(
             Book(name, lev),
-            start_ms=START_MS,
+            start_ms=start_ms,
             bars=bars,
             signals=signals,
             ag_days=ag_days,
             funding=funding,
         )
-        # AG Paper 그래프와 같은 눈금: AG-CR 첫날 평가액 = 1,000. 하루(UTC) 마지막 값만, 시작 전날은
-        # AG-CR 과 같은 값에서 갈라지게 넣는다.
+        # AG Paper 그래프와 같은 눈금: 그 롱 원장 첫날 평가액 = 1,000. 하루(UTC) 마지막 값만,
+        # 시작 전날은 롱 원장과 같은 값에서 갈라지게 넣는다.
         base = ag_days[0].equity if ag_days else None
         path: dict[str, float] = {}
         if base and ag_start is not None and b.equity_path:
-            path[_iso(START_MS - DAY)[:10]] = round(ag_start / base * 1000, 2)
+            path[_iso(start_ms - DAY)[:10]] = round(ag_start / base * 1000, 2)
             for ms, eq in b.equity_path:
                 path[_iso(ms - 1)[:10]] = round(eq / base * 1000, 2)
         start_eq = b.equity_path[0][1] if b.equity_path else None
         last_eq = b.equity_path[-1][1] if b.equity_path else None
         books[name] = {
+            "long": "AG-CR4" if ledger == "ag4" else "AG-CR",
+            "start_utc": _iso(start_ms),
             "short_leverage": lev,
             "path": path,
             "start_equity": start_eq,
@@ -170,15 +193,11 @@ def daily() -> dict[str, Any]:
     report = {
         "as_of_utc": _iso(last_bar + H4) if last_bar else None,
         "start_utc": _iso(START_MS),
-        "ag_cr": {
-            "equity_at_start": ag_start,
-            "equity_now": ag_now.equity if ag_now else None,
-            "return_since_start": (ag_now.equity / ag_start - 1) if ag_now and ag_start else None,
-            "long_target_now": dict(ag_now.target) if ag_now else None,
-        },
+        "ag_cr": _long("ag", START_MS),
+        "ag_cr4": _long("ag4", START4_MS),
         "books": books,
         "rules": (
-            "AG-CR(AG3) Paper 롱 그대로 + 232 숏(RSI7 70 꺾임 · 일봉 ADX 하락 · "
+            "AG-CR(AG3) · AG-CR4 Paper 롱 그대로 + 232 숏(RSI7 70 꺾임 · 일봉 ADX 하락 · "
             "롱 목표 0 인 코인만 · 3% 손절 · 48h · 증거금 10% × 배율 · 위험 1% · "
             "숏 자기 손익 2.5% 차단). 4 시간봉 시가 체결 근사."
         ),
