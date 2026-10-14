@@ -3,6 +3,20 @@
 최종 갱신: 2026-10-14 · 작성: Claude · Codex.
 현재: **Phase 6 — Paper T/v2·O/v1·O/v2·O/v3 관찰 중**. 신규 BTC 옵션 후보는 Phase 0 실행 안전성 게이트 미통과로 보류.
 
+## 2026-10-14 — 롱↔숏 전환 70:30·90:10 / SQQQ 설명용 비교 (Codex)
+
+사용자는 동시 배분이 아니라 반대 신호 때 기존 포지션을 먼저 정리하는 전환을 명시했고,
+두 시장·두 비율의 설명용 후향 1회를 승인했다: “이번 범위의 설명용 후향 계산 허용”.
+[고정 계약](docs/research/DIRECTION_SWITCH_PILOT_20261014.md).
+Phase0 / USER_APPROVED_EXPLANATORY_ONE_SHOT / IMPLEMENTATION_VERIFIED / 시장PnL 계산 전.
+T/v2↔RSI숏(BTC·ETH) / QQQ추세 TQQQ↔SQQQ, FULL/MATCHED/SHORT_ONLY/SWITCH ×4민감도=64계좌.
+정확한flat·주문종결 후60분, 지정가0.3%·DD25%·일손실2%·숏위험1%/코인증거금10% 유지.
+주식 일봉은 다음 세션 일반 체결만; 역사 호가/결제현금·독립검증 미확보 예외는 이번 설명용에만 해당.
+새합성31/전체pytest3858/leakage137/strict mypy646/ruff check·format982 정상, 기존UI import1위반 유지.
+[입력·Config·소스해시](docs/research/DIRECTION_SWITCH_INPUTS_20261014.json)를 소스와 함께 결과 전에 커밋한다.
+독립OOS/PASS·새Paper/Live0, Phase6 운영/208·9월이후 원시시장자료·기존결과 불변.
+다음: 동결 커밋 뒤64계좌1회 계산→별도원장검산→모든군 결과와 전환 증분 보고·문서 동기화.
+
 ## 2026-10-14 — 숏·롱 비교 재검토·주식 포함 롱 후보 3개 (Codex)
 
 사용자: Claude 설명 대조·숏과 롱 비교 누락·어울리는 기존 롱 찾기. 후속 주식/TQQQ·SQQQ도 포함.

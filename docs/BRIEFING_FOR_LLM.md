@@ -4,6 +4,15 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
+## 2026-10-14 — 롱↔숏 전환 70:30·90:10 / SQQQ 설명용 승인
+
+[고정 계약](research/DIRECTION_SWITCH_PILOT_20261014.md). 사용자는 동시 배분이 아닌 반대 신호 때 기존 방향 청산 후 전환을 원한다.
+“이번 범위의 설명용 후향 계산 허용” 승인. 코인T/v2↔RSI숏/주식QQQ추세TQQQ↔SQQQ,
+두비율×FULL/MATCHED/SHORT_ONLY/SWITCH×4민감도=64계좌를 소스/입력 동결 후1회 계산한다.
+Phase0 구현검증 중/새PnL0. 정확한flat·주문종결 후60분·지정가·DD25%/숏위험·증거금 유지.
+미확보 독립검증/역사호가·주식결제현금은 이번 설명용 예외, 정식PASS/새Paper/Live 승인은 아니다.
+운영Phase6·기존판정/208·9월이후 원시자료 불변. 결과를 채팅에 비교하고 진행 문서를 동기화한다.
+
 ## 2026-10-13 후속 — 실행 증거·지갑별 공동계좌 Phase 0 설계
 
 2026-10-14 [숏·롱 비교 재검토/주식포함후보3개](research/LONG_SHORT_CANDIDATE_REVIEW_20261014.md).
