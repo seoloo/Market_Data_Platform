@@ -142,7 +142,7 @@ def test_render_and_numbers_block() -> None:
     }
     text = render_telegram(brief)
     assert "SPY  -0.24%" in text and "VIX  15.08" in text and "BTQ  미확보" in text
-    assert "나스닥 100 상위 10\n   미확보" in text
+    assert "나스닥 100 상위 10 (S&P 겹침 제외)\n   미확보" in text
     assert "🔺 A  +1.00%  (기여 +0.10%p)" in text
     assert "마감 뒤 소식" in text and "매매 신호 아님" in text
     assert text.count("\n") > 15  # 한 줄에 하나
@@ -182,3 +182,31 @@ def test_jev_check_two_questions_record_only() -> None:
     ]
     none = jev_check_parse(ai, keys, None, {"answers": {"fa00": {"noul": 1.7}}})
     assert [x["flag"] for x in none] == [None, None]
+
+
+def test_nasdaq_top_skips_companies_in_sp_top() -> None:
+    from auto_trading.ops.market_brief import Holding, top_excluding
+
+    ndx = [
+        Holding(s, s, w)
+        for s, w in (("NVDA", 0.09), ("AAPL", 0.08), ("GOOG", 0.04), ("COST", 0.03), ("NFLX", 0.02))
+    ]
+    got = top_excluding(ndx, ["NVDA", "AAPL", "GOOGL"], 2)
+    assert [h.symbol for h in got] == ["COST", "NFLX"]  # GOOG 는 GOOGL 과 같은 회사
+
+
+def test_ai_items_keep_tone_and_share_is_rendered() -> None:
+    from auto_trading.ops.market_brief import Evidence, tone_share, validate_answer
+
+    ev = [Evidence("E1", "news", "x", "t", "2026-10-14", "u")]
+    ans = {
+        "facts": [
+            {"text": "a", "evidence": ["E1"], "tone": "악재"},
+            {"text": "b", "evidence": ["E1"], "tone": "대박"},
+        ],
+        "causes": [{"text": "c", "evidence": ["E1"], "tone": "호재"}],
+    }
+    kept = validate_answer(ans, ev, "")
+    assert [x["tone"] for x in kept["facts"]] == ["악재", "중립"]  # 모르는 값은 중립
+    share = tone_share(kept)
+    assert share is not None and round(share["악재"], 3) == round(1 / 3, 3)

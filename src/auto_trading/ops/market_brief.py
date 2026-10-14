@@ -35,7 +35,9 @@ __all__ = [
     "parse_spy_holdings",
     "pct_rank",
     "render_telegram",
+    "tone_share",
     "top_by",
+    "top_excluding",
     "validate_answer",
 ]
 
@@ -133,6 +135,19 @@ def top_by(holdings: Sequence[Holding], n: int) -> list[Holding]:
     return sorted(holdings, key=lambda h: (-h.weight, h.symbol))[:n]
 
 
+_SAME_COMPANY = {"GOOG": "GOOGL", "BRK.B": "BRK", "BRK.A": "BRK"}
+"""같은 회사의 다른 주식 종류 — 겹침을 볼 때 한 회사로 친다."""
+
+
+def top_excluding(holdings: Sequence[Holding], exclude: Sequence[str], n: int) -> list[Holding]:
+    """``exclude``(예: S&P 500 상위 10)에 있는 회사를 빼고 다음 순위로 채운 상위 n (순수).
+
+    사용자 2026-10-15: "sp랑 나스닥의 종목이 겹치잖아? 안겹치도록 해줘"."""
+    taken = {_SAME_COMPANY.get(x, x) for x in exclude}
+    rest = [h for h in holdings if _SAME_COMPANY.get(h.symbol, h.symbol) not in taken]
+    return top_by(rest, n)
+
+
 # ---------------------------------------------------------------- 수치
 
 
@@ -207,7 +222,15 @@ def validate_answer(
                 dropped.append({"where": key, "text": text, "reason": reason})
                 continue
             states = sorted({ids[r].state for r in refs})
-            kept[key].append({"text": text, "evidence": refs, "state": " / ".join(states)})
+            tone = str(item.get("tone", "")).strip()
+            kept[key].append(
+                {
+                    "text": text,
+                    "evidence": refs,
+                    "state": " / ".join(states),
+                    "tone": tone if tone in TONES else "중립",
+                }
+            )
     unknown = [str(x) for x in answer.get("unknown", []) or [] if str(x).strip()]
     to_check = [str(x) for x in answer.get("to_check", []) or [] if str(x).strip()]
     return {**kept, "unknown": unknown, "to_check": to_check, "dropped": dropped}
@@ -340,6 +363,24 @@ _STATE_SHORT = {"공식 원문": "공식", "기사 · 요약만": "기사"}
 RULE = "━━━━━━━━━━━━"
 
 
+TONES = ("호재", "중립", "악재")
+_TONE_MARK = {"호재": "🟢", "중립": "⚪", "악재": "🔴"}
+
+
+def tone_share(ai: Mapping[str, Any]) -> dict[str, float] | None:
+    """검사를 통과한 사실 · 원인 후보 · 반대 근거의 호재 · 중립 · 악재 비율 (순수).
+
+    항목이 없으면 None."""
+    tones = [
+        str(x.get("tone") or "중립")
+        for k in ("facts", "causes", "counter")
+        for x in ai.get(k) or []
+    ]
+    if not tones:
+        return None
+    return {t: tones.count(t) / len(tones) for t in TONES}
+
+
 def _tag(item: Mapping[str, Any]) -> str:
     states = [_STATE_SHORT.get(x.strip(), x.strip()) for x in str(item["state"]).split(" / ")]
     return f"   └ {', '.join(item['evidence'])} · {'/'.join(x for x in states if x)}"
@@ -361,7 +402,11 @@ def render_telegram(brief: Mapping[str, Any]) -> str:
         lines.append("😰 VIX  미확보")
     groups = (
         ("🏢 S&P 500 상위 10", "SPY 보유 비중 기준", "spy"),
-        ("💻 나스닥 100 상위 10", "시가총액 비중 기준(근사)", "qqq"),
+        (
+            "💻 나스닥 100 상위 10 (S&P 겹침 제외)",
+            "시가총액 비중 · S&P 상위 10 회사는 다음 순위로",
+            "qqq",
+        ),
     )
     for title, basis, key in groups:
         lines += ["", title]
@@ -385,6 +430,13 @@ def render_telegram(brief: Mapping[str, Any]) -> str:
     ai = brief.get("ai")
     if ai:
         lines += ["", RULE, "🤖 AI 정리 (근거 번호 · 공식/기사)"]
+        tone_pct = tone_share(ai)
+        if tone_pct:
+            n = sum(len(ai.get(k) or []) for k in ("facts", "causes", "counter"))
+            lines.append(
+                f"   🟢 호재 {tone_pct['호재']:.0%} · ⚪ 중립 {tone_pct['중립']:.0%} · "
+                f"🔴 악재 {tone_pct['악재']:.0%} ({n} 건, AI 분류)"
+            )
         for title, key in (
             ("✅ 확인된 사실", "facts"),
             ("🔎 원인 후보", "causes"),
@@ -394,7 +446,8 @@ def render_telegram(brief: Mapping[str, Any]) -> str:
             if items:
                 lines += ["", title]
                 for x in items[:5]:
-                    lines += [f"• {x['text']}", _tag(x)]
+                    mark = _TONE_MARK.get(str(x.get("tone") or "중립"), "•")
+                    lines += [f"{mark} {x['text']}", _tag(x)]
         for title, key in (("❓ 확인 불가", "unknown"), ("📌 추가로 볼 것", "to_check")):
             items = ai.get(key) or []
             if items:
