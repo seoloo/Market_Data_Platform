@@ -543,6 +543,29 @@ class TestRender:
         assert "롱이 켜진 코인: 없음" in html
         assert EVIL not in html
 
+    def test_ag_chart_overlays_ags_lines(self, root: Path) -> None:
+        import json
+
+        for folder, body in (
+            ("ag_paper", {"date": "2026-10-15", "books": {}, "paths": {}}),
+            (
+                "ags_paper",
+                {
+                    "books": {
+                        "AGS1": {"path": {"2026-10-13": 908.2, "2026-10-14": 910.0}},
+                        "AGS3": {"path": {"2026-10-13": 908.2}},  # 점 하나는 선을 안 그림
+                    }
+                },
+            ),
+        ):
+            (root / "reports" / folder).mkdir(parents=True)
+            (root / "reports" / folder / "latest.json").write_text(
+                json.dumps(body), encoding="utf-8"
+            )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "ag_paper")
+        chart = html.split("평가액 (USD)", 1)[1].split("지금 들고 있는 것", 1)[0]
+        assert "AGS1 · AG-CR + 숏 1 배" in chart and "AGS3 · AG-CR + 숏 3 배" not in chart
+
     def test_toss_page_reads_saved_reports(self, root: Path) -> None:
         import json
 

@@ -48,6 +48,11 @@ def _crypto_row(name: str, cr: dict[str, Any]) -> str:
     )
 
 
+_AGS_LINES = (
+    ("AGS1", "AGS1 · AG-CR + 숏 1 배", "var(--warn)"),
+    ("AGS3", "AGS3 · AG-CR + 숏 3 배", "var(--bad)"),
+)
+"""AG-CR 과 같은 눈금(AG-CR 첫날 = 1,000)으로 그래프에 겹친다. 시작 전날 AG-CR 값에서 갈라진다."""
 _SKIP = {
     "LONG_TARGET_POSITIVE": "롱이 켜져 있어 안 함",
     "OWN_HALT": "숏 차단 중",
@@ -73,7 +78,8 @@ def _ags_panel(root: Path) -> str:
     target = ag.get("long_target_now") or {}
     on = [escape(str(k).replace("USDT", "")) for k, w in target.items() if float(w or 0) > 0]
     cards = (
-        f'<div class="card"><h3>{_pct(ag.get("return_since_start"))}</h3><div class="sub">'
+        f'<div class="card" style="border-left-color:var(--o2)">'
+        f'<h3>{_pct(ag.get("return_since_start"))}</h3><div class="sub">'
         "AG-CR (숏 없음) · 같은 시작부터</div></div>"
     )
     rows = ""
@@ -82,8 +88,10 @@ def _ags_panel(root: Path) -> str:
         scaled = 1000 * float(eq) / float(start) if start and eq else None
         halt = b.get("own_halted_at")
         state = f"숏 차단 {escape(str(halt))}" if halt else "숏 가능"
+        color = next((c for k, _, c in _AGS_LINES if k == name), "var(--line2)")
         cards += (
-            f'<div class="card"><h3>{_usd(scaled) if scaled else "시작 전"}</h3>'
+            f'<div class="card" style="border-left-color:{color}">'
+            f"<h3>{_usd(scaled) if scaled else '시작 전'}</h3>"
             f'<div class="sub">{escape(str(name))} · '
             f"숏 {float(b.get('short_leverage') or 1):.0f} 배 · {_pct(b.get('return_since_start'))}"
             f" · 숏 {int(b.get('short_trades') or 0)} 건 손익 {_usd(b.get('short_realized'))}"
@@ -166,6 +174,12 @@ def ag_paper_page(data: Any) -> str:
             if t is not None:
                 points.append((t, float(v)))
         series.append(Series(label, color, tuple(points)))
+    ags = _read(root / "reports" / "ags_paper" / "latest.json") or {}
+    for key, label, color in _AGS_LINES:
+        raw = ((ags.get("books") or {}).get(key) or {}).get("path") or {}
+        pts = [(t, float(v)) for d, v in sorted(raw.items()) if (t := _ms(str(d))) is not None]
+        if len(pts) >= 2:
+            series.append(Series(label, color, tuple(pts)))
     chart = '<div class="panel"><h2>평가액 (USD)</h2>' + line_chart(series) + "</div>"
     us = books.get("AG-US") or {}
     trades = (

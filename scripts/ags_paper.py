@@ -130,10 +130,19 @@ def daily() -> dict[str, Any]:
             ag_days=ag_days,
             funding=funding,
         )
+        # AG Paper 그래프와 같은 눈금: AG-CR 첫날 평가액 = 1,000. 하루(UTC) 마지막 값만, 시작 전날은
+        # AG-CR 과 같은 값에서 갈라지게 넣는다.
+        base = ag_days[0].equity if ag_days else None
+        path: dict[str, float] = {}
+        if base and ag_start is not None and b.equity_path:
+            path[_iso(START_MS - DAY)[:10]] = round(ag_start / base * 1000, 2)
+            for ms, eq in b.equity_path:
+                path[_iso(ms - 1)[:10]] = round(eq / base * 1000, 2)
         start_eq = b.equity_path[0][1] if b.equity_path else None
         last_eq = b.equity_path[-1][1] if b.equity_path else None
         books[name] = {
             "short_leverage": lev,
+            "path": path,
             "start_equity": start_eq,
             "equity": last_eq,
             "return_since_start": (last_eq / start_eq - 1) if start_eq and last_eq else None,
