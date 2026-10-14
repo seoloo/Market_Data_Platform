@@ -16,7 +16,7 @@ from typing import Any
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.lt_render import _ms, _pct, _read
 
-__all__ = ["follow_lines", "kr_shadow_page", "load_history"]
+__all__ = ["follow_lines", "kospi_200", "kr_shadow_page", "load_history"]
 
 _REASON = {"trend_off": "추세 꺾임", "stop_35": "고점 −35%", "delisted": "상장폐지"}
 _ROOM = {"up": "더 오를 여지 있음", "neutral": "중립", "down": "내릴 위험"}
@@ -100,6 +100,56 @@ def follow_lines(root: Path, history: list[dict[str, Any]]) -> dict[str, list[tu
             level["kospi"] *= b / a
             out["kospi"].append((day, level["kospi"]))
     return out
+
+
+def kospi_200(
+    root: Path, days: int = 250
+) -> tuple[list[tuple[str, float]], list[tuple[str, float]]]:
+    """최근 ``days`` 거래일 KOSPI 종가와 200 일 이동평균 (``data/kr_shadow/kospi.csv``)."""
+    closes = sorted(_closes(root / "data" / "kr_shadow" / "kospi.csv").items())
+    out_c: list[tuple[str, float]] = []
+    out_m: list[tuple[str, float]] = []
+    run = 0.0
+    for i, (d, c) in enumerate(closes):
+        run += c
+        if i >= 200:
+            run -= closes[i - 200][1]
+        if i >= len(closes) - days:
+            out_c.append((d, c))
+            if i >= 199:
+                out_m.append((d, run / 200))
+    return out_c, out_m
+
+
+def _kospi_panel(root: Path) -> str:
+    closes, ma = kospi_200(root)
+    if not closes or not ma:
+        return ""
+    last, line = closes[-1][1], ma[-1][1]
+    gap = last / line - 1
+    chart = line_chart(
+        [
+            Series(
+                "KOSPI",
+                "var(--o1)",
+                tuple((t, v) for d, v in closes if (t := _ms(d)) is not None),
+            ),
+            Series(
+                "200 일선",
+                "var(--hold)",
+                tuple((t, v) for d, v in ma if (t := _ms(d)) is not None),
+            ),
+        ]
+    )
+    state = "위 — 새로 살 수 있음" if gap > 0 else "아래 — 새로 사지 않음"
+    return (
+        '<div class="panel"><h2>KOSPI 와 200 일선 (최근 1 년)</h2>'
+        f"<div class='sub'>{escape(closes[-1][0])} 종가 {last:,.2f} · 200 일선 {line:,.2f} · "
+        f"{_pct(gap)} · {state}</div>{chart}"
+        "<div class='foot'>Paper 는 판단일(15 일 무렵 · 월말)에 KOSPI 가 200 일선 위일 때만 "
+        "새로 산다.</div>"
+        "</div>"
+    )
 
 
 def _follow_panel(root: Path, history: list[dict[str, Any]]) -> str:
@@ -392,6 +442,7 @@ def kr_shadow_page(data: Any) -> str:
     return (
         intro
         + head
+        + _kospi_panel(root)
         + _follow_panel(root, history)
         + lists
         + _ai_panel(ai, news)

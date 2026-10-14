@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from auto_trading.ui.kr_shadow_render import follow_lines
+from auto_trading.ui.kr_shadow_render import follow_lines, kospi_200
 
 
 def _csv(path: Path, rows: list[tuple[str, float]]) -> None:
@@ -42,3 +42,16 @@ def test_follow_uses_previous_evening_list(tmp_path: Path) -> None:
 def test_follow_needs_two_days(tmp_path: Path) -> None:
     lines = follow_lines(tmp_path, [{"date": "2026-10-01"}])
     assert all(v == [] for v in lines.values())
+
+
+def test_kospi_200_day_average(tmp_path: Path) -> None:
+    base = tmp_path / "data" / "kr_shadow"
+    base.mkdir(parents=True)
+    lines = ["date,close"] + [
+        f"2026{1 + i // 28:02d}{1 + i % 28:02d},{100 + i}" for i in range(250)
+    ]
+    base.joinpath("kospi.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    closes, ma = kospi_200(tmp_path, days=10)
+    assert len(closes) == 10 and len(ma) == 10
+    assert ma[-1][1] == pytest.approx(sum(range(150, 350)) / 200)  # 마지막 200 개 평균
+    assert closes[-1][1] == 349
