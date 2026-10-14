@@ -175,12 +175,12 @@ def alert_text(
 ) -> str:
     """투자 봇 HTML 알림 (바깥 글은 이스케이프). ``whys`` = 알림 번호(1 부터) → Gemini 한 줄."""
     whys = whys or {}
-    head = "Laya 1 차 + Gemini 확인" if whys else "Laya 판단"
+    head = "AI 1 차 + Gemini 확인" if whys else "AI 판단"
     lines = [f"⚠️ <b>보유 종목 위험 뉴스</b> ({head} · 확인 필요)", ""]
     for k, (h, label, prob) in enumerate(alerts, 1):
         grp = f" · {escape(h.asset.group)}" if h.asset.group else ""
         lines.append(
-            f"🔴 <b>{escape(h.asset.key)}</b>{grp} — {escape(KINDS[label][0])} (Laya {prob:.0%})"
+            f"🔴 <b>{escape(h.asset.key)}</b>{grp} — {escape(KINDS[label][0])} (AI {prob:.0%})"
         )
         if whys.get(k):
             lines.append(f"   {escape(whys[k])}")

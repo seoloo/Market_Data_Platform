@@ -150,10 +150,10 @@ def laya_text(calls: Sequence[Call]) -> str:
     pairs = [(c.tones[k], v) for c in calls for k, v in c.laya.items() if c.tones.get(k)]
     times = [c.laya_ms for c in calls if c.laya]
     if not pairs:
-        return "🧪 Laya 비교: 아직 기록 없음 (Laya 주소 · 키 확인 필요)"
+        return "🧪 보조 AI 비교: 아직 기록 없음 (보조 AI 주소 · 키 확인 필요)"
     same = sum(1 for g, lay in pairs if g == lay) / len(pairs)
     ms = sum(times) / len(times) if times else 0.0
     return (
-        f"🧪 Laya 비교 (그림자): 기사 {len(pairs)}건 · Gemini 와 같은 판단 {same:.0%} · "
+        f"🧪 보조 AI 비교 (그림자): 기사 {len(pairs)}건 · Gemini 와 같은 판단 {same:.0%} · "
         f"평균 {ms:.0f}ms\n※ 정답이 없는 비교예요 — 붙일지는 직접 정해 주세요"
     )

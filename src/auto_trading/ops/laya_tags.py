@@ -73,7 +73,7 @@ def brief_line(t: Mapping[str, Any]) -> str:
         return ""
     parts = " · ".join(f"{_MOOD[k][0]} {_MOOD[k][1]} {t[k]}" for k in ("good", "bad", "neutral"))
     drop = f" · 관계없는 기사 {t['dropped']}건 뺌" if t.get("dropped") else ""
-    return f"🧪 Laya 기사 분위기 ({t['judged']}건): {parts}{drop}"
+    return f"🧪 AI 기사 분위기 ({t['judged']}건): {parts}{drop}"
 
 
 THEMES: dict[str, tuple[str, str]] = {
@@ -126,7 +126,7 @@ def theme_lines(
     """주간 테마 메시지에 붙일 줄 — 기사 수 많은 순, 지난주 대비 증감."""
     if not now:
         return []
-    lines = [f"🧪 Laya 테마별 기사 수 (미국 기사 {total}건 분류)"]
+    lines = [f"🧪 AI 테마별 기사 수 (미국 기사 {total}건 분류)"]
     for k, n in sorted(now.items(), key=lambda x: -x[1])[:top]:
         diff = ""
         if last is not None:

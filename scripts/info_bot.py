@@ -79,7 +79,7 @@ HELP = """📌 정보 봇 사용법 — 이렇게 보내 보세요
   🤖 AI 의견(강세·중립·약세)은 검증 안 된 참고 — 20거래일 뒤 채점해요
 
 🧾 성적 (또는 /score) — AI 의견이 실제로 맞은 비율
-🧪 라야 (또는 /laya) — Laya 와 Gemini 판단 비교
+🧪 비교 (또는 /compare) — 보조 AI 와 Gemini 판단 비교
 ❓ 도움 (또는 /help) — 이 안내
 
 자동으로 오는 것: 주간 테마(토 09:00) · 시장 브리핑(화~토 07:30)
@@ -87,10 +87,13 @@ HELP = """📌 정보 봇 사용법 — 이렇게 보내 보세요
 COMMANDS_MENU = [
     ("help", "사용법"),
     ("score", "성적 — AI 의견 채점표"),
-    ("laya", "라야 — Laya 와 Gemini 비교"),
+    ("compare", "비교 — 보조 AI 와 Gemini 판단 비교"),
 ]
 SCORE_WORDS = ("성적", "/성적", "성적표", "/score", "score")
-LAYA_WORDS = ("라야", "/라야", "laya", "/laya")
+LAYA_WORDS = ("비교", "/비교", "compare", "/compare", "라야", "/라야", "laya", "/laya")
+"""보조 AI 비교 명령. 알림 · 도움말에는 '비교' 만 보인다(옛 말도 받는다).
+
+사용자 2026-10-15 'Laya 라는 단어 좀 빼'."""
 HELP_WORDS = ("/start", "/help", "도움", "도움말", "help", "?")
 _UA = {"User-Agent": "Mozilla/5.0"}
 EXCERPTS = 4
