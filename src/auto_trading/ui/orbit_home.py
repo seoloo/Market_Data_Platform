@@ -213,6 +213,8 @@ def layout(body: str, theme: str, active: str = "live") -> str:
         )
         + f"{icon('home')}<span>홈</span></a>"
         f'<a href="/live#orbit-assets" aria-label="내 자산">{icon("pie")}<span>내 자산</span></a>'
+        # Paper(가상 장부) 화면 모음 — 운영 개요에서 코인 · 주식 Paper 페이지로 이어진다.
+        f'<a href="/" aria-label="Paper 기록">{icon("chart")}<span>Paper</span></a>'
         + (
             '<button type="button" class="orbit-accounts" popovertarget="orbit-accounts" '
             f'aria-label="연결 계좌">{icon("wallet")}<span>연결 계좌</span></button>'
