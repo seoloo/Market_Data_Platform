@@ -50,6 +50,41 @@ def _ms(day: str) -> int | None:
         return None
 
 
+_NQ_BOOKS = (
+    ("NQ", "nq_paper", "NQ · 나스닥 100 상위 10 (각 10%)"),
+    ("SN20", "sn20_paper", "SN20 · S&P 10 + 나스닥 10 (각 5%)"),
+    ("SN20C", "sn20c_paper", "SN20-C · SN20 + 10% 상한 덜어내기"),
+)
+
+
+def _nq_panel(root: Path) -> str:
+    """NQ · SN20 · SN20-C Paper — 모멘텀 순위 상위 종목, 판단일(첫 거래일 · 14 일 뒤) 교체."""
+    cards, rows = "", ""
+    for key, folder, label in _NQ_BOOKS:
+        r = _read(root / "reports" / folder / "latest.json")
+        if r is None:
+            continue
+        held = ", ".join(escape(str(x.get("symbol"))) for x in r.get("positions") or []) or "현금"
+        cards += (
+            f'<div class="card"><h3>{_usd(r.get("equity_usd"))}</h3><div class="sub">'
+            f"{escape(label)} · {_pct(r.get('return_since_start'))} · 같은 기간 QQQ "
+            f"{_pct(r.get('qqq_since_start'))}</div></div>"
+        )
+        rows += (
+            f"<tr><th>{escape(key)}</th><td>기준 {escape(str(r.get('date')))} · 다음 판단 "
+            f"{escape(str(r.get('next_rebalance')))} · 보유 {held}</td></tr>"
+        )
+    if not cards:
+        return ""
+    return (
+        '<div class="panel"><h2>나스닥 · S&amp;P 상위 종목 Paper (가상 1,000 USD 씩)</h2>'
+        '<p class="mute">모멘텀 순위 상위 종목을 판단일(그달 첫 거래일 · 14 일 뒤)에 바꾸고, '
+        "T/v2 추세가 꺼진 종목은 다음 날 판다. 현재 명단을 쓰므로 앞으로의 기록만 판단 근거다. "
+        "실제 주문은 없다.</p>"
+        f'<div class="cards">{cards}</div><table>{rows}</table></div>'
+    )
+
+
 def lt_paper_page(data: Any) -> str:
     root = getattr(data, "root", None) or Path()
     latest = _read(root / "reports" / "lt_paper" / "latest.json")
@@ -62,7 +97,11 @@ def lt_paper_page(data: Any) -> str:
         "<b>실제 주문은 없다.</b></p></div>"
     )
     if latest is None:
-        return intro + '<div class="panel"><p class="mute">아직 기록이 없다.</p></div>'
+        return (
+            intro
+            + '<div class="panel"><p class="mute">아직 기록이 없다.</p></div>'
+            + _nq_panel(root)
+        )
     equity = latest.get("equity_usd")
     cards = (
         f'<div class="card"><h3>{_usd(equity)}</h3><div class="sub">평가액 · 시작 '
@@ -188,4 +227,4 @@ def lt_paper_page(data: Any) -> str:
             "<div class='foot'>AI 는 그날 모은 뉴스 제목만 보고 판단한다 (기계 규칙 결과는 안 줌). "
             "기록·채점용이며 매매에 쓰지 않는다.</div></div>"
         )
-    return intro + head + chart + positions + tables + news_panel + ai_panel
+    return intro + head + chart + positions + tables + news_panel + ai_panel + _nq_panel(root)

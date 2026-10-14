@@ -18,6 +18,7 @@ _BOOKS = {
     "NBG": ("나스닥·채권·금", "var(--o2)"),
     "MIX": ("나스닥·추세 ETF", "var(--o3)"),
     "BASE": ("QNDX 기준", "var(--mute2)"),
+    "GBG": ("Glide·채권·금", "var(--warn)"),
 }
 _DAY_MS = 86_400_000
 

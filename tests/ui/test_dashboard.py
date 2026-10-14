@@ -281,6 +281,31 @@ class TestRender:
         assert "주도주 추세 보유" in html and "HPE" in html and "$997.50" in html
         assert "추세 꺾임" in html and "뉴스 529 건" in html
 
+    def test_lt_paper_page_shows_nq_and_sn20_books(self, root: Path) -> None:
+        import json
+
+        for folder, eq in (("nq_paper", 985.06), ("sn20_paper", 1008.46)):
+            rep = root / "reports" / folder
+            rep.mkdir(parents=True)
+            (rep / "latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-10-12",
+                        "equity_usd": eq,
+                        "return_since_start": eq / 1000 - 1,
+                        "qqq_since_start": 0.0085,
+                        "next_rebalance": "2026-10-15",
+                        "positions": [{"symbol": EVIL}, {"symbol": "MRNA"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "lt_paper")
+        assert "$985.06" in html and "$1,008.46" in html and "MRNA" in html
+        assert "SN20 · S&amp;P 10" in html and "2026-10-15" in html
+        assert "SN20-C" not in html  # 보고서 없는 장부는 건너뛴다
+        assert EVIL not in html
+
     def test_kr_shadow_page_shows_three_lists_paper_and_history(self, root: Path) -> None:
         import json
 
@@ -455,6 +480,42 @@ class TestRender:
         assert EVIL not in html
         nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
         assert nav.count('href="/ag-paper"') == 1
+
+    def test_ag_paper_page_shows_ags_books(self, root: Path) -> None:
+        import json
+
+        rep = root / "reports" / "ags_paper"
+        rep.mkdir(parents=True)
+        (rep / "latest.json").write_text(
+            json.dumps(
+                {
+                    "as_of_utc": "2026-10-20 12:00",
+                    "start_utc": "2026-10-14 16:00",
+                    "ag_cr": {"return_since_start": -0.01, "long_target_now": {"BTCUSDT": 0.0}},
+                    "books": {
+                        "AGS1": {
+                            "short_leverage": 1.0,
+                            "start_equity": 9000.0,
+                            "equity": 9090.0,
+                            "return_since_start": 0.01,
+                            "short_trades": 2,
+                            "short_realized": 90.0,
+                            "open_shorts": [
+                                {"symbol": "BTCUSDT", "entry_at": EVIL, "entry": 1, "stop": 2}
+                            ],
+                            "trades": [{"symbol": "ETHUSDT", "reason": "STOP", "net": -5}],
+                            "signals": [{"symbol": "BTCUSDT", "skipped": "OWN_HALT"}],
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        html = render_page(load_dashboard(root, P0 + 11 * D), "ag_paper")
+        assert "AGS · AG-CR + 숏" in html and "$1,010.00" in html
+        assert "숏 1 배" in html and "손절" in html and "숏 차단 중" in html
+        assert "롱이 켜진 코인: 없음" in html
+        assert EVIL not in html
 
     def test_toss_page_reads_saved_reports(self, root: Path) -> None:
         import json

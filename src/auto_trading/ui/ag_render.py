@@ -1,6 +1,7 @@
 """AG Paper 화면 (docs/research/117) — 저장된 보고서만 읽는다. 주문 없음.
 
-출처: ``reports/ag_paper/latest.json`` (매일 21:17 KST). 모든 동적 문자열은 이스케이프한다.
+출처: ``reports/ag_paper/latest.json`` (매일 21:17 KST), AGS 는 ``reports/ags_paper/latest.json``
+(같은 작업 안, 문서 232 §8). 모든 동적 문자열은 이스케이프한다.
 """
 
 from __future__ import annotations
@@ -47,6 +48,80 @@ def _crypto_row(name: str, cr: dict[str, Any]) -> str:
     )
 
 
+_SKIP = {
+    "LONG_TARGET_POSITIVE": "롱이 켜져 있어 안 함",
+    "OWN_HALT": "숏 차단 중",
+    "COOLDOWN": "쉬는 중",
+    "DAILY_LOSS": "하루 손실 2%",
+    "NO_ROOM": "남은 증거금 없음",
+}
+_REASON = {"STOP": "손절", "48H": "48 시간", "LONG_PRIORITY": "롱 복귀"}
+
+
+def _ags_panel(root: Path) -> str:
+    """AGS1 · AGS3 — AG-CR Paper 롱 + 232 숏 관찰 장부. 시작 = 1,000 으로 맞춰 보인다."""
+    r = _read(root / "reports" / "ags_paper" / "latest.json")
+    head = (
+        '<div class="panel"><h2>AGS · AG-CR + 숏 (관찰 장부)</h2>'
+        '<p class="mute">AG-CR(코인 3 배) Paper 를 롱으로 그대로 쓰고, 롱이 꺼진 코인에만 '
+        "4 시간봉 RSI7 꺾임 숏을 붙인다(문서 232). AGS1 = 숏 1 배, AGS3 = 숏 3 배. "
+        "숏 손익은 AG-CR 평가액에 더한다. 실제 주문은 없다.</p>"
+    )
+    if r is None:
+        return head + '<p class="mute">아직 기록이 없다.</p></div>'
+    ag = r.get("ag_cr") or {}
+    target = ag.get("long_target_now") or {}
+    on = [escape(str(k).replace("USDT", "")) for k, w in target.items() if float(w or 0) > 0]
+    cards = (
+        f'<div class="card"><h3>{_pct(ag.get("return_since_start"))}</h3><div class="sub">'
+        "AG-CR (숏 없음) · 같은 시작부터</div></div>"
+    )
+    rows = ""
+    for name, b in (r.get("books") or {}).items():
+        start, eq = b.get("start_equity"), b.get("equity")
+        scaled = 1000 * float(eq) / float(start) if start and eq else None
+        halt = b.get("own_halted_at")
+        state = f"숏 차단 {escape(str(halt))}" if halt else "숏 가능"
+        cards += (
+            f'<div class="card"><h3>{_usd(scaled) if scaled else "시작 전"}</h3>'
+            f'<div class="sub">{escape(str(name))} · '
+            f"숏 {float(b.get('short_leverage') or 1):.0f} 배 · {_pct(b.get('return_since_start'))}"
+            f" · 숏 {int(b.get('short_trades') or 0)} 건 손익 {_usd(b.get('short_realized'))}"
+            f" · {state}</div></div>"
+        )
+        opened = " · ".join(
+            f"{escape(str(o.get('symbol')).replace('USDT', ''))} {escape(str(o.get('entry_at')))} "
+            f"진입 {float(o.get('entry') or 0):,.2f} 손절 {float(o.get('stop') or 0):,.2f}"
+            for o in b.get("open_shorts") or []
+        )
+        trades = " · ".join(
+            f"{escape(str(t.get('symbol')).replace('USDT', ''))} {escape(str(t.get('exit_at')))} "
+            f"{escape(_REASON.get(str(t.get('reason')), str(t.get('reason'))))} "
+            f"{_usd(t.get('net'))}"
+            for t in (b.get("trades") or [])[-5:]
+        )
+        signals = " · ".join(
+            f"{escape(str(e.get('symbol')).replace('USDT', ''))} {escape(str(e.get('at')))} "
+            + escape(_SKIP.get(str(e.get("skipped")), "진입") if e.get("skipped") else "진입")
+            for e in (b.get("signals") or [])[-5:]
+        )
+        rows += (
+            f"<tr><th>{escape(str(name))}</th><td>열린 숏 {opened or '없음'}"
+            f"<br>최근 청산 {trades or '—'}<br>최근 신호 {signals or '—'}</td></tr>"
+        )
+    note = (
+        f"지금 AG-CR 롱이 켜진 코인: {', '.join(on) or '없음'} — 켜진 코인에는 숏을 내지 않는다."
+        if target
+        else ""
+    )
+    return (
+        head + f'<div class="sub">기준 {escape(str(r.get("as_of_utc")))} UTC · 시작 '
+        f"{escape(str(r.get('start_utc')))} UTC</div>"
+        f'<div class="cards">{cards}</div><table>{rows}</table>'
+        f"<div class='foot'>{note}</div></div>"
+    )
+
+
 def ag_paper_page(data: Any) -> str:
     root = getattr(data, "root", None) or Path()
     latest = _read(root / "reports" / "ag_paper" / "latest.json")
@@ -59,7 +134,11 @@ def ag_paper_page(data: Any) -> str:
         "<b>처음 돈의 30%(300 USD) 이하가 되면 정리하고 멈춘다.</b> 실제 주문은 없다.</p></div>"
     )
     if latest is None:
-        return intro + '<div class="panel"><p class="mute">아직 기록이 없다.</p></div>'
+        return (
+            intro
+            + '<div class="panel"><p class="mute">아직 기록이 없다.</p></div>'
+            + _ags_panel(root)
+        )
     books = latest.get("books") or {}
     cards = ""
     for key, label, _ in _BOOKS:
@@ -106,4 +185,4 @@ def ag_paper_page(data: Any) -> str:
         "<div class='foot'>AG-MIX 는 두 계좌 값으로 계산한다(따로 매매하지 않음). "
         "AG-US 는 QS Paper(21:15) 뒤에 읽는다.</div></div>"
     )
-    return intro + head + chart + detail
+    return intro + head + chart + detail + _ags_panel(root)
