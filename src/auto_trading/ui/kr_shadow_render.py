@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import csv
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,7 @@ from typing import Any
 from auto_trading.ui.charts import Series, line_chart
 from auto_trading.ui.lt_render import _ms, _pct, _read
 
-__all__ = ["kr_shadow_page", "load_history"]
+__all__ = ["follow_lines", "kr_shadow_page", "load_history"]
 
 _REASON = {"trend_off": "추세 꺾임", "stop_35": "고점 −35%", "delisted": "상장폐지"}
 _ROOM = {"up": "더 오를 여지 있음", "neutral": "중립", "down": "내릴 위험"}
@@ -30,6 +31,102 @@ def load_history(root: Path) -> list[dict[str, Any]]:
         if rep is not None:
             out.append(rep)
     return out
+
+
+_FOLLOW = (
+    ("price", "① 가격 주도주", "var(--t2)"),
+    ("flow", "② 수급 주도주", "var(--o2)"),
+    ("ai", "③ AI 판단", "var(--o3)"),
+)
+
+
+def _closes(path: Path) -> dict[str, float]:
+    """``data/kr_shadow`` 일봉 CSV(날짜 YYYYMMDD, 종가, …) → {YYYY-MM-DD: 종가}. 못 읽으면 빈 값."""
+    out: dict[str, float] = {}
+    try:
+        with path.open(encoding="utf-8") as f:
+            for row in csv.reader(f):
+                if len(row) >= 2 and row[0].isdigit() and len(row[0]) == 8:
+                    out[f"{row[0][:4]}-{row[0][4:6]}-{row[0][6:]}"] = float(row[1])
+    except (OSError, ValueError):
+        return {}
+    return out
+
+
+def _codes(rep: dict[str, Any], key: str) -> list[str]:
+    if key == "ai":
+        ai = rep.get("ai")
+        rows = (ai.get("leaders") or []) if isinstance(ai, dict) else []
+    else:
+        rows = rep.get(f"{key}_leaders") or []
+    return [str(r.get("code")) for r in rows if isinstance(r, dict) and r.get("code")]
+
+
+def follow_lines(root: Path, history: list[dict[str, Any]]) -> dict[str, list[tuple[str, float]]]:
+    """매일 **전날 저녁 목록**을 고르게 든다고 칠 때의 지수(첫 기록일 = 100, 비용 없음).
+
+    다음 거래일 수익 = 전날 목록 종목들의 (오늘 종가 ÷ 전날 종가 − 1) 평균. 종가가 없는 종목은 뺀다.
+    KOSPI 도 같은 날짜로 함께. 사용자 2026-10-15 '국장 주도주 같은 경우도 그래프를 만들어줘'.
+    """
+    base = root / "data" / "kr_shadow"
+    days = [str(r.get("date")) for r in history if r.get("date")]
+    cache: dict[str, dict[str, float]] = {}
+
+    def close(code: str, day: str) -> float | None:
+        if code not in cache:
+            cache[code] = _closes(base / "prices" / f"{code}.csv")
+        return cache[code].get(day)
+
+    kospi = _closes(base / "kospi.csv")
+    out: dict[str, list[tuple[str, float]]] = {k: [] for k, _, _ in _FOLLOW}
+    out["kospi"] = []
+    if len(days) < 2:
+        return out
+    level = dict.fromkeys(out, 100.0)
+    for k in out:
+        out[k].append((days[0], 100.0))
+    for prev, rep, day in zip(days, history, days[1:], strict=False):
+        for key, _, _ in _FOLLOW:
+            rets = []
+            for code in _codes(rep, key):
+                a, b = close(code, prev), close(code, day)
+                if a and b:
+                    rets.append(b / a - 1)
+            if rets:
+                level[key] *= 1 + sum(rets) / len(rets)
+                out[key].append((day, level[key]))
+        a, b = kospi.get(prev), kospi.get(day)
+        if a and b:
+            level["kospi"] *= b / a
+            out["kospi"].append((day, level["kospi"]))
+    return out
+
+
+def _follow_panel(root: Path, history: list[dict[str, Any]]) -> str:
+    lines = follow_lines(root, history)
+    series = [
+        Series(label, color, tuple((t, v) for d, v in lines[key] if (t := _ms(d)) is not None))
+        for key, label, color in _FOLLOW
+    ]
+    series.append(
+        Series(
+            "KOSPI",
+            "var(--hold)",
+            tuple((t, v) for d, v in lines["kospi"] if (t := _ms(d)) is not None),
+        )
+    )
+    last = " · ".join(
+        f"{label} {lines[key][-1][1] - 100:+.1f}%"
+        for key, label in (*((k, lbl) for k, lbl, _ in _FOLLOW), ("kospi", "KOSPI"))
+        if lines[key]
+    )
+    return (
+        '<div class="panel"><h2>목록 따라가기 (첫 기록일 = 100)</h2>'
+        '<p class="mute">매일 저녁 기록한 목록을 다음 거래일에 고르게 들었다고 칠 때의 움직임. '
+        "비용 · 체결 · KOSPI 200 일선 규칙은 넣지 않은 비교용 지수이고 Paper 장부가 아니다.</p>"
+        f"<div class='sub'>{escape(last) if last else '기록 2 일째부터 그려진다'}</div>"
+        f"{line_chart(series)}</div>"
+    )
 
 
 def _won(x: Any) -> str:
@@ -294,6 +391,7 @@ def kr_shadow_page(data: Any) -> str:
     return (
         intro
         + head
+        + _follow_panel(root, history)
         + lists
         + _ai_panel(ai, news)
         + sectors
