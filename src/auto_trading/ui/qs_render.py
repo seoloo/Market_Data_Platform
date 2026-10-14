@@ -46,10 +46,11 @@ def qs_paper_page(data: Any) -> str:
         f"({escape(str(nxt.get('as_of')))} 종가) · 20 일 {_pct(nxt.get('r20'))} · 60 일 "
         f"{_pct(nxt.get('r60'))} · 120 일 {_pct(nxt.get('r120'))}</div></div>"
     )
-    for key, label, _ in _BOOKS:
+    for key, label, color in _BOOKS:  # 카드 왼쪽 띠 = 그래프 선 색
         b = books.get(key) or {}
         cards += (
-            f'<div class="card"><h3>{_usd(b.get("value_usd"))}</h3><div class="sub">'
+            f'<div class="card" style="border-left-color:{color}">'
+            f'<h3>{_usd(b.get("value_usd"))}</h3><div class="sub">'
             f"{escape(label)} · 넣은 돈 {_usd(b.get('invested_usd'))} · "
             f"{_pct(b.get('return_on_invested'))}</div></div>"
         )

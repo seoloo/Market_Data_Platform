@@ -141,14 +141,15 @@ def ag_paper_page(data: Any) -> str:
         )
     books = latest.get("books") or {}
     cards = ""
-    for key, label, _ in _BOOKS:
+    for key, label, color in _BOOKS:  # 카드 왼쪽 띠 = 그래프 선 색
         b = books.get(key) or {}
         stopped = b.get("stopped")
         state = (
             f"정리됨 {escape(str(stopped))}" if stopped else f"고점 대비 {_pct(b.get('from_peak'))}"
         )
         cards += (
-            f'<div class="card"><h3>{_usd(b.get("value_usd"))}</h3><div class="sub">'
+            f'<div class="card" style="border-left-color:{color}">'
+            f'<h3>{_usd(b.get("value_usd"))}</h3><div class="sub">'
             f"{escape(label)} · {_pct(b.get('return'))} · {state} · 최저 "
             f"{_pct(b.get('worst_vs_start'))}</div></div>"
         )
