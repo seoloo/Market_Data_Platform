@@ -5,7 +5,7 @@
 것이 원칙이다(AGENTS §2).
 
 **그룹 정지** (2026-10-11, 사용자 '전부 정리' 요청): ``data/HALT_cruise`` · ``HALT_glide`` ·
-``HALT_acc`` 는 그 그룹(Cruise · Glide · 토스 적립)의 새 주문만 멈춘다. 실행기는
+``HALT_acc`` 는 그 그룹(Cruise · Glide · 자동 적립)의 새 주문만 멈춘다. 실행기는
 :func:`halted_for` 로 전체 정지와 자기 그룹 정지를 함께 본다.
 
 파일을 만들고 지우는 것은 사람의 결정뿐이다 — 설정 화면의 비상 정지 버튼, 사용자가 누른
@@ -18,7 +18,7 @@ from pathlib import Path
 
 __all__ = ["GROUPS", "group_path", "halted_for", "halted_reason"]
 
-GROUPS: dict[str, str] = {"cruise": "Cruise", "glide": "Glide", "acc": "토스 적립"}
+GROUPS: dict[str, str] = {"cruise": "Cruise", "glide": "Glide", "acc": "자동 적립"}
 """그룹 키 → 보이는 이름."""
 
 

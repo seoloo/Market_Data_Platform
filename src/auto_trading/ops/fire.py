@@ -103,7 +103,7 @@ def report_text(
             lines.append(sub(f"{icon} {label}(연 {annual:.0%}) {when}"))
     lines += [
         "",
-        "※ 세금 전 · 실거래 장부(Glide · Cruise · 토스 적립)만 · 연금 · ISA 제외",
+        "※ 세금 전 · 실거래 장부(Glide · Cruise · 자동 적립)만 · 연금 · ISA 제외",
         "※ 도달 시점은 가정한 연수익으로 낸 계산이지 예측이 아님",
     ]
     return "\n".join(lines)

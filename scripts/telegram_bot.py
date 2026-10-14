@@ -68,11 +68,11 @@ def report(root: Path = REPO) -> str:
 HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 📊 현황 (또는 /status · 수익 · 잔고)
-  실거래 요약: Glide · Cruise · 토스 적립 + 파이어 목표까지 %
+  실거래 요약: Glide · Cruise · 자동 적립 + 파이어 목표까지 %
 
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
-  [전부 정리] [Cruise 만] [Glide 만] [토스 적립만] [취소]
+  [전부 정리] [Cruise 만] [Glide 만] [자동 적립만] [취소]
   버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
 
 ▶ 정지풀기 (또는 /unhalt)
@@ -124,7 +124,7 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
     return [
         [b("🧯 전부 정리", "all")],
         [b("Cruise 만", "cruise"), b("Glide 만", "glide")],
-        [b("토스 적립만", "acc")],
+        [b("자동 적립만", "acc")],
         [b("취소", "cancel")],
     ]
 

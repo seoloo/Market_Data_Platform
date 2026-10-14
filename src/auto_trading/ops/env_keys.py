@@ -34,7 +34,7 @@ class KeySpec:
 SERVICES: tuple[tuple[str, str, str], ...] = (
     (
         "toss",
-        "토스증권 (Glide · 토스 적립)",
+        "토스증권 (Glide · 자동 적립)",
         "토스증권 앱 → 전체 → 설정 → Open API 에서 앱을 만들고 Client ID · Secret 을 받아요. "
         "주문은 아래 '실제 주문 허용' 을 켜야 나가요.",
     ),

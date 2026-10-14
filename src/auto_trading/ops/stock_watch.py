@@ -54,7 +54,7 @@ def check_toss(root: Path, now_kst: datetime) -> tuple[list[str], list[Finding]]
         if (s := _read(states / f"{sym}.json")) and s.get("start_date")
     ]
     if not starts:
-        return [], [Finding("INFO", "토스", "토스 적립 시작 전")]
+        return [], [Finding("INFO", "토스", "자동 적립 시작 전")]
     base = root / "reports" / "toss"
     runs = sorted(p.stem for p in base.glob("20*.json"))
     expected = expected_toss_day(now_kst).isoformat()
@@ -103,7 +103,7 @@ def check_toss(root: Path, now_kst: datetime) -> tuple[list[str], list[Finding]]
                 Finding("WARN", "토스 QS", f"TQQQ 를 {word} 차례인데 이틀째 체결되지 않았다")
             )
     line = (
-        f"토스 적립 + QS: 마지막 실행 {last or '없음'}"
+        f"자동 적립 + QS: 마지막 실행 {last or '없음'}"
         + (f" · 주문 {', '.join(orders)}" if orders else "")
         + qs_line
     )
