@@ -213,7 +213,8 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
     if not paper:
         return (
             '<div class="panel"><h2>Paper (가상 1,000 만 원)</h2>'
-            "<p class='mute'>2026-10-06 부터 굴린다 — 첫 매수는 10-30 월말 신호 → 11-02 종가.</p>"
+            "<p class='mute'>2026-10-06 부터 굴린다 — 판단은 2 주마다(15 일 무렵 · 월말), "
+            "KOSPI 가 200 일선 위일 때만 다음 거래일 종가에 산다.</p>"
             "</div>"
         )
     lines: dict[str, list[tuple[int, float]]] = {"price": [], "flow": [], "ew": []}

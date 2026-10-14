@@ -188,11 +188,27 @@ Picker = Callable[["KrPanel", int, Sequence[str]], list[tuple[str, float]]]
 """월말 ``t`` 에 종목군 안에서 주도주(점수 높은 순)를 고르는 함수."""
 
 
+def month_end_day(days: Sequence[str], t: int) -> bool:
+    """그달 마지막 거래일 (141 · 142 연구의 판단일)."""
+    return t + 1 < len(days) and days[t + 1][:7] != days[t][:7]
+
+
+def biweekly_day(days: Sequence[str], t: int) -> bool:
+    """월말 + 15 일 이전 마지막 거래일 — 약 2 주마다.
+
+    2026-10-15 사용자 '2주마다 확인해주면 좋겠어'.
+    """
+    if month_end_day(days, t):
+        return True
+    return t + 1 < len(days) and int(days[t][8:10]) <= 15 < int(days[t + 1][8:10])
+
+
 def simulate_kr(
     panel: KrPanel,
     index_ok: Sequence[bool],
     pick: Picker | None = None,
     start_date: str = FROM,
+    decide: Callable[[Sequence[str], int], bool] = month_end_day,
 ) -> Run:
     """문서 113 ``simulate`` 와 같은 순서(어제 신호 → 오늘 종가 실행 → 오늘 종가로 내일 할 일).
 
@@ -262,7 +278,7 @@ def simulate_kr(
                 pending_sell[sym] = "stop_35"
             elif trend_off(panel.close[sym], t) and sym not in pending_sell:
                 pending_sell[sym] = "trend_off"
-        month_end = t + 1 < len(days) and days[t + 1][:7] != d[:7]
+        month_end = decide(days, t)  # 판단일 (기본 월말, 국장 그림자 Paper 는 2 주마다)
         if month_end:
             pool = members(panel, t)
             run.universe_log[d] = pool

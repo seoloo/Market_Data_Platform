@@ -13,7 +13,8 @@
 3. **AI 판단** — 그날 모은 한국 경제 뉴스 제목과 종목군(코드·이름)만 주고 Gemini 에게
    주도 테마·주도주·KOSPI 여지를 묻는다. 기계 목록과 가격 지표는 주지 않는다(베끼면 비교가 안 됨).
 
-두 기계 규칙은 가상 Paper 로도 굴린다(141·142 의 `simulate_kr` 그대로, 2026-10-06 부터).
+두 기계 규칙은 가상 Paper 로도 굴린다(141·142 의 `simulate_kr`, 2026-10-06 부터).
+판단일은 2026-10-15 사용자 요청으로 월말 → 2 주마다(15 일 이전 마지막 거래일 · 월말).
 문서 147: 세 목록·종목군·KOSPI 에 매달 같은 금액을 넣고 팔지 않는 **장기 적립 장부**도 굴린다.
 자료는 141·142 연구 자료(해시 고정)를 건드리지 않게 ``data/kr_shadow/`` 에 따로 둔다.
 한국투자증권은 조회만 쓴다.
@@ -43,6 +44,7 @@ from scripts.fetch_kr_stocks import (
 from scripts.run_kr_flow import flow_picker, flow_scores, load_flows
 from scripts.run_lt_kr import (
     UNKNOWN,
+    biweekly_day,
     build_panel,
     equal_weight_pit,
     leaders_pit,
@@ -356,8 +358,11 @@ def run() -> dict[str, object]:
         ),
     }
     if day >= PAPER_START:
-        lt = simulate_kr(panel, index_ok, None, start_date=PAPER_START)
-        fl = simulate_kr(panel, index_ok, flow_picker(f), start_date=PAPER_START)
+        # 판단은 2 주마다(15 일 무렵 · 월말) — 사용자 2026-10-15. 141 · 142 연구는 월말 판단이었다.
+        lt = simulate_kr(panel, index_ok, None, start_date=PAPER_START, decide=biweekly_day)
+        fl = simulate_kr(
+            panel, index_ok, flow_picker(f), start_date=PAPER_START, decide=biweekly_day
+        )
         ew = equal_weight_pit(panel, lt.universe_log, start_date=PAPER_START)
         report["paper"] = {
             "start": PAPER_START,
