@@ -47,7 +47,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("testnet", "/testnet", "테스트넷 검증"),
     ("risk", "/risk", "위험 · 알림"),
     ("demo", "/demo", "데모 · 실거래 준비"),
-    ("toss", "/toss", "토스 적립"),
+    ("toss", "/toss", "자동 적립"),
     ("lt_paper", "/lt-paper", "주도주 Paper"),
     ("qs_paper", "/qs-paper", "QS Paper"),
     ("ag_paper", "/ag-paper", "AG Paper"),

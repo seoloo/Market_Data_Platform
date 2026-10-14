@@ -318,13 +318,22 @@ _CHART_SYMBOLS = (("BTQ", "var(--c3)"), ("QS", "var(--c2)"), ("WQTM", "var(--c5)
 
 
 def _toss_chart(root: Path) -> str:
-    """종목별 평가액(원) = 그날 보고서의 보유 수량 × 가격 × 환율.
+    """종목별 평가액(원)과 수익률(%) 두 그래프.
 
+    평가액 = 그날 밤 보고서의 보유 수량 × 가격 × 환율, 수익률 = 평가액 ÷ 그날까지 넣은 원가 − 1.
     보유가 없는 종목은 그리지 않는다.
     """
-    series, cards = [], ""
+    won, pct, cards = [], [], ""
     for symbol, color in _CHART_SYMBOLS:
-        points: list[tuple[int, float]] = []
+        state = _read(root / "data" / "toss" / f"{symbol}.json") or {}
+        buys: list[tuple[str, float]] = []
+        for b in state.get("buys") or []:
+            usd, rate = _number(b.get("cost_usd")), _number(b.get("fx_rate"))
+            if usd is not None and rate is not None:
+                buys.append((str(b.get("date") or ""), usd * rate))
+        values: list[tuple[int, float]] = []
+        returns: list[tuple[int, float]] = []
+        cost = 0.0
         for path in sorted((root / "reports" / "toss" / symbol).glob("20*.json")):
             r = _read(path)
             advice = (r or {}).get("advice")
@@ -337,29 +346,31 @@ def _toss_chart(root: Path) -> str:
                 at = int(datetime.fromisoformat(day).replace(tzinfo=UTC).timestamp() * 1000)
             except ValueError:
                 continue
-            if qty and price and fx and qty > 0:
-                points.append((at, qty * price * fx))
-        if not points:
+            if not (qty and price and fx and qty > 0):
+                continue
+            value = qty * price * fx
+            cost = sum(c for d, c in buys if d <= day)
+            values.append((at, value))
+            if cost > 0:
+                returns.append((at, (value / cost - 1) * 100))
+        if not values:
             continue
-        state = _read(root / "data" / "toss" / f"{symbol}.json") or {}
-        cost = 0.0
-        for b in state.get("buys") or []:
-            usd, rate = _number(b.get("cost_usd")), _number(b.get("fx_rate"))
-            if usd is not None and rate is not None:
-                cost += usd * rate
-        value = points[-1][1]
+        last = values[-1][1]
+        ret = f" · 수익률 {returns[-1][1]:+.2f}%" if returns else ""
         cards += (
-            f'<div class="card" style="border-left-color:{color}"><h3>{value:,.0f}원</h3>'
-            f'<div class="sub">{escape(symbol)} · 넣은 원가 {cost:,.0f}원</div></div>'
+            f'<div class="card" style="border-left-color:{color}"><h3>{last:,.0f}원</h3>'
+            f'<div class="sub">{escape(symbol)} · 넣은 원가 {cost:,.0f}원{ret}</div></div>'
         )
-        series.append(Series(symbol, color, tuple(points)))
-    if not series:
+        won.append(Series(symbol, color, tuple(values)))
+        pct.append(Series(symbol, color, tuple(returns)))
+    if not won:
         return ""
     return (
-        '<div class="panel"><h2>적립 종목 평가액 (원)</h2>'
-        '<p class="mute">그날 밤 보고서의 보유 수량 × 가격 × 환율. 적립을 멈춘 QNDX 는 뺐다. '
-        "넣은 원가는 체결된 매수의 달러 금액 × 그날 환율 합.</p>"
-        f'<div class="cards">{cards}</div>{line_chart(series)}</div>'
+        '<div class="panel"><h2>적립 종목 평가액 · 수익률</h2>'
+        '<p class="mute">평가액은 그날 밤 보고서의 보유 수량 × 가격 × 환율, 수익률은 그날까지 넣은 '
+        "원가(체결된 매수의 달러 금액 × 그날 환율 합) 대비. 적립을 멈춘 QNDX 는 뺐다.</p>"
+        f'<div class="cards">{cards}</div>'
+        f"<h3>평가액 (원)</h3>{line_chart(won)}<h3>수익률 (%)</h3>{line_chart(pct)}</div>"
     )
 
 
@@ -372,7 +383,7 @@ def toss_page(data: Any) -> str:
         '<section class="savings-hero"><div><div class="eyebrow">OVERSEAS / SAVINGS</div>'
         "<h2>작게 시작하고,<br>꾸준히 쌓아가는 투자.</h2>"
         '<p>토스증권 · 적립 현황</p><div class="hero-chips"><span>3개 적립 종목</span>'
-        "<span>월~금 21:00 KST</span><span>평가 손익 비표시</span></div></div>"
+        "<span>월~금 21:00 KST</span><span>평가액 · 수익률 그래프</span></div></div>"
         '<div class="hero-note"><span class="hero-symbol" aria-hidden="true">↗</span>'
         "<b>내역만 편안하게 확인하세요.</b><p>저장된 마지막 보고서입니다.<br>"
         "실시간 계좌 조회나 주문은 하지 않습니다.</p></div></section>"

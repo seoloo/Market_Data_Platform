@@ -93,7 +93,7 @@ def test_schedule_skips_finished_tracks_and_weekends(tmp_path: Path) -> None:
     rows = _upcoming(load_dashboard(tmp_path, _NOW))
     assert rows[0][0].strftime("%Y-%m-%d %H:%M") == "2026-10-04 21:00"
     assert "선물 실행기 훈련 V4" not in [name for _, name in rows]
-    toss = next(at for at, name in rows if "토스" in name)
+    toss = next(at for at, name in rows if "자동 적립" in name)
     assert toss.strftime("%Y-%m-%d %H:%M") == "2026-10-05 21:00"
     late = int(datetime(2026, 10, 4, 23, tzinfo=_KST).timestamp() * 1000)
     assert _upcoming(load_dashboard(tmp_path, late))[0][0].day == 5

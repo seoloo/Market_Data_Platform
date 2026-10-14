@@ -514,7 +514,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         )
     return Book(
         "accumulate",
-        "토스 적립",
+        "자동 적립",
         "토스 · 매일 $1 · 기존 보유",
         total_cost,
         0.0,

@@ -114,7 +114,7 @@ def stock_settings(data: DashboardData) -> str:
         for symbol, description, setting, status in rows
     )
     return (
-        '<section class="panel stock-settings"><div class="row"><h2>토스 적립 현황</h2>'
+        '<section class="panel stock-settings"><div class="row"><h2>자동 적립 현황</h2>'
         '<a class="text-link" href="/toss">저장 보고서 →</a></div>'
         '<div class="sub">2026-10-09 등록 설정 · 실행·체결 여부는 저장 보고서로 확인</div>'
         f"<table><tr><th>종목</th><th>설정</th><th>상태</th></tr>{body}</table>"

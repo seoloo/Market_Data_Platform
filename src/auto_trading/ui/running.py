@@ -164,7 +164,7 @@ TRACKS: tuple[Track, ...] = (
     ),
     Track(
         "toss",
-        "토스 적립 + QS (QNDX·BTQ·WQTM·QS)",
+        "자동 적립 + QS (QNDX·BTQ·WQTM·QS)",
         "실계좌 (토스증권)",
         "매일 가상 적립 · 1주 값이 모이면 장 마감 지정가 1주 · QQQ 추세로 QS (문서 118)",
         "21:00 월~금 · 환전 알림 09·12·15시",

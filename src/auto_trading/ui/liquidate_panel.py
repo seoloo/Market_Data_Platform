@@ -17,10 +17,10 @@ from auto_trading.ops.liquidate import SCOPES
 __all__ = ["liquidate_panel"]
 
 _ASK = {
-    "all": "Cruise · Glide · 토스 적립을 모두",
+    "all": "Cruise · Glide · 자동 적립을 모두",
     "cruise": "Cruise(업비트 BTC · ETH · SOL)를",
     "glide": "Glide(토스 TQQQ · SCHD Glide 몫)를",
-    "acc": "토스 적립(미국 · 국내)을",
+    "acc": "자동 적립(미국 · 국내)을",
 }
 
 

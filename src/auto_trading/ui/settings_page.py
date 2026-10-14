@@ -123,7 +123,7 @@ SECTIONS = (
     ("goal", "목표 · 보고"),
     ("glide", "Glide"),
     ("cruise", "Cruise"),
-    ("toss", "토스 적립"),
+    ("toss", "자동 적립"),
     ("alerts", "알림"),
     ("screen", "화면"),
     ("safety", "안전 · 기록"),
@@ -512,14 +512,14 @@ def render_settings(
         )
         ask_t, ask_p, btn = (
             "정말 비상 정지를 푸시겠습니까?",
-            "풀면 다음 실행부터 Glide · Cruise · 토스 적립 주문이 다시 나가요.",
+            "풀면 다음 실행부터 Glide · Cruise · 자동 적립 주문이 다시 나가요.",
             "비상 정지 풀기",
         )
     else:
         state = '<p class="set-note ok" role="status">✅ 정상 운영 중</p>'
         ask_t, ask_p, btn = (
             "정말 비상 정지를 켜시겠습니까?",
-            "Glide · Cruise · 토스 적립의 새 주문을 모두 멈춰요. 이미 낸 주문과 보유는 "
+            "Glide · Cruise · 자동 적립의 새 주문을 모두 멈춰요. 이미 낸 주문과 보유는 "
             "그대로예요. 다시 풀 때도 이 창으로 확인해요.",
             "비상 정지 켜기",
         )

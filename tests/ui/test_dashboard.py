@@ -590,8 +590,9 @@ class TestRender:
             encoding="utf-8",
         )
         html = render_page(load_dashboard(root, P0 + 11 * D), "toss")
-        chart = html.split("적립 종목 평가액 (원)", 1)[1]
+        chart = html.split("적립 종목 평가액 · 수익률", 1)[1]
         assert "6,700원" in chart and "넣은 원가 3,900원" in chart  # 2 주 × 2.5 × 1,340
+        assert "수익률 +71.79%" in chart and "수익률 (%)" in chart  # 6,700 ÷ 3,900 − 1
         drawn = chart.split('<div class="cards">', 1)[1].split("</svg>", 1)[0]
         assert "QNDX" not in drawn  # 설명 문장에만 나오고 카드 · 선에는 없다
 
@@ -658,7 +659,7 @@ class TestRender:
             "나의 투자 현황",
             "확인할 일",
             "다가오는 일정",
-            "토스 적립 현황",
+            "자동 적립 현황",
             "Glide",
             "수익률 추이",
             "주식 Paper 비교",
