@@ -301,3 +301,10 @@ header,html[data-page=live] header{flex-direction:column;align-items:stretch;pad
 /* 여러 선 그래프 전용 구분 색 8 개 (2026-10-14 사용자 '색이 같은 그래프는 각각 다르게') */
 :root{--c1:#2864ce;--c2:#008576;--c3:#7651bc;--c4:#b74380;--c5:#c2540a;--c6:#9a7400;--c7:#3f8a1c;--c8:#6b7a90}
 html[data-theme=dark]{--c1:#7eacff;--c2:#50cabc;--c3:#ba9afa;--c4:#ef92bc;--c5:#ff9f5a;--c6:#f2d15c;--c7:#9be07a;--c8:#a5b3c7}
+/* 자동 적립 그래프 — 평가액 / 수익률 버튼 (스크립트 없이 radio) */
+.acc-chart>input{position:absolute;opacity:0;width:1px;height:1px}
+.acc-controls{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0}
+.acc-chart label{display:inline-block;padding:6px 15px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:12px;cursor:pointer;color:var(--mute)}
+#acc-usd:checked~.acc-controls label[for=acc-usd],#acc-ret:checked~.acc-controls label[for=acc-ret]{color:var(--brand);background:var(--info-bg);border-color:var(--brand)}
+.acc-plot{display:none}#acc-usd:checked~.acc-plot.acc-usd,#acc-ret:checked~.acc-plot.acc-ret{display:block}
+.acc-chart>input:focus-visible~.acc-controls{outline:2px solid var(--brand);outline-offset:3px;border-radius:9px}

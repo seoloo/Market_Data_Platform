@@ -318,19 +318,19 @@ _CHART_SYMBOLS = (("BTQ", "var(--c3)"), ("QS", "var(--c2)"), ("WQTM", "var(--c5)
 
 
 def _toss_chart(root: Path) -> str:
-    """종목별 평가액(원)과 수익률(%) 두 그래프.
+    """종목별 평가액(USD)과 수익률(%) — 버튼으로 바꿔 보는 그래프 하나(스크립트 없이 radio).
 
-    평가액 = 그날 밤 보고서의 보유 수량 × 가격 × 환율, 수익률 = 평가액 ÷ 그날까지 넣은 원가 − 1.
+    평가액 = 그날 밤 보고서의 보유 수량 × 가격(USD), 수익률 = 평가액 ÷ 그날까지 넣은 원가(USD) − 1.
     보유가 없는 종목은 그리지 않는다.
     """
-    won, pct, cards = [], [], ""
+    usd_lines, pct_lines, cards = [], [], ""
     for symbol, color in _CHART_SYMBOLS:
         state = _read(root / "data" / "toss" / f"{symbol}.json") or {}
         buys: list[tuple[str, float]] = []
         for b in state.get("buys") or []:
-            usd, rate = _number(b.get("cost_usd")), _number(b.get("fx_rate"))
-            if usd is not None and rate is not None:
-                buys.append((str(b.get("date") or ""), usd * rate))
+            usd = _number(b.get("cost_usd"))
+            if usd is not None:
+                buys.append((str(b.get("date") or ""), usd))
         values: list[tuple[int, float]] = []
         returns: list[tuple[int, float]] = []
         cost = 0.0
@@ -339,38 +339,45 @@ def _toss_chart(root: Path) -> str:
             advice = (r or {}).get("advice")
             if not isinstance(r, dict) or not isinstance(advice, dict):
                 continue
+            if advice.get("currency") != "USD":
+                continue
             qty, price = _number(r.get("holding_qty")), _number(advice.get("price"))
-            fx = _number(advice.get("fx_rate")) if advice.get("currency") == "USD" else 1.0
             day = str(r.get("date") or path.stem)
             try:
                 at = int(datetime.fromisoformat(day).replace(tzinfo=UTC).timestamp() * 1000)
             except ValueError:
                 continue
-            if not (qty and price and fx and qty > 0):
+            if not (qty and price and qty > 0):
                 continue
-            value = qty * price * fx
+            value = qty * price
             cost = sum(c for d, c in buys if d <= day)
             values.append((at, value))
             if cost > 0:
                 returns.append((at, (value / cost - 1) * 100))
         if not values:
             continue
-        last = values[-1][1]
         ret = f" · 수익률 {returns[-1][1]:+.2f}%" if returns else ""
         cards += (
-            f'<div class="card" style="border-left-color:{color}"><h3>{last:,.0f}원</h3>'
-            f'<div class="sub">{escape(symbol)} · 넣은 원가 {cost:,.0f}원{ret}</div></div>'
+            f'<div class="card" style="border-left-color:{color}"><h3>${values[-1][1]:,.2f}</h3>'
+            f'<div class="sub">{escape(symbol)} · 넣은 원가 ${cost:,.2f}{ret}</div></div>'
         )
-        won.append(Series(symbol, color, tuple(values)))
-        pct.append(Series(symbol, color, tuple(returns)))
-    if not won:
+        usd_lines.append(Series(symbol, color, tuple(values)))
+        pct_lines.append(Series(symbol, color, tuple(returns)))
+    if not usd_lines:
         return ""
     return (
-        '<div class="panel"><h2>적립 종목 평가액 · 수익률</h2>'
-        '<p class="mute">평가액은 그날 밤 보고서의 보유 수량 × 가격 × 환율, 수익률은 그날까지 넣은 '
-        "원가(체결된 매수의 달러 금액 × 그날 환율 합) 대비. 적립을 멈춘 QNDX 는 뺐다.</p>"
+        '<section class="panel acc-chart">'
+        '<input id="acc-usd" type="radio" name="acc-metric" checked>'
+        '<input id="acc-ret" type="radio" name="acc-metric">'
+        "<h2>적립 종목 평가액 · 수익률</h2>"
+        '<p class="mute">평가액은 그날 밤 보고서의 보유 수량 × 가격(달러), 수익률은 그날까지 넣은 '
+        "원가(체결된 매수의 달러 금액 합) 대비 — 환율 변화는 넣지 않는다. "
+        "적립을 멈춘 QNDX 는 뺐다.</p>"
         f'<div class="cards">{cards}</div>'
-        f"<h3>평가액 (원)</h3>{line_chart(won)}<h3>수익률 (%)</h3>{line_chart(pct)}</div>"
+        '<div class="acc-controls"><label for="acc-usd">평가액 (USD)</label>'
+        '<label for="acc-ret">수익률 (%)</label></div>'
+        f'<div class="acc-plot acc-usd">{line_chart(usd_lines)}</div>'
+        f'<div class="acc-plot acc-ret">{line_chart(pct_lines)}</div></section>'
     )
 
 
