@@ -73,6 +73,8 @@ _COLORS = {
     "o1": "var(--o1)",
     "o2": "var(--o2)",
     "o3": "var(--o3)",
+    "t2s": "var(--ok)",
+    "t2u": "var(--warn)",
     "hold": "var(--hold)",
 }
 PHASE7_FROM = datetime(2026, 9, 25, tzinfo=UTC)
@@ -450,7 +452,9 @@ def _events(data: DashboardData, limit: int = 10) -> str:
 
 
 def _overview(data: DashboardData) -> str:
-    days = min((len(lg.points) for lg in data.ledgers), default=0)
+    # 나중에 시작한 비교 장부(그림자 · 업비트)는 '초기 데이터' 안내에서 뺀다.
+    main = [lg for lg in data.ledgers if lg.key in {"t2", "o1", "o2", "o3"}]
+    days = min((len(lg.points) for lg in main), default=0)
     banner = (
         f'<div class="banner">초기 데이터 — 원장 기록 {days}일. '
         "곡선과 수익률은 아직 의미가 작다.</div>"

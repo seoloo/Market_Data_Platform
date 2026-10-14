@@ -19,7 +19,10 @@ _BOOKS = {
     "MIX": ("나스닥·추세 ETF", "var(--o3)"),
     "BASE": ("QNDX 기준", "var(--mute2)"),
     "GBG": ("Glide·채권·금", "var(--warn)"),
+    "NBG_ISA": ("나스닥·채권·금 ISA (원화 ÷ 1,000)", "var(--ok)"),
 }
+_KRW_SCALE = {"NBG_ISA": 0.001}
+"""원화 장부(100 만 원)를 USD 장부(1,000)와 같은 그래프에 놓을 때 나누는 값."""
 _DAY_MS = 86_400_000
 
 
@@ -147,10 +150,13 @@ def _paper_series(data: DashboardData) -> tuple[list[Series], list[str]]:
         book = books.get(key)
         if book is None:
             continue
-        if not isinstance(book, dict) or book.get("ccy") != "USD":
+        krw = key in _KRW_SCALE and isinstance(book, dict) and book.get("ccy") == "KRW"
+        if not isinstance(book, dict) or (book.get("ccy") != "USD" and not krw):
             errors.append(f"{key}: USD 장부 형식 미확인")
             continue
         points = _history(book.get("history"), data.now_ms)
+        if points and krw:
+            points = tuple((t, v * _KRW_SCALE[key]) for t, v in points)
         if points is None:
             errors.append(f"{key}: 평가 이력 오류")
         elif points:

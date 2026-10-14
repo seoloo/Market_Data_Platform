@@ -190,8 +190,16 @@ def _day(decision_ms: int) -> int:
     return decision_ms + 1 - _DAY_MS
 
 
-def _t2_view(rows: Sequence[PaperDay]) -> LedgerView:
-    points = tuple(Point(_day(r.decision_ms), float(r.equity)) for r in rows)
+def _t2_view(
+    rows: Sequence[PaperDay],
+    *,
+    key: str = "t2",
+    name: str = "T/v2",
+    subtitle: str = "현물 추세",
+    scale: float = 1.0,
+) -> LedgerView:
+    """T/v2 형 현물 장부. ``scale`` 은 원화 장부(1,000 만 원)를 1 만 단위로 맞출 때 쓴다."""
+    points = tuple(Point(_day(r.decision_ms), float(r.equity) * scale) for r in rows)
     last = rows[-1]
     equity = float(last.equity)
     holdings: list[Holding] = []
@@ -200,12 +208,12 @@ def _t2_view(rows: Sequence[PaperDay]) -> LedgerView:
         if qty:
             notional = qty * float(last.prices[symbol])
             holdings.append(
-                Holding("T/v2", symbol, "현물", qty, notional, notional / equity, "추세 청산")
+                Holding(name, symbol, "현물", qty, notional * scale, notional / equity, "추세 청산")
             )
     return LedgerView(
-        key="t2",
-        name="T/v2",
-        subtitle="현물 추세",
+        key=key,
+        name=name,
+        subtitle=subtitle,
         points=points,
         status=last.status,
         note=last.note or "",
@@ -526,6 +534,23 @@ def load_dashboard(root: Path, now_ms: int) -> DashboardData:
             if o3:
                 ledgers.append(
                     _overlay_view("o3", "O/v3", "2배 + 비상 스톱 · 한 달 관찰", o3, reserve)
+                )
+            days = PaperDayRepository(conn)
+            shadow = list(reversed(days.recent("t2_shadow_10000", 1_000_000)))
+            if shadow:
+                ledgers.append(
+                    _t2_view(shadow, key="t2s", name="T/v2 그림자", subtitle="실주문 흉내 · 1 만")
+                )
+            upbit = list(reversed(days.recent("t2_upbit", 1_000_000)))
+            if upbit:
+                ledgers.append(
+                    _t2_view(
+                        upbit,
+                        key="t2u",
+                        name="T/v2 업비트",
+                        subtitle="원화 1,000 만 원 → 1 만으로 환산",
+                        scale=0.001,
+                    )
                 )
         except (sqlite3.Error, KeyError, ValueError, TypeError) as exc:
             errors.append(f"원장 읽기 실패: {type(exc).__name__}: {exc}")

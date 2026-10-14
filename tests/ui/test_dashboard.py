@@ -167,6 +167,32 @@ class TestData:
         html = render_page(data, "compare")
         assert "현금 이자 가정" in html and "실제 예치는 없다" in html
 
+    def test_shadow_and_upbit_t2_ledgers_join_compare(self, root: Path) -> None:
+        conn = connect(root / "data" / "trading.db")
+        days = PaperDayRepository(conn)
+        for sid, equity in (("t2_shadow_10000", "9800"), ("t2_upbit", "9950000")):
+            days.insert(
+                PaperDay(
+                    strategy_id=sid,
+                    decision_ms=P0 + D - 1,
+                    status="OK",
+                    equity=Decimal(equity),
+                    holdings={"BTC": "0.01", "USDT": "1"},
+                    prices={"BTCUSDT": "1000", "ETHUSDT": "10"},
+                    targets={},
+                    executed=[],
+                    note="",
+                    created_ms=1,
+                )
+            )
+        conn.close()
+        data = load_dashboard(root, P0 + 11 * D)
+        assert [lg.key for lg in data.ledgers] == ["t2", "o1", "o2", "t2s", "t2u"]
+        assert data.ledgers[-1].equity == pytest.approx(9950.0)  # 원화 ÷ 1,000
+        html = render_page(data, "compare")
+        assert "T/v2 그림자" in html and "T/v2 업비트" in html
+        assert "초기 데이터 — 원장 기록 3일" in render_page(data, "overview")  # 1 일 장부 제외
+
     def test_no_cash_yield_file_means_no_assumption(self, root: Path) -> None:
         (root / "config" / "cash_yield.yaml").unlink()
         data = load_dashboard(root, P0 + 11 * D)

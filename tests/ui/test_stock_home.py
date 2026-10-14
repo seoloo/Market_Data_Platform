@@ -11,7 +11,13 @@ import pytest
 from auto_trading.ui.charts import Series
 from auto_trading.ui.data import load_dashboard
 from auto_trading.ui.render import render_page
-from auto_trading.ui.stock_home import _history, _transformed, glide_card, stock_performance
+from auto_trading.ui.stock_home import (
+    _history,
+    _paper_series,
+    _transformed,
+    glide_card,
+    stock_performance,
+)
 
 NOW = int(datetime(2026, 10, 9, 12, tzinfo=UTC).timestamp() * 1000)
 
@@ -117,3 +123,22 @@ def test_corrupt_paper_schema_reports_problem(tmp_path: Path) -> None:
     )
     html = stock_performance(load_dashboard(tmp_path, NOW))
     assert "평가 이력 오류" in html and "<polyline" not in html
+
+
+def test_krw_isa_book_joins_chart_scaled_to_thousand(tmp_path: Path) -> None:
+    _save(
+        tmp_path,
+        "data/mf_paper/state.json",
+        {
+            "books": {
+                "NBG_ISA": {
+                    "ccy": "KRW",
+                    "history": [["2026-10-07", 1000000], ["2026-10-08", 990000]],
+                },
+            }
+        },
+    )
+    series, errors = _paper_series(load_dashboard(tmp_path, NOW))
+    assert errors == []
+    assert [s.name for s in series] == ["나스닥·채권·금 ISA (원화 ÷ 1,000)"]
+    assert [v for _, v in series[0].points] == [1000.0, 990.0]
