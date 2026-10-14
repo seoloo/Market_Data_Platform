@@ -4,6 +4,13 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
+## 2026-10-15 — 234 233 이 운인지: AG4 시작 시점 9 개 (Claude, 새벽 작업, 설명용)
+
+[234](research/234-ag4-start-robustness.md), 사전 고정 `360ace2` 뒤 1 회, 2020-06 은 233 과 일치. 판정 **시작 시점에 약함(운)**:
+T + 숏 Calmar > AG4 인 시작 BASE 2 / 9 · COST2 0 / 9 — 233 의 T + 숏 우위는 2020 초반 경로 덕, "AG4 + T + 숏" 장부 근거 없음.
+참고: AG4 + 숏(롱 그대로)은 BASE 9 / 9 · COST2 8 / 9 로 나았으나 크기는 작음. AG4 MDD 는 어느 시작에서도 43 ~ 57%. 채택 · Paper 근거 아님.
+같은 새벽: 텔레그램 '자동 적립' 이름 통일, AGENTS §10 동시 작업 규칙 · 상황판 `data/agents/`, PROGRESS 9 월 기록을 `docs/archive/PROGRESS_2026-09.md` 로 옮김.
+
 ## 2026-10-14 — 233 AG4 롱 손보기(추세 · 변동성 · 낙폭 브레이크) ± 숏 (Claude, 설명용)
 
 사용자: "ag4의 롱을 한번 손 봐줘" · "변동성에 대해 한번 연구" · "AG4 + 낙폭 브레이크 ( + 숏)". [233](research/233-ag4-long-trend-vol-dd.md), 사전 고정 `ba48d6f` 뒤 1 회, L0 는 Codex · 232 와 일치.
