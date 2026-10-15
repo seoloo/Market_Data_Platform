@@ -18,7 +18,7 @@ from auto_trading.ui.live_home import Book, Quotes, Trade, build_books
 
 @pytest.fixture(autouse=True)
 def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    """이 시험들은 업비트 Vega 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
     from auto_trading.ui import live_home
 
     monkeypatch.setattr(live_home, "SHOW_UPBIT", True)

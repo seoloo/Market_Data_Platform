@@ -18,11 +18,11 @@
   - M3 변동성 맞춤: QQQ 20 일 변동성이 20% 를 넘으면 TQQQ 60% × 0.20/σ.
   - 몫은 직전 달 말 정보로 정해 매달 첫 거래일에 맞춘다.
   - M3 는 182 에서 REJECT 였지만 사용자 결정(2026-10-09 "m2 m3 로 해줘")으로 기록한다.
-* GBG = Glide 핵심 60% + IEF 20% + GLDM 20%
-  (사용자 2026-10-12, 참고 계산 'Glide 60 · 채권 20 · 금 20').
-  Glide 몫 안은 LD_M3 와 같은 변동성 맞춤(TQQQ 60% × min(1, 0.20/σ), 나머지 SCHD)
+* GBG = Deneb 핵심 60% + IEF 20% + GLDM 20%
+  (사용자 2026-10-12, 참고 계산 'Deneb 60 · 채권 20 · 금 20').
+  Deneb 몫 안은 LD_M3 와 같은 변동성 맞춤(TQQQ 60% × min(1, 0.20/σ), 나머지 SCHD)
   — T 브레이크는 없다.
-  비교 상대는 LD_M3 (같은 Glide 핵심 100%).
+  비교 상대는 LD_M3 (같은 Deneb 핵심 100%).
 * 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도: 미국 ETF 0.15%(수수료 0.10% + 환전 0.05%) ·
   국내 ETF(ISA) 0.02%.
 * 상태 ``data/mf_paper/state.json`` · 보고 ``reports/mf_paper/latest.json``.
@@ -159,7 +159,7 @@ def targets_for(
     else:
         closes = [qqq[d] for d in sorted(qqq) if d[:7] < day[:7]]
         share = lev_share_vol(realized_vol(closes))
-    if rule == "M3BG":  # Glide 몫(60%) 안에서만 변동성 맞춤, 채권 · 금은 고정
+    if rule == "M3BG":  # Deneb 몫(60%) 안에서만 변동성 맞춤, 채권 · 금은 고정
         return {
             "TQQQ": GBG_SLEEVE * share,
             "SCHD": GBG_SLEEVE * (1 - share),

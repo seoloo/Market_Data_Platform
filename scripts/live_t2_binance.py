@@ -1,11 +1,11 @@
-"""Cruise — T/v2 바이낸스 **실거래** (BTC · ETH · SOL, USDT). 하루 1 회.
+"""Vega — T/v2 바이낸스 **실거래** (BTC · ETH · SOL, USDT). 하루 1 회.
 
     python -m scripts.live_t2_binance plan     # 계획만 — 주문 · 기록 · 알림 없음 (첫날 확인)
     python -m scripts.live_t2_binance run      # 실행 (예약 매일 09:05 KST, 일봉 마감 5 분 뒤)
     python -m scripts.live_t2_binance status
     python -m scripts.live_t2_binance release-dd "사유"   # 계좌 낙폭 30% 정지 해제 (자동 해제 없음)
 
-* 사용자 (2026-10-15): "cruise는 그냥 바이낸스로 옮기면 돼" — 업비트 Cruise
+* 사용자 (2026-10-15): "cruise는 그냥 바이낸스로 옮기면 돼" — 업비트 Vega
   (:mod:`scripts.live_t2_upbit`)와 **같은 규칙**(:mod:`auto_trading.ops.t2_upbit`: T/v2 그대로 ·
   세 종목 합 100% 넘으면 비율대로 줄임 · 밴드 5%p · 계좌 낙폭 30% 면 새 매수 정지)을
   바이낸스 현물에서 USDT 로 돌린다.
@@ -67,7 +67,7 @@ SYMBOLS = {c: f"{c}USDT" for c in COINS}
 FEE = Decimal("0.001")
 """바이낸스 현물 기본 수수료(테이커 0.1%) — 매수 가능 수량을 넉넉히 잡을 때만 쓴다."""
 LEVEL = 2
-TAG = "🛫 [Cruise · T/v2 바이낸스]"
+TAG = "🌌 [Vega · T/v2 바이낸스]"
 _FINAL = {"FILLED", "CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH"}
 
 
@@ -268,10 +268,10 @@ def _record(
 
 
 def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
-    """Falcon 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
+    """Altair 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
 
     판단은 :func:`auto_trading.ops.falcon_split.move_amount`. 이체는 문서 53 규약(선기록 ·
-    결과 모르면 재전송 안 함, :class:`WalletTransferManager`). 실패해도 Cruise 실행은 계속한다.
+    결과 모르면 재전송 안 함, :class:`WalletTransferManager`). 실패해도 Vega 실행은 계속한다.
     """
     dms, day = _decision(now_ms)
     cash, hold, prices = _snapshot(c)
@@ -285,7 +285,7 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
     else:
         new_money = eq
     fut = c.futures_balance()
-    # 오르빗 Falcon 카드가 읽는 기록 (화면은 계좌를 조회하지 않는다)
+    # 오르빗 Altair 카드가 읽는 기록 (화면은 계좌를 조회하지 않는다)
     falcon = st.setdefault("falcon", {"transfers": []})
     falcon.update(futures_usdt=str(fut), checked=day)
     amount = move_amount(spot_equity=eq, futures_balance=fut, new_money=new_money, free_usdt=cash)
@@ -302,7 +302,7 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
         )
         manager.recover()
         if manager.blocked():
-            return ["⚠ Falcon 이체 결과를 아직 모르는 건이 있어 이번엔 옮기지 않음 (확인 필요)"]
+            return ["⚠ Altair 이체 결과를 아직 모르는 건이 있어 이번엔 옮기지 않음 (확인 필요)"]
         rec = manager.transfer(
             decision_ms=dms, direction=TransferDirection.SPOT_TO_FUTURES, amount=amount
         )
@@ -311,15 +311,15 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
         falcon["transfers"].append([day, str(amount)])
         falcon["futures_usdt"] = str(fut + amount)
         return [
-            f"🦅 Falcon 몫 {_usd(amount)} 현물 → 선물 이체",
+            f"☄️ Altair 몫 {_usd(amount)} 현물 → 선물 이체",
             sub(f"목표 선물 {share} · 선물 지갑 {_usd(fut + amount)}"),
         ]
     if rec.state == "REJECTED":
         return [
-            f"⚠ Falcon 이체 거부 — {rec.error}",
+            f"⚠ Altair 이체 거부 — {rec.error}",
             sub("키에 '내부 이체(Universal Transfer)' 권한이 필요해요"),
         ]
-    return [f"⚠ Falcon 이체 결과 모름 ({_usd(amount)}) — 다음 실행 때 이력으로 확인해요"]
+    return [f"⚠ Altair 이체 결과 모름 ({_usd(amount)}) — 다음 실행 때 이력으로 확인해요"]
 
 
 def run_cmd() -> int:
@@ -336,8 +336,8 @@ def run_cmd() -> int:
         if not halted and c.trading_enabled:
             try:
                 lines += _split(c, st, now_ms)
-            except (AutoTradingError, sqlite3.Error) as exc:  # 분배 실패는 Cruise 를 멈추지 않는다
-                lines.append(f"⚠ Falcon 자동 분배 실패: {exc}")
+            except (AutoTradingError, sqlite3.Error) as exc:  # 분배 실패는 Vega 를 멈추지 않는다
+                lines.append(f"⚠ Altair 자동 분배 실패: {exc}")
         p, filters = _plan_today(c, st, now_ms)
         ns = p["nav"]
         deposits = st.setdefault("deposits", [])

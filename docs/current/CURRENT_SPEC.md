@@ -3,6 +3,8 @@
 기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / K VALIDATION `REJECT` / M TRAIN `REJECT` / F 전향 관찰 / **T 추세 추종 1회 판정 PASS · 전향 관찰 중**(2026-09-24). 승인된 전략 없음.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
+> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 알림 · 오르빗 · 설정 화면의 보이는 이름만 바꿨고, 내부 키(glide · cruise · falcon) · 파일 · 예약 작업 이름과 아래 옛 기록 속 이름은 그대로다.
+
 ## 2026-10-14 추가 — 사용자 승인 방향 전환 설명용 비교
 
 [전환 계약](../research/DIRECTION_SWITCH_PILOT_20261014.md): 코인 T/v2↔RSI숏 / 주식 TQQQ↔SQQQ,

@@ -71,10 +71,10 @@ DAY_MS = 86_400_000
 FEE = Decimal("0.0005")
 LEVEL = 2
 """호가창 몇 번째 칸(0 부터) 가격으로 IOC 를 낼지."""
-TAG = "🛫 [Cruise · T/v2 업비트]"
-"""2026-10-09 사용자: 업비트 T/v2 실거래 이름 = **Cruise**.
+TAG = "🌌 [Vega · T/v2 업비트]"
+"""2026-10-09 사용자: 업비트 T/v2 실거래 이름 = **Vega**.
 
-Glide 처럼 보이는 이름만 바꾼다. 내부 파일 · 예약 이름은 그대로."""
+Deneb 처럼 보이는 이름만 바꾼다. 내부 파일 · 예약 이름은 그대로."""
 
 
 def _client() -> UpbitClient:
@@ -218,16 +218,16 @@ def _send(
 
 
 def run_cmd() -> int:
-    # 2026-10-15 Cruise 를 바이낸스로 옮김(scripts.live_t2_binance) — 옛 예약이 남아 있어도 업비트에
+    # 2026-10-15 Vega 를 바이낸스로 옮김(scripts.live_t2_binance) — 옛 예약이 남아 있어도 업비트에
     # 남은 원화로 사지 않게, 환경변수 CRUISE_UPBIT=on 일 때만 업비트에서 주문한다.
     import os
 
     if os.environ.get("CRUISE_UPBIT", "").strip().lower() != "on":
-        print("Cruise 는 바이낸스로 옮겼어요(2026-10-15) — 업비트 실행은 하지 않아요")
+        print("Vega 는 바이낸스로 옮겼어요(2026-10-15) — 업비트 실행은 하지 않아요")
         return 0
     now_ms = int(time.time() * 1000)
     st = _load()
-    halted = halted_for(HALT, "cruise")  # 전체 정지 또는 Cruise 정지(전부 정리 뒤)
+    halted = halted_for(HALT, "cruise")  # 전체 정지 또는 Vega 정지(전부 정리 뒤)
     c = _client()
     lines: list[str] = []
     fill_lines: list[str] = []
@@ -488,7 +488,7 @@ def weekly_cmd() -> int:
     dd = max(Decimal(0), 1 - nav_now / peak) if peak > 0 else Decimal(0)
     text = "\n".join(
         [
-            f"📅 [Cruise 주간 요약] {label_start:%m/%d} ~ {label_end:%m/%d}",
+            f"📅 [Vega 주간 요약] {label_start:%m/%d} ~ {label_end:%m/%d}",
             RULE,
             f"📈 이번 주 수익률 {week_ret:+.1%}"
             f" (입출금 뺀 단위 가치 {nav_then:,.1f} → {nav_now:,.1f})",

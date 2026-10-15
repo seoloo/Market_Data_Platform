@@ -12,13 +12,13 @@ from auto_trading.ui.data import DashboardData
 from auto_trading.ui.qndx_render import _read
 
 _BOOKS = {
-    "LD_M3": ("Glide 비교 · 변동성", "var(--c1)"),
-    "LD_M2": ("Glide 비교 · 브레이크", "var(--c2)"),
+    "LD_M3": ("Deneb 비교 · 변동성", "var(--c1)"),
+    "LD_M2": ("Deneb 비교 · 브레이크", "var(--c2)"),
     "LD_M0": ("TQQQ·SCHD 기준", "var(--c8)"),
     "NBG": ("나스닥·채권·금", "var(--c3)"),
     "MIX": ("나스닥·추세 ETF", "var(--c4)"),
     "BASE": ("QNDX 기준", "var(--c6)"),
-    "GBG": ("Glide·채권·금", "var(--c5)"),
+    "GBG": ("Deneb·채권·금", "var(--c5)"),
     "NBG_ISA": ("나스닥·채권·금 ISA (원화 ÷ 1,000)", "var(--c7)"),
 }
 """선마다 다른 색(dashboard.css 의 --c1 ~ --c8)."""
@@ -79,7 +79,7 @@ def glide_card(data: DashboardData) -> str:
         status = "장부 읽기 실패 · 체결 상태 미확인"
     return (
         '<section class="panel glide-hero"><div class="glide-main">'
-        '<div><div class="eyebrow">STOCKS / 토스</div><h2>Glide</h2>'
+        '<div><div class="eyebrow">STOCKS / 토스</div><h2>Deneb</h2>'
         '<div class="hero-status"><span>실거래 등록 설정</span>'
         f'<span class="pending">{status}</span></div>'
         '<div class="sub">이번 달 설정 납입금</div>'
@@ -127,7 +127,7 @@ def paper_links() -> str:
     return (
         '<section class="panel stock-paper-links"><div class="row"><h2>주식 Paper 비교</h2>'
         '<span class="tag">가상 자금</span></div>'
-        '<a href="#stock-performance"><b>Glide 비교</b>'
+        '<a href="#stock-performance"><b>Deneb 비교</b>'
         "<small>TQQQ · SCHD / M0 · M2 · M3</small></a>"
         '<a href="#stock-performance"><b>분산 포트폴리오</b><small>나스닥 · 채권 · 금</small></a>'
         '<a href="#stock-performance"><b>추세 분산</b><small>나스닥 · 추세 ETF</small></a>'
@@ -225,7 +225,7 @@ def stock_performance(data: DashboardData) -> str:
         + '<div class="row"><h2>수익률 추이</h2><span class="tag">저장된 실제 기록만</span></div>'
         + f'<div class="perf-controls"><div>{sources}</div><div>{periods}</div></div>'
         + '<div class="perf-live-content"><div class="chart-empty"><b>실거래 평가 기록 대기</b>'
-        + "<p>Glide 장부에는 입금·주문·보유 기록만 있습니다.<br>"
+        + "<p>Deneb 장부에는 입금·주문·보유 기록만 있습니다.<br>"
         + "일별 평가액·입출금 시점·환율 이력이 없어 수익률을 추정하지 않습니다.</p></div>"
         + '<div class="foot">납입금 증가를 수익으로 표시하지 않습니다. '
         + "실거래·Paper·코인 자산을 합산하지 않습니다.</div></div>"

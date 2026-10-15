@@ -60,7 +60,7 @@ def plan(
 ) -> list[SpotOrderIntent]:
     """주문 의도 (매도 먼저). ``allow_buy`` 가 False 면(낙폭 정지) 매수는 뺀다.
 
-    ``step`` · ``min_notional`` 을 주지 않으면 업비트 값(0.00000001 · 5,000 원). 바이낸스 Cruise 는
+    ``step`` · ``min_notional`` 을 주지 않으면 업비트 값(0.00000001 · 5,000 원). 바이낸스 Vega 는
     종목별 LOT_SIZE · NOTIONAL 을 넘긴다(2026-10-15)."""
     tg = {c: SpotTarget(c, w) for c, w in weights.items()}
     intents = plan_spot_orders(

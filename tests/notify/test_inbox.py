@@ -112,4 +112,4 @@ def test_liquidation_words_and_buttons_go_to_bot_not_glide() -> None:
         assert is_liquidation(m(t)) and is_command(m(t))
     assert is_liquidation(m(data="liq:ab12:all")) and is_command(m(data="unh:ab12:cruise"))
     assert is_command(m("현황")) and not is_liquidation(m("현황"))
-    assert not is_command(m("30만")) and not is_command(m(data="p1:all"))  # Glide 몫
+    assert not is_command(m("30만")) and not is_command(m(data="p1:all"))  # Deneb 몫

@@ -118,7 +118,7 @@ def test_pages_render_without_scripts() -> None:
     html = render_settings(v, token="T", errors={"fire.target_krw": "숫자로"})
     assert '<form method="post" action="/settings/review">' in html
     assert 'name="token" value="T"' in html and "<script" not in html
-    assert "🔒 Glide 규칙 · 잠김" in html and "준비 중" in html
+    assert "🔒 Deneb 규칙 · 잠김" in html and "준비 중" in html
     review = render_review(
         [us.Change("fire.target_krw", "파이어 목표", 1, 2, "바로")], {"a": "1"}, token="T"
     )
@@ -320,7 +320,7 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
         assert any(off in c for c in calls)
         with urllib.request.urlopen(base + "/settings") as r:
             page = r.read().decode()
-        assert "자동 실행" in page and "Cruise 매매" in page
+        assert "자동 실행" in page and "Vega 매매" in page
     finally:
         server.shutdown()  # type: ignore[attr-defined]
         server.server_close()  # type: ignore[attr-defined]
@@ -338,8 +338,8 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
             page = r.read().decode()
         token = re.search(r'name="token" value="([^"]+)"', page)
         assert token and 'id="set-liquidate"' in page and "그룹 정지 없음" in page
-        assert page.count('action="/settings/liquidate"') == 4  # 전부 · Cruise · Glide · 적립
-        assert "정말 Cruise(업비트 BTC · ETH · SOL)를 정리할까요?" in page
+        assert page.count('action="/settings/liquidate"') == 4  # 전부 · Vega · Deneb · 적립
+        assert "정말 Vega(업비트 BTC · ETH · SOL)를 정리할까요?" in page
         post = TestServer._post
         tok = token.group(1)
         assert post(base, "/settings/liquidate", {"token": "x", "scope": "all"})[0] == 403
@@ -348,10 +348,10 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
         assert calls == [["start", "cruise", "오르빗"]]
         halt = tmp_path / "data" / "HALT_cruise"
         halt.parent.mkdir(parents=True, exist_ok=True)
-        halt.write_text("전부 정리(Cruise 만) · 오르빗\n", encoding="utf-8")
+        halt.write_text("전부 정리(Vega 만) · 오르빗\n", encoding="utf-8")
         with urllib.request.urlopen(base + "/settings?liq=1") as r:
             after = r.read().decode()
-        assert "정리를 시작했어요" in after and "Cruise 정지 중" in after
+        assert "정리를 시작했어요" in after and "Vega 정지 중" in after
         assert 'action="/settings/unhalt"' in after
         assert post(base, "/settings/unhalt", {"token": tok, "group": "bad"})[0] == 400
         assert post(base, "/settings/unhalt", {"token": tok, "group": "cruise"})[0] == 303

@@ -83,7 +83,7 @@ def _upbit() -> UpbitClient:
 
 
 def _binance() -> BinanceSpotLive | None:
-    """Cruise 바이낸스 거래 키(2026-10-15 이전). 키가 없으면 None — 바이낸스 몫은 없다고 본다."""
+    """Vega 바이낸스 거래 키(2026-10-15 이전). 키가 없으면 None — 바이낸스 몫은 없다고 본다."""
     try:
         creds, enabled = load_live_spot(REPO / ".env")
     except ConfigError:
@@ -268,7 +268,7 @@ def _kr_open(reader: TossReader, now_ms: int) -> bool:
 
 
 def _book_glide(symbol: str, qty: Decimal, usd: Decimal) -> None:
-    """팔린 Glide 몫을 Glide 장부(M3.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑."""
+    """팔린 Deneb 몫을 Deneb 장부(M3.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑."""
     m3 = M3State.from_dict(json.loads(M3_FILE.read_text(encoding="utf-8")))
     m3.qty[symbol] = max(0.0, m3.qty.get(symbol, 0.0) - float(qty))
     m3.cash_usd += float(usd)
@@ -316,7 +316,7 @@ def step(job: Job) -> list[str]:
     if bins:
         b = _binance()
         if b is None:
-            log.append("바이낸스 거래 키 없음 — Cruise 바이낸스 몫은 앱에서 직접 팔아 주세요")
+            log.append("바이낸스 거래 키 없음 — Vega 바이낸스 몫은 앱에서 직접 팔아 주세요")
         else:
             try:
                 for it in bins:
@@ -366,7 +366,7 @@ def step(job: Job) -> list[str]:
                     if take > 0:
                         _book_glide(it.symbol, take, usd)
                         it.glide_booked += take
-                        log.append(f"Glide 장부: {it.symbol} {take:f}주 빼고 ${usd:,.2f} 현금")
+                        log.append(f"Deneb 장부: {it.symbol} {take:f}주 빼고 ${usd:,.2f} 현금")
             finally:
                 trader.close()
         except AutoTradingError as exc:

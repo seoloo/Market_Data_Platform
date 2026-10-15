@@ -31,7 +31,7 @@ def _save(root: Path, relative: str, value: object) -> Path:
 
 def test_stock_first_home_and_no_fake_live_curve(tmp_path: Path) -> None:
     html = render_page(load_dashboard(tmp_path, NOW), "overview")
-    assert html.index("Glide</h2>") < html.index("수익률 추이") < html.index("자동 적립 현황")
+    assert html.index("Deneb</h2>") < html.index("수익률 추이") < html.index("자동 적립 현황")
     tabs = html.split('aria-label="주 메뉴">')[1].split("</div>")[0]
     assert tabs.index('href="/toss"') < tabs.index('href="/compare"')
     assert "실거래 평가 기록 대기" in html
@@ -107,7 +107,7 @@ def test_real_saved_paper_data_only_separate_ccy_and_no_writes(tmp_path: Path) -
     )
     before = path.read_bytes()
     html = stock_performance(load_dashboard(tmp_path, NOW))
-    assert "Glide 비교 · 변동성" in html and "<polyline" in html
+    assert "Deneb 비교 · 변동성" in html and "<polyline" in html
     assert "87654321" not in html and "7654321" not in html
     assert "perf-live-content" in html and "실거래 평가 기록 대기" in html
     assert 'id="perf-live" type="radio" name="perf-source" checked' in html

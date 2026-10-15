@@ -1,6 +1,6 @@
-"""Binance 현물 **실계좌** 주문 어댑터 — Cruise(T/v2 · BTC · ETH · SOL) 전용 (2026-10-15).
+"""Binance 현물 **실계좌** 주문 어댑터 — Vega(T/v2 · BTC · ETH · SOL) 전용 (2026-10-15).
 
-사용자 (2026-10-15): "cruise는 그냥 바이낸스로 옮기면 돼" — 업비트(원화) Cruise 를
+사용자 (2026-10-15): "cruise는 그냥 바이낸스로 옮기면 돼" — 업비트(원화) Vega 를
 바이낸스(USDT)로 옮긴다.
 문서 85 §11 의 L3(실계좌 현물 어댑터)에 해당한다.
 
@@ -161,7 +161,7 @@ class BinanceSpotLive(BinanceSpotReadOnly):
     def place_market_order(
         self, symbol: str, side: str, quantity: Decimal, client_order_id: str
     ) -> SpotOrderResult:
-        raise ConfigError("Cruise 는 시장가를 쓰지 않는다 (사용자 규칙 2026-10-05)")
+        raise ConfigError("Vega 는 시장가를 쓰지 않는다 (사용자 규칙 2026-10-05)")
 
     def fills(self, symbol: str, exchange_order_id: str) -> list[LiveFill]:
         rows = self._send(
@@ -178,7 +178,7 @@ class BinanceSpotLive(BinanceSpotReadOnly):
             for r in rows
         ]
 
-    # ------------------------------------------------------------ 지갑 이체 (Falcon 자동 분배)
+    # ------------------------------------------------------------ 지갑 이체 (Altair 자동 분배)
     # 사용자 2026-10-15 "비율 대로 자동 분배 할 수 있도록 해줘" — 문서 53 의 WalletTransfers 계약을
     # 실계좌로 구현한다. 키에 "Permits Universal Transfer" 권한이 필요하다. 출금 권한은 쓰지 않는다.
 

@@ -1,4 +1,4 @@
-"""AG4S2 바이낸스 선물 **데모(가짜 돈)** 실행 — AG-CR4 롱 + 232 숏 2 배를 실제 주문으로.
+"""Altair(옛 AG4S2) 바이낸스 선물 **데모(가짜 돈)** 실행 — AG-CR4 롱 + 232 숏 2 배를 실제 주문으로.
 
     python -m scripts.ag4s2_testnet plan     # 지금 낼 주문 미리 보기 (주문 없음)
     python -m scripts.ag4s2_testnet tick     # 할 차례면 실행 (현황 봇이 2 분마다 부른다)
@@ -615,7 +615,7 @@ def alert_text(
     body = list(blocks)
     while body and not body[-1]:
         body.pop()
-    out = [f"🧪 Falcon 선물 데모 · 가짜 돈 · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
+    out = [f"🧪 ☄️ Altair 선물 데모 · 가짜 돈 · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
     if skipped:
         out.append("🚫 숏 신호 났지만 안 함: " + " · ".join(skipped))
     elif not shorts_open and long_w and all(v > 0 for v in long_w.values()):

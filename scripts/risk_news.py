@@ -5,7 +5,7 @@
     python -m scripts.risk_news run            # 예약: 매시 17 분
     python -m scripts.risk_news run --no-send  # 알림 없이 화면에만 (기억도 남기지 않음)
 
-* 대상: Glide(TQQQ · SCHD), 토스 적립 장부 종목, Cruise(BTC · ETH · SOL) + 업비트 거래소,
+* 대상: Deneb(TQQQ · SCHD), 토스 적립 장부 종목, Vega(BTC · ETH · SOL) + 업비트 거래소,
   토스의 그 밖 미국 보유(수동 보유). 국내 종목은 영어 기사가 드물어 뺀다.
 * 뉴스: 구글 뉴스 영어 검색(지난 1 일) + 미국 종목은 야후 RSS. 새 기사만 Laya 에 한 번에 보낸다.
 * Laya 가 위험 후보(50% 이상)를 고르면 Gemini(무료)가 '이미 일어난 중대 사건' 인지
@@ -67,10 +67,10 @@ NAMES = {
     "WQTM": "WisdomTree Quantum Computing Fund (WQTM)",
 }
 CRYPTO = (
-    Asset("BTC", "Bitcoin", "Bitcoin", group="Cruise"),
-    Asset("ETH", "Ethereum", "Ethereum", group="Cruise"),
-    Asset("SOL", "Solana", "Solana crypto", group="Cruise"),
-    Asset("Upbit", "Upbit, the Korean crypto exchange", "Upbit exchange", group="Cruise 거래소"),
+    Asset("BTC", "Bitcoin", "Bitcoin", group="Vega"),
+    Asset("ETH", "Ethereum", "Ethereum", group="Vega"),
+    Asset("SOL", "Solana", "Solana crypto", group="Vega"),
+    Asset("Upbit", "Upbit, the Korean crypto exchange", "Upbit exchange", group="Vega 거래소"),
 )
 
 
@@ -80,7 +80,7 @@ def _us(sym: str, group: str) -> Asset:
 
 
 def assets(root: Path = REPO) -> list[Asset]:
-    out = [_us(s, "Glide") for s in GLIDE_SYMBOLS]
+    out = [_us(s, "Deneb") for s in GLIDE_SYMBOLS]
     acc: list[str] = []
     for f in sorted((root / "data" / "toss").glob("*.json")):
         try:

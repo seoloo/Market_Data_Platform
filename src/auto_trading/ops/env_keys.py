@@ -34,19 +34,19 @@ class KeySpec:
 SERVICES: tuple[tuple[str, str, str], ...] = (
     (
         "toss",
-        "토스증권 (Glide · 자동 적립)",
+        "토스증권 (Deneb · 자동 적립)",
         "토스증권 앱 → 전체 → 설정 → Open API 에서 앱을 만들고 Client ID · Secret 을 받아요. "
         "주문은 아래 '실제 주문 허용' 을 켜야 나가요.",
     ),
     (
         "binance",
-        "바이낸스 (Cruise, 2026-10-15 업비트에서 옮김)",
+        "바이낸스 (Vega, 2026-10-15 업비트에서 옮김)",
         "바이낸스 → API 관리 → API 만들기(시스템 생성). 권한은 '읽기' 와 '현물 거래' 만, 출금은 끄고, "
         "IP 제한에 이 PC 의 공인 IP 를 넣어요. 주문은 .env 의 BINANCE_LIVE_TRADING_ENABLED=true 일 때만 나가요.",
     ),
     (
         "upbit",
-        "업비트 (옛 Cruise)",
+        "업비트 (옛 Vega)",
         "업비트 웹 → 마이페이지 → Open API 관리에서 '자산 조회 · 주문 조회 · 주문하기' 만 고르고, "
         "허용 IP 에 이 PC 의 공인 IP 를 넣어요(출금 권한은 켜지 마세요).",
     ),

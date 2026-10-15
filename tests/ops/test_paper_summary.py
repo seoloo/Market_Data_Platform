@@ -51,7 +51,7 @@ def test_summary_reads_saved_ledgers(tmp_path: Path) -> None:
     text = paper_text(tmp_path, coins=lambda: [("T/v2", 10_000.0, 9_761.0)])
     assert "T/v2 9,761 (-2.4%)" in text
     assert "AG-CR $908 (-9.2%)" in text and "AG4S2 (AG-CR4 + 숏 2 배) 시작 전" in text
-    assert "NQ $981 (-1.9%)" in text and "Glide·채권·금 $974 (-2.6%)" in text
+    assert "NQ $981 (-1.9%)" in text and "Deneb·채권·금 $974 (-2.6%)" in text
     assert "① 가격 10,000,000원 · 보유 0 종목" in text and "아래 — 새로 안 삼" in text
 
 

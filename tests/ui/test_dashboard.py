@@ -36,7 +36,7 @@ LIVE_SCRIPT = '<script src="/assets/orbit-live.js" defer></script>'
 
 @pytest.fixture(autouse=True)
 def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    """이 시험들은 업비트 Vega 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
     from auto_trading.ui import live_home
 
     monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
@@ -670,7 +670,7 @@ class TestRender:
             "확인할 일",
             "다가오는 일정",
             "자동 적립 현황",
-            "Glide",
+            "Deneb",
             "수익률 추이",
             "주식 Paper 비교",
         ):

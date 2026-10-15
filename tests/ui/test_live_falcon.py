@@ -1,4 +1,4 @@
-"""오르빗 실거래 — 업비트 Cruise 숨김 · 바이낸스 Cruise + Falcon 카드 (사용자 2026-10-15)."""
+"""오르빗 실거래 — 업비트 Vega 숨김 · 바이낸스 Vega + Altair 카드 (사용자 2026-10-15)."""
 
 from __future__ import annotations
 
@@ -34,5 +34,5 @@ def test_upbit_hidden_and_falcon_card(tmp_path: Path) -> None:
     books = {b.key: b for b in build_books(tmp_path, q)}
     assert set(books) == {"cruise", "falcon"}
     f = books["falcon"]
-    assert f.title == "Falcon" and f.cash_krw == 600 * 1400.0 and f.deposits_krw == 600 * 1400.0
+    assert f.title == "Altair" and f.cash_krw == 600 * 1400.0 and f.deposits_krw == 600 * 1400.0
     assert any("선물 지갑 600.00 USDT" in n for n in f.notes)

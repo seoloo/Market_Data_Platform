@@ -5,10 +5,10 @@
     python -m scripts.telegram_bot run    # 받은 명령이 있으면 답장 (예약: 2 분마다)
     python -m scripts.telegram_bot show   # 보내지 않고 화면에만
 
-* 받은 글은 Glide 대화와 같은 대기열(``data/telegram/inbox.json``)로 나눠 읽는다.
+* 받은 글은 Deneb 대화와 같은 대기열(``data/telegram/inbox.json``)로 나눠 읽는다.
   이 봇은 명령(현황 · 수익 · 잔고 · /status)과 '전부 정리'(정리 · 정지풀기 · 그 버튼)만 가져가고,
-  금액 · 버튼 답은 Glide 몫으로 남긴다.
-* **'정리'** (2026-10-11): 미리 보기 + 범위 버튼(전부 · Cruise · Glide · 적립 · 취소, 5 분 · 한 번).
+  금액 · 버튼 답은 Deneb 몫으로 남긴다.
+* **'정리'** (2026-10-11): 미리 보기 + 범위 버튼(전부 · Vega · Deneb · 적립 · 취소, 5 분 · 한 번).
   누르면 ``scripts/liquidate.py`` 가 그룹 정지 → 토스 매수 취소 → 지정가 매도. 이 실행 안에서
   2 분 동안 버튼을 기다린다. 매 실행마다 진행 중 정리를 이어 한다(토스 장 시간 · 미체결 다시 내기).
 * 내용은 대시보드 실거래 홈과 같다: 장부 + 공개 시세(키 없음). 주문 · 계좌 조회 없음.
@@ -50,7 +50,7 @@ def inbox_path(root: Path = REPO) -> Path:
 
 
 def _start_offset(root: Path) -> int:
-    """대기열이 처음 생길 때 — Glide 가 쓰던 offset 에서 잇는다."""
+    """대기열이 처음 생길 때 — Deneb 이 쓰던 offset 에서 잇는다."""
     try:
         return int(json.loads((root / "data" / "toss" / "M3.json").read_text("utf-8"))["tg_offset"])
     except (OSError, ValueError, KeyError, TypeError):
@@ -70,14 +70,14 @@ def report(root: Path = REPO) -> str:
 HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 📊 현황 (또는 /status · 수익 · 잔고)
-  실거래 요약: Glide · Cruise · 자동 적립 + 파이어 목표까지 %
+  실거래 요약: Deneb · Vega · 자동 적립 + 파이어 목표까지 %
 
 📒 Paper (또는 /paper · 페이퍼)
   가상 장부 요약: 코인 · AG/AGS · 미국 주식 · 국장 주도주 (매일 21:30 자동으로도 와요)
 
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
-  [전부 정리] [Cruise 만] [Glide 만] [자동 적립만] [취소]
+  [전부 정리] [Vega 만] [Deneb 만] [자동 적립만] [취소]
   버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
 
 ▶ 정지풀기 (또는 /unhalt)
@@ -85,14 +85,14 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 💵 이번 달 입금 (세 곳 합계)
   매달 매수일 아침 질문에 합계로 답: 100만 · 1000000 · 0(쉬기)
-  → Glide 80 · Cruise 10 · AG4S2 10 으로 나눠 어디에 얼마 넣을지 알려 줘요
+  → Deneb 80 · Vega 10 · Altair 10 으로 나눠 어디에 얼마 넣을지 알려 줘요
 
 🔘 제안 버튼 (배당 단계 · 12월 공제 실현)
   메시지 아래 버튼으로 답해요
 
 ❓ 도움 (또는 /help) — 이 안내
 
-이 방으로 오는 알림: Glide · Cruise · 토스 매매 결과, 환전 요청, 위험 알림,
+이 방으로 오는 알림: Deneb · Vega · 토스 매매 결과, 환전 요청, 위험 알림,
 경제 일정 · 실적 경고(CPI · FOMC · 보유 종목 실적 등 07:35 · 16:30),
 매일 21:30 Paper 요약
 종목 뉴스는 정보 봇에 물어보세요."""
@@ -132,7 +132,7 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
 
     return [
         [b("🧯 전부 정리", "all")],
-        [b("Cruise 만", "cruise"), b("Glide 만", "glide")],
+        [b("Vega 만", "cruise"), b("Deneb 만", "glide")],
         [b("자동 적립만", "acc")],
         [b("취소", "cancel")],
     ]
@@ -315,7 +315,7 @@ def _namu_follow(root: Path) -> None:
 
 
 def _ag4s2_demo(root: Path) -> None:
-    """AG4S2 바이낸스 선물 데모(가짜 돈) — 하루 한 번 롱 맞추기 · 4 시간봉마다 숏 점검."""
+    """Altair(옛 AG4S2) 선물 데모(가짜 돈) — 하루 한 번 롱 맞추기 · 4 시간봉마다 숏 점검."""
     if not user_settings.get(root, "demo.ag4s2"):
         return
     try:
@@ -323,9 +323,9 @@ def _ag4s2_demo(root: Path) -> None:
 
         done = ag4s2_testnet.tick()
         if done:
-            print(f"AG4S2 데모: {len(done)} 줄")
+            print(f"Altair 데모: {len(done)} 줄")
     except Exception as exc:  # 데모 문제로 봇을 멈추지 않는다
-        print(f"AG4S2 데모 건너뜀: {type(exc).__name__}: {exc}")
+        print(f"Altair 데모 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _event_alert(root: Path) -> None:

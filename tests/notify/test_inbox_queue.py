@@ -1,4 +1,4 @@
-"""받은 글 대기열: 명령은 봇이, 나머지(금액 · 버튼)는 Glide 가 — 서로 지우지 않는다."""
+"""받은 글 대기열: 명령은 봇이, 나머지(금액 · 버튼)는 Deneb 이 — 서로 지우지 않는다."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def test_is_command_only_plain_status_words() -> None:
     assert is_command(InboxMessage(1, 0, "현황"))
     assert is_command(InboxMessage(1, 0, " /Status "))
     assert not is_command(InboxMessage(1, 0, "30만"))
-    assert not is_command(InboxMessage(1, 0, "", data="현황"))  # 버튼은 Glide 몫
+    assert not is_command(InboxMessage(1, 0, "", data="현황"))  # 버튼은 Deneb 몫
 
 
 def test_two_readers_share_one_offset(tmp_path: Path) -> None:

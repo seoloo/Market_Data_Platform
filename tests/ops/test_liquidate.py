@@ -1,4 +1,4 @@
-"""'전부 정리' — 범위 · 계획 · 가격(1% 바닥) · 업비트 IOC · 토스 주문 수명 · Glide 장부.
+"""'전부 정리' — 범위 · 계획 · 가격(1% 바닥) · 업비트 IOC · 토스 주문 수명 · Deneb 장부.
 
 저장 · 일회용 버튼 번호 · 실행 잠금 · 그룹 정지 파일도.
 
@@ -66,7 +66,7 @@ def test_plan_cruise_only_sells_cruise_coins_and_skips_dust() -> None:
     items, notes = _plan(("cruise",))
     assert [(i.venue, i.symbol, i.want) for i in items] == [("upbit", "BTC", D("0.01"))]
     assert any("ETH" in n and "5,000" in n for n in notes)  # 50 원어치 → 남김
-    assert all(i.symbol != "XRP" for i in items)  # Cruise 밖 코인은 건드리지 않음
+    assert all(i.symbol != "XRP" for i in items)  # Vega 밖 코인은 건드리지 않음
 
 
 def test_plan_splits_glide_and_accumulation() -> None:
@@ -355,7 +355,7 @@ def test_group_halts_and_text(tmp_path: Path) -> None:
     assert group_path(halt, "acc").name == "HALT_acc"
     job = Job("J", "glide", "오르빗", 0, [Item("toss_us", "SCHD", ["glide"], D(3))])
     text = job_text(job)
-    assert "Glide 만" in text and "토스 미국 SCHD 0/3" in text and "정지풀기" in text
+    assert "Deneb 만" in text and "토스 미국 SCHD 0/3" in text and "정지풀기" in text
 
 
 def test_toss_unknown_end_status_closes_order() -> None:

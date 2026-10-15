@@ -25,10 +25,10 @@ def daily_due(now_kst_hm: tuple[int, int], today: str, last_sent: str | None) ->
 
 
 _MF = (
-    ("GBG", "Glide·채권·금"),
+    ("GBG", "Deneb·채권·금"),
     ("NBG", "나스닥·채권·금"),
     ("MIX", "나스닥·추세 ETF"),
-    ("LD_M3", "Glide 비교 · 변동성"),
+    ("LD_M3", "Deneb 비교 · 변동성"),
 )
 
 
@@ -163,7 +163,7 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
     if dh:
         v, base = float(dh[-1][1]), float((demo or {}).get("alloc") or 1000)
         lines.append(
-            f"• Falcon 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
+            f"• Altair 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
         )
     namu = _read(root / "data" / "namu_follow" / "ledger.json")
     hist = (namu or {}).get("history") or []

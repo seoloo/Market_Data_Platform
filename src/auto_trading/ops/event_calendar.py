@@ -200,7 +200,7 @@ def morning_text(
         ]
     lines += [
         "",
-        "자동 매매 장부(Glide · Cruise · 자동 적립)는 원래 규칙대로 돌아요 — 직접 매매용 경고예요.",
+        "자동 매매 장부(Deneb · Vega · 자동 적립)는 원래 규칙대로 돌아요 — 직접 매매용 경고예요.",
     ]
     return "\n".join(lines) + _stale(until, today)
 

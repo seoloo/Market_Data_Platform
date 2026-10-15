@@ -45,18 +45,18 @@ class TaskDef:
 
 TASKS: tuple[TaskDef, ...] = (
     TaskDef(
-        "AutoTrading_Toss_Accumulate", "toss", "토스 매수 (Glide 월 매수 · 미국 적립)", "평일 21:00"
+        "AutoTrading_Toss_Accumulate", "toss", "토스 매수 (Deneb 월 매수 · 미국 적립)", "평일 21:00"
     ),
     TaskDef("AutoTrading_Toss_FX", "toss", "환전 알림 (달러 모자랄 때)", "평일 09 · 12 · 15시"),
     TaskDef(
         "AutoTrading_Toss_M3_Chat",
         "glide",
-        "Glide 금액 묻기 · 버튼 답 받기",
+        "Deneb 금액 묻기 · 버튼 답 받기",
         "평일 09:00 부터 5분마다",
     ),
-    TaskDef("AutoTrading_Toss_M3_Retry", "glide", "Glide 체결 확인 · 재시도", "평일 23:40 · 03:30"),
+    TaskDef("AutoTrading_Toss_M3_Retry", "glide", "Deneb 체결 확인 · 재시도", "평일 23:40 · 03:30"),
     TaskDef("AutoTrading_Toss_KR", "toss_kr", "국내 주식 적립", "평일 12:10"),
-    TaskDef("AutoTrading_Binance_Cruise", "cruise", "Cruise 매매 (바이낸스)", "매일 09:05"),
+    TaskDef("AutoTrading_Binance_Cruise", "cruise", "Vega 매매 (바이낸스)", "매일 09:05"),
     TaskDef("AutoTrading_Telegram_Bot", "common", "텔레그램 '현황' 봇", "2분마다"),
     TaskDef("AutoTrading_Risk_News", "common", "보유 종목 위험 뉴스 감시 (AI)", "매시 17분"),
     TaskDef("AutoTrading_Ledger_Sync", "common", "기록 DB · 그래프 기록", "매일 23:00"),
@@ -75,12 +75,12 @@ TASKS: tuple[TaskDef, ...] = (
 )
 
 GROUPS: tuple[tuple[str, str, str], ...] = (
-    ("glide", "Glide (토스 미국 주식)", "토스 키 필요 · 토스 매수 · 환전 알림도 함께 켜짐"),
-    ("toss", "토스 매수 · 환전", "Glide 나 토스 미국 적립에 필요"),
+    ("glide", "Deneb (토스 미국 주식)", "토스 키 필요 · 토스 매수 · 환전 알림도 함께 켜짐"),
+    ("toss", "토스 매수 · 환전", "Deneb 나 토스 미국 적립에 필요"),
     ("toss_kr", "토스 국내 적립", "국내 주식 적립을 쓸 때만"),
     (
         "cruise",
-        "Cruise (바이낸스 코인)",
+        "Vega (바이낸스 코인)",
         "바이낸스 거래 키(BINANCE_LIVE_*) 필요 — 2026-10-15 업비트에서 옮김",
     ),
     ("common", "공통 (텔레그램 봇 · 기록 · 보고)", "텔레그램 봇 토큰 필요"),
@@ -89,7 +89,7 @@ GROUPS: tuple[tuple[str, str, str], ...] = (
     ("phone", "휴대폰으로 보기 (화면 서버)", "'휴대폰' 메뉴의 Tailscale 연결과 함께 써요"),
 )
 _NEEDS = {"glide": ("toss",)}
-"""Glide 를 고르면 함께 켜야 하는 묶음 (토스 매수 실행기가 Glide 월 매수도 한다)."""
+"""Deneb 을 고르면 함께 켜야 하는 묶음 (토스 매수 실행기가 Deneb 월 매수도 한다)."""
 
 
 def expand(groups: Sequence[str]) -> list[str]:

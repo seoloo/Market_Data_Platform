@@ -1,4 +1,4 @@
-"""Glide 제안 (12 월 공제 실현 · 배당 단계) · 양도세 줄 — 가짜 텔레그램 · 가짜 토스로만."""
+"""Deneb 제안 (12 월 공제 실현 · 배당 단계) · 양도세 줄 — 가짜 텔레그램 · 가짜 토스로만."""
 
 from __future__ import annotations
 
@@ -199,7 +199,7 @@ def test_amount_answer_still_works_with_open_proposal(
     st = mod._load_m3()
     st.ask_month, st.ask_ts = "2026-12", 0
     mod._save_m3(st)
-    box.append(InboxMessage(1, 5, "50만"))  # 세 곳 합계 → Glide 몫 40만 (시안 A)
+    box.append(InboxMessage(1, 5, "50만"))  # 세 곳 합계 → Deneb 몫 40만 (시안 A)
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 12, 1, 9, 5, tzinfo=UTC))
     monkeypatch.setattr(mod, "_usdt_krw", lambda: None)
     mod._m3_poll("2026-12-01", True)

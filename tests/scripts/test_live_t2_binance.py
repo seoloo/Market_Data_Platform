@@ -1,4 +1,4 @@
-"""Cruise 바이낸스 실행기 — 가짜 거래소 (실제 호출 없음)."""
+"""Vega 바이낸스 실행기 — 가짜 거래소 (실제 호출 없음)."""
 
 from __future__ import annotations
 
@@ -127,7 +127,7 @@ _SPLIT = m._split
 
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setattr(m, "_split", lambda *a, **k: [])  # Falcon 분배는 아래 시험에서만
+    monkeypatch.setattr(m, "_split", lambda *a, **k: [])  # Altair 분배는 아래 시험에서만
     monkeypatch.setattr(m, "REPO", tmp_path)
     monkeypatch.setattr(m, "DATA", tmp_path / "data" / "binance_t2")
     monkeypatch.setattr(m, "STATE", tmp_path / "data" / "binance_t2" / "state.json")
@@ -245,9 +245,9 @@ def test_falcon_split_moves_half_once_big_enough(
     assert m.run_cmd() == 0
     assert fake.moved == [Decimal("600.00")]  # 첫 분배: 선물 목표 50%
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
-    assert st["deposits"][0][1] == "600.00"  # Cruise 는 남은 600 만 자기 돈으로 본다
+    assert st["deposits"][0][1] == "600.00"  # Vega 는 남은 600 만 자기 돈으로 본다
     outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
-    assert "Falcon 몫 600.00 USDT 현물 → 선물 이체" in outbox
+    assert "Altair 몫 600.00 USDT 현물 → 선물 이체" in outbox
 
 
 def test_falcon_split_small_account_and_rejected(
@@ -265,6 +265,6 @@ def test_falcon_split_small_account_and_rejected(
     big.transfer_error = OrderRejectedError("code=-1002")
     monkeypatch.setattr(m, "_client", lambda **_: big)
     monkeypatch.setattr(time, "time", lambda: NOW / 1000 + 86_400)
-    assert m.run_cmd() == 0  # 거부돼도 Cruise 는 돈다
+    assert m.run_cmd() == 0  # 거부돼도 Vega 는 돈다
     outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
-    assert "Falcon 이체 거부" in outbox and "Universal Transfer" in outbox
+    assert "Altair 이체 거부" in outbox and "Universal Transfer" in outbox

@@ -98,7 +98,7 @@ def _binance(root: Path) -> str:
     if not r.get("ipRestrict"):
         problems.append("⚠ IP 제한이 없어요 — 이 PC 공인 IP 로 묶어 주세요")
     if r.get("enableFutures"):
-        problems.append("선물 권한은 Cruise 에 필요 없어요")
+        problems.append("선물 권한은 Vega 에 필요 없어요")
     if problems:
         raise RuntimeError(" · ".join(problems))
     return "연결됨 · 권한 안전(현물 거래만 · 출금 꺼짐 · IP 제한)" + (

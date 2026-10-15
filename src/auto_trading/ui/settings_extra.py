@@ -111,7 +111,7 @@ def keys_tab(
             trading = bool((status.get(TOSS_SWITCH) or {}).get("set"))
             rows.append(
                 '<div class="set-toggle"><label for="toss_trading"><b>토스 실제 주문 허용</b>'
-                "<small>켜야 Glide · 자동 적립 주문이 실제로 나가요 (끄면 계획만)</small></label>"
+                "<small>켜야 Deneb · 자동 적립 주문이 실제로 나가요 (끄면 계획만)</small></label>"
                 '<input type="hidden" name="toss_trading" value="off" form="keys-f">'
                 f'<input type="checkbox" class="set-switch danger" id="toss_trading" name="toss_trading" '
                 f'value="on" form="keys-f" role="switch"{" checked" if trading else ""}></div>'

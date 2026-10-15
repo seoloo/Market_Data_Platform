@@ -23,7 +23,7 @@ _Q = Quotes({"BTC": 110_000_000.0}, {"TQQQ": 80.0, "SCHD": 30.0, "BTQ": 3.0}, 13
 
 @pytest.fixture(autouse=True)
 def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    """이 시험들은 업비트 Vega 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
     from auto_trading.ui import live_home
 
     monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
@@ -156,7 +156,7 @@ def test_live_page_in_nav_without_network(tmp_path: Path, monkeypatch: pytest.Mo
     _seed(tmp_path)
     monkeypatch.setattr(live_home, "quote_source", lambda coins, tickers: _Q)
     html = render_page(load_dashboard(tmp_path, _NOW), "live")
-    assert 'href="/live"' in html and "총 입금" in html and "Cruise" in html
+    assert 'href="/live"' in html and "총 입금" in html and "Vega" in html
     assert "오르빗" in html and "SOL" in html
 
 
@@ -227,7 +227,7 @@ def test_stopped_book_is_warning_not_live_health_status(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("value", [0.0, -10.0])
 def test_nonpositive_values_do_not_break_display(value: float) -> None:
-    book = Book("glide", "Glide", "토스", 0.0, value, ())
+    book = Book("glide", "Deneb", "토스", 0.0, value, ())
     html = render_live([book], _Q, _NOW)
     assert "nan" not in html.lower() and "inf" not in html.lower()
     assert f"{value:,.0f}" in html
@@ -305,7 +305,7 @@ def test_summary_text_for_phone(tmp_path: Path) -> None:
     _seed(tmp_path)
     text = summary_text(build_books(tmp_path, _Q), _Q, _NOW)
     assert text.startswith("📊 [실거래 현황] 10/09 22:00")
-    assert "📈 Glide · 토스" in text and "🛫 Cruise · 업비트" in text
+    assert "🌟 Deneb · 토스" in text and "🌌 Vega · 업비트" in text
     assert "🟢 BTC" in text and "⏳ SCHD 3주" in text
     assert "원/달러 1,300.0" in text
 
@@ -392,7 +392,7 @@ def test_telegram_bot_replies_once_and_leaves_amounts(
     assert bot_mod.run(tmp_path) == 0
     assert len(sent) == 1 and "실거래 현황" in sent[0]
     queue = json.loads((tmp_path / "data/telegram/inbox.json").read_text(encoding="utf-8"))
-    assert [p["msg"]["text"] for p in queue["pending"]] == ["30만"]  # Glide 몫은 남는다
+    assert [p["msg"]["text"] for p in queue["pending"]] == ["30만"]  # Deneb 몫은 남는다
     assert bot_mod.run(tmp_path) == 0 and len(sent) == 1  # 새 명령 없으면 조용
 
 
@@ -415,7 +415,7 @@ def test_kr_accumulate_state_is_valued_in_krw(tmp_path: Path) -> None:
 
 
 def test_binance_cruise_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> None:
-    """2026-10-15 Cruise 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로."""
+    """2026-10-15 Vega 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로."""
     up = tmp_path / "data" / "upbit_t2"
     up.mkdir(parents=True)
     (up / "state.json").write_text(

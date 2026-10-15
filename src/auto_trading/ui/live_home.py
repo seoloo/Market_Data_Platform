@@ -1,4 +1,4 @@
-"""실거래 홈 — Glide(토스) · Cruise(업비트) · 토스 적립을 한 화면에 (사용자 2026-10-09).
+"""실거래 홈 — Deneb(토스) · Vega(업비트) · 토스 적립을 한 화면에 (사용자 2026-10-09).
 
 * 장부(``data/toss/*.json`` · ``data/upbit_t2/state.json``)는 읽기만 한다. 주문 · 계좌 조회 없음.
 * 평가는 **공개 시세만** 쓴다 — 업비트 ticker · 야후 차트(키 없음), 60 초 캐시.
@@ -24,12 +24,12 @@ __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_
 CRUISE_COINS = ("BTC", "ETH", "SOL")
 BINANCE_CRUISE = Path("data") / "binance_t2" / "state.json"
 SHOW_UPBIT = False
-"""업비트 Cruise 장부를 보일지. 2026-10-15 사용자 "cruise를 이제 바이낸스로 변경해줘 업비트는
+"""업비트 Vega 장부를 보일지. 2026-10-15 사용자 "cruise를 이제 바이낸스로 변경해줘 업비트는
 지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
-"""바이낸스 Cruise 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
+"""바이낸스 Vega 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
 GLIDE_TICKERS = ("TQQQ", "SCHD")
 _SKIP = frozenset({"M3", "QS_SWITCH"})
-"""data/toss 안에서 적립 장부가 아닌 파일 (Glide 는 따로, QS_SWITCH 는 Paper)."""
+"""data/toss 안에서 적립 장부가 아닌 파일 (Deneb 은 따로, QS_SWITCH 는 Paper)."""
 _TTL_S = 60.0
 _KST = timedelta(hours=9)
 
@@ -147,7 +147,7 @@ class Trade:
     ref: str = ""
     """기록 DB 고유 번호 (장부 · 주문 번호 · 입금 순서로 고정, 2026-10-10 기록 DB)."""
     fx: float | None = None
-    """원/달러 (장부에 있을 때만 — Glide 입금 · 미국 적립 매수)."""
+    """원/달러 (장부에 있을 때만 — Deneb 입금 · 미국 적립 매수)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,7 +294,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     }
     return Book(
         "glide",
-        "Glide",
+        "Deneb",
         "토스 · TQQQ + SCHD",
         dep_krw,
         cash,
@@ -361,7 +361,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         )
     deposits = sum(_f(d[1]) for d in state.get("deposits") or [] if isinstance(d, list))
     cash = _f(exp.get("KRW"))
-    book = Book("cruise", "Cruise", "업비트 · BTC · ETH · SOL", deposits, cash, tuple(holdings))
+    book = Book("cruise", "Vega", "업비트 · BTC · ETH · SOL", deposits, cash, tuple(holdings))
     units, peak = _f(state.get("units")), _f(state.get("peak"))
     notes = []
     dd: float | None = None
@@ -443,11 +443,11 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
 
 
 CRUISE_USD = {c: f"{c}-USD" for c in CRUISE_COINS}
-"""바이낸스 Cruise 코인 시세 — 야후 달러 시세(USDT ≈ USD)로 재고 원/달러로 원화 환산."""
+"""바이낸스 Vega 코인 시세 — 야후 달러 시세(USDT ≈ USD)로 재고 원/달러로 원화 환산."""
 
 
 def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
-    """바이낸스 Cruise (2026-10-15 업비트에서 옮김, ``data/binance_t2/state.json``) — 원화로 환산.
+    """바이낸스 Vega (2026-10-15 업비트에서 옮김, ``data/binance_t2/state.json``) — 원화로 환산.
 
     USDT 는 1 달러로 보고 지금 원/달러로 바꾼다. 입금 · 원가도 지금 환율로 바꾼 값이다(근사)."""
     fx = q.fx
@@ -545,7 +545,7 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
     }
     return Book(
         "cruise",
-        "Cruise",
+        "Vega",
         "바이낸스 · BTC · ETH · SOL",
         deposits,
         cash,
@@ -559,9 +559,9 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
 
 
 def falcon_book(state: Mapping[str, Any], q: Quotes) -> Book:
-    """Falcon (옛 AG4S2) — 바이낸스 USDⓈ-M 선물 지갑.
+    """Altair (옛 AG4S2) — 바이낸스 USDⓈ-M 선물 지갑.
 
-    사용자 2026-10-15 "오르빗에 실거래에 falcon 추가". Cruise 실행기가 날마다 남기는
+    사용자 2026-10-15 "오르빗에 실거래에 falcon 추가". Vega 실행기가 날마다 남기는
     ``falcon`` 기록(선물 지갑 USDT · 자동 이체)만 읽는다. 화면은 계좌를 조회하지 않는다.
     실거래 실행기 전이라 지금은 선물 지갑의 USDT 가 대기 중인 모습이다."""
     fx = q.fx or 0.0
@@ -586,14 +586,14 @@ def falcon_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
     return Book(
         "falcon",
-        "Falcon",
+        "Altair",
         "바이낸스 선물 · BTC · ETH",
         sum(_f(t[1]) for t in rows) * fx,
         usdt * fx,
         (),
         notes,
         (),
-        tuple((str(t[0]), f"🦅 현물 → 선물 {_f(t[1]):,.2f} USDT") for t in rows),
+        tuple((str(t[0]), f"☄️ 현물 → 선물 {_f(t[1]):,.2f} USDT") for t in rows),
         trades,
     )
 
@@ -839,7 +839,7 @@ def live_page(data: DashboardData) -> str:
 # ---------------------------------------------------------------- 텔레그램 '현황' 답
 
 
-_ICON = {"glide": "📈", "cruise": "🛫", "falcon": "🦅", "accumulate": "💰"}
+_ICON = {"glide": "🌟", "cruise": "🌌", "falcon": "☄️", "accumulate": "💰"}
 
 
 def _pl_text(value: float, base: float) -> str:

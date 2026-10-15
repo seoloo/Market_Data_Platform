@@ -12,8 +12,8 @@ import pytest
 from auto_trading.ops import laya_client, laya_tags, risk_news
 from auto_trading.ops.risk_news import Asset, Headline
 
-BTC = Asset("BTC", "Bitcoin", "bitcoin", group="Cruise")
-TQQQ = Asset("TQQQ", "ProShares UltraPro QQQ (TQQQ)", "TQQQ", "TQQQ", "Glide")
+BTC = Asset("BTC", "Bitcoin", "bitcoin", group="Vega")
+TQQQ = Asset("TQQQ", "ProShares UltraPro QQQ (TQQQ)", "TQQQ", "TQQQ", "Deneb")
 
 
 def _h(title: str, asset: Asset = BTC, link: str = "https://x.test/a?b=1&c=2") -> Headline:

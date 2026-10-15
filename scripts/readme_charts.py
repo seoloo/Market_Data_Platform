@@ -5,7 +5,7 @@
 
     python -m scripts.readme_charts   # docs/assets/readme/*.svg 를 다시 만든다
 
-* Glide 곡선은 184 엔진(`run_brake_184.simulate`)으로 그 자리에서 다시 계산한다.
+* Deneb 곡선은 184 엔진(`run_brake_184.simulate`)으로 그 자리에서 다시 계산한다.
 * 막대 숫자는 판정 문서(184 · 190)와 RESEARCH_HISTORY 에서 옮겼다 — 문서가 바뀌면 여기도 고친다.
 * 밝은 · 어두운 화면 모두에서 읽히도록 SVG 안의 CSS 가 ``prefers-color-scheme`` 을 따른다.
 """
@@ -177,7 +177,7 @@ def tradeoff() -> str:
     names = [("브레이크 없음", GRAY), ("H (평단·12개월 고점)", LIGHT), ("T (TQQQ 고점) ✔", BLUE)]
     colors = [c for _, c in names]
     body = [
-        text(24, 28, "Glide 브레이크 고르기 — 세금까지 넣은 비교 (문서 184)", "h"),
+        text(24, 28, "Deneb 브레이크 고르기 — 세금까지 넣은 비교 (문서 184)", "h"),
         text(24, 50, "매달 30만 원 적립 · 양도세 250만 원 공제 22% · 끝에 전부 판다고 가정", "s"),
         legend(24, 78, names),
         bar_panel(
@@ -202,7 +202,7 @@ def tradeoff() -> str:
             best="min",
         ),
     ]
-    return svg(880, 370, "".join(body), "Glide 브레이크 비교")
+    return svg(880, 370, "".join(body), "Deneb 브레이크 비교")
 
 
 def crisis() -> str:
@@ -216,7 +216,7 @@ def crisis() -> str:
     w, left, top = 880, 200, 92
     pw = w - left - 70
     body = [
-        text(24, 28, "위기 구간 손실 — 브레이크 없음 vs Glide T 브레이크", "h"),
+        text(24, 28, "위기 구간 손실 — 브레이크 없음 vs Deneb T 브레이크", "h"),
         text(24, 50, "구간 수익률 (계좌 기준가). 막대가 짧을수록 덜 잃었다", "s"),
         legend(24, 76, [("브레이크 없음", GRAY), ("T 브레이크", BLUE)]),
     ]
@@ -235,7 +235,7 @@ def crisis() -> str:
 
 def cruise() -> str:
     body = [
-        text(24, 28, "Cruise (T/v2 업비트) — 같은 규칙, 어디서 하느냐 (문서 190)", "h"),
+        text(24, 28, "Vega (T/v2 업비트) — 같은 규칙, 어디서 하느냐 (문서 190)", "h"),
         text(24, 50, "연수익 막대 · 괄호는 최대 낙폭. 비용 업비트 0.10% · 바이낸스 0.15%", "s"),
         bar_panel(
             24,
@@ -271,7 +271,7 @@ def cruise() -> str:
             "s",
         )
     )
-    return svg(880, 404, "".join(body), "Cruise 비교")
+    return svg(880, 404, "".join(body), "Vega 비교")
 
 
 def verdicts() -> str:
@@ -377,8 +377,8 @@ def glide_curves() -> tuple[str, str]:
     r = data_real()
     rr = runs(r, m.qqq_real())
     eq = line_chart(
-        [("브레이크 없음", GRAY, rr["M0"], False), ("Glide (T 브레이크)", BLUE, rr["T"], False)],
-        title="Glide 계좌 기준가 — 실제 TQQQ + SCHD (2012 ~ 2026-08, 로그)",
+        [("브레이크 없음", GRAY, rr["M0"], False), ("Deneb (T 브레이크)", BLUE, rr["T"], False)],
+        title="Deneb 계좌 기준가 — 실제 TQQQ + SCHD (2012 ~ 2026-08, 로그)",
         sub="매달 적립 · 변동성 비율 · 세전. 같은 돈을 넣어도 2020 · 2022 폭락에서 덜 잃은 만큼 앞선다",
         log=True,
         y_ticks=(1, 2, 5, 10, 20, 50, 100),
@@ -397,7 +397,7 @@ def glide_curves() -> tuple[str, str]:
     a, b = dd(ss["M0"]), dd(ss["T"])
     la, lb = min(a, key=lambda p: p[1]), min(b, key=lambda p: p[1])
     dch = line_chart(
-        [("브레이크 없음", GRAY, a, True), ("Glide (T 브레이크)", BLUE, b, False)],
+        [("브레이크 없음", GRAY, a, True), ("Deneb (T 브레이크)", BLUE, b, False)],
         title="고점 대비 낙폭 — 합성 40년 (1986 ~ 2026-08)",
         sub="닷컴 · 금융위기가 들어 있는 스트레스 시험. 바닥이 얕을수록 버티기 쉽다",
         log=False,

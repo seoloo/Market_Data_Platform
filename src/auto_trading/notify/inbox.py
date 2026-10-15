@@ -4,7 +4,7 @@
 
 * 토큰은 주소에만 쓰고 출력 · 파일에 남기지 않는다(오류 문구에서도 가린다).
 * ``offset`` 을 넘기면 그 앞 글은 텔레그램 서버에서 지워진다 — 같은 글을 두 번 처리하지 않는다.
-* 받는 쪽이 여럿(Glide 대화 · '현황' 봇)이라 :class:`InboxQueue` 한 파일로 나눠 읽는다(2026-10-10).
+* 받는 쪽이 여럿(Deneb 대화 · '현황' 봇)이라 :class:`InboxQueue` 한 파일로 나눠 읽는다(2026-10-10).
   직접 ``fetch`` 를 부르는 쪽이 둘이면 서로의 글 · 버튼을 지운다.
 """
 
@@ -129,7 +129,7 @@ def parse_krw(text: str) -> float | None:
 
 
 COMMANDS = frozenset({"현황", "/현황", "수익", "/수익", "잔고", "/status", "status"})
-"""'현황' 봇이 답하는 글. 나머지 글 · 버튼은 Glide 대화 몫."""
+"""'현황' 봇이 답하는 글. 나머지 글 · 버튼은 Deneb 대화 몫."""
 
 HELP_WORDS = frozenset({"도움", "도움말", "사용법", "/help", "/start", "help"})
 """사용법 안내 (2026-10-11) — 봇 몫."""
@@ -154,7 +154,7 @@ def is_liquidation(msg: InboxMessage) -> bool:
 
 
 def is_command(msg: InboxMessage) -> bool:
-    """봇(scripts/telegram_bot.py) 몫 — '현황' 류와 '전부 정리' 류. 나머지는 Glide 대화 몫."""
+    """봇(scripts/telegram_bot.py) 몫 — '현황' 류와 '전부 정리' 류. 나머지는 Deneb 대화 몫."""
     return is_liquidation(msg) or (
         not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS
     )

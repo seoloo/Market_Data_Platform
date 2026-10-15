@@ -6,7 +6,7 @@
   업비트는 매수 호가 몇 칸 아래 지정가 IOC 를 여러 번, 토스는 매수 호가를 따라 당일(DAY) 지정가를
   내고 10 분마다 미체결분을 취소 · 다시 낸다. 어느 쪽도 최우선 매수 호가의 1% 아래로는 내지 않는다.
 * 토스 장이 닫혀 있으면 **다음 정규장 시작 뒤** 판다(그때까지 '대기').
-* 범위: 전부 · Cruise 만 · Glide 만 · 자동 적립만.
+* 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만.
 
 순서: 그룹 정지 파일(``data/HALT_<그룹>``)을 먼저 만들어 새 매수를 막고 → 토스의 그 종목 미체결
 **매수** 주문을 취소하고 → 판다. 그룹 정지는 사람이 풀 때까지 남는다(풀면 각 전략이 자기 규칙대로
@@ -53,8 +53,8 @@ D = Decimal
 ZERO = D(0)
 SCOPES: dict[str, str] = {
     "all": "전부",
-    "cruise": "Cruise 만",
-    "glide": "Glide 만",
+    "cruise": "Vega 만",
+    "glide": "Deneb 만",
     "acc": "자동 적립만",
 }
 FLOOR_PCT = D("0.01")
@@ -107,7 +107,7 @@ class Item:
     groups: list[str]
     want: Decimal
     glide_part: Decimal = ZERO
-    """Glide 장부 몫 (토스 미국 TQQQ · SCHD). 팔린 만큼 Glide 장부에서 뺀다."""
+    """Deneb 장부 몫 (토스 미국 TQQQ · SCHD). 팔린 만큼 Deneb 장부에서 뺀다."""
     glide_booked: Decimal = ZERO
     status: str = "waiting"
     """waiting · working · done · failed."""
@@ -319,9 +319,9 @@ def build_items(
 ) -> tuple[list[Item], list[str]]:
     """그룹 → 팔 것 · 못 파는 것 (먼지 · 소수점 · 묶인 수량 · 수동 보유).
 
-    * Cruise = 업비트 · 바이낸스 현물의 BTC · ETH · SOL 전량 (다른 코인은 건드리지 않는다).
-      Cruise 는 2026-10-15 바이낸스로 옮겼다 — 업비트에 남은 몫도 Cruise 로 함께 판다.
-    * Glide = 토스 TQQQ · SCHD 중 Glide 장부 수량.
+    * Vega = 업비트 · 바이낸스 현물의 BTC · ETH · SOL 전량 (다른 코인은 건드리지 않는다).
+      Vega 는 2026-10-15 바이낸스로 옮겼다 — 업비트에 남은 몫도 Vega 로 함께 판다.
+    * Deneb = 토스 TQQQ · SCHD 중 Deneb 장부 수량.
     * 토스 적립 = 적립 장부가 산 몫(``acc_qty``) — 장부 밖 보유(사람이 직접 산 종목 · 적립 시작 전
       수량)는 **수동 보유로 남긴다**.
     * 토스 지정가는 정수 주만 — 소수점은 남기고 알린다(소수점 매도는 시장가만 된다).
@@ -532,7 +532,7 @@ def run_binance_item(
     min_notional: Decimal,
     rounds: int = UPBIT_ROUNDS,
 ) -> list[str]:
-    """바이낸스 현물(Cruise) — 업비트와 같은 방식: 매수 호가 ``2 + 2 × 회차`` 칸(1% 안) 지정가 IOC.
+    """바이낸스 현물(Vega) — 업비트와 같은 방식: 매수 호가 ``2 + 2 × 회차`` 칸(1% 안) 지정가 IOC.
 
     체결은 주문 조회로 확인하고, 예전 주문도 다시 조회해 고친다(업비트 10-13 교훈)."""
     log: list[str] = []
@@ -699,7 +699,7 @@ def run_toss_item(
 
 
 def glide_to_book(item: Item) -> tuple[Decimal, Decimal]:
-    """아직 Glide 장부에 안 뺀 (수량, 달러 순수령액). 장부에 쓴 뒤 ``glide_booked`` 를 올린다."""
+    """아직 Deneb 장부에 안 뺀 (수량, 달러 순수령액). 장부에 쓴 뒤 ``glide_booked`` 를 올린다."""
     closed = [o for o in item.orders if o.closed and o.filled > 0]
     sold = sum((o.filled for o in closed), ZERO)
     if sold <= 0 or item.glide_part <= item.glide_booked:

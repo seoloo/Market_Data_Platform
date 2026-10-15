@@ -30,7 +30,7 @@ _NAMES = {
 _KST = timedelta(hours=9)
 _HIDDEN = "•••••"
 STALE_HOURS = {"cruise": 30, "accumulate": 30, "glide": 24 * 35}
-"""장부가 이 시간보다 오래되면 '오래된 기록' (Cruise · 적립은 매일, Glide 는 매달 돈다)."""
+"""장부가 이 시간보다 오래되면 '오래된 기록' (Vega · 적립은 매일, Deneb 은 매달 돈다)."""
 PERIODS = (
     ("w1", "1주", 7),
     ("m1", "1개월", 31),
@@ -162,7 +162,7 @@ def _guide() -> str:
             "<p>‘장부 업데이트’는 매매 프로그램이 장부를 마지막으로 저장한 시각, "
             "‘시세 업데이트’는 이 화면이 공개 시세를 받은 시각입니다. "
             "화면이 열려 있다고 매매가 정상이라는 뜻은 아닙니다.</p>"
-            "<p>Glide는 미국 주식, Cruise는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. "
+            "<p>Deneb은 미국 주식, Vega는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. "
             "이 화면은 읽기 전용입니다. 앱을 닫아도 매매 프로그램은 종료되지 않습니다.</p>"
             "<p>자산 그래프는 하루 한 번 남긴 실거래 평가 기록만 그립니다. "
             "기록이 없는 과거는 채우지 않습니다. 입금은 수익이 아닙니다.</p>",
@@ -466,8 +466,8 @@ def _card(
 ) -> str:
     key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
     category, subtitle, glyph = {
-        "glide": ("미국 주식", "Glide", "chart"),
-        "cruise": ("코인", "Cruise", "coins"),
+        "glide": ("미국 주식", "Deneb", "chart"),
+        "cruise": ("코인", "Vega", "coins"),
         "accumulate": ("자동 적립", "자동 적립", "leaf"),
     }.get(key, ("투자 장부", book.title, "wallet"))
     priced = _priced(book, quotes)
@@ -803,8 +803,8 @@ def _accounts(books: Sequence[Book], now_ms: int) -> str:
     by_key = {b.key: b for b in books}
     rows = []
     for key, name, venue in (
-        ("glide", "Glide", "토스증권 · 미국 주식"),
-        ("cruise", "Cruise", "업비트 · 코인"),
+        ("glide", "Deneb", "토스증권 · 미국 주식"),
+        ("cruise", "Vega", "업비트 · 코인"),
         ("accumulate", "자동 적립", "토스증권 · 주식 모으기"),
     ):
         b = by_key.get(key)
@@ -836,7 +836,7 @@ def _onboard() -> str:
         '<h2 id="orbit-onboard-title">처음 오셨나요? 세 가지만 보면 됩니다</h2><ol>'
         "<li><b>화면 설명</b><span>내 자산 = 장부의 현금 + 보유 평가액. "
         "기준 금액은 넣은 돈입니다. 눈 아이콘으로 금액을 가릴 수 있습니다.</span></li>"
-        "<li><b>계좌 연결</b><span>Glide · 자동 적립은 토스증권, Cruise 는 업비트입니다. "
+        "<li><b>계좌 연결</b><span>Deneb · 자동 적립은 토스증권, Vega 는 업비트입니다. "
         "연결은 매매 프로그램이 하고, 이 화면은 저장 장부만 읽습니다.</span></li>"
         "<li><b>기록 확인</b><span>장부 업데이트 시각과 거래 내역으로 프로그램이 일했는지 "
         "봅니다. 오래된 장부는 빨갛게 표시됩니다.</span></li></ol>"

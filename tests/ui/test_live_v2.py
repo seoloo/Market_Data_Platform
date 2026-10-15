@@ -27,7 +27,7 @@ _H = 3_600_000
 
 @pytest.fixture(autouse=True)
 def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    """이 시험들은 업비트 Vega 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
     from auto_trading.ui import live_home
 
     monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
@@ -75,7 +75,7 @@ def test_update_stamps_and_stale_ledger_are_visible() -> None:
     old = render_live([_book(updated_ms=_NOW - 40 * _H)], Quotes(at_ms=_NOW), _NOW)
     assert "오래된 기록" in old and "오래된 장부 1개" in old and "orbit-stale" in old
     assert "장부가 오래됨" in old  # 확인할 사항에도
-    # Glide 는 매달 도니 40 시간은 오래된 게 아니다
+    # Deneb 은 매달 도니 40 시간은 오래된 게 아니다
     assert "오래된" not in render_live([_book("glide", updated_ms=_NOW - 40 * _H)], Quotes(), _NOW)
 
 
@@ -235,7 +235,7 @@ class TestLiveServer:
 def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
     cruise = Book(
         "cruise",
-        "Cruise",
+        "Vega",
         "업비트",
         300.0,
         100.0,
@@ -272,7 +272,7 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
     assert 'class="warn">17 / 0%' in dt  # 목표에서 10%p 넘게 벗어나면 노랑
     glide = Book(
         "glide",
-        "Glide",
+        "Deneb",
         "토스",
         300_000.0,
         57_057.0,
@@ -316,11 +316,11 @@ def test_one_toggle_opens_all_three_details_and_words_stay_whole() -> None:
 
 def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> None:
     two = Book(
-        "glide", "Glide", "토스", 1.0, 0.0, (Holding("TQQQ", 1, 1, 1), Holding("SCHD", 1, 1, 1))
+        "glide", "Deneb", "토스", 1.0, 0.0, (Holding("TQQQ", 1, 1, 1), Holding("SCHD", 1, 1, 1))
     )
     three = Book(
         "cruise",
-        "Cruise",
+        "Vega",
         "업비트",
         1.0,
         0.0,

@@ -79,7 +79,7 @@ FIELDS: tuple[Field, ...] = (
     Field("fire.rate_bad", "도달 예상 · 나쁠 때", "float", 4.0, "다음 보고부터", -20, 50),
     Field(
         "glide.monthly_krw",
-        "Glide 기본 월 납입",
+        "Deneb 기본 월 납입",
         "int",
         300_000,
         "다음 매수 달부터 (텔레그램 질문의 기본값)",
@@ -88,7 +88,7 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "glide.max_krw",
-        "Glide 한 달 상한",
+        "Deneb 한 달 상한",
         "int",
         5_000_000,
         "다음 텔레그램 답부터",
@@ -97,8 +97,8 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field("glide.ask_on", "매수 전날 금액 묻기", "bool", True, "다음 매수 달부터"),
     Field("glide.harvest_on", "12월 양도세 공제 실현", "bool", True, "올해 12월 공지부터"),
-    Field("alerts.cruise_trade", "Cruise 매매 알림", "bool", True, "다음 09:05 실행부터"),
-    Field("alerts.cruise_weekly", "Cruise 주간 요약", "bool", True, "다음 토요일부터"),
+    Field("alerts.cruise_trade", "Vega 매매 알림", "bool", True, "다음 09:05 실행부터"),
+    Field("alerts.cruise_weekly", "Vega 주간 요약", "bool", True, "다음 토요일부터"),
     Field("alerts.fx", "환전 알림", "bool", True, "다음 환전 확인(평일 09 · 12 · 15시)부터"),
     Field("alerts.bot_down", "봇 멈춤 알림", "bool", True, "바로"),
     Field("alerts.theme", "주간 테마", "bool", True, "다음 토요일부터"),
@@ -106,7 +106,7 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.news", "종목 뉴스 답", "bool", True, "바로"),
     Field("alerts.events", "경제 일정 · 실적 경고", "bool", True, "바로"),
     Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
-    Field("demo.ag4s2", "Falcon 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
+    Field("demo.ag4s2", "Altair 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
     Field(
         "namu.follow",
         "나무 모의 — 국장 수급 Paper 따라가기",

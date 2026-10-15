@@ -83,7 +83,7 @@ def test_unhalt_lists_only_halted_groups(fake: dict[str, list[Any]]) -> None:
     bot = FakeBot()
     assert tb.handle_liquidation(bot, InboxMessage(1, 0, "정지풀기"))  # type: ignore[arg-type]
     text, buttons = bot.out[-1][1]
-    assert "Cruise" in text and len(buttons) == 2  # Cruise 풀기 + 취소
+    assert "Vega" in text and len(buttons) == 2  # Vega 풀기 + 취소
     tb.handle_liquidation(bot, _press(buttons[0][0]["callback_data"]))  # type: ignore[arg-type]
     assert fake["unhalt"] == [("cruise", "텔레그램")]
 
@@ -94,7 +94,7 @@ def test_help_words_route_to_bot_and_pin_help(
     from auto_trading.notify.inbox import is_command
 
     for w in ("도움", "/help", "/start", "사용법"):
-        assert is_command(InboxMessage(1, 0, w))  # Glide 대화가 가져가지 않는다
+        assert is_command(InboxMessage(1, 0, w))  # Deneb 대화가 가져가지 않는다
     assert "정리" in tb.HELP and "현황" in tb.HELP and "정지풀기" in tb.HELP
 
     calls: list[Any] = []

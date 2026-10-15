@@ -121,8 +121,8 @@ SECTIONS = (
     ("tasks", "자동 실행"),
     ("phone", "휴대폰"),
     ("goal", "목표 · 보고"),
-    ("glide", "Glide"),
-    ("cruise", "Cruise"),
+    ("glide", "Deneb"),
+    ("cruise", "Vega"),
     ("toss", "자동 적립"),
     ("alerts", "알림"),
     ("screen", "화면"),
@@ -270,7 +270,7 @@ def render_settings(
         + "</section>"
     )
     glide = (
-        '<section class="set-card" id="set-glide"><h2>Glide · 토스</h2>'
+        '<section class="set-card" id="set-glide"><h2>Deneb · 토스</h2>'
         '<p class="set-sub">TQQQ + SCHD, 매달 첫 거래일 밤 장 마감 지정가</p><div class="set-grid">'
         + _num(
             "glide.monthly_krw",
@@ -303,9 +303,9 @@ def render_settings(
         )
         + '<div class="set-toggle"><div><b>매수 · 체결 알림</b><small>실거래라 항상 켜져 있어요'
         '</small></div><input type="checkbox" class="set-switch" checked disabled '
-        'aria-label="Glide 알림 (항상 켜짐)"></div></section>'
+        'aria-label="Deneb 알림 (항상 켜짐)"></div></section>'
         + _locked(
-            "Glide 규칙 · 잠김",
+            "Deneb 규칙 · 잠김",
             (
                 ("TQQQ 최대 비중", "60%"),
                 ("기준 변동성 (QQQ 20일)", "20%"),
@@ -317,7 +317,7 @@ def render_settings(
         )
     )
     cruise = (
-        '<section class="set-card" id="set-cruise"><h2>Cruise · 업비트</h2>'
+        '<section class="set-card" id="set-cruise"><h2>Vega · 업비트</h2>'
         '<p class="set-sub">BTC · ETH · SOL 추세 비중, 매일 지정가</p><div class="set-grid">'
         '<div class="set-field"><span class="set-label">매일 실행 시각'
         '<span class="set-soon">준비 중</span></span>'
@@ -340,7 +340,7 @@ def render_settings(
         )
         + "</section>"
         + _locked(
-            "Cruise 규칙 · 잠김",
+            "Vega 규칙 · 잠김",
             (
                 ("코인", "BTC · ETH · SOL"),
                 ("변동성 목표 · 코인당 최대", "15% · 50%"),
@@ -470,7 +470,7 @@ def render_settings(
             v["alerts.news"],
         )
         + _soon("조용한 시간 23:00 ~ 07:00", "위험 알림은 이때도 와요", on=False)
-        + '<p class="set-help">Glide · Cruise 매매, 환전, 파이어 보고 알림은 각 메뉴에서 바꿔요. '
+        + '<p class="set-help">Deneb · Vega 매매, 환전, 파이어 보고 알림은 각 메뉴에서 바꿔요. '
         "정지 · 실패 같은 위험 알림은 끌 수 없어요.</p></section>"
     )
     theme_opts = "".join(
@@ -512,14 +512,14 @@ def render_settings(
         )
         ask_t, ask_p, btn = (
             "정말 비상 정지를 푸시겠습니까?",
-            "풀면 다음 실행부터 Glide · Cruise · 자동 적립 주문이 다시 나가요.",
+            "풀면 다음 실행부터 Deneb · Vega · 자동 적립 주문이 다시 나가요.",
             "비상 정지 풀기",
         )
     else:
         state = '<p class="set-note ok" role="status">✅ 정상 운영 중</p>'
         ask_t, ask_p, btn = (
             "정말 비상 정지를 켜시겠습니까?",
-            "Glide · Cruise · 자동 적립의 새 주문을 모두 멈춰요. 이미 낸 주문과 보유는 "
+            "Deneb · Vega · 자동 적립의 새 주문을 모두 멈춰요. 이미 낸 주문과 보유는 "
             "그대로예요. 다시 풀 때도 이 창으로 확인해요.",
             "비상 정지 켜기",
         )

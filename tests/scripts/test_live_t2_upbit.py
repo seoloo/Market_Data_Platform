@@ -103,7 +103,7 @@ def test_run_buys_with_limit_ioc_once_per_day(env: tuple[Any, FakeUpbit, list[st
     sides = {(c, s) for c, s, *_ in fake.sent}
     assert sides == {("BTC", "bid"), ("ETH", "bid"), ("SOL", "bid")}
     assert fake.krw > 0  # 원화 안에서만 샀다
-    assert sent and "Cruise" in sent[0]
+    assert sent and "Vega" in sent[0]
     n = len(fake.sent)
     assert m.main(["run"]) == 0  # 같은 날 다시 → 주문 없음
     assert len(fake.sent) == n
@@ -195,7 +195,7 @@ def test_kimp_line_and_failure_does_not_block() -> None:
 def test_retired_upbit_run_orders_nothing_without_flag(
     env: tuple[Any, FakeUpbit, list[str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """2026-10-15 Cruise 를 바이낸스로 옮김 — 옛 업비트 예약이 남아 있어도 주문하지 않는다."""
+    """2026-10-15 Vega 를 바이낸스로 옮김 — 옛 업비트 예약이 남아 있어도 주문하지 않는다."""
     m, fake, sent = env
     monkeypatch.delenv("CRUISE_UPBIT")
     assert m.run_cmd() == 0

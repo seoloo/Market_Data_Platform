@@ -1,4 +1,4 @@
-"""Falcon 자동 분배 — 선물 몫 최소 · 새 돈 안에서만 · 첫 분배 · 되돌리지 않음."""
+"""Altair 자동 분배 — 선물 몫 최소 · 새 돈 안에서만 · 첫 분배 · 되돌리지 않음."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def test_share_is_half_for_10_10() -> None:
 
 
 def test_small_account_moves_nothing() -> None:
-    # 바이낸스 218 USDT → 선물 목표 109 < 500 → 안 옮김 (Cruise 가 씀)
+    # 바이낸스 218 USDT → 선물 목표 109 < 500 → 안 옮김 (Vega 가 씀)
     assert (
         move_amount(
             spot_equity=Decimal(218),
@@ -49,7 +49,7 @@ def test_later_only_new_money_and_never_back() -> None:
         new_money=Decimal(100),
         free_usdt=Decimal(300),
     ) == Decimal(50)
-    # 새 돈이 없으면 Cruise 돈은 건드리지 않는다
+    # 새 돈이 없으면 Vega 돈은 건드리지 않는다
     assert (
         move_amount(
             spot_equity=Decimal(700),

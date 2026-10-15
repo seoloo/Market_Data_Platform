@@ -97,7 +97,7 @@ class Asset:
     yahoo: str = ""
     """야후 뉴스 RSS 기호 (미국 종목만)."""
     group: str = ""
-    """Glide · Cruise · 토스 적립 · 수동 보유."""
+    """Deneb · Vega · 토스 적립 · 수동 보유."""
 
 
 @dataclass(frozen=True, slots=True)

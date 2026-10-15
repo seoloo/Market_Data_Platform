@@ -1,6 +1,6 @@
 """'전부 정리' 실행기 흐름.
 
-그룹 정지 → 토스 매수 취소 → 업비트 즉시 · 토스 장 열린 뒤 → Glide 장부.
+그룹 정지 → 토스 매수 취소 → 업비트 즉시 · 토스 장 열린 뒤 → Deneb 장부.
 
 거래소 · 텔레그램은 가짜로 바꿔 끼운다. 실제 주문 없음.
 """
@@ -158,10 +158,10 @@ def test_glide_only_halts_cancels_buys_and_waits_for_session(env: dict[str, Any]
     tmp = env["tmp"]
     assert group_path(tmp / "HALT", "glide").exists()
     assert not group_path(tmp / "HALT", "cruise").exists()
-    assert FakeToss.canceled == ["b2"]  # Glide 종목 매수만 (BTQ 적립 매수는 그대로)
+    assert FakeToss.canceled == ["b2"]  # Deneb 종목 매수만 (BTQ 적립 매수는 그대로)
     assert not FakeUpbit.sent and not FakeToss.sent  # 장 닫힘 → 대기
     assert "⏳ 장 열리면 토스 미국 TQQQ 0/1" in text and "SCHD 0/3" in text
-    assert env["sent"] and "Glide 만" in env["sent"][0]
+    assert env["sent"] and "Deneb 만" in env["sent"][0]
     FakeToss.open_session = True
     try:
         liq.resume()
@@ -195,10 +195,10 @@ def test_cruise_sells_upbit_now_and_unhalt(env: dict[str, Any]) -> None:
 
 def test_acc_scope_sells_only_ledger_share(env: dict[str, Any]) -> None:
     text = liq.start("acc", "텔레그램")
-    assert FakeToss.canceled == ["b1"]  # 적립 매수만 취소 (Glide SCHD 매수는 그대로)
+    assert FakeToss.canceled == ["b1"]  # 적립 매수만 취소 (Deneb SCHD 매수는 그대로)
     assert "토스 미국 BTQ 0/1" in text and "TQQQ" not in text.split("수동 보유")[0]
     manual = text.split("수동 보유")[1]
-    assert "TQQQ 2" in manual and "SCHD" not in manual  # Glide 몫 3 주는 수동이 아님
+    assert "TQQQ 2" in manual and "SCHD" not in manual  # Deneb 몫 3 주는 수동이 아님
 
 
 def test_second_start_while_running_is_refused(env: dict[str, Any]) -> None:

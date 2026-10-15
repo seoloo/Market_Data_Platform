@@ -443,7 +443,7 @@ def _m3_resolve(day: Day, m3: M3State) -> tuple[list[str], list[str]]:
         if o.status == "UNKNOWN":
             o.status = "EXPIRED"
             notes.append(
-                f"⚠ Glide {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
+                f"⚠ Deneb {o.symbol} {o.date} 주문 전송 결과 모름 — 잔고를 직접 확인해 주세요"
             )
             continue
         out = quiet if o.kind else notes
@@ -462,9 +462,9 @@ def _m3_resolve(day: Day, m3: M3State) -> tuple[list[str], list[str]]:
         apply_fill(m3, o)
         word = "매수" if o.side == "BUY" else "매도"
         if o.filled_qty > 0:
-            out.append(f"Glide {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
+            out.append(f"Deneb {o.symbol} {o.filled_qty:g}주 {word} 체결 — ${o.filled_usd:,.2f}")
         else:
-            out.append(f"Glide {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
+            out.append(f"Deneb {o.symbol} {word} 미체결 ({st.status}) — 돈은 다음 달로 이월")
     return notes, quiet
 
 
@@ -524,15 +524,15 @@ def _m3_send(
     try:
         res = trader.order(symbol, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
     except OrderStateUnknownError as exc:
-        return order, f"⚠ Glide {symbol} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}"
+        return order, f"⚠ Deneb {symbol} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}"
     except TradingDisabledError as exc:
         order.status = "REJECTED"
-        return order, f"❌ Glide {symbol} {word} 안 보냄: {exc}"
+        return order, f"❌ Deneb {symbol} {word} 안 보냄: {exc}"
     if res.accepted:
         order.status, order.order_id = "SENT", res.code
-        return order, f"🛑 Glide {symbol} {qty}주 {word} 접수 — 장 마감 지정가 {limit:.2f} USD"
+        return order, f"🛑 Deneb {symbol} {qty}주 {word} 접수 — 장 마감 지정가 {limit:.2f} USD"
     order.status, order.code = "REJECTED", res.code
-    return order, f"❌ Glide {symbol} {word} 거절 {res.code}: {res.message}"
+    return order, f"❌ Deneb {symbol} {word} 거절 {res.code}: {res.message}"
 
 
 def _m3_brake(
@@ -563,7 +563,7 @@ def _m3_brake(
             b.last_day = d
     if not closes:
         m3.brake = b.to_dict()
-        return [*alerts, "⚠ Glide 브레이크: TQQQ 일봉 없음 — 오늘 판단 못 함"], report
+        return [*alerts, "⚠ Deneb 브레이크: TQQQ 일봉 없음 — 오늘 판단 못 함"], report
     last_d, last = closes[-1]
     dd = drawdown(b, last)
     report.append(
@@ -595,7 +595,7 @@ def _m3_brake(
             on, as_of, _ = qs_signal(day.reader, _utc_now())
             report.append(f"QQQ 추세 {'켜짐' if on else '꺼짐'} ({as_of} 종가)")
         except AutoTradingError as exc:
-            alerts.append(f"⚠ Glide 브레이크 추세 확인 실패: {exc}")
+            alerts.append(f"⚠ Deneb 브레이크 추세 확인 실패: {exc}")
         if rebuy_due(b, on):
             limit = limit_price(day.prices[LEV], "BUY")
             qty = math.floor(b.reserve_usd / (limit * (1 + day.fee)))
@@ -720,13 +720,13 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
         if target == m3.ask_month and msg.date < m3.ask_ts:
             continue
         total = parse_krw(msg.text)
-        # 답은 세 곳 합계(시안 A, 사용자 2026-10-15) — Glide 몫만 그달 Glide 매수 금액이 된다
-        krw = None if total is None else deposit_split.split(total)["Glide"]
+        # 답은 세 곳 합계(시안 A, 사용자 2026-10-15) — Deneb 몫만 그달 Deneb 매수 금액이 된다
+        krw = None if total is None else deposit_split.split(total)["Deneb"]
         if total is None or krw is None:
             _notify("❓ 금액으로 읽지 못했어요. 예: 100만 · 1000000 · 0(이번 달 쉬기)", telegram)
         elif krw > _m3_max():
             _notify(
-                f"❓ Glide 몫 {krw:,.0f}원이 상한({_m3_max():,.0f}원)보다 커요. 다시 보내 주세요",
+                f"❓ Deneb 몫 {krw:,.0f}원이 상한({_m3_max():,.0f}원)보다 커요. 다시 보내 주세요",
                 telegram,
             )
         else:
@@ -739,7 +739,7 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
         try:
             _notify(_m3_preview(_kst_now()), telegram)
         except (AutoTradingError, TossApiError) as exc:
-            _notify(f"📈 Glide 금액은 정했지만 계획 계산 실패: {exc}", telegram)
+            _notify(f"🌟 Deneb 금액은 정했지만 계획 계산 실패: {exc}", telegram)
 
 
 def _m3_ask_today(today: str, telegram: bool) -> bool:
@@ -847,20 +847,20 @@ def _m3_run(
         )
     if not due(m3, day.today):
         _save_m3(m3)
-        return [*(f"📈 Glide · {x}" for x in notes), *alerts]
+        return [*(f"🌟 Deneb · {x}" for x in notes), *alerts]
     plan, vol, share, more = _m3_plan(day, m3)
     notes += more
     if not any(str(x[0]) == day.today[:7] for x in m3.months):
         m3.months.append([day.today[:7], vol, share])
     vol_txt = f"{vol:.1%}" if vol is not None else "모름"
     head = (
-        f"📈 Glide · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
+        f"🌟 Deneb · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
         f" (QQQ 20일 변동성 {vol_txt})"
     )
     if not enabled or halted:
         _save_m3(m3)
         why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
-        return [head, *notes, f"⏸ Glide 주문 안 함 — {why} (다음 날 다시)", *alerts]
+        return [head, *notes, f"⏸ Deneb 주문 안 함 — {why} (다음 날 다시)", *alerts]
     retry = False
     lines = []
     for sym, n in sorted(plan.items(), key=lambda kv: kv[1]):  # 파는 것 먼저
@@ -875,20 +875,20 @@ def _m3_run(
         try:
             res = trader.order(sym, side, qty, Decimal(f"{limit:.2f}"), client_order_id=cid)
         except OrderStateUnknownError as exc:
-            lines.append(f"⚠ Glide {sym} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}")
+            lines.append(f"⚠ Deneb {sym} {word} 전송 결과 모름 — 다시 보내지 않는다: {exc}")
             continue
         except TradingDisabledError as exc:
             order.status = "REJECTED"
-            lines.append(f"❌ Glide {sym} {word} 안 보냄: {exc}")
+            lines.append(f"❌ Deneb {sym} {word} 안 보냄: {exc}")
             continue
         if res.accepted:
             order.status, order.order_id = "SENT", res.code
-            lines.append(f"🛒 Glide {sym} {qty}주 장 마감 지정가 {word} 접수 — {limit:.2f} USD")
+            lines.append(f"🛒 Deneb {sym} {qty}주 장 마감 지정가 {word} 접수 — {limit:.2f} USD")
         else:
             order.status, order.code = "REJECTED", res.code
             if res.code in M3_RETRY:
                 retry = True
-            lines.append(f"❌ Glide {sym} {word} 거절 {res.code}: {res.message}")
+            lines.append(f"❌ Deneb {sym} {word} 거절 {res.code}: {res.message}")
         _save_m3(m3)
     if not plan:
         lines.append("살 것 없음 (돈이 1 주 값보다 적음) — 다음 달로 이월")
@@ -906,7 +906,7 @@ def _m3_run(
     return [head, *notes, *lines, *alerts]
 
 
-# ------------------------------------------------------------ Glide 제안 (공제 실현 · 배당 단계)
+# ------------------------------------------------------------ Deneb 제안 (공제 실현 · 배당 단계)
 
 
 def _bot() -> TelegramNotifier | None:
@@ -1025,7 +1025,7 @@ def _new_harvest(
     if pick is None:
         text = (
             f"🧾 {year}년 해외주식 공제 — 올해는 실현할 이익이 없어요\n{RULE}\n"
-            f"세금 없이 더 실현할 수 있는 이익 {room:,.0f}원 · Glide 보유에 이익 난 종목이 없음"
+            f"세금 없이 더 실현할 수 있는 이익 {room:,.0f}원 · Deneb 보유에 이익 난 종목이 없음"
         )
         return Proposal(
             f"h{year}", "harvest", today, deadline, LEV, 0, {"text": text}, "expired"
@@ -1057,7 +1057,7 @@ def _new_div_step(
     if sell < 1:
         m3.div_steps, m3.lev_cap = k + 1, new_cap
         return None, (
-            f"💰 Glide · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)\n{RULE}\n"
+            f"💰 Deneb · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)\n{RULE}\n"
             f"TQQQ 비중이 이미 낮아 팔 것이 없어요. 앞으로 TQQQ 목표를 {new_cap:.0%}로 낮춰 둘게요."
         )
     since = (datetime.fromisoformat(today) - timedelta(days=365)).date().isoformat()
@@ -1105,7 +1105,7 @@ def _glide_morning(now: datetime, telegram: bool) -> None:
             changed = True
         elif remind_due(x, today):
             x.reminded = today
-            head = (x.plan.get("text", "") or "Glide 제안").splitlines()[0]
+            head = (x.plan.get("text", "") or "Deneb 제안").splitlines()[0]
             _tg_send(
                 bot,
                 f"⏰ 아직 답을 기다리고 있어요 — {x.deadline} 밤까지\n{head}",
@@ -1170,7 +1170,7 @@ def _glide_actions(
     if not any(x.status == "accepted" for x in props):
         return alerts, report
     if not enabled or halted:
-        return alerts, ["Glide 제안 주문 안 함 — 거래 꺼짐 · 정지"]
+        return alerts, ["Deneb 제안 주문 안 함 — 거래 꺼짐 · 정지"]
     bot = _bot() if telegram else None
     by_cid = {o.client_id: o for o in m3.orders}
     for x in props:
@@ -1183,7 +1183,7 @@ def _glide_actions(
             if x.kind == "harvest" and day.today > x.deadline:
                 x.status = "expired"
                 _refresh(bot, x)
-                alerts.append(f"⚠ Glide 공제 실현 {x.deadline} 마감을 넘겨 진행하지 않았어요")
+                alerts.append(f"⚠ Deneb 공제 실현 {x.deadline} 마감을 넘겨 진행하지 않았어요")
                 continue
             q = min(x.qty, math.floor(m3.qty.get(x.symbol, 0.0)))
             if q < 1:
@@ -1429,7 +1429,7 @@ def fx(telegram: bool = True) -> int:
     try:
         _glide_morning(now, telegram)
     except (AutoTradingError, TossApiError) as exc:
-        print(f"Glide 제안 확인 실패: {exc}")
+        print(f"Deneb 제안 확인 실패: {exc}")
     reader = _trader()
     try:
         day = Day(reader, now, dry=True)
@@ -1552,7 +1552,7 @@ def run(telegram: bool = True) -> int:
             _save_qs(qs)
         enabled = trader.credentials.trading_enabled
         halted = halted_for(HALT, "acc")  # 적립 · QS: 전체 정지 또는 토스 적립 정지
-        halted_glide = halted_for(HALT, "glide")  # Glide: 전체 정지 또는 Glide 정지
+        halted_glide = halted_for(HALT, "glide")  # Deneb: 전체 정지 또는 Deneb 정지
         accrued_qndx = 0.0
         for plan in _plans():
             state = states.get(plan.symbol)
@@ -1714,10 +1714,10 @@ def m3_only(telegram: bool = True) -> int:
         now -= timedelta(days=1)
     today = now.strftime("%Y-%m-%d")
     if not M3_ENABLED or now.weekday() >= 5 or not due(_load_m3(), today):
-        print("Glide: 할 일 없음")
+        print("Deneb: 할 일 없음")
         return 0
     if not any(o.date == today for o in _load_m3().orders):
-        print("Glide: 오늘 21:00 실행 전 — 재시도만 한다")
+        print("Deneb: 오늘 21:00 실행 전 — 재시도만 한다")
         return 0
     _m3_poll(today, telegram)
     trader = _trader()
@@ -1731,13 +1731,13 @@ def m3_only(telegram: bool = True) -> int:
             brake=False,
         )
     except (AutoTradingError, TossApiError) as exc:
-        text = f"⚠ Glide 재시도 실패\n{RULE}\n{exc}"
+        text = f"⚠ Deneb 재시도 실패\n{RULE}\n{exc}"
         _notify(text, telegram)
         print(text)
         return 1
     finally:
         trader.close()
-    text = "\n".join([f"📈 Glide 재시도 · {today} {now:%H:%M}", RULE, *lines])
+    text = "\n".join([f"🌟 Deneb 재시도 · {today} {now:%H:%M}", RULE, *lines])
     _notify(text, telegram)
     print(text)
     return 0
@@ -1804,13 +1804,13 @@ def status() -> int:
     if M3_ENABLED:
         m3 = _load_m3()
         print(
-            f"Glide(M3): 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
+            f"Deneb(M3): 시작 {m3.start} · 이번 달 끝 {m3.done_month or '아직'}"
             f" · 전략 현금 ${m3.cash_usd:,.2f} · TQQQ {m3.qty.get(LEV, 0):g}"
             f" · SCHD {m3.qty.get(DIV, 0):g} · 월 {_m3_monthly():,.0f}원"
         )
         b = _brake_of(m3)
         print(
-            f"Glide 브레이크({'켜짐' if M3_BRAKE else '꺼짐'}): 단계 {b.stage}"
+            f"Deneb 브레이크({'켜짐' if M3_BRAKE else '꺼짐'}): 단계 {b.stage}"
             f" · TQQQ 고점 ${b.lev_peak:.2f}"
             f" ({b.last_day or '기록 전'}) · 보관금 ${b.reserve_usd:,.2f}"
             f" · 누적 매도 ${b.sold_total_usd:,.2f}"
@@ -1881,7 +1881,7 @@ def m3_chat(telegram: bool = True) -> int:
         for x in _props(m3)
     )
     if not M3_ENABLED or now.weekday() >= 5 or not (9 <= now.hour < 21) or not (asking or live):
-        print("Glide 대화: 할 일 없음")
+        print("Deneb 대화: 할 일 없음")
         return 0
     _m3_poll(today, telegram, reply=asking)
     return 0
@@ -1901,7 +1901,7 @@ def m3_test(telegram: bool = True) -> int:
     )
     _notify(split, telegram)
     print(split)
-    plan = _m3_preview(now, title=f"{mark} (Glide 몫 기본 금액이라고 가정)")
+    plan = _m3_preview(now, title=f"{mark} (Deneb 몫 기본 금액이라고 가정)")
     _notify(plan, telegram)
     print(plan)
     return 0
