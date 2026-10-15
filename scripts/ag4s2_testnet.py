@@ -11,8 +11,9 @@
 * 계좌: 데모 선물(``demo-fapi``)의 **USDC 지갑만** 쓴다 — BTCUSDT 는 Phase 7 훈련,
   ETHUSDT 는 O/v2 데모가 같은 계좌에서 쓰므로 **BTCUSDC · ETHUSDC** 로 주문한다.
   신호는 메인넷 BTCUSDT · ETHUSDT 자료로 계산한다(엘리엇 데모와 같은 방식).
-* 크기: 가상 **1,000 USDC** 장부(``ALLOC``) — 100 달러면 BTC 주문이 최소 금액 아래라
-  1,000 으로 돌리고, 보고에 "100 달러였다면 막혔을 주문" 을 적는다.
+* 크기: 가상 **2,000 USDC** 장부(``ALLOC``, 처음 1,000 → 같은 날 사용자 요청으로 2,000) —
+  BTC 주문 단위(0.001 BTC ≈ 81 달러) 오차가 20% 안에 드는 크기.
+  보고에 "100 달러였다면 막혔을 주문" 도 적는다.
 * 롱(AG-CR4): 매일 00:05 UTC 뒤 한 번, T/v2 목표 비중(BTC · ETH) × **4** 만큼 선물 롱으로.
   Paper 원장은 현물 1 배 + 선물 3 배로 나누지만 데모 현물 지갑은 따로라 **모두 선물로** 든다
   (같은 노출, 펀딩은 전체에 붙는 차이). 비상 스톱: 롱 평균가 −20% STOP_MARKET
@@ -51,7 +52,8 @@ DATA = REPO / "data" / "ag4s2_testnet"
 STATE = DATA / "state.json"
 REPORTS = REPO / "reports" / "ag4s2_testnet"
 TAG = "🧪 [AG4S2 · 바이낸스 선물 데모 · 가짜 돈]"
-ALLOC = 1_000.0
+ALLOC = 2_000.0
+"""가상 장부 크기 — 2026-10-15 사용자 "2000달러 기준으로해서 데모 진행해줘" (처음 1,000)."""
 EXPOSURE = 4.0
 SHORT_LEV = 2.0
 LEVERAGE = 5
@@ -231,6 +233,7 @@ def _equity(c: BinanceUsdmTestnet, st: dict[str, Any]) -> tuple[float, dict[str,
     """가상 장부 평가액 = ALLOC + (USDC 지갑 변화) + 우리 포지션 미실현 손익. (코인 → 부호 수량)."""
     wallet = float(c.asset_balance("USDC"))
     st.setdefault("wallet0", wallet)
+    st["alloc"] = ALLOC
     acct = c.account()
     pos: dict[str, float] = {}
     unreal = 0.0

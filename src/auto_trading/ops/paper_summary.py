@@ -161,8 +161,10 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
     demo = _read(root / "data" / "ag4s2_testnet" / "state.json")
     dh = (demo or {}).get("history") or []
     if dh:
-        v = float(dh[-1][1])
-        lines.append(f"• AG4S2 선물 데모(가짜 돈, 시작 1,000) {v:,.0f} USDC ({_pct(v / 1000 - 1)})")
+        v, base = float(dh[-1][1]), float((demo or {}).get("alloc") or 1000)
+        lines.append(
+            f"• AG4S2 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
+        )
     namu = _read(root / "data" / "namu_follow" / "ledger.json")
     hist = (namu or {}).get("history") or []
     if hist:

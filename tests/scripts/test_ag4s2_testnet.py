@@ -21,8 +21,8 @@ def test_short_size_is_smaller_of_margin_cap_and_one_percent_risk() -> None:
 def test_qty_rounds_down_to_step_and_small_account_report() -> None:
     assert m.round_qty(459.0, 80_000.0, Decimal("0.001")) == Decimal("0.005")
     assert m.round_qty(0.0, 80_000.0, Decimal("0.001")) == 0
-    lines = m.blocked_small([("BTC", 459.0), ("ETH", 330.0)], {"BTC": 100.0, "ETH": 20.0})
-    assert lines == ["BTC 46 < 100 USDC"]  # 100 달러 장부면 BTC 만 막힘
+    lines = m.blocked_small([("BTC", 918.0), ("ETH", 661.0)], {"BTC": 100.0, "ETH": 20.0})
+    assert lines == ["BTC 46 < 100 USDC"]  # 2,000 장부 주문을 100 달러로 줄이면 BTC 만 막힘
 
 
 def test_tick_does_nothing_between_bars(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
