@@ -27,6 +27,7 @@ from auto_trading.ops.liquidate import (
     floor_price,
     groups_of,
     job_text,
+    run_futures_item,
     run_toss_item,
     run_upbit_item,
     set_group_halts,
@@ -56,7 +57,8 @@ def _plan(groups: tuple[str, ...], **over: object) -> tuple[list[Item], list[str
 
 
 def test_scopes() -> None:
-    assert groups_of("all") == ("vega", "deneb", "acc")
+    assert groups_of("all") == ("vega", "deneb", "acc", "altair")
+    assert groups_of("altair") == ("altair",)
     assert groups_of("deneb") == ("deneb",)
     with pytest.raises(ValueError):
         groups_of("everything")
@@ -439,3 +441,99 @@ def test_old_saved_job_with_glide_names_still_loads(tmp_path: Path) -> None:
     assert job.scope == "vega" and job.items[0].groups == ["deneb"]
     assert job.items[0].deneb_part == D(1)
     assert groups_of("glide") == ("deneb",)
+
+
+class _FutResult:
+    def __init__(self, qty: Decimal, px: Decimal) -> None:
+        self.executed_qty, self.avg_price, self.fee = qty, px, Decimal("0.01")
+
+
+class FakeFutures:
+    """한 번에 ``fill`` 만큼만 차는 가짜 선물 거래소."""
+
+    def __init__(self, fill: Decimal) -> None:
+        self.fill = fill
+        self.sent: list[tuple[str, str, Decimal, Decimal, bool]] = []
+
+    def mark_price(self, symbol: str) -> Decimal:
+        return Decimal("80000")
+
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> _FutResult:
+        self.sent.append((symbol, side, quantity, price, reduce_only))
+        return _FutResult(min(self.fill, quantity), price)
+
+    def get_order(self, symbol: str, client_order_id: str) -> None:
+        return None
+
+
+def test_altair_items_close_longs_and_shorts() -> None:
+    items, _notes = build_items(
+        ("altair",),
+        upbit_balances={},
+        upbit_prices={},
+        vega_coins=(),
+        toss_holdings={},
+        toss_sellable={},
+        deneb_qty={},
+        acc_qty={},
+        is_kr=lambda s: False,
+        altair_positions={"BTC": Decimal("0.011"), "ETH": Decimal("-0.28")},
+    )
+    assert [(i.venue, i.symbol, i.want, i.side) for i in items] == [
+        ("binance_fut", "BTC", Decimal("0.011"), "SELL"),
+        ("binance_fut", "ETH", Decimal("0.28"), "BUY"),
+    ]
+    assert items[0].currency == "USDC"
+
+
+def test_run_futures_item_reduce_only_limit_steps_down_one_percent() -> None:
+    it = Item("binance_fut", "BTC", ["altair"], Decimal("0.011"), side="SELL")
+    c = FakeFutures(Decimal("0.004"))
+    log = run_futures_item(
+        it,
+        c,
+        "J",
+        lambda: 0,
+        lambda s: None,
+        held=Decimal("0.011"),
+        step=Decimal("0.001"),
+        tick=Decimal("0.1"),
+    )
+    assert [x[3] for x in c.sent] == [Decimal("79840.0"), Decimal("79680.0"), Decimal("79520.0")]
+    assert all(x[1] == "SELL" and x[4] is True and x[0] == "BTCUSDC" for x in c.sent)
+    assert it.status == "done" and it.sold == Decimal("0.011") and "닫음" in log[-1]
+    short = Item("binance_fut", "ETH", ["altair"], Decimal("0.28"), side="BUY")
+    c2 = FakeFutures(Decimal("0"))
+    run_futures_item(
+        short,
+        c2,
+        "J",
+        lambda: 0,
+        lambda s: None,
+        held=Decimal("0.28"),
+        step=Decimal("0.001"),
+        tick=Decimal("0.1"),
+    )
+    assert len(c2.sent) == 5 and c2.sent[-1][3] == Decimal("80800.0")  # +1% 까지만
+    assert short.status == "working"
+    gone = Item("binance_fut", "ETH", ["altair"], Decimal("0.28"), side="BUY")
+    run_futures_item(
+        gone,
+        c2,
+        "J",
+        lambda: 0,
+        lambda s: None,
+        held=Decimal(0),
+        step=Decimal("0.001"),
+        tick=Decimal("0.1"),
+    )
+    assert gone.status == "done" and gone.note == "포지션 없음"

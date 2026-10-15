@@ -17,10 +17,11 @@ from auto_trading.ops.liquidate import SCOPES
 __all__ = ["liquidate_panel"]
 
 _ASK = {
-    "all": "Vega · Deneb · 자동 적립을 모두",
+    "all": "Vega · Deneb · 자동 적립 · Altair 를 모두",
     "vega": "Vega(업비트 BTC · ETH · SOL)를",
     "deneb": "Deneb(토스 TQQQ · SCHD Deneb 몫)를",
     "acc": "자동 적립(미국 · 국내)을",
+    "altair": "Altair(바이낸스 선물 BTC · ETH 포지션)를",
 }
 
 
@@ -41,8 +42,8 @@ def liquidate_panel(
             f'aria-labelledby="{mid}-t"><h3 id="{mid}-t">'
             f"정말 {escape(_ASK[scope])} 정리할까요?</h3>"
             "<p>① 그 그룹의 새 매수를 멈추고 ② 토스 미체결 매수 주문을 취소한 뒤 ③ 보유를 "
-            "지정가로 팔아요(시장가 안 씀). 업비트는 바로, 토스는 정규장에서 — 닫혀 있으면 "
-            "열린 뒤 팔아요. 결과는 텔레그램으로 와요. 되돌릴 수 없어요.</p>"
+            "지정가로 팔아요(시장가 안 씀). 업비트 · 바이낸스는 바로, 토스는 정규장에서 — "
+            "닫혀 있으면 열린 뒤 팔아요. 결과는 텔레그램으로 와요. 되돌릴 수 없어요.</p>"
             f'<div><button type="button" popovertarget="{mid}" popovertargetaction="hide">취소'
             f'</button><button type="submit" form="{fid}" class="set-danger-btn">정리 시작'
             "</button></div></div>"

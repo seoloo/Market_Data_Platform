@@ -6,7 +6,9 @@
   업비트는 매수 호가 몇 칸 아래 지정가 IOC 를 여러 번, 토스는 매수 호가를 따라 당일(DAY) 지정가를
   내고 10 분마다 미체결분을 취소 · 다시 낸다. 어느 쪽도 최우선 매수 호가의 1% 아래로는 내지 않는다.
 * 토스 장이 닫혀 있으면 **다음 정규장 시작 뒤** 판다(그때까지 '대기').
-* 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만.
+* 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만 · Altair 만
+  (Altair 는 2026-10-16 사용자 "전부 정리에 altair넣어줘"). Altair 는 바이낸스 USDⓈ-M(USDC)
+  포지션을 reduce-only 지정가 IOC 로 닫고, 그 종목의 비상 스톱을 지운다.
 
 순서: 그룹 정지 파일(``data/HALT_<그룹>``)을 먼저 만들어 새 매수를 막고 → 토스의 그 종목 미체결
 **매수** 주문을 취소하고 → 판다. 그룹 정지는 사람이 풀 때까지 남는다(풀면 각 전략이 자기 규칙대로
@@ -25,7 +27,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_UP, Decimal
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -44,6 +46,7 @@ __all__ = [
     "groups_of",
     "job_text",
     "run_binance_item",
+    "run_futures_item",
     "run_toss_item",
     "run_upbit_item",
     "set_group_halts",
@@ -56,6 +59,7 @@ SCOPES: dict[str, str] = {
     "vega": "Vega 만",
     "deneb": "Deneb 만",
     "acc": "자동 적립만",
+    "altair": "Altair 만",
 }
 FLOOR_PCT = D("0.01")
 """최우선 매수 호가에서 이만큼 아래까지만 판다 (한 번 주문에서)."""
@@ -65,8 +69,12 @@ VENUE_NAMES = {
     "binance": "바이낸스",
     "toss_us": "토스 미국",
     "toss_kr": "토스 국내",
+    "binance_fut": "바이낸스 선물",
 }
 UPBIT_ROUNDS = 8
+FUT_ROUNDS = 5
+FUT_PAD = D("0.002")
+"""선물 정리: 표시 가격에서 회차마다 0.2% 씩 더 불리하게 (5 회 = 1% 까지)."""
 TOSS_REPLACE_MS = 10 * 60_000
 TOSS_MAX_ORDERS = 12
 REQUEST_TTL_MS = 5 * 60_000
@@ -109,7 +117,7 @@ class Order:
 @dataclass
 class Item:
     venue: str
-    """upbit · binance · toss_us · toss_kr."""
+    """upbit · binance · toss_us · toss_kr · binance_fut."""
     symbol: str
     groups: list[str]
     want: Decimal
@@ -120,6 +128,8 @@ class Item:
     """waiting · working · done · failed."""
     note: str = ""
     orders: list[Order] = field(default_factory=list)
+    side: str = ""
+    """binance_fut 만: 닫는 방향 (롱이면 SELL, 숏이면 BUY)."""
 
     @property
     def sold(self) -> Decimal:
@@ -141,6 +151,8 @@ class Item:
     def currency(self) -> str:
         if self.venue == "binance":
             return "USDT"
+        if self.venue == "binance_fut":
+            return "USDC"
         return "USD" if self.venue == "toss_us" else "KRW"
 
 
@@ -327,6 +339,7 @@ def build_items(
     binance_balances: Mapping[str, Decimal] | None = None,
     binance_prices: Mapping[str, Decimal] | None = None,
     binance_min: Mapping[str, Decimal] | None = None,
+    altair_positions: Mapping[str, Decimal] | None = None,
 ) -> tuple[list[Item], list[str]]:
     """그룹 → 팔 것 · 못 파는 것 (먼지 · 소수점 · 묶인 수량 · 수동 보유).
 
@@ -336,9 +349,16 @@ def build_items(
     * 토스 적립 = 적립 장부가 산 몫(``acc_qty``) — 장부 밖 보유(사람이 직접 산 종목 · 적립 시작 전
       수량)는 **수동 보유로 남긴다**.
     * 토스 지정가는 정수 주만 — 소수점은 남기고 알린다(소수점 매도는 시장가만 된다).
+    * Altair = 바이낸스 선물 BTCUSDC · ETHUSDC 포지션 전부(코인 → 부호 수량, 롱 · 숏 모두).
     """
     items: list[Item] = []
     notes: list[str] = []
+    if "altair" in groups:
+        for coin, q in sorted((altair_positions or {}).items()):
+            if q != 0:
+                items.append(
+                    Item("binance_fut", coin, ["altair"], abs(q), side="SELL" if q > 0 else "BUY")
+                )
     if "vega" in groups:
         for coin in vega_coins:
             qty = upbit_balances.get(coin, ZERO)
@@ -589,6 +609,79 @@ def run_binance_item(
     return log
 
 
+class FuturesLike(Protocol):
+    def mark_price(self, symbol: str) -> Decimal: ...
+    def place_limit_ioc(
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool,
+    ) -> Any: ...
+    def get_order(self, symbol: str, client_order_id: str) -> Any: ...
+
+
+def run_futures_item(
+    item: Item,
+    client: FuturesLike,
+    job_id: str,
+    now_ms: Callable[[], int],
+    sleep: Callable[[float], None],
+    *,
+    held: Decimal,
+    step: Decimal,
+    tick: Decimal,
+    rounds: int = FUT_ROUNDS,
+) -> list[str]:
+    """바이낸스 선물(Altair) — reduce-only 지정가 IOC, 표시 가격 ± 0.2% × 회차(1% 까지).
+
+    ``held`` = 지금 거래소의 그 포지션 절대 수량 — 남은 수량은 장부가 아니라 이것으로 정한다
+    (비상 스톱이 먼저 닫았으면 0). reduce-only 라 포지션보다 많이 닫히지 않는다."""
+    log: list[str] = []
+    symbol = f"{item.symbol}USDC"
+    if held <= 0:
+        item.status = "done"
+        item.note = item.note or "포지션 없음"
+        log.append(f"{item.symbol} 선물 포지션 없음 — 끝")
+        return log
+    rem = held
+    start = len(item.orders)
+    for r in range(rounds):
+        qty = (rem / step).to_integral_value(rounding=ROUND_DOWN) * step
+        if qty <= 0:
+            break
+        mark = client.mark_price(symbol)
+        pad = FUT_PAD * (r + 1)
+        if item.side == "SELL":
+            price = (mark * (1 - pad) / tick).to_integral_value(rounding=ROUND_DOWN) * tick
+        else:
+            price = (mark * (1 + pad) / tick).to_integral_value(rounding=ROUND_UP) * tick
+        ident = f"liq-{job_id}-{item.symbol}-f{start + r}"[:36]
+        try:
+            got = client.place_limit_ioc(symbol, item.side, qty, price, ident, reduce_only=True)
+        except OrderStateUnknownError:
+            got = client.get_order(symbol, ident)
+        o = Order(ident, ident, qty, price, now_ms(), closed=True, status="IOC")
+        if got is not None:
+            o.filled = got.executed_qty
+            o.amount = got.executed_qty * (got.avg_price or price)
+            o.fee = getattr(got, "fee", ZERO) or ZERO
+        item.orders.append(o)
+        rem -= o.filled
+        if rem <= 0:
+            break
+        sleep(1.0)
+    item.status = "done" if rem < step else "working"
+    log.append(
+        f"{item.symbol} 선물 {'롱' if item.side == 'SELL' else '숏'} {_n(item.sold)} 닫음"
+        f" · {item.amount:,.2f} USDC" + (f" · 남음 {_n(rem)}" if item.status != "done" else "")
+    )
+    return log
+
+
 class TossStatus(Protocol):
     @property
     def status(self) -> str: ...
@@ -740,12 +833,14 @@ def job_text(job: Job) -> str:
         "binance": "바이낸스",
         "toss_us": "토스 미국",
         "toss_kr": "토스 국내",
+        "binance_fut": "바이낸스 선물",
     }
     word = {"waiting": "⏳ 장 열리면", "working": "🔄 진행 중", "done": "✅ 끝", "failed": "⚠ 실패"}
     for it in job.items:
         amt = {
             "KRW": f"{it.amount:,.0f} 원",
             "USDT": f"{it.amount:,.2f} USDT",
+            "USDC": f"{it.amount:,.2f} USDC",
         }.get(it.currency, f"${it.amount:,.2f}")
         lines.append(
             f"{word.get(it.status, it.status)} {names[it.venue]} {it.symbol} "

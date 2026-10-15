@@ -26,7 +26,7 @@ __all__ = [
     "legacy_path",
 ]
 
-GROUPS: dict[str, str] = {"vega": "Vega", "deneb": "Deneb", "acc": "자동 적립"}
+GROUPS: dict[str, str] = {"vega": "Vega", "deneb": "Deneb", "acc": "자동 적립", "altair": "Altair"}
 """그룹 키 → 보이는 이름."""
 LEGACY: dict[str, str] = {"vega": "cruise", "deneb": "glide"}
 """2026-10-15 이름 변경 전 그룹 키 — 옛 정지 파일(``HALT_glide`` 등)이 남아 있으면

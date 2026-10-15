@@ -17,7 +17,8 @@
 * **입금 · 출금은 손익이 아니다**: 선물 지갑 이체(``TRANSFER``)를 단위(NAV)로 바꿔 낙폭을 잰다
   (Vega 와 같은 방식).
 * **낙폭 30% 정지**: 단위 가치가 고점에서 30% 빠지면 새 노출(롱 늘리기 · 새 숏) 금지 —
-  줄이기 · 정리 · 스톱은 그대로. ``unhalt`` 로만 푼다. ``data/HALT``(전체 정지) 동안도 새 노출 금지.
+  줄이기 · 정리 · 스톱은 그대로. ``unhalt`` 로만 푼다.
+  전체 정지 · Altair 그룹 정지(전부 정리 · 텔레그램 정지) 동안도 새 노출 금지.
 * 상태 ``data/altair_live/state.json``, 알림 기록 ``reports/altair_live/outbox.log``.
 """
 
@@ -35,7 +36,7 @@ from auto_trading.exchange.binance_usdm_live import BinanceUsdmLive, load_live_f
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.ops import user_settings
 from auto_trading.ops.ag_short_paper import DAY, H4
-from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.kill_switch import halted_for
 from scripts import altair_demo as core
 
 REPO = Path(__file__).resolve().parent.parent
@@ -202,7 +203,7 @@ def tick(now_ms: int | None = None) -> list[str]:
             return lines
         st["alloc"] = float(st.get("alloc") or eq)
         st.setdefault("peak", eq)  # 데모 기본값(가상 2,000)이 숏 규칙의 고점으로 쓰이지 않게
-        st["no_new"] = stop_reason(st, halted_reason(HALT))
+        st["no_new"] = stop_reason(st, halted_for(HALT, "altair"))
         if due_long:
             lines += core.rebalance_long(c, st, now_ms, alert=alert)
             st["long_day"] = day

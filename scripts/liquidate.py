@@ -30,6 +30,7 @@ from auto_trading.config.secrets import (
 )
 from auto_trading.core.errors import AutoTradingError, ConfigError
 from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
+from auto_trading.exchange.binance_usdm_live import BinanceUsdmLive, load_live_futures
 from auto_trading.exchange.toss import (
     TossPosition,
     TossReader,
@@ -57,6 +58,7 @@ from auto_trading.ops.liquidate import (
     groups_of,
     job_text,
     run_binance_item,
+    run_futures_item,
     run_toss_item,
     run_upbit_item,
     set_group_halts,
@@ -94,6 +96,42 @@ def _binance() -> BinanceSpotLive | None:
     except ConfigError:
         return None
     return BinanceSpotLive(creds, trading_enabled=enabled)
+
+
+ALTAIR_STATE = REPO / "data" / "altair_live" / "state.json"
+ALTAIR_SYMBOLS = {"BTC": "BTCUSDC", "ETH": "ETHUSDC"}
+"""Altair 실거래 종목 (scripts/altair_live · altair_demo.TRADE 와 같음)."""
+
+
+def _futures() -> BinanceUsdmLive | None:
+    """Altair 선물 키. 없으면 None — Altair 몫은 없다고 본다."""
+    try:
+        creds, enabled = load_live_futures(REPO / ".env")
+    except ConfigError:
+        return None
+    return BinanceUsdmLive(creds, trading_enabled=enabled)
+
+
+def _altair_positions(c: BinanceUsdmLive) -> dict[str, Decimal]:
+    acct = c.account()
+    return {
+        coin: acct.positions[sym].quantity
+        for coin, sym in ALTAIR_SYMBOLS.items()
+        if sym in acct.positions and acct.positions[sym].quantity != 0
+    }
+
+
+def _altair_forget(coin: str) -> None:
+    """정리한 코인의 Altair 숏 · 스톱 기록을 지운다 — 실행기가 '스톱 발동' 으로 잘못 읽지 않게."""
+    try:
+        st = json.loads(ALTAIR_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    st.get("shorts", {}).pop(coin, None)
+    st.get("stops", {}).pop(coin, None)
+    tmp = ALTAIR_STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(ALTAIR_STATE)
 
 
 def _reader() -> TossReader:
@@ -194,6 +232,18 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
             notes.append(f"바이낸스 조회 실패: {exc}")
         finally:
             b.close()
+    fut: dict[str, Decimal] = {}
+    if "altair" in groups:
+        f = _futures()
+        if f is None:
+            notes.append("Altair 선물 키 없음 — 바이낸스 선물 포지션은 확인 못 함")
+        else:
+            try:
+                fut = _altair_positions(f)
+            except AutoTradingError as exc:
+                notes.append(f"바이낸스 선물 조회 실패: {exc}")
+            finally:
+                f.close()
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
     if "deneb" in groups or "acc" in groups:
@@ -219,6 +269,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         binance_balances=b_bal,
         binance_prices=b_px,
         binance_min=b_min,
+        altair_positions=fut,
     )
     return items, notes + more
 
@@ -230,6 +281,7 @@ def preview_text(scope: str = "all") -> str:
         "binance": "바이낸스",
         "toss_us": "토스 미국",
         "toss_kr": "토스 국내",
+        "binance_fut": "바이낸스 선물",
     }
     lines = [f"🧯 전부 정리 미리 보기 · {SCOPES[scope]} (아직 아무것도 안 팔았어요)"]
     for g in groups_of(scope):
@@ -244,7 +296,7 @@ def preview_text(scope: str = "all") -> str:
     lines += [f"· {n}" for n in notes]
     lines.append(
         "누르면: ① 그 그룹 새 매수 정지 ② 토스 미체결 매수 취소 ③ 지정가로 매도 "
-        "(업비트는 바로, 토스는 정규장에서 — 닫혀 있으면 열린 뒤)"
+        "(업비트 · 바이낸스는 바로, 토스는 정규장에서 — 닫혀 있으면 열린 뒤)"
     )
     return "\n".join(lines)
 
@@ -301,6 +353,51 @@ def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
     return log
 
 
+def _step_futures(job: Job, futs: list[Item]) -> list[str]:
+    """Altair 선물 포지션 닫기 → 닫히면 그 종목 비상 스톱 지우기 · 장부 기록 정리."""
+    log: list[str] = []
+    f = _futures()
+    if f is None:
+        return ["Altair 선물 키 없음 — 바이낸스 앱에서 선물 포지션을 직접 닫아 주세요"]
+    if not f.trading_enabled:
+        f.close()
+        return [
+            "BINANCE_FUTURES_LIVE_TRADING_ENABLED 꺼짐 — 선물 포지션은 바이낸스 앱에서 직접"
+            " 닫아 주세요 (또는 .env 에서 켜면 다음 확인 때 닫아요)"
+        ]
+    try:
+        held = _altair_positions(f)
+        for it in futs:
+            sym = ALTAIR_SYMBOLS[it.symbol]
+            try:
+                flt = f.filters(sym)
+                log += run_futures_item(
+                    it,
+                    f,
+                    job.job_id,
+                    _now_ms,
+                    time.sleep,
+                    held=abs(held.get(it.symbol, Decimal(0))),
+                    step=flt.step_size,
+                    tick=flt.tick_size,
+                )
+            except AutoTradingError as exc:
+                it.status = "working"  # 코인은 24 시간 — 다음 확인 때 다시
+                log.append(f"{it.symbol} 바이낸스 선물 오류: {exc} — 다음 확인 때 다시")
+                continue
+            if it.status == "done":
+                for stop in f.open_stops(sym):
+                    try:
+                        f.cancel_stop(sym, stop.client_order_id)
+                    except AutoTradingError as exc:
+                        log.append(f"{it.symbol} 스톱 취소 실패: {exc}")
+                _altair_forget(it.symbol)
+                log.append(f"{it.symbol} 선물 비상 스톱 지움")
+    finally:
+        f.close()
+    return log
+
+
 def step(job: Job) -> list[str]:
     """한 번 진행: 업비트는 끝날 때까지 몇 회, 토스는 상태 확인 · (장 열려 있으면) 주문."""
     now = _now_ms()
@@ -341,6 +438,11 @@ def step(job: Job) -> list[str]:
                         log.append(f"{it.symbol} 바이낸스 오류: {exc} — 다음 확인 때 다시")
             finally:
                 b.close()
+    futs = [
+        it for it in job.items if it.venue == "binance_fut" and it.status not in ("done", "failed")
+    ]
+    if futs:
+        log += _step_futures(job, futs)
     toss = [
         it
         for it in job.items
