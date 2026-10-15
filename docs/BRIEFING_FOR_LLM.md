@@ -6,6 +6,12 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-15 — 237 국장 시장 조건 KEEP · Altair 데모 청산 거리 · 선물 USDC (Claude)
+
+[237](research/237-kr-market-gate-preregistration.md): 국장 Paper 의 'KOSPI 200 일선 위일 때만 새로 삼' 을 60 일선 · 조건 없음과 비교(설명용) → `KEEP_G200`.
+조건 없음은 하락장에 크게 잃음(LT 낙폭 90%), 60 일선은 수급 규칙엔 낫고 가격 규칙엔 나쁨. 지금 KOSPI 는 60 일선 아래이기도 해 어느 쪽이든 빈손.
+Altair 데모: cross 확인 · 알림에 청산 거리. 선물 비용: USDC taker 0.04% · maker 0% 가 USDT(0.05 · 0.02%)보다 쌈, 펀딩비는 같음 → Altair 실계좌는 USDC 권고.
+
 ## 2026-10-15 — 236 섹터 ETF 수급 REJECT · 나무증권 모의 따라가기 (Claude)
 
 [236](research/236-kr-sector-etf-flow-preregistration.md): 국장 수급 점수로 고른 상위 3 섹터를 TIGER 200 섹터 ETF 로 들면(연금저축용) → 모든 섹터를 고르게 든 것과 같음(샤프 0.30 vs 0.31) → `REJECT`.
