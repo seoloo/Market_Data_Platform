@@ -140,12 +140,49 @@ def _ags_panel(root: Path) -> str:
         if target
         else ""
     )
+    chart = line_chart(ags_series(root, r), fmt=lambda v: f"${v:,.0f}", show_legend=True)
+    no_short = all(
+        not b.get("short_trades") and not b.get("open_shorts")
+        for b in (r.get("books") or {}).values()
+    )
+    if no_short:
+        chart += (
+            "<div class='foot'>아직 숏이 한 번도 없어 AGS 선이 롱만(AG-CR · AG-CR4) 선과 겹친다 — "
+            "롱이 꺼진 코인에 숏 신호가 나야 갈라진다.</div>"
+        )
     return (
         head + f'<div class="sub">기준 {escape(str(r.get("as_of_utc")))} UTC · 시작 '
-        f"{escape(str(r.get('start_utc')))} UTC</div>"
-        f'<div class="cards">{cards}</div><table>{rows}</table>'
+        f"{escape(str(r.get('start_utc')))} UTC · 그래프는 롱 원장 첫날 = 1,000 눈금</div>"
+        f'<div class="cards">{cards}</div>{chart}<table>{rows}</table>'
         f"<div class='foot'>{note}</div></div>"
     )
+
+
+def ags_series(root: Path, r: dict[str, Any]) -> list[Series]:
+    """AGS 장부 선 + 비교용 롱만(AG-CR · AG-CR4) 선 — 같은 눈금, AGS 가 시작한 날부터."""
+    books = r.get("books") or {}
+    first = min(
+        (d for b in books.values() for d in (b.get("path") or {})),
+        default=None,
+    )
+    paths = (_read(root / "reports" / "ag_paper" / "latest.json") or {}).get("paths") or {}
+    out = []
+    for key, label, color in (
+        ("AG-CR", "AG-CR · 롱만 (비교)", "var(--o2)"),
+        ("AG-CR4", "AG-CR4 · 롱만 (비교)", "var(--o3)"),
+    ):
+        raw = paths.get(key) or {}
+        pts = [
+            (t, float(v))
+            for d, v in sorted(raw.items())
+            if first is not None and str(d) >= first and (t := _ms(str(d))) is not None
+        ]
+        out.append(Series(label, color, tuple(pts), tag=key))
+    for key, label, color in _AGS_LINES:
+        raw = (books.get(key) or {}).get("path") or {}
+        pts = [(t, float(v)) for d, v in sorted(raw.items()) if (t := _ms(str(d))) is not None]
+        out.append(Series(label, color, tuple(pts), tag=key))
+    return out
 
 
 def ag_paper_page(data: Any) -> str:

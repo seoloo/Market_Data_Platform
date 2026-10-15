@@ -50,6 +50,8 @@ def _ms(day: str) -> int | None:
         return None
 
 
+_NQ_COLORS = {"NQ": "var(--c1)", "SN20": "var(--c3)", "SN20C": "var(--c5)"}
+"""NQ 계열 그래프 · 카드 왼쪽 선 색 (같게)."""
 _NQ_BOOKS = (
     ("NQ", "nq_paper", "NQ · 나스닥 100 상위 10 (각 10%)"),
     ("SN20", "sn20_paper", "SN20 · S&P 10 + 나스닥 10 (각 5%)"),
@@ -66,7 +68,8 @@ def _nq_panel(root: Path) -> str:
             continue
         held = ", ".join(escape(str(x.get("symbol"))) for x in r.get("positions") or []) or "현금"
         cards += (
-            f'<div class="card"><h3>{_usd(r.get("equity_usd"))}</h3><div class="sub">'
+            f'<div class="card" style="border-left-color:{_NQ_COLORS[key]}">'
+            f'<h3>{_usd(r.get("equity_usd"))}</h3><div class="sub">'
             f"{escape(label)} · {_pct(r.get('return_since_start'))} · 같은 기간 QQQ "
             f"{_pct(r.get('qqq_since_start'))}</div></div>"
         )
@@ -76,13 +79,29 @@ def _nq_panel(root: Path) -> str:
         )
     if not cards:
         return ""
+    chart = line_chart(nq_series(root), fmt=lambda v: f"${v:,.0f}", show_legend=True)
     return (
         '<div class="panel"><h2>나스닥 · S&amp;P 상위 종목 Paper (가상 1,000 USD 씩)</h2>'
         '<p class="mute">모멘텀 순위 상위 종목을 판단일(그달 첫 거래일 · 14 일 뒤)에 바꾸고, '
         "T/v2 추세가 꺼진 종목은 다음 날 판다. 현재 명단을 쓰므로 앞으로의 기록만 판단 근거다. "
         "실제 주문은 없다.</p>"
-        f'<div class="cards">{cards}</div><table>{rows}</table></div>'
+        f'<div class="cards">{cards}</div>{chart}<table>{rows}</table></div>'
     )
+
+
+def nq_series(root: Path) -> list[Series]:
+    """NQ · SN20 · SN20-C 날마다 평가액 (``reports/<장부>/<날짜>.json`` 의 equity_usd)."""
+    out = []
+    for key, folder, label in _NQ_BOOKS:
+        pts = []
+        for f in sorted((root / "reports" / folder).glob("20??-??-??.json")):
+            r = _read(f)
+            t = _ms(f.stem)
+            if r and t is not None and r.get("equity_usd") is not None:
+                pts.append((t, float(r["equity_usd"])))
+        if pts:  # 기록이 없는 장부는 범례에도 넣지 않는다
+            out.append(Series(label, _NQ_COLORS[key], tuple(pts), tag=key))
+    return out
 
 
 def lt_paper_page(data: Any) -> str:

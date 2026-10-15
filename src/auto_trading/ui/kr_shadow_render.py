@@ -13,7 +13,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from auto_trading.ui.charts import Series, line_chart
+from auto_trading.ui.charts import Series, line_chart, won_short
 from auto_trading.ui.lt_render import _ms, _pct, _read
 
 __all__ = ["follow_lines", "kospi_200", "kr_shadow_page", "load_history"]
@@ -122,33 +122,48 @@ def kospi_200(
     return out_c, out_m
 
 
+def kospi_ma(root: Path, n: int, days: int = 250) -> list[tuple[str, float]]:
+    """최근 ``days`` 거래일의 KOSPI ``n`` 일 이동평균."""
+    closes = sorted(_closes(root / "data" / "kr_shadow" / "kospi.csv").items())
+    out: list[tuple[str, float]] = []
+    run = 0.0
+    for i, (d, c) in enumerate(closes):
+        run += c
+        if i >= n:
+            run -= closes[i - n][1]
+        if i >= len(closes) - days and i >= n - 1:
+            out.append((d, run / n))
+    return out
+
+
 def _kospi_panel(root: Path) -> str:
     closes, ma = kospi_200(root)
     if not closes or not ma:
         return ""
+    ma60 = kospi_ma(root, 60)
     last, line = closes[-1][1], ma[-1][1]
     gap = last / line - 1
+
+    def pts(rows: list[tuple[str, float]]) -> tuple[tuple[int, float], ...]:
+        return tuple((t, v) for d, v in rows if (t := _ms(d)) is not None)
+
     chart = line_chart(
         [
-            Series(
-                "KOSPI",
-                "var(--o1)",
-                tuple((t, v) for d, v in closes if (t := _ms(d)) is not None),
-            ),
-            Series(
-                "200 일선",
-                "var(--hold)",
-                tuple((t, v) for d, v in ma if (t := _ms(d)) is not None),
-            ),
-        ]
+            Series("KOSPI", "var(--o1)", pts(closes), tag="KOSPI"),
+            Series("60 일선", "var(--o3)", pts(ma60), tag="60일"),
+            Series("200 일선", "var(--hold)", pts(ma), tag="200일"),
+        ],
+        fmt=lambda v: f"{v:,.0f}",
+        show_legend=True,
     )
     state = "위 — 새로 살 수 있음" if gap > 0 else "아래 — 새로 사지 않음"
+    sixty = f" · 60 일선 {ma60[-1][1]:,.2f} ({_pct(last / ma60[-1][1] - 1)})" if ma60 else ""
     return (
-        '<div class="panel"><h2>KOSPI 와 200 일선 (최근 1 년)</h2>'
-        f"<div class='sub'>{escape(closes[-1][0])} 종가 {last:,.2f} · 200 일선 {line:,.2f} · "
-        f"{_pct(gap)} · {state}</div>{chart}"
+        '<div class="panel"><h2>KOSPI · 60 일선 · 200 일선 (최근 1 년)</h2>'
+        f"<div class='sub'>{escape(closes[-1][0])} 종가 {last:,.2f} · 200 일선 {line:,.2f} "
+        f"({_pct(gap)}) · {state}{sixty}</div>{chart}"
         "<div class='foot'>Paper 는 판단일(15 일 무렵 · 월말)에 KOSPI 가 200 일선 위일 때만 "
-        "새로 산다.</div>"
+        "새로 산다. 60 일선은 참고용(규칙에 쓰지 않음).</div>"
         "</div>"
     )
 
@@ -156,14 +171,20 @@ def _kospi_panel(root: Path) -> str:
 def _follow_panel(root: Path, history: list[dict[str, Any]]) -> str:
     lines = follow_lines(root, history)
     series = [
-        Series(label, color, tuple((t, v) for d, v in lines[key] if (t := _ms(d)) is not None))
+        Series(
+            label,
+            color,
+            tuple((t, v) for d, v in lines[key] if (t := _ms(d)) is not None),
+            tag=label.split()[0],
+        )
         for key, label, color in _FOLLOW
     ]
     series.append(
         Series(
-            "KOSPI",
+            "KOSPI 지수",
             "var(--hold)",
             tuple((t, v) for d, v in lines["kospi"] if (t := _ms(d)) is not None),
+            tag="KOSPI",
         )
     )
     last = " · ".join(
@@ -176,7 +197,8 @@ def _follow_panel(root: Path, history: list[dict[str, Any]]) -> str:
         '<p class="mute">매일 저녁 기록한 목록을 다음 거래일에 고르게 들었다고 칠 때의 움직임. '
         "비용 · 체결 · KOSPI 200 일선 규칙은 넣지 않은 비교용 지수이고 Paper 장부가 아니다.</p>"
         f"<div class='sub'>{escape(last) if last else '기록 2 일째부터 그려진다'}</div>"
-        f"{line_chart(series)}</div>"
+        f"{line_chart(series, show_legend=True)}"
+        "<div class='foot'>③ AI 판단은 그날 AI 목록이 없으면 선이 먼저 끝난다.</div></div>"
     )
 
 
@@ -284,11 +306,22 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
                 lines[key].append((t, float(val)))
     chart = line_chart(
         [
-            Series("① 가격 규칙", "var(--t2)", tuple(lines["price"])),
-            Series("② 수급 규칙", "var(--o2)", tuple(lines["flow"])),
-            Series("④ 외국인 규칙", "var(--o1)", tuple(lines["foreign"])),
-            Series("고르게 들기", "var(--hold)", tuple(lines["ew"])),
-        ]
+            Series("① 가격 규칙", "var(--t2)", tuple(lines["price"]), tag="①"),
+            Series("② 수급 규칙", "var(--o2)", tuple(lines["flow"]), tag="②"),
+            Series("④ 외국인 규칙", "var(--o1)", tuple(lines["foreign"]), tag="④"),
+            Series("고르게 들기(비교)", "var(--hold)", tuple(lines["ew"]), tag="비교"),
+        ],
+        fmt=won_short,
+        show_legend=True,
+    )
+    vals = [lines[k][-1][1] for k in ("price", "flow", "foreign") if lines[k]]
+    same = len(vals) > 1 and max(vals) - min(vals) < 1
+    overlap = (
+        "<div class='foot'>①②④ 는 아직 산 종목이 없어(판단일에 KOSPI 가 200 일선 아래) "
+        f"{won_short(vals[0])} 원 그대로라 세 선이 겹쳐 하나로 보인다. "
+        "'고르게 들기' 는 같은 종목군을 고르게 들었을 때의 비교선이다.</div>"
+        if same
+        else ""
     )
 
     def holds(rule: dict[str, Any]) -> str:
@@ -317,12 +350,12 @@ def _paper_panel(paper: dict[str, Any] | None, history: list[dict[str, Any]]) ->
     flow = paper.get("flow_rule") or {}
     frgn = paper.get("foreign_rule") or {}
     return (
-        '<div class="panel"><h2>Paper (가상 1,000 만 원, '
+        '<div class="panel"><h2>Paper 규칙별 평가액 (가상 1,000 만 원, '
         f"{escape(str(paper.get('start')))} 부터)</h2>"
         f"<div class='sub'>① 가격 규칙 {_won(price.get('value_krw'))} · ② 수급 규칙 "
         f"{_won(flow.get('value_krw'))} · ④ 외국인 규칙 {_won(frgn.get('value_krw'))} · "
         f"고르게 들기 {_won(paper.get('equal_weight_krw'))}</div>"
-        f"{chart}</div>"
+        f"{chart}{overlap}</div>"
         '<div class="grid2"><div class="panel"><h2>① 가격 규칙 보유</h2>'
         f"{holds(price)}</div>"
         f'<div class="panel"><h2>② 수급 규칙 보유</h2>{holds(flow)}</div></div>'

@@ -60,6 +60,7 @@ th{color:var(--mute);font-weight:600;background:var(--panel2)}tr:last-child td{b
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px}.ok-bg{background:var(--ok)}.warn-bg{background:var(--warn)}.bad-bg{background:var(--bad)}.mute-bg{background:var(--mute2)}
 .chart{width:100%;height:auto}.chart .grid{stroke:var(--line);stroke-dasharray:3 5}.chart .axis{fill:var(--mute2);font-size:11px}.chart .end{font-size:12px;font-weight:700}
+.chart-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px;font-size:12px;color:var(--mute)}.chart-legend span{display:inline-flex;align-items:center;gap:6px}.chart-legend i{display:inline-block;width:14px;height:3px;border-radius:2px}
 .chart-empty{color:var(--mute);padding:44px 0;text-align:center;border:1px dashed var(--line2);border-radius:8px}
 .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--mute);font-size:11px;margin-bottom:14px}
 .ranges input{position:absolute;opacity:0;width:1px;height:1px}
