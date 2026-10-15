@@ -389,6 +389,7 @@ def test_telegram_bot_replies_once_and_leaves_amounts(
     monkeypatch.setattr(bot_mod, "TelegramInbox", FakeInbox)
     monkeypatch.setattr(bot_mod, "TelegramNotifier", FakeBot)
     monkeypatch.setattr(bot_mod, "fetch_quotes", lambda coins, tickers: _Q)
+    monkeypatch.setattr(bot_mod, "_paper_daily", lambda root: None)
     assert bot_mod.run(tmp_path) == 0
     assert len(sent) == 1 and "실거래 현황" in sent[0]
     queue = json.loads((tmp_path / "data/telegram/inbox.json").read_text(encoding="utf-8"))
