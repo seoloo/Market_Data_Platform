@@ -25,6 +25,14 @@ _NOW = int(datetime(2026, 10, 10, 15, tzinfo=_KST).timestamp() * 1000)
 _H = 3_600_000
 
 
+@pytest.fixture(autouse=True)
+def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    from auto_trading.ui import live_home
+
+    monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
+
+
 def _write(root: Path, rel: str, obj: dict[str, Any]) -> Path:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)

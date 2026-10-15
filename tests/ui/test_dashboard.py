@@ -34,6 +34,14 @@ EVIL = "<script>alert(1)</script>"
 LIVE_SCRIPT = '<script src="/assets/orbit-live.js" defer></script>'
 
 
+@pytest.fixture(autouse=True)
+def _show_upbit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """이 시험들은 업비트 Cruise 장부로 화면 규칙을 본다 (실화면은 2026-10-15 부터 숨김)."""
+    from auto_trading.ui import live_home
+
+    monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
+
+
 def _no_script(html: str, page: str) -> bool:
     """실거래 홈만 같은 서버 스크립트 파일 하나 허용 (인라인 금지, 2026-10-10)."""
     if page == "live":

@@ -163,7 +163,7 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
     if dh:
         v, base = float(dh[-1][1]), float((demo or {}).get("alloc") or 1000)
         lines.append(
-            f"• AG4S2 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
+            f"• Falcon 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
         )
     namu = _read(root / "data" / "namu_follow" / "ledger.json")
     hist = (namu or {}).get("history") or []

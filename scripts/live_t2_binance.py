@@ -273,7 +273,7 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
     판단은 :func:`auto_trading.ops.falcon_split.move_amount`. 이체는 문서 53 규약(선기록 ·
     결과 모르면 재전송 안 함, :class:`WalletTransferManager`). 실패해도 Cruise 실행은 계속한다.
     """
-    dms, _day = _decision(now_ms)
+    dms, day = _decision(now_ms)
     cash, hold, prices = _snapshot(c)
     eq = equity(cash, hold, prices)
     exp = st.get("expected")
@@ -285,6 +285,9 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
     else:
         new_money = eq
     fut = c.futures_balance()
+    # 오르빗 Falcon 카드가 읽는 기록 (화면은 계좌를 조회하지 않는다)
+    falcon = st.setdefault("falcon", {"transfers": []})
+    falcon.update(futures_usdt=str(fut), checked=day)
     amount = move_amount(spot_equity=eq, futures_balance=fut, new_money=new_money, free_usdt=cash)
     if amount <= 0:
         return []
@@ -305,6 +308,8 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
         )
     share = f"{falcon_share():.0%}"
     if rec.state == "CONFIRMED":
+        falcon["transfers"].append([day, str(amount)])
+        falcon["futures_usdt"] = str(fut + amount)
         return [
             f"🦅 Falcon 몫 {_usd(amount)} 현물 → 선물 이체",
             sub(f"목표 선물 {share} · 선물 지갑 {_usd(fut + amount)}"),

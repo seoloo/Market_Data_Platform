@@ -23,6 +23,9 @@ __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_
 
 CRUISE_COINS = ("BTC", "ETH", "SOL")
 BINANCE_CRUISE = Path("data") / "binance_t2" / "state.json"
+SHOW_UPBIT = False
+"""업비트 Cruise 장부를 보일지. 2026-10-15 사용자 "cruise를 이제 바이낸스로 변경해줘 업비트는
+지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
 """바이낸스 Cruise 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
 GLIDE_TICKERS = ("TQQQ", "SCHD")
 _SKIP = frozenset({"M3", "QS_SWITCH"})
@@ -555,6 +558,46 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
+def falcon_book(state: Mapping[str, Any], q: Quotes) -> Book:
+    """Falcon (옛 AG4S2) — 바이낸스 USDⓈ-M 선물 지갑.
+
+    사용자 2026-10-15 "오르빗에 실거래에 falcon 추가". Cruise 실행기가 날마다 남기는
+    ``falcon`` 기록(선물 지갑 USDT · 자동 이체)만 읽는다. 화면은 계좌를 조회하지 않는다.
+    실거래 실행기 전이라 지금은 선물 지갑의 USDT 가 대기 중인 모습이다."""
+    fx = q.fx or 0.0
+    fal = state.get("falcon") or {}
+    rows = [t for t in fal.get("transfers") or [] if isinstance(t, list) and len(t) >= 2]
+    usdt = _f(fal.get("futures_usdt"))
+    notes = (
+        "실거래 실행기 준비 중 — 선물 지갑에서 대기",
+        "바이낸스 돈의 50% 를 선물로 (선물 몫 500 USDT 부터 자동 이체)",
+        f"선물 지갑 {usdt:,.2f} USDT · 마지막 확인 {fal.get('checked', '—')}",
+    )
+    trades = tuple(
+        Trade(
+            str(t[0]),
+            "deposit",
+            "USDT",
+            amount=_f(t[1]),
+            status="현물 → 선물 이체",
+            ref=f"falcon:transfer:{t[0]}:{i}",
+        )
+        for i, t in enumerate(rows)
+    )
+    return Book(
+        "falcon",
+        "Falcon",
+        "바이낸스 선물 · BTC · ETH",
+        sum(_f(t[1]) for t in rows) * fx,
+        usdt * fx,
+        (),
+        notes,
+        (),
+        tuple((str(t[0]), f"🦅 현물 → 선물 {_f(t[1]):,.2f} USDT") for t in rows),
+        trades,
+    )
+
+
 def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     holdings = []
     activity: list[tuple[str, str]] = []
@@ -689,13 +732,17 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
         out.append(replace(glide_book(glide, q), updated_ms=_mtime_ms(toss / "M3.json")))
     binance = _read(root / BINANCE_CRUISE)
     cruise_path = root / "data" / "upbit_t2" / "state.json"
-    cruise = _read(cruise_path)
-    if binance:  # 2026-10-15 바이낸스로 옮김 — 업비트 장부는 더 이상 갱신되지 않아 보이지 않는다
+    cruise = _read(cruise_path) if SHOW_UPBIT else {}
+    if cruise and not binance:
+        out.append(replace(cruise_book(cruise, q), updated_ms=_mtime_ms(cruise_path)))
+    if binance:
         out.append(
             replace(cruise_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_CRUISE))
         )
-    elif cruise:
-        out.append(replace(cruise_book(cruise, q), updated_ms=_mtime_ms(cruise_path)))
+        if binance.get("falcon"):
+            out.append(
+                replace(falcon_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_CRUISE))
+            )
     acc = _toss_states(root)
     if acc:
         files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
@@ -792,7 +839,7 @@ def live_page(data: DashboardData) -> str:
 # ---------------------------------------------------------------- 텔레그램 '현황' 답
 
 
-_ICON = {"glide": "📈", "cruise": "🛫", "accumulate": "💰"}
+_ICON = {"glide": "📈", "cruise": "🛫", "falcon": "🦅", "accumulate": "💰"}
 
 
 def _pl_text(value: float, base: float) -> str:

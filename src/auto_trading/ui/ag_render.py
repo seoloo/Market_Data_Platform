@@ -52,7 +52,7 @@ _AGS_LINES = (
     ("AGS1", "AGS1 · AG-CR + 숏 1 배", "var(--warn)"),
     ("AGS3", "AGS3 · AG-CR + 숏 3 배", "var(--bad)"),
     ("AG4S1", "AG4S1 · AG-CR4 + 숏 1 배", "var(--c7)"),
-    ("AG4S2", "AG4S2 · AG-CR4 + 숏 2 배", "var(--c5)"),
+    ("AG4S2", "Falcon(AG4S2) · AG-CR4 + 숏 2 배", "var(--c5)"),
 )
 """롱 원장과 같은 눈금(그 원장 첫날 = 1,000)으로 그래프에 겹친다.
 

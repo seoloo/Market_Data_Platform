@@ -53,6 +53,10 @@ def dated_deposits(root: Path) -> list[tuple[str, float]]:
         for row in binance.get("deposits") or []:
             if isinstance(row, list) and len(row) >= 2:
                 out.append((str(row[0]), float(row[1]) * fx))
+        # Falcon 자동 이체분(2026-10-15) — Cruise 입금에서 빠진 만큼 Falcon 입금으로 센다
+        for row in (binance.get("falcon") or {}).get("transfers") or []:
+            if isinstance(row, list) and len(row) >= 2:
+                out.append((str(row[0]), float(row[1]) * fx))
     else:
         for row in _read(root / "data" / "upbit_t2" / "state.json").get("deposits") or []:
             if isinstance(row, list) and len(row) >= 2:

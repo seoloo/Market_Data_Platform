@@ -615,7 +615,7 @@ def alert_text(
     body = list(blocks)
     while body and not body[-1]:
         body.pop()
-    out = [f"🧪 AG4S2 선물 데모 · 가짜 돈 · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
+    out = [f"🧪 Falcon 선물 데모 · 가짜 돈 · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
     if skipped:
         out.append("🚫 숏 신호 났지만 안 함: " + " · ".join(skipped))
     elif not shorts_open and long_w and all(v > 0 for v in long_w.values()):
