@@ -40,7 +40,6 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from auto_trading.ops import env_keys, phone_link, task_setup, user_settings
-from auto_trading.ops.conn_test import run_test
 from auto_trading.ops.kill_switch import GROUPS, group_path, halted_reason
 from auto_trading.ops.kr_accumulate import read_universe
 from auto_trading.ops.liquidate import SCOPES, Store, job_text
@@ -409,7 +408,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/settings/test":
             service = form.get("service", "")
-            self.server.key_tests[service] = run_test(root, service)
+            self.server.key_tests[service] = _conn_test(root, service)
             self._redirect("/settings#set-keys")
             return
         if self.path == "/settings/phone":
@@ -647,6 +646,31 @@ def _spawn(args: list[str], root: Path | None = None) -> None:
             stdin=subprocess.DEVNULL,
             creationflags=flags,
         )
+
+
+def _conn_test(root: Path, service: str) -> tuple[bool, str]:
+    """설정 '연결 시험' — 거래소 코드를 이 서버에 들이지 않도록 따로 띄운다(import-linter 계약)."""
+    repo = Path(__file__).resolve().parents[3]
+    py = repo / ".venv" / "Scripts" / "python.exe"
+    exe = str(py) if py.exists() else sys.executable
+    try:
+        done = subprocess.run(
+            [exe, "-m", "auto_trading.ops.conn_test", str(root), service],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            stdin=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
+        )
+        lines = done.stdout.strip().splitlines()
+        ok, text = json.loads(lines[-1]) if lines else (False, "")
+        return bool(ok), str(text) or "실패 — 결과를 받지 못했어요"
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        return False, f"실패 ({type(exc).__name__}) — 잠시 뒤 다시 시험해 주세요"
 
 
 def _halt_note(root: Path) -> str:

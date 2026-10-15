@@ -4,10 +4,14 @@
 * 토스: 매수 가능 금액 조회 · 업비트: 잔고 조회 · 텔레그램: 봇 확인 + 대화방에 시험 문자 한 통 ·
   Supabase: Data API 응답.
 * 결과 문구에 **키 · 금액을 넣지 않는다.** 오류도 종류만(텔레그램 주소에는 토큰이 들어 있어 원문을 안 씀).
+* 설정 화면(UI)은 거래소 코드를 import 하지 않는다(import-linter 계약) — 그래서 UI 는
+  ``python -m auto_trading.ops.conn_test <root> <서비스>`` 를 따로 띄워 마지막 줄 JSON 만 읽는다.
 """
 
 from __future__ import annotations
 
+import json
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -99,3 +103,16 @@ def run_test(root: Path, service: str) -> tuple[bool, str]:
         if type(exc).__name__ in {"ConfigError", "TossApiError"} and "=" not in text:
             return False, text[:160]
         return False, f"실패 ({type(exc).__name__}) — 키 · 허용 IP 를 확인해 주세요"
+
+
+def main(argv: list[str]) -> int:
+    """``<root> <서비스>`` → 마지막 줄에 ``[성공, 한 줄]`` JSON."""
+    if len(argv) != 2:
+        raise SystemExit("usage: python -m auto_trading.ops.conn_test <root> <service>")
+    ok, text = run_test(Path(argv[0]), argv[1])
+    sys.stdout.write(json.dumps([ok, text]) + "\n")  # ASCII 만 — 콘솔 인코딩(cp949)과 무관
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
