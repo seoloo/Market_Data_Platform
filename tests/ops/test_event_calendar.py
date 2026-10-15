@@ -84,3 +84,41 @@ def test_real_calendar_file_parses_and_is_ordered() -> None:
     assert until is not None and len(events) >= 20
     assert all(e.time_et.minute in (0, 30) for e in events)
     assert all(e.day.weekday() < 5 for e in events)  # 미국 평일
+
+
+ROWS = [
+    {"symbol": "TSM", "name": "TSMC", "time": "time-pre-market", "marketCap": "$2,308,617,010,000"},
+    {"symbol": "CIEN", "name": "Ciena", "time": "time-after-hours", "marketCap": "$20,000,000,000"},
+    {"symbol": "QS", "name": "QuantumScape", "time": "time-not-supplied", "marketCap": "$5,000"},
+    {"symbol": "XYZ", "name": "Small", "time": "time-pre-market", "marketCap": "$9,000,000,000"},
+    {"symbol": "BAD", "name": "No cap", "time": "", "marketCap": "N/A"},
+]
+
+
+def test_earnings_pick_held_watch_and_mega_caps_only() -> None:
+    from auto_trading.ops.event_calendar import parse_earnings
+
+    got = parse_earnings(ROWS, date(2026, 10, 20), held=["cien"], watch=["QS"])
+    assert [(e.symbol, e.why, e.timing) for e in got] == [
+        ("CIEN", "보유", "장 마감 뒤"),
+        ("QS", "관심", "시각 미정"),
+        ("TSM", "대형주", "장 전"),
+    ]
+    assert [e.high for e in got] == [True, True, False]
+
+
+def test_held_earnings_tonight_holds_new_buys_and_mega_cap_is_caution() -> None:
+    from auto_trading.ops.event_calendar import parse_earnings
+
+    day = date(2026, 10, 20)
+    held = parse_earnings(ROWS, day, held=["CIEN"], watch=[])
+    pre = premarket_text(_kst(2026, 10, 20, 16, 30), EVENTS, UNTIL, held)
+    assert pre is not None and "새 매수 보류" in pre and "CIEN 실적 (장 마감 뒤) · 보유" in pre
+    assert "오늘 CIEN 를 사면" in pre
+    eve = morning_text(_kst(2026, 10, 19, 7, 35), EVENTS, UNTIL, held)
+    assert eve is not None and "내일 밤" in eve and "CIEN" in eve
+    assert "TSM" not in eve  # 내일 밤은 보유 · 관심 실적만
+    assert "보유 종목 실적" in eve
+    mega = parse_earnings(ROWS, day, held=[], watch=[])
+    only = premarket_text(_kst(2026, 10, 20, 16, 30), EVENTS, UNTIL, mega)
+    assert only is not None and "크기 주의" in only and "나스닥 전체" in only
