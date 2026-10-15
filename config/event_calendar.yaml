@@ -4,6 +4,7 @@
 #   BLS CPI       https://www.bls.gov/schedule/news_release/cpi.htm
 #   BLS 고용      https://www.bls.gov/schedule/news_release/empsit.htm
 #   BLS PPI       https://www.bls.gov/schedule/news_release/ppi.htm
+#   10월 누락 대조 https://www.bls.gov/schedule/2026/10_sched.htm (2026-10-15 재확인)
 #   연준 FOMC     https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm (결정 발표 = 둘째 날 14:00 ET)
 #   BEA GDP · PCE https://www.bea.gov/news/schedule
 # 날짜 · 시각은 미국 동부 시간(ET). 기관이 일정을 바꾸면 여기를 고친다.
@@ -13,6 +14,9 @@ covered_until: "2026-12-31"
 
 events:
   # ---- 2026
+  - {date: "2026-10-02", time_et: "08:30", key: NFP, name: "9 월 고용지표"}
+  - {date: "2026-10-14", time_et: "08:30", key: CPI, name: "9 월 소비자물가(CPI)"}
+  - {date: "2026-10-15", time_et: "08:30", key: PPI, name: "9 월 생산자물가(PPI)"}
   - {date: "2026-10-28", time_et: "14:00", key: FOMC, name: "FOMC 금리 결정 · 의장 회견"}
   - {date: "2026-10-29", time_et: "08:30", key: GDP, name: "3 분기 GDP 속보"}
   - {date: "2026-10-29", time_et: "08:30", key: PCE, name: "9 월 PCE 물가 · 소득 · 소비"}

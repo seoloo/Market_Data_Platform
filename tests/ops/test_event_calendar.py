@@ -86,6 +86,34 @@ def test_real_calendar_file_parses_and_is_ordered() -> None:
     assert all(e.day.weekday() < 5 for e in events)  # 미국 평일
 
 
+def test_real_calendar_includes_october_jobs_cpi_and_ppi() -> None:
+    """공식 10월 일정이 있어도 로컬 표에서 빠져 조용히 누락되는 것을 막는다."""
+    path = Path(__file__).resolve().parents[2] / "config" / "event_calendar.yaml"
+    events, _ = parse(yaml.safe_load(path.read_text(encoding="utf-8")))
+    actual = {(e.day, e.key, e.at_kst.strftime("%H:%M")) for e in events}
+    assert {
+        (date(2026, 10, 2), "NFP", "21:30"),
+        (date(2026, 10, 14), "CPI", "21:30"),
+        (date(2026, 10, 15), "PPI", "21:30"),
+    } <= actual
+
+
+def test_real_calendar_ppi_and_pce_appear_in_notice_without_sending() -> None:
+    path = Path(__file__).resolve().parents[2] / "config" / "event_calendar.yaml"
+    events, until = parse(yaml.safe_load(path.read_text(encoding="utf-8")))
+    ppi = premarket_text(_kst(2026, 10, 15, 16, 30), events, until)
+    pce = morning_text(_kst(2026, 10, 29, 7, 35), events, until)
+    assert ppi is not None and "생산자물가(PPI)" in ppi and "21:30 KST" in ppi
+    assert pce is not None and "PCE" in pce and "21:30 KST" in pce
+
+
+def test_real_calendar_november_ppi_notice_uses_standard_time() -> None:
+    path = Path(__file__).resolve().parents[2] / "config" / "event_calendar.yaml"
+    events, until = parse(yaml.safe_load(path.read_text(encoding="utf-8")))
+    text = premarket_text(_kst(2026, 11, 13, 16, 30), events, until)
+    assert text is not None and "생산자물가(PPI)" in text and "22:30 KST" in text
+
+
 ROWS = [
     {"symbol": "TSM", "name": "TSMC", "time": "time-pre-market", "marketCap": "$2,308,617,010,000"},
     {"symbol": "CIEN", "name": "Ciena", "time": "time-after-hours", "marketCap": "$20,000,000,000"},

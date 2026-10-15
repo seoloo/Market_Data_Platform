@@ -6,6 +6,17 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-15 — 시장 건강검진·중요 경제일정 알림 명세 (Codex)
+
+[명세](research/MARKET_HEALTHCHECK_SPEC_DRAFT_20261015.md), IDEAS 29.9. Phase0 / DRAFT / INFORMATION_ONLY.
+고용·PPI·PCE·금리·한국지표·신용/밸류에이션을 실제/이전/수정/예상·시각·단위로 구분하고,
+경기 긍정과 정책 부담을 분리해 호재/중립/악재/혼재/판단보류로 설명하는 설계다. 새 해석기/화면은 미구현.
+기존 텔레그램 일정 안내(07:35/16:30 이후)를 감사하고 공식 BLS의 10월 누락 3행만 보완했다.
+PPI/PCE 문구·DST 회귀 추가. 10/15 PPI는 이미 지난 예정, 소급 발송·실제 수신 인증 없음.
+다음 PCE 10/29 21:30·PPI 11/13 22:30 KST 공식 대조. 30분전/발표후 요약/자동 갱신은 아직 설계다.
+기존 봇 시험의 시간 의존 Paper 발송 혼입만 사용자 승인으로 1줄 격리, 별도 `97043d7`.
+실제 봇·사용자 설정값·예약·계좌·주문·전략·연구 판정/운영Phase6 불변, 새 자동화/알림 전송 없음.
+
 ## 2026-10-15 — 237 국장 시장 조건 KEEP · Altair 데모 청산 거리 · 선물 USDC (Claude)
 
 [237](research/237-kr-market-gate-preregistration.md): 국장 Paper 의 'KOSPI 200 일선 위일 때만 새로 삼' 을 60 일선 · 조건 없음과 비교(설명용) → `KEEP_G200`.
