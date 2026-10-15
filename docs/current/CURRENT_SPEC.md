@@ -3,7 +3,7 @@
 기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / K VALIDATION `REJECT` / M TRAIN `REJECT` / F 전향 관찰 / **T 추세 추종 1회 판정 PASS · 전향 관찰 중**(2026-09-24). 승인된 전략 없음.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
-> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 알림 · 오르빗 · 설정 화면의 보이는 이름만 바꿨고, 내부 키(glide · cruise · falcon) · 파일 · 예약 작업 이름과 아래 옛 기록 속 이름은 그대로다.
+> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
 ## 2026-10-14 추가 — 사용자 승인 방향 전환 설명용 비교
 

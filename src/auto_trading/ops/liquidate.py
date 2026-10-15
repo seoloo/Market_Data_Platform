@@ -73,6 +73,7 @@ REQUEST_TTL_MS = 5 * 60_000
 
 
 def groups_of(scope: str) -> tuple[str, ...]:
+    scope = _OLD_GROUPS.get(scope, scope)
     if scope == "all":
         return tuple(GROUPS)
     if scope not in GROUPS:
@@ -81,6 +82,12 @@ def groups_of(scope: str) -> tuple[str, ...]:
 
 
 # ------------------------------------------------------------------ 장부
+
+
+_OLD_ITEM_KEYS = {"glide_part": "deneb_part", "glide_booked": "deneb_booked"}
+"""2026-10-15 이름 변경 전에 저장된 정리 기록의 칸 이름."""
+_OLD_GROUPS = {"glide": "deneb", "cruise": "vega"}
+"""이름 변경 전 범위 · 그룹 키 (저장된 정리 기록)."""
 
 
 @dataclass
@@ -175,12 +182,16 @@ class Job:
                 )
                 for o in x.pop("orders", [])
             ]
+            for old, new in _OLD_ITEM_KEYS.items():  # 2026-10-15 이름 변경 전 기록
+                if old in x:
+                    x.setdefault(new, x.pop(old))
+            x["groups"] = [_OLD_GROUPS.get(g, g) for g in x.get("groups") or []]
             for k in ("want", "deneb_part", "deneb_booked"):
                 x[k] = D(str(x.get(k, "0")))
             items.append(Item(**x, orders=orders))
         return cls(
             job_id=str(d["job_id"]),
-            scope=str(d["scope"]),
+            scope=_OLD_GROUPS.get(str(d["scope"]), str(d["scope"])),
             source=str(d.get("source", "")),
             created_ms=int(d["created_ms"]),
             items=items,

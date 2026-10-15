@@ -10,6 +10,9 @@
 사용자: 우주 · 항성 이름으로 → "1번으로 하되" (여름철 대삼각형) · 아이콘 "그렇게 하자". Glide → 🌟 Deneb · Cruise → 🌌 Vega · Falcon(옛 AG4S2) → ☄️ Altair.
 알림 태그 · 도움말 · 오르빗 · 설정 · 월 입금 안내 등 보이는 글자만(src · scripts 37 파일, 조사 은/는 · 이/가 맞춤). 내부 키 · 파일 · 예약 이름, 연구 장부 이름(AGS1 · AG4S2 Paper) 그대로.
 account2 상황판은 'Falcon 실거래 실행기 진행 중'(19:42)이었으나 파일 변화 · 실행기 파일 없음 → 사용자 "멈춰 있음 — 지금 변경".
+- 같은 날 사용자 "paper를 제외한 전부 변경" → "Paper · 연구 기록 빼고 전부": worktree 에서 바꾸고 검사 뒤 20:50 에 합침(`d7a2a34`) + 장부 옮김
+  (M3.json → DENEB.json · HALT_glide → HALT_deneb · ag4s2_testnet → altair_demo · M3_BRAKE → DENEB_BRAKE). 옛 정리 기록(glide_part · 범위 cruise) 을 못 읽어
+  현황 봇이 20:51 · 20:53 두 번 실패 → 호환 읽기 추가 뒤 20:55 부터 정상. 등록된 옛 예약은 껍데기 · 옛 명령으로 계속 돈다 — 새 예약 등록은 사용자.
 
 ## 2026-10-15 — AG4S2 바이낸스 선물 데모 실행 (Claude, 가짜 돈)
 

@@ -4,7 +4,7 @@
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
 
-> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 알림 · 오르빗 · 설정 화면의 보이는 이름만 바꿨고, 내부 키(glide · cruise · falcon) · 파일 · 예약 작업 이름과 아래 옛 기록 속 이름은 그대로다.
+> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
 ## 2026-10-15 — 236 섹터 ETF 수급 REJECT · 나무증권 모의 따라가기 (Claude)
 

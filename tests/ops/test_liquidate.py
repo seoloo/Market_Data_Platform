@@ -411,3 +411,31 @@ def test_binance_runner_sells_with_ioc_and_reads_fills() -> None:
     )
     assert item.status == "done" and item.sold == D("0.002")
     assert "USDT" in log[-1]
+
+
+def test_old_saved_job_with_glide_names_still_loads(tmp_path: Path) -> None:
+    """2026-10-15 이름 변경 전 기록(glide_part · 범위 cruise)도 읽는다."""
+    from auto_trading.ops.liquidate import Job
+
+    job = Job.from_dict(
+        {
+            "job_id": "j1",
+            "scope": "cruise",
+            "source": "telegram",
+            "created_ms": 1,
+            "items": [
+                {
+                    "venue": "toss_us",
+                    "symbol": "TQQQ",
+                    "groups": ["glide"],
+                    "want": "3",
+                    "glide_part": "1",
+                    "glide_booked": "0",
+                    "orders": [],
+                }
+            ],
+        }
+    )
+    assert job.scope == "vega" and job.items[0].groups == ["deneb"]
+    assert job.items[0].deneb_part == D(1)
+    assert groups_of("glide") == ("deneb",)

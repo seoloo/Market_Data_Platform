@@ -3,7 +3,7 @@
 기준일: 2026-09-23. 백필/저장 기반은 구현, 주문 연동·운영 자동화·UI·Shadow 파이프라인은 계획이다.
 실거래 활성화와 데이터 삭제는 이번 문서 작업의 범위가 아니다.
 
-> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 알림 · 오르빗 · 설정 화면의 보이는 이름만 바꿨고, 내부 키(glide · cruise · falcon) · 파일 · 예약 작업 이름과 아래 옛 기록 속 이름은 그대로다.
+> **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
 ## 데이터·API·복구
 
