@@ -199,8 +199,9 @@ def test_amount_answer_still_works_with_open_proposal(
     st = mod._load_m3()
     st.ask_month, st.ask_ts = "2026-12", 0
     mod._save_m3(st)
-    box.append(InboxMessage(1, 5, "50만"))
+    box.append(InboxMessage(1, 5, "50만"))  # 세 곳 합계 → Glide 몫 40만 (시안 A)
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 12, 1, 9, 5, tzinfo=UTC))
+    monkeypatch.setattr(mod, "_usdt_krw", lambda: None)
     mod._m3_poll("2026-12-01", True)
-    assert _state(tmp_path)["amounts"] == {"2026-12": 500_000.0}
+    assert _state(tmp_path)["amounts"] == {"2026-12": 400_000.0}
     assert _state(tmp_path)["proposals"][0]["status"] == "open"

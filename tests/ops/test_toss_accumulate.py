@@ -388,10 +388,11 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     # 매수 당일(10-06) 아침 09:00 환전 알림 실행: 금액을 묻는다
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 0, tzinfo=UTC))
     assert mod.fx(telegram=True) == 0
-    assert any("얼마를 매수하시겠습니까" in x and "예시 답: 30만원" in x for x in sent)
+    assert any("입금 안내" in x and "예시 답: 100만" in x and "Glide 80" in x for x in sent)
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
     assert state["ask_month"] == "2026-10"
-    # 답 "50만" → 5 분 대화 실행이 금액을 정하고 오늘 밤 계획 · 보유 · 배당을 답장
+    # 답 "50만"(세 곳 합계) → Glide 몫 40만 · Cruise 5만 · AG4S2 5만 안내 + 오늘 밤 계획 답장
+    monkeypatch.setattr(mod, "_usdt_krw", lambda: 1_400.0)
     sent.clear()
     inbox.append(InboxMessage(1, 9_999_999_999, "50만"))
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 5, tzinfo=UTC))
@@ -401,13 +402,16 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     assert "이유: QQQ 20일 변동성" in plan[0] and "현재 보유 달러 $2,000.00 → 필요 달러" in plan[0]
     assert "📦 현재 보유 (Glide 몫)" in plan[0] and "💰 배당" in plan[0]
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
-    assert state["amounts"] == {"2026-10": 500_000.0}
+    assert state["amounts"] == {"2026-10": 400_000.0}
+    split = [x for x in sent if "입금 500,000원 → 이렇게 넣어 주세요" in x]
+    assert split and "Glide · 토스 증권  400,000원" in split[0]
+    assert "Cruise · 바이낸스 현물  50,000원 ≈ 36 USDT" in split[0]
     assert not state["deposits"] and not fake.sent  # 답장은 계산만 — 주문 · 납입 없음
     # 밤 21:00 실행이 그 금액으로 산다
     monkeypatch.setattr(mod, "_kst_now", lambda: NOW_KST)
     assert mod.run(telegram=True) == 0
     state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
-    assert state["deposits"][0][1] == 500_000.0
+    assert state["deposits"][0][1] == 400_000.0
     # 같은 달은 다시 묻지 않는다 · 대화 실행도 할 일 없음
     sent.clear()
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 9, 0, tzinfo=UTC))
@@ -416,7 +420,7 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
             f"OID-{k}", TossOrderStatus("FILLED", Decimal(1), Decimal(1), Decimal(1), Decimal(0))
         )
     assert mod.fx(telegram=True) == 0
-    assert not any("얼마를 매수하시겠습니까" in x for x in sent)
+    assert not any("입금 안내" in x for x in sent)
     assert mod.m3_chat(telegram=True) == 0
 
 

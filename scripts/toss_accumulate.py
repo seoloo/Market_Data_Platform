@@ -38,6 +38,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from auto_trading.config.secrets import (
     load_telegram_credentials,
     load_toss_credentials,
@@ -54,7 +56,7 @@ from auto_trading.exchange.toss import (
 )
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, SUB, sub
-from auto_trading.ops import user_settings
+from auto_trading.ops import deposit_split, user_settings
 from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.m3_guard import (
     DIV_STEPS_KRW,
@@ -92,7 +94,6 @@ from auto_trading.ops.m3_live import (
     M3State,
     amount_target,
     apply_fill,
-    ask_message,
     choose,
     cost_basis,
     credit_dividends,
@@ -648,6 +649,15 @@ def _m3_plan(
     return choose(qty, cash, last, share, day.fee), vol, share, notes
 
 
+def _usdt_krw() -> float | None:
+    """업비트 USDT 원화 값(공개 시세, 키 없음). 실패하면 None — 원화만 알린다."""
+    try:
+        r = httpx.get("https://api.upbit.com/v1/ticker?markets=KRW-USDT", timeout=5.0)
+        return float(r.json()[0]["trade_price"]) if r.status_code == 200 else None
+    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
 def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
     """텔레그램 답으로 이번(또는 물어본 다음) 달 M3 금액을 정한다. 등록 채팅의 글만 읽는다.
 
@@ -709,18 +719,20 @@ def _m3_poll(today: str, telegram: bool, *, reply: bool = False) -> None:
             continue
         if target == m3.ask_month and msg.date < m3.ask_ts:
             continue
-        krw = parse_krw(msg.text)
-        if krw is None:
-            _notify("❓ 금액으로 읽지 못했어요. 예: 30만 · 500000 · 0(이번 달 쉬기)", telegram)
+        total = parse_krw(msg.text)
+        # 답은 세 곳 합계(시안 A, 사용자 2026-10-15) — Glide 몫만 그달 Glide 매수 금액이 된다
+        krw = None if total is None else deposit_split.split(total)["Glide"]
+        if total is None or krw is None:
+            _notify("❓ 금액으로 읽지 못했어요. 예: 100만 · 1000000 · 0(이번 달 쉬기)", telegram)
         elif krw > _m3_max():
             _notify(
-                f"❓ {krw:,.0f}원은 상한({_m3_max():,.0f}원)보다 커요. 다시 보내 주세요", telegram
+                f"❓ Glide 몫 {krw:,.0f}원이 상한({_m3_max():,.0f}원)보다 커요. 다시 보내 주세요",
+                telegram,
             )
         else:
             m3.amounts[target] = krw
             planned = planned or target == today[:7]
-            if not (reply and target == today[:7]):
-                _notify(f"📈 Glide {target} 매수 금액 {krw:,.0f}원으로 정했어요", telegram)
+            _notify(deposit_split.split_text(target, total, _usdt_krw()), telegram)
     _put(m3, props)
     _save_m3(m3)
     if planned and reply and due(m3, today):
@@ -740,7 +752,7 @@ def _m3_ask_today(today: str, telegram: bool) -> bool:
         return False  # 이미 물었거나 이번 달 금액을 미리 정해 두었다
     m3.ask_month, m3.ask_ts = today[:7], int(time.time())
     _save_m3(m3)
-    _notify(ask_message(today, _m3_monthly()), telegram)
+    _notify(deposit_split.ask_text(today, _m3_monthly()), telegram)
     return True
 
 
@@ -1880,10 +1892,16 @@ def m3_test(telegram: bool = True) -> int:
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
     mark = "🧪 테스트 — 실제 묻기 · 주문 아님"
-    ask = f"{mark}\n{ask_message(today, _m3_monthly())}"
+    ask = f"{mark}\n{deposit_split.ask_text(today, _m3_monthly())}"
     _notify(ask, telegram)
     print(ask)
-    plan = _m3_preview(now, title=f"{mark} (답 30만원이라고 가정)")
+    total = deposit_split.default_total(_m3_monthly())
+    split = f"{mark} (기본 합계라고 가정)\n" + deposit_split.split_text(
+        today[:7], total, _usdt_krw()
+    )
+    _notify(split, telegram)
+    print(split)
+    plan = _m3_preview(now, title=f"{mark} (Glide 몫 기본 금액이라고 가정)")
     _notify(plan, telegram)
     print(plan)
     return 0
