@@ -15,7 +15,8 @@
   거래일 15:00 ~ 15:20 현황 봇 안에서 하루 한 번(`scripts/namu_follow.py` · `ops/namu_follow.py`, 설정 `namu.follow`).
   Paper 보고서에 `buy_next_close` · 종목 `weight` 추가(`Run.pending_buys`, 결과 불변). 10-14 기준 Paper ①②④ 모두 빈손 —
   첫 판단일 10-15, KOSPI 가 200 일선 −6% 라 새로 안 삼. 다음 판단일 10-30.
-- 이미 있던 lint-imports 위반 1 건(ui.server → ops.conn_test → exchange) — 이번 변경과 무관, 그대로 둠.
+- lint-imports 위반(10-11 부터, ui.server → ops.conn_test → exchange) 해소 — 설정 '연결 시험' 을 따로 띄운 프로세스로(`2daa44a`). 5 계약 모두 통과.
+- [236 섹터 ETF 수급](docs/research/236-kr-sector-etf-flow-preregistration.md) `REJECT` — FLOW 샤프 0.30 vs EW-G 0.31, KODEX 200 보유 +13.4% 가 가장 나음. 연금저축은 NBG 유지.
 - 일정 경고에 실적 발표일: Nasdaq 실적 캘린더(하루 한 번) — 토스 보유 · 관심 종목은 '새 매수 보류', 시총 $500B 이상 '크기 주의'.
 - 국장 주도주 화면 섹터: KSIC 27 중 의료용 기기만 헬스케어, 정밀 · 광학기기는 IT(디아이 · 케이씨텍). Paper 고르는 규칙은 그대로.
 - O/v1 · O/v2 Paper 21 일 같은 값 — O/v2 비상 스톱(−20%) 0 회라 정상.
