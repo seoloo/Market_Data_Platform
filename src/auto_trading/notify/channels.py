@@ -179,12 +179,20 @@ class TelegramNotifier:
         self._call("unpinAllChatMessages", {})
 
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
-        """입력칸의 '/' 메뉴 — (영문 소문자 명령, 설명). 이 봇 전체에 적용."""
-        self._call(
-            "setMyCommands",
-            {"commands": [{"command": c, "description": d} for c, d in commands]},
-            chat=False,
-        )
+        """입력칸의 '/' 메뉴 — (영문 소문자 명령, 설명). 기본 · 개인 대화 · 이 대화방에 모두 적용.
+
+        대화방 범위까지 다시 정해야 휴대폰 앱이 예전 목록을 버리고 새로 받는다(2026-10-16 실측:
+        기본 범위만 바꾸면 '메뉴' 에 예전 5 개가 그대로였다). 좁은 범위가 넓은 범위를 덮으므로
+        한 번 정한 범위는 매번 같이 바꾼다."""
+        body = [{"command": c, "description": d} for c, d in commands]
+        for scope in (None, {"type": "all_private_chats"}, {"type": "chat"}):
+            payload: dict[str, Any] = {"commands": body}
+            if scope is not None:
+                payload["scope"] = (
+                    {**scope, "chat_id": self._creds.chat_id} if scope["type"] == "chat" else scope
+                )
+            self._call("setMyCommands", payload, chat=False)
+        self._call("setChatMenuButton", {"menu_button": {"type": "commands"}})
 
     def answer_callback(self, callback_id: str, text: str = "") -> None:
         """버튼을 누른 쪽의 '불러오는 중' 표시를 끈다 (늦으면 텔레그램이 거부 — 무시해도 된다)."""

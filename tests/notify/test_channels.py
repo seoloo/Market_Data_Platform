@@ -200,7 +200,12 @@ def test_unpin_all_and_commands_menu() -> None:
     bot.unpin_all()
     bot.set_commands([("help", "사용법")])
     assert seen[0] == ("unpinAllChatMessages", {"chat_id": "42"})
-    assert seen[1] == (
+    cmds = [{"command": "help", "description": "사용법"}]
+    assert seen[1] == ("setMyCommands", {"commands": cmds})
+    # 휴대폰 앱이 새 목록을 받도록 개인 대화 · 이 대화방 범위까지 (2026-10-16)
+    assert seen[2] == ("setMyCommands", {"commands": cmds, "scope": {"type": "all_private_chats"}})
+    assert seen[3] == (
         "setMyCommands",
-        {"commands": [{"command": "help", "description": "사용법"}]},
+        {"commands": cmds, "scope": {"type": "chat", "chat_id": "42"}},
     )
+    assert seen[4] == ("setChatMenuButton", {"chat_id": "42", "menu_button": {"type": "commands"}})
