@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from auto_trading.ops.m3_guard import (
+from auto_trading.ops.deneb_guard import (
     Brake,
     Proposal,
     add_deposit,

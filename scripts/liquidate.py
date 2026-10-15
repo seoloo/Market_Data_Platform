@@ -2,11 +2,11 @@
 
 사용 예::
 
-    python -m scripts.liquidate preview [all|cruise|glide|acc]   # 보기만 (주문 없음)
+    python -m scripts.liquidate preview [all|vega|deneb|acc]   # 보기만 (주문 없음)
     python -m scripts.liquidate start <범위> <출처>               # 정지 → 매수 취소 → 지정가 매도
     python -m scripts.liquidate resume                            # 이어 하기 (봇이 2 분마다)
     python -m scripts.liquidate status
-    python -m scripts.liquidate unhalt <cruise|glide|acc>         # 그룹 정지 풀기
+    python -m scripts.liquidate unhalt <vega|deneb|acc>         # 그룹 정지 풀기
 
 규칙 · 순서는 :mod:`auto_trading.ops.liquidate`. 시장가는 쓰지 않는다(지정가만).
 업비트 키 ``UPBIT_API_KEY`` · ``UPBIT_AOU_SECRET``, 토스는 ``TOSS_*`` (값은 출력하지 않는다).
@@ -39,14 +39,21 @@ from auto_trading.exchange.toss import (
 )
 from auto_trading.exchange.upbit import UpbitClient
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
-from auto_trading.ops.kill_switch import GROUPS, group_path, halted_reason
+from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
+from auto_trading.ops.deneb_live import DenebState
+from auto_trading.ops.kill_switch import (
+    GROUPS,
+    group_halted,
+    group_path,
+    legacy_path,
+)
 from auto_trading.ops.liquidate import (
     SCOPES,
     Item,
     Job,
     Store,
     build_items,
-    glide_to_book,
+    deneb_to_book,
     groups_of,
     job_text,
     run_binance_item,
@@ -54,8 +61,6 @@ from auto_trading.ops.liquidate import (
     run_upbit_item,
     set_group_halts,
 )
-from auto_trading.ops.m3_live import SYMBOLS as GLIDE_SYMBOLS
-from auto_trading.ops.m3_live import M3State
 from auto_trading.ops.t2_upbit import COINS, MARKETS
 
 REPO = Path(__file__).resolve().parent.parent
@@ -63,7 +68,7 @@ STORE = Store(REPO / "data" / "liquidate")
 HALT = REPO / "data" / "HALT"
 TOKEN = REPO / "data" / "toss_token.json"
 TOSS_DATA = REPO / "data" / "toss"
-M3_FILE = TOSS_DATA / "M3.json"
+DENEB_FILE = TOSS_DATA / "DENEB.json"
 REPORTS = REPO / "reports" / "liquidate"
 KST = timedelta(hours=9)
 NY = ZoneInfo("America/New_York")
@@ -111,9 +116,9 @@ def _trader(holdings: dict[str, TossPosition], symbols: set[str]) -> TossTrader:
     )
 
 
-def _glide_qty() -> dict[str, Decimal]:
+def _deneb_qty() -> dict[str, Decimal]:
     try:
-        d = json.loads(M3_FILE.read_text(encoding="utf-8"))
+        d = json.loads(DENEB_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return {s: Decimal(str(q)) for s, q in (d.get("qty") or {}).items() if float(q) > 0}
@@ -166,7 +171,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
     notes: list[str] = []
     bal: dict[str, Decimal] = {}
     px: dict[str, Decimal] = {}
-    if "cruise" in groups:
+    if "vega" in groups:
         c = _upbit()
         try:
             bal = c.balances()
@@ -178,7 +183,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
     b_bal: dict[str, Decimal] = {}
     b_px: dict[str, Decimal] = {}
     b_min: dict[str, Decimal] = {}
-    if "cruise" in groups and (b := _binance()) is not None:
+    if "vega" in groups and (b := _binance()) is not None:
         try:
             b_bal = b.balances()
             for k in COINS:
@@ -191,7 +196,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
             b.close()
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
-    if "glide" in groups or "acc" in groups:
+    if "deneb" in groups or "acc" in groups:
         r = _reader()
         try:
             held = r.holdings()
@@ -205,10 +210,10 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         groups,
         upbit_balances=bal,
         upbit_prices=px,
-        cruise_coins=COINS,
+        vega_coins=COINS,
         toss_holdings=holdings,
         toss_sellable=sellable,
-        glide_qty={s: q for s, q in _glide_qty().items() if s in GLIDE_SYMBOLS},
+        deneb_qty={s: q for s, q in _deneb_qty().items() if s in DENEB_SYMBOLS},
         acc_qty=_acc_qty(holdings),
         is_kr=is_kr_symbol,
         binance_balances=b_bal,
@@ -267,14 +272,14 @@ def _kr_open(reader: TossReader, now_ms: int) -> bool:
 # ------------------------------------------------------------------ 실행
 
 
-def _book_glide(symbol: str, qty: Decimal, usd: Decimal) -> None:
-    """팔린 Deneb 몫을 Deneb 장부(M3.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑."""
-    m3 = M3State.from_dict(json.loads(M3_FILE.read_text(encoding="utf-8")))
-    m3.qty[symbol] = max(0.0, m3.qty.get(symbol, 0.0) - float(qty))
-    m3.cash_usd += float(usd)
-    tmp = M3_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(m3.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8")
-    tmp.replace(M3_FILE)
+def _book_deneb(symbol: str, qty: Decimal, usd: Decimal) -> None:
+    """팔린 Deneb 몫을 Deneb 장부(DENEB.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑."""
+    deneb = DenebState.from_dict(json.loads(DENEB_FILE.read_text(encoding="utf-8")))
+    deneb.qty[symbol] = max(0.0, deneb.qty.get(symbol, 0.0) - float(qty))
+    deneb.cash_usd += float(usd)
+    tmp = DENEB_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(deneb.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8")
+    tmp.replace(DENEB_FILE)
 
 
 def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
@@ -282,8 +287,8 @@ def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
     groups = groups_of(job.scope)
     log = []
     for o in trader.open_orders():
-        glide = o.symbol in GLIDE_SYMBOLS
-        mine = ("glide" in groups and glide) or ("acc" in groups and not glide)
+        deneb = o.symbol in DENEB_SYMBOLS
+        mine = ("deneb" in groups and deneb) or ("acc" in groups and not deneb)
         if o.side != "BUY" or not mine or o.status.startswith("PENDING_CANCEL"):
             continue
         res = trader.cancel(o.order_id)
@@ -343,7 +348,7 @@ def step(job: Job) -> list[str]:
     ]
     groups = groups_of(job.scope)
     first = not job.log and (
-        "glide" in groups or "acc" in groups
+        "deneb" in groups or "acc" in groups
     )  # 팔 것이 없어도 매수 취소는 한 번
     if toss or first:
         r = _reader()
@@ -362,10 +367,10 @@ def step(job: Job) -> list[str]:
                         _now_ms(),
                         session_open=us if it.venue == "toss_us" else kr,
                     )
-                    take, usd = glide_to_book(it)
+                    take, usd = deneb_to_book(it)
                     if take > 0:
-                        _book_glide(it.symbol, take, usd)
-                        it.glide_booked += take
+                        _book_deneb(it.symbol, take, usd)
+                        it.deneb_booked += take
                         log.append(f"Deneb 장부: {it.symbol} {take:f}주 빼고 ${usd:,.2f} 현금")
             finally:
                 trader.close()
@@ -428,14 +433,16 @@ def resume() -> list[str]:
 
 
 def halts() -> dict[str, str | None]:
-    return {g: halted_reason(group_path(HALT, g)) for g in GROUPS}
+    return {g: group_halted(HALT, g) for g in GROUPS}
 
 
 def unhalt(group: str, source: str) -> str:
-    p = group_path(HALT, group)
-    if not p.exists():
+    paths = [group_path(HALT, group), legacy_path(HALT, group)]
+    found = [p for p in paths if p is not None and p.exists()]
+    if not found:
         return f"{GROUPS[group]} 는 정지 중이 아니에요"
-    p.unlink()
+    for p in found:
+        p.unlink()
     text = f"▶ {GROUPS[group]} 정지 풀림 ({source}) — 다음 실행부터 그 전략 규칙대로 다시 사요" + (
         " · 전체 비상 정지는 아직 켜져 있어요" if HALT.exists() else ""
     )

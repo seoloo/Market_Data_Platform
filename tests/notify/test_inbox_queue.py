@@ -42,8 +42,8 @@ def test_two_readers_share_one_offset(tmp_path: Path) -> None:
     )
     bot = InboxQueue(path, start_offset=7).take(fake, is_command)  # type: ignore[arg-type]
     assert [m.text for m in bot] == ["현황"]
-    glide = InboxQueue(path, start_offset=999).take(fake, lambda m: not is_command(m))  # type: ignore[arg-type]
-    assert [m.update_id for m in glide] == [11, 12]
+    deneb = InboxQueue(path, start_offset=999).take(fake, lambda m: not is_command(m))  # type: ignore[arg-type]
+    assert [m.update_id for m in deneb] == [11, 12]
     assert fake.offsets == [7, 13]  # 두 번째는 파일의 offset (start_offset 무시)
     assert json.loads(path.read_text(encoding="utf-8"))["pending"] == []
     assert not path.with_suffix(".lock").exists()

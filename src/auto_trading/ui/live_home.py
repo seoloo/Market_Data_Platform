@@ -21,13 +21,13 @@ from auto_trading.ui.data import DashboardData
 
 __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_history"]
 
-CRUISE_COINS = ("BTC", "ETH", "SOL")
-BINANCE_CRUISE = Path("data") / "binance_t2" / "state.json"
+VEGA_COINS = ("BTC", "ETH", "SOL")
+BINANCE_VEGA = Path("data") / "vega" / "state.json"
 SHOW_UPBIT = False
-"""업비트 Vega 장부를 보일지. 2026-10-15 사용자 "cruise를 이제 바이낸스로 변경해줘 업비트는
+"""업비트 Vega 장부를 보일지. 2026-10-15 사용자 "vega를 이제 바이낸스로 변경해줘 업비트는
 지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
 """바이낸스 Vega 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
-GLIDE_TICKERS = ("TQQQ", "SCHD")
+DENEB_TICKERS = ("TQQQ", "SCHD")
 _SKIP = frozenset({"M3", "QS_SWITCH"})
 """data/toss 안에서 적립 장부가 아닌 파일 (Deneb 은 따로, QS_SWITCH 는 Paper)."""
 _TTL_S = 60.0
@@ -194,7 +194,7 @@ def _read(path: Path) -> dict[str, Any] | None:
     return d if isinstance(d, dict) else None
 
 
-def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
+def deneb_book(state: Mapping[str, Any], q: Quotes) -> Book:
     deposits = [d for d in state.get("deposits") or [] if isinstance(d, list) and len(d) >= 4]
     dep_krw = sum(_f(d[1]) for d in deposits)
     dep_usd = sum(_f(d[2]) for d in deposits)
@@ -216,7 +216,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
             amount=_f(d[1]),
             status="입금 기록",
             note=f"${_f(d[2]):,.2f} 환전 · {_f(d[3]):,.1f}원/$",
-            ref=f"glide:deposit:{d[0]}:{i}",
+            ref=f"deneb:deposit:{d[0]}:{i}",
             fx=_f(d[3]) or None,
         )
         for i, d in enumerate(deposits)
@@ -243,7 +243,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 "USD",
                 state_text,
                 "" if filled > 0 else f"지정가 ${_f(o.get('limit')):,.2f}",
-                ref="glide:order:"
+                ref="deneb:order:"
                 + str(o.get("client_id") or o.get("order_id") or f"{o.get('date')}-{sym}-{oi}"),
             )
         )
@@ -257,7 +257,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
     lev_target = _f(months[-1][2]) if months else None
     targets = {"TQQQ": lev_target, "SCHD": None if lev_target is None else 1 - lev_target}
     holdings = []
-    for sym in GLIDE_TICKERS:
+    for sym in DENEB_TICKERS:
         n = _f(qty.get(sym))
         if n <= 0:
             continue
@@ -293,7 +293,7 @@ def glide_book(state: Mapping[str, Any], q: Quotes) -> Book:
         "reserve_usd": reserve_usd,
     }
     return Book(
-        "glide",
+        "deneb",
         "Deneb",
         "토스 · TQQQ + SCHD",
         dep_krw,
@@ -313,11 +313,11 @@ def _stored_coin_costs(orders: Iterable[Mapping[str, object]]) -> dict[str, Deci
     기존 t2_upbit.books의 수수료 포함 이동평균 원가와 동일한 장부 읽기 규칙.
     실현 손익·목표 비중·실행 판단은 화면에서 계산하지 않는다.
     """
-    qty = dict.fromkeys(CRUISE_COINS, Decimal(0))
-    cost = dict.fromkeys(CRUISE_COINS, Decimal(0))
+    qty = dict.fromkeys(VEGA_COINS, Decimal(0))
+    cost = dict.fromkeys(VEGA_COINS, Decimal(0))
     for order in orders:
         parts = str(order.get("identifier") or order.get("id") or "").split("-")
-        if len(parts) < 3 or parts[-2] not in CRUISE_COINS:
+        if len(parts) < 3 or parts[-2] not in VEGA_COINS:
             continue
         coin = parts[-2]
         volume = Decimal(str(order.get("executed_volume") or "0"))
@@ -336,12 +336,12 @@ def _stored_coin_costs(orders: Iterable[Mapping[str, object]]) -> dict[str, Deci
     return cost
 
 
-def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
+def vega_book(state: Mapping[str, Any], q: Quotes) -> Book:
     exp = state.get("expected") or {}
     costs = _stored_coin_costs(state.get("orders") or [])
     sig = state.get("last_trade_signals") or {}
     holdings = []
-    for coin in CRUISE_COINS:
+    for coin in VEGA_COINS:
         n = _f(exp.get(coin))
         if n <= 0:
             continue
@@ -361,7 +361,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
         )
     deposits = sum(_f(d[1]) for d in state.get("deposits") or [] if isinstance(d, list))
     cash = _f(exp.get("KRW"))
-    book = Book("cruise", "Vega", "업비트 · BTC · ETH · SOL", deposits, cash, tuple(holdings))
+    book = Book("vega", "Vega", "업비트 · BTC · ETH · SOL", deposits, cash, tuple(holdings))
     units, peak = _f(state.get("units")), _f(state.get("peak"))
     notes = []
     dd: float | None = None
@@ -390,7 +390,7 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
             "KRW",
             amount=_f(d[1]),
             status="입금 기록",
-            ref=f"cruise:deposit:{d[0]}:{i}",
+            ref=f"vega:deposit:{d[0]}:{i}",
         )
         for i, d in enumerate(state.get("deposits") or [])
         if isinstance(d, list)
@@ -417,12 +417,12 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 _f(o.get("paid_fee")),
                 "KRW",
                 state_text,
-                ref=f"cruise:order:{o.get('identifier') or o.get('id')}",
+                ref=f"vega:order:{o.get('identifier') or o.get('id')}",
             )
         )
     info = {
-        "buying": sum(1 for c in CRUISE_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
-        "coins": len(CRUISE_COINS),
+        "buying": sum(1 for c in VEGA_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
+        "coins": len(VEGA_COINS),
         "dd": dd,
         "stopped": bool(state.get("stopped")),
         "last_decision": str(state.get("last_decision") or ""),
@@ -442,23 +442,23 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
-CRUISE_USD = {c: f"{c}-USD" for c in CRUISE_COINS}
+VEGA_USD = {c: f"{c}-USD" for c in VEGA_COINS}
 """바이낸스 Vega 코인 시세 — 야후 달러 시세(USDT ≈ USD)로 재고 원/달러로 원화 환산."""
 
 
-def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
-    """바이낸스 Vega (2026-10-15 업비트에서 옮김, ``data/binance_t2/state.json``) — 원화로 환산.
+def vega_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
+    """바이낸스 Vega (2026-10-15 업비트에서 옮김, ``data/vega/state.json``) — 원화로 환산.
 
     USDT 는 1 달러로 보고 지금 원/달러로 바꾼다. 입금 · 원가도 지금 환율로 바꾼 값이다(근사)."""
     fx = q.fx
     exp = state.get("expected") or {}
     orders = [o for o in state.get("orders") or [] if isinstance(o, Mapping)]
-    qty = dict.fromkeys(CRUISE_COINS, 0.0)
-    cost = dict.fromkeys(CRUISE_COINS, 0.0)
+    qty = dict.fromkeys(VEGA_COINS, 0.0)
+    cost = dict.fromkeys(VEGA_COINS, 0.0)
     trades = []
     for o in orders:
         parts = str(o.get("id") or "").split("-")
-        coin = parts[-2] if len(parts) >= 3 and parts[-2] in CRUISE_COINS else ""
+        coin = parts[-2] if len(parts) >= 3 and parts[-2] in VEGA_COINS else ""
         vol, funds, fee = _f(o.get("executed_qty")), _f(o.get("quote_qty")), _f(o.get("fee_usdt"))
         buy = parts[-1:] == ["B"]
         if coin and vol > 0:
@@ -481,16 +481,16 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 fee,
                 "USDT",
                 "체결" if vol > 0 else "체결 없음" if o.get("status") else "결과 확인 안 됨",
-                ref=f"cruise:order:{o.get('id')}",
+                ref=f"vega:order:{o.get('id')}",
             )
         )
     sig = state.get("last_trade_signals") or {}
     holdings = []
-    for coin in CRUISE_COINS:
+    for coin in VEGA_COINS:
         n = _f(exp.get(coin))
         if n <= 0:
             continue
-        usd = q.usd.get(CRUISE_USD[coin])
+        usd = q.usd.get(VEGA_USD[coin])
         w = _f((sig.get(coin) or {}).get("weight"))
         holdings.append(
             Holding(
@@ -511,7 +511,7 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
     if units > 0 and peak > 0 and fx:
         nav_usdt = (
             _f(exp.get("USDT"))
-            + sum(_f(exp.get(c)) * (q.usd.get(CRUISE_USD[c]) or 0.0) for c in CRUISE_COINS)
+            + sum(_f(exp.get(c)) * (q.usd.get(VEGA_USD[c]) or 0.0) for c in VEGA_COINS)
         ) / units
         dd = max(0.0, 1 - nav_usdt / peak)
         notes.append(
@@ -532,19 +532,19 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
             "USDT",
             amount=_f(d[1]),
             status="입금 기록",
-            ref=f"cruise:deposit:{d[0]}:{i}",
+            ref=f"vega:deposit:{d[0]}:{i}",
         )
         for i, d in enumerate(rows)
     ]
     info = {
-        "buying": sum(1 for c in CRUISE_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
-        "coins": len(CRUISE_COINS),
+        "buying": sum(1 for c in VEGA_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
+        "coins": len(VEGA_COINS),
         "dd": dd,
         "stopped": bool(state.get("stopped")),
         "last_decision": str(state.get("last_decision") or ""),
     }
     return Book(
-        "cruise",
+        "vega",
         "Vega",
         "바이낸스 · BTC · ETH · SOL",
         deposits,
@@ -558,14 +558,14 @@ def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
-def falcon_book(state: Mapping[str, Any], q: Quotes) -> Book:
+def altair_book(state: Mapping[str, Any], q: Quotes) -> Book:
     """Altair (옛 AG4S2) — 바이낸스 USDⓈ-M 선물 지갑.
 
-    사용자 2026-10-15 "오르빗에 실거래에 falcon 추가". Vega 실행기가 날마다 남기는
-    ``falcon`` 기록(선물 지갑 USDT · 자동 이체)만 읽는다. 화면은 계좌를 조회하지 않는다.
+    사용자 2026-10-15 "오르빗에 실거래에 altair 추가". Vega 실행기가 날마다 남기는
+    ``altair`` 기록(선물 지갑 USDT · 자동 이체)만 읽는다. 화면은 계좌를 조회하지 않는다.
     실거래 실행기 전이라 지금은 선물 지갑의 USDT 가 대기 중인 모습이다."""
     fx = q.fx or 0.0
-    fal = state.get("falcon") or {}
+    fal = state.get("altair") or {}
     rows = [t for t in fal.get("transfers") or [] if isinstance(t, list) and len(t) >= 2]
     usdt = _f(fal.get("futures_usdt"))
     notes = (
@@ -580,12 +580,12 @@ def falcon_book(state: Mapping[str, Any], q: Quotes) -> Book:
             "USDT",
             amount=_f(t[1]),
             status="현물 → 선물 이체",
-            ref=f"falcon:transfer:{t[0]}:{i}",
+            ref=f"altair:transfer:{t[0]}:{i}",
         )
         for i, t in enumerate(rows)
     )
     return Book(
-        "falcon",
+        "altair",
         "Altair",
         "바이낸스 선물 · BTC · ETH",
         sum(_f(t[1]) for t in rows) * fx,
@@ -706,12 +706,12 @@ def kr_ticker(state: Mapping[str, Any]) -> str:
 
 def needed(root: Path) -> tuple[set[str], set[str]]:
     """시세가 필요한 (코인, 미국 종목 · 국내는 .KS · .KQ 기호)."""
-    tickers = set(GLIDE_TICKERS) | {
+    tickers = set(DENEB_TICKERS) | {
         kr_ticker(d) if d.get("currency") == "KRW" else str(d["symbol"]) for d in _toss_states(root)
     }
-    if (root / BINANCE_CRUISE).exists():
-        tickers |= set(CRUISE_USD.values())
-    return set(CRUISE_COINS), tickers
+    if (root / BINANCE_VEGA).exists():
+        tickers |= set(VEGA_USD.values())
+    return set(VEGA_COINS), tickers
 
 
 def _mtime_ms(*paths: Path) -> int:
@@ -727,22 +727,20 @@ def _mtime_ms(*paths: Path) -> int:
 def build_books(root: Path, q: Quotes) -> list[Book]:
     out = []
     toss = root / "data" / "toss"
-    glide = _read(toss / "M3.json")
-    if glide:
-        out.append(replace(glide_book(glide, q), updated_ms=_mtime_ms(toss / "M3.json")))
-    binance = _read(root / BINANCE_CRUISE)
-    cruise_path = root / "data" / "upbit_t2" / "state.json"
-    cruise = _read(cruise_path) if SHOW_UPBIT else {}
-    if cruise and not binance:
-        out.append(replace(cruise_book(cruise, q), updated_ms=_mtime_ms(cruise_path)))
+    deneb = _read(toss / "DENEB.json")
+    if deneb:
+        out.append(replace(deneb_book(deneb, q), updated_ms=_mtime_ms(toss / "DENEB.json")))
+    binance = _read(root / BINANCE_VEGA)
+    vega_path = root / "data" / "upbit_t2" / "state.json"
+    vega = _read(vega_path) if SHOW_UPBIT else {}
+    if vega and not binance:
+        out.append(replace(vega_book(vega, q), updated_ms=_mtime_ms(vega_path)))
     if binance:
         out.append(
-            replace(cruise_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_CRUISE))
+            replace(vega_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_VEGA))
         )
-        if binance.get("falcon"):
-            out.append(
-                replace(falcon_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_CRUISE))
-            )
+        if binance.get("altair"):
+            out.append(replace(altair_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_VEGA)))
     acc = _toss_states(root)
     if acc:
         files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
@@ -787,7 +785,7 @@ def _pl(value: float, base: float) -> str:
 
 def _priced(b: Book, q: Quotes) -> bool:
     """표시 품질만 판단한다. 달러 현금의 환율 대체도 확정 평가로 표시하지 않는다."""
-    return b.priced and (b.key not in {"glide", "accumulate"} or q.fx is not None)
+    return b.priced and (b.key not in {"deneb", "accumulate"} or q.fx is not None)
 
 
 def render_live(
@@ -839,7 +837,7 @@ def live_page(data: DashboardData) -> str:
 # ---------------------------------------------------------------- 텔레그램 '현황' 답
 
 
-_ICON = {"glide": "🌟", "cruise": "🌌", "falcon": "☄️", "accumulate": "💰"}
+_ICON = {"deneb": "🌟", "vega": "🌌", "altair": "☄️", "accumulate": "💰"}
 
 
 def _pl_text(value: float, base: float) -> str:
@@ -873,7 +871,7 @@ def summary_text(books: list[Book], q: Quotes, now_ms: int) -> str:
         ]
         for h in b.holdings:
             trend = h.note[:1] + " " if h.note[:1] in ("🟢", "🔴") else ""
-            qty = f"{h.qty:g}주 " if b.key != "cruise" else ""
+            qty = f"{h.qty:g}주 " if b.key != "vega" else ""
             if h.value_krw is None:
                 lines.append(sub(f"{trend}{h.name} {qty}원가 {h.cost_krw:,.0f}원 (시세 없음)"))
             else:

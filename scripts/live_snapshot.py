@@ -37,7 +37,7 @@ def snapshot_row(root: Path, now_ms: int) -> dict[str, Any] | None:
         b.key: {
             "value": round(b.value_krw),
             "deposits": round(b.deposits_krw),
-            "priced": b.priced and (b.key == "cruise" or fx_ok),
+            "priced": b.priced and (b.key == "vega" or fx_ok),
         }
         for b in books
     }

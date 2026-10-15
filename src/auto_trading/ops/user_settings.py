@@ -78,7 +78,7 @@ FIELDS: tuple[Field, ...] = (
     Field("fire.rate_mid", "도달 예상 · 보통", "float", 12.0, "다음 보고부터", 0, 50),
     Field("fire.rate_bad", "도달 예상 · 나쁠 때", "float", 4.0, "다음 보고부터", -20, 50),
     Field(
-        "glide.monthly_krw",
+        "deneb.monthly_krw",
         "Deneb 기본 월 납입",
         "int",
         300_000,
@@ -87,7 +87,7 @@ FIELDS: tuple[Field, ...] = (
         5_000_000,
     ),
     Field(
-        "glide.max_krw",
+        "deneb.max_krw",
         "Deneb 한 달 상한",
         "int",
         5_000_000,
@@ -95,10 +95,10 @@ FIELDS: tuple[Field, ...] = (
         100_000,
         50_000_000,
     ),
-    Field("glide.ask_on", "매수 전날 금액 묻기", "bool", True, "다음 매수 달부터"),
-    Field("glide.harvest_on", "12월 양도세 공제 실현", "bool", True, "올해 12월 공지부터"),
-    Field("alerts.cruise_trade", "Vega 매매 알림", "bool", True, "다음 09:05 실행부터"),
-    Field("alerts.cruise_weekly", "Vega 주간 요약", "bool", True, "다음 토요일부터"),
+    Field("deneb.ask_on", "매수 전날 금액 묻기", "bool", True, "다음 매수 달부터"),
+    Field("deneb.harvest_on", "12월 양도세 공제 실현", "bool", True, "올해 12월 공지부터"),
+    Field("alerts.vega_trade", "Vega 매매 알림", "bool", True, "다음 09:05 실행부터"),
+    Field("alerts.vega_weekly", "Vega 주간 요약", "bool", True, "다음 토요일부터"),
     Field("alerts.fx", "환전 알림", "bool", True, "다음 환전 확인(평일 09 · 12 · 15시)부터"),
     Field("alerts.bot_down", "봇 멈춤 알림", "bool", True, "바로"),
     Field("alerts.theme", "주간 테마", "bool", True, "다음 토요일부터"),
@@ -106,7 +106,7 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.news", "종목 뉴스 답", "bool", True, "바로"),
     Field("alerts.events", "경제 일정 · 실적 경고", "bool", True, "바로"),
     Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
-    Field("demo.ag4s2", "Altair 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
+    Field("demo.altair", "Altair 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
     Field(
         "namu.follow",
         "나무 모의 — 국장 수급 Paper 따라가기",
@@ -200,13 +200,28 @@ def fields(meta: Sequence[Mapping[str, Any]]) -> list[Field]:
     return [*FIELDS, *_xfields(meta)]
 
 
+_OLD_KEYS = {
+    "deneb.monthly_krw": "glide.monthly_krw",
+    "deneb.max_krw": "glide.max_krw",
+    "deneb.ask_on": "glide.ask_on",
+    "deneb.harvest_on": "glide.harvest_on",
+    "alerts.vega_trade": "alerts.cruise_trade",
+    "alerts.vega_weekly": "alerts.cruise_weekly",
+    "demo.altair": "demo.ag4s2",
+}
+"""2026-10-15 이름 변경 전 키 — 저장된 옛 값이 있으면 그대로 쓴다."""
+
+
 def load(root: Path) -> dict[str, Any]:
     """키 → 값 (저장 안 된 것은 기본값). ``safety.halt`` 는 HALT 파일이 있는지.
 
     ``_extras`` 에 추가 종목 정보(이름 · 시장)를 함께 싣는다 — 화면 · 검사 · 기록이 같이 쓴다."""
     saved = _read(root).get("values") or {}
     meta = extras(root)
-    out: dict[str, Any] = {f.key: saved.get(f.key, f.default) for f in fields(meta)}
+    out: dict[str, Any] = {
+        f.key: saved.get(f.key, saved.get(_OLD_KEYS.get(f.key, ""), f.default))
+        for f in fields(meta)
+    }
     out["safety.halt"] = _paths(root)[2].exists()
     out["_extras"] = meta
     return out
@@ -285,8 +300,8 @@ def validate(
     if not errors:
         if not new["fire.rate_good"] >= new["fire.rate_mid"] >= new["fire.rate_bad"]:
             errors["fire.rate_mid"] = "좋을 때 ≥ 보통 ≥ 나쁠 때 순서로"
-        if new["glide.monthly_krw"] > new["glide.max_krw"]:
-            errors["glide.monthly_krw"] = "한 달 상한보다 클 수 없어요"
+        if new["deneb.monthly_krw"] > new["deneb.max_krw"]:
+            errors["deneb.monthly_krw"] = "한 달 상한보다 클 수 없어요"
     return new, errors
 
 

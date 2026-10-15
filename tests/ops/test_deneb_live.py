@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from auto_trading.ops.m3_live import (
-    M3Order,
-    M3State,
+from auto_trading.ops.deneb_live import (
+    DenebOrder,
+    DenebState,
     apply_fill,
     choose,
     credit_dividends,
@@ -30,10 +30,10 @@ def test_choose_sells_only_when_over_by_more_than_a_share() -> None:
 
 
 def test_deposit_once_per_month_and_fill_and_dividend() -> None:
-    st = M3State("2026-10-01")
+    st = DenebState("2026-10-01")
     assert deposit(st, "2026-10-09", 300_000, 1350) == pytest.approx(300_000 / 1350)
     assert deposit(st, "2026-10-12", 300_000, 1350) == 0.0
-    o = M3Order(
+    o = DenebOrder(
         "2026-10-09",
         "SCHD",
         "BUY",
@@ -60,10 +60,10 @@ def test_lev_share_uses_previous_month() -> None:
 
 
 def test_amount_target_and_next_weekday() -> None:
-    from auto_trading.ops.m3_live import amount_target, next_weekday
+    from auto_trading.ops.deneb_live import amount_target, next_weekday
 
     assert next_weekday("2026-10-30") == "2026-11-02"  # 금 → 월
-    st = M3State("2026-10-01", done_month="2026-10")
+    st = DenebState("2026-10-01", done_month="2026-10")
     assert amount_target(st, "2026-10-30") is None
     st.ask_month = "2026-11"
     assert amount_target(st, "2026-10-30") == "2026-11"
@@ -73,21 +73,21 @@ def test_amount_target_and_next_weekday() -> None:
 
 
 def test_holdings_dividends_and_reason_lines() -> None:
-    from auto_trading.ops.m3_live import (
-        M3Order,
-        M3State,
+    from auto_trading.ops.deneb_live import (
+        DenebOrder,
+        DenebState,
         dividend_lines,
         holdings_lines,
         share_reason,
     )
 
-    st = M3State("2026-10-01", cash_usd=12.4)
+    st = DenebState("2026-10-01", cash_usd=12.4)
     st.qty = {"TQQQ": 2.0, "SCHD": 3.0}
     st.orders = [
-        M3Order(
+        DenebOrder(
             "2026-10-01", "TQQQ", "BUY", 2, 80, "a", filled_qty=2, filled_usd=160, commission=0.2
         ),
-        M3Order(
+        DenebOrder(
             "2026-10-01", "SCHD", "BUY", 3, 33, "b", filled_qty=3, filled_usd=99, commission=0.1
         ),
     ]

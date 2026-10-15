@@ -43,20 +43,20 @@ def split(total_krw: float) -> dict[str, float]:
     return {name: out[name] for name, _ in MIX}
 
 
-def default_total(glide_krw: float) -> float:
+def default_total(deneb_krw: float) -> float:
     """답이 없을 때의 합계 — 기본 Deneb 금액(설정)을 Deneb 비율로 나눈 값."""
-    return glide_krw / _weight("Deneb")
+    return deneb_krw / _weight("Deneb")
 
 
 def _mix_label() -> str:
     return " · ".join(f"{n} {w * 100:.0f}" for n, w in MIX)
 
 
-def ask_text(today: str, glide_default_krw: float) -> str:
+def ask_text(today: str, deneb_default_krw: float) -> str:
     """매수 당일 아침 — 이번 달 넣을 돈(합계)을 묻는다."""
     from auto_trading.notify.style import RULE, sub
 
-    total = default_total(glide_default_krw)
+    total = default_total(deneb_default_krw)
     return "\n".join(
         [
             f"💰 {today[:4]}년 {int(today[5:7])}월 입금 안내 · 목표 {_mix_label()}",
@@ -64,7 +64,7 @@ def ask_text(today: str, glide_default_krw: float) -> str:
             "이번 달 세 곳에 넣을 돈(합계)을 알려 주세요",
             sub("예시 답: 100만  (0 = 이번 달 쉬기)"),
             sub(f"답이 없으면 합계 {total:,.0f}원 기준"),
-            sub(f"그때는 Deneb {glide_default_krw:,.0f}원만 삽니다"),
+            sub(f"그때는 Deneb {deneb_default_krw:,.0f}원만 삽니다"),
             sub(f"🌟 Deneb 은 오늘({today}) 밤 그 몫으로 매수해요"),
         ]
     )

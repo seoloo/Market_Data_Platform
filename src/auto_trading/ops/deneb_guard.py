@@ -159,7 +159,7 @@ def brake_lines(b: Brake) -> list[str]:
 
 
 def monthly_dividend_krw(dividends: Sequence[Sequence[Any]], today: str, fx: float) -> float:
-    """최근 365 일 SCHD 세후 배당(달러) × 환율 ÷ 12. ``dividends`` 는 M3State.dividends."""
+    """최근 365 일 SCHD 세후 배당(달러) × 환율 ÷ 12. ``dividends`` 는 DenebState.dividends."""
     since = (date.fromisoformat(today) - timedelta(days=365)).isoformat()
     usd = sum(float(r[4]) for r in dividends if str(r[0]) >= since and r[1] == "SCHD")
     return usd * fx / 12

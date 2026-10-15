@@ -23,5 +23,5 @@ def test_default_total_and_texts() -> None:
     assert "비율대로 자동으로 나눠요" in text
     no_rate = split_text("2026-11", 1_000_000, None)
     assert "≈" not in no_rate
-    only_glide = split_text("2026-11", 0, 1_400.0)
-    assert "바이낸스로 보내는 법" not in only_glide
+    only_deneb = split_text("2026-11", 0, 1_400.0)
+    assert "바이낸스로 보내는 법" not in only_deneb

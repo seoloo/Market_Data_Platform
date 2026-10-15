@@ -29,7 +29,7 @@ DIV_WAIT_DAYS = 10
 
 
 @dataclass(slots=True)
-class M3Order:
+class DenebOrder:
     date: str
     symbol: str
     side: str
@@ -50,7 +50,7 @@ class M3Order:
 
 
 @dataclass(slots=True)
-class M3State:
+class DenebState:
     start: str
     cash_usd: float = 0.0
     qty: dict[str, float] = field(default_factory=lambda: dict.fromkeys(SYMBOLS, 0.0))
@@ -61,16 +61,16 @@ class M3State:
     """[배당락일, 종목, 주수, 주당, 받은 달러(세후)]."""
     months: list[list[Any]] = field(default_factory=list)
     """[달, 변동성, TQQQ 몫]."""
-    orders: list[M3Order] = field(default_factory=list)
+    orders: list[DenebOrder] = field(default_factory=list)
     amounts: dict[str, float] = field(default_factory=dict)
     """달 → 사용자가 텔레그램으로 정한 납입(원). 없으면 기본 금액."""
     ask_month: str = ""
     ask_ts: int = 0
     tg_offset: int = 0
     brake: dict[str, Any] = field(default_factory=dict)
-    """T 브레이크 상태 (``ops.m3_guard.Brake.to_dict``)."""
+    """T 브레이크 상태 (``ops.deneb_guard.Brake.to_dict``)."""
     proposals: list[dict[str, Any]] = field(default_factory=list)
-    """텔레그램 제안 (``ops.m3_guard.Proposal.to_dict``): 12 월 공제 실현 · 배당 단계."""
+    """텔레그램 제안 (``ops.deneb_guard.Proposal.to_dict``): 12 월 공제 실현 · 배당 단계."""
     div_steps: int = 0
     """지난 배당 단계 수 (월 10 · 30 · 50 · 100 만 원)."""
     lev_cap: float = LEV_MAX
@@ -80,7 +80,7 @@ class M3State:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> M3State:
+    def from_dict(cls, d: Mapping[str, Any]) -> DenebState:
         return cls(
             start=d["start"],
             cash_usd=float(d.get("cash_usd", 0.0)),
@@ -89,7 +89,7 @@ class M3State:
             deposits=list(d.get("deposits") or []),
             dividends=list(d.get("dividends") or []),
             months=list(d.get("months") or []),
-            orders=[M3Order(**o) for o in d.get("orders") or []],
+            orders=[DenebOrder(**o) for o in d.get("orders") or []],
             amounts={k: float(v) for k, v in (d.get("amounts") or {}).items()},
             ask_month=d.get("ask_month", ""),
             ask_ts=int(d.get("ask_ts", 0)),
@@ -101,15 +101,15 @@ class M3State:
         )
 
 
-def due(state: M3State, today: str) -> bool:
+def due(state: DenebState, today: str) -> bool:
     return state.done_month != today[:7]
 
 
-def deposited(state: M3State, month: str) -> bool:
+def deposited(state: DenebState, month: str) -> bool:
     return any(str(d[0])[:7] == month for d in state.deposits)
 
 
-def amount_target(state: M3State, today: str) -> str | None:
+def amount_target(state: DenebState, today: str) -> str | None:
     """텔레그램 금액 답이 들어갈 달: 이번 달 매수 전이면 이번 달, 아니면 물어본 다음 달."""
     if due(state, today) and not deposited(state, today[:7]):
         return today[:7]
@@ -166,12 +166,12 @@ def plan_message(
         lines.append("이번 달 납입 0원 — 이월 현금 · 배당만으로")
     lines.append(f"비율 TQQQ {share:.0%} : SCHD {1 - share:.0%}")
     lines.append(sub(f"이유: {share_reason(vol, share)}"))
-    need_m3 = 0.0
+    need_deneb = 0.0
     for sym in SYMBOLS:
         n = plan.get(sym, 0)
         if n > 0:
             approx = n * prices[sym] * (1 + fee)
-            need_m3 += n * limit_price(prices[sym], "BUY") * (1 + fee)
+            need_deneb += n * limit_price(prices[sym], "BUY") * (1 + fee)
             lines.append(f"🛒 {sym} {n}주 · 약 ${approx:,.2f}")
         elif n < 0:
             lines.append(f"↩ {sym} {-n}주 매도 · 약 ${-n * prices[sym]:,.2f}")
@@ -179,8 +179,8 @@ def plan_message(
             lines.append(f"· {sym} 이번 달 안 삼")
     if not any(n > 0 for n in plan.values()):
         lines.append(sub("돈이 1 주 값보다 적어 다음 달로 이월"))
-    lines += ["", f"💵 현재 보유 달러 ${usd_now:,.2f} → 필요 달러 ${need_m3:,.2f}"]
-    if need_all > need_m3 + 0.005:
+    lines += ["", f"💵 현재 보유 달러 ${usd_now:,.2f} → 필요 달러 ${need_deneb:,.2f}"]
+    if need_all > need_deneb + 0.005:
         lines.append(sub(f"오늘 밤 다른 적립 매수까지 합치면 ${need_all:,.2f}"))
     short = need_all - usd_now
     if short > 0:
@@ -212,7 +212,7 @@ def ask_message(today: str, default_krw: float) -> str:
     )
 
 
-def cost_basis(state: M3State) -> dict[str, float]:
+def cost_basis(state: DenebState) -> dict[str, float]:
     """종목 → M3 몫의 남은 원가(달러, 수수료 포함). 판 것은 평균 단가로 뺀다 (순수)."""
     qty: dict[str, float] = {}
     cost: dict[str, float] = {}
@@ -228,7 +228,7 @@ def cost_basis(state: M3State) -> dict[str, float]:
     return cost
 
 
-def holdings_lines(state: M3State, prices: Mapping[str, float]) -> list[str]:
+def holdings_lines(state: DenebState, prices: Mapping[str, float]) -> list[str]:
     """현재 보유(Deneb 몫): 종목마다 주수 · 평가액 · 평균 단가 대비 % (순수)."""
     from auto_trading.notify.style import arrow, sub
 
@@ -259,7 +259,7 @@ def holdings_lines(state: M3State, prices: Mapping[str, float]) -> list[str]:
 
 
 def dividend_lines(
-    state: M3State,
+    state: DenebState,
     events: Sequence[tuple[str, str, float]],
     credited: Sequence[Sequence[Any]],
     after_qty: Mapping[str, float],
@@ -301,7 +301,7 @@ def lev_share(closes: Sequence[tuple[str, float]], today: str) -> tuple[float | 
     return vol, lev_share_vol(vol)
 
 
-def deposit(state: M3State, today: str, krw: float, fx_rate: float) -> float:
+def deposit(state: DenebState, today: str, krw: float, fx_rate: float) -> float:
     """이번 달 납입을 한 번만 넣는다. 넣은 달러(이미 넣었으면 0)."""
     if any(str(d[0])[:7] == today[:7] for d in state.deposits) or krw <= 0 or fx_rate <= 0:
         return 0.0
@@ -348,7 +348,7 @@ def choose(
     return {s: n for s, n in (best[1] if best else {}).items() if n != 0}
 
 
-def apply_fill(state: M3State, order: M3Order) -> None:
+def apply_fill(state: DenebState, order: DenebOrder) -> None:
     """체결분을 장부에 넣는다 (매수: 현금 −(금액 + 수수료), 매도: 현금 +(금액 − 수수료))."""
     if order.filled_qty <= 0:
         return
@@ -357,7 +357,7 @@ def apply_fill(state: M3State, order: M3Order) -> None:
     state.cash_usd += -sign * order.filled_usd - order.commission
 
 
-def held_on(state: M3State, symbol: str, ex_date: str) -> float:
+def held_on(state: DenebState, symbol: str, ex_date: str) -> float:
     """배당락일 전날까지 체결된 전략 보유 주수."""
     n = 0.0
     for o in state.orders:
@@ -367,7 +367,7 @@ def held_on(state: M3State, symbol: str, ex_date: str) -> float:
 
 
 def credit_dividends(
-    state: M3State, events: Sequence[tuple[str, str, float]], today: str, days_since: Any
+    state: DenebState, events: Sequence[tuple[str, str, float]], today: str, days_since: Any
 ) -> list[str]:
     """(배당락일, 종목, 주당 배당) 중 아직 안 넣은 것을 세후로 넣는다.
 

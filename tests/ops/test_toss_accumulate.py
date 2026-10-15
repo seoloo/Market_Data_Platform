@@ -101,7 +101,7 @@ def _mod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeToss) -> Any
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: None)
     monkeypatch.setattr(mod, "STOPPED", {})
     monkeypatch.setattr(mod, "QS_LIVE", True)
-    monkeypatch.setattr(mod, "M3_ENABLED", False)
+    monkeypatch.setattr(mod, "DENEB_ENABLED", False)
     monkeypatch.setattr(mod, "_dividend_events", lambda: [])
     return mod
 
@@ -309,19 +309,19 @@ def test_routine_run_is_quiet_but_rejection_alerts(
     assert all(any(m in x for m in mod.ALERT_MARKS) for x in sent)
 
 
-def test_m3_first_month_buys_whole_shares_then_settles(
+def test_deneb_first_month_buys_whole_shares_then_settles(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake = FakeToss(usd="500")
     mod = _mod(monkeypatch, tmp_path, fake)
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
     _seed(mod)
     assert mod.run(telegram=False) == 0
-    m3 = [o for o in fake.sent if o[4].startswith("M3")]
+    deneb = [o for o in fake.sent if o[4].startswith("M3")]
     # 30 만 원 / 1350 = 222.2 USD, 변동성 작음 → TQQQ 60%: TQQQ 1 주 + SCHD 3 주
-    assert sorted((o[0], o[1], o[2]) for o in m3) == [("SCHD", "BUY", 3), ("TQQQ", "BUY", 1)]
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert sorted((o[0], o[1], o[2]) for o in deneb) == [("SCHD", "BUY", 3), ("TQQQ", "BUY", 1)]
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["done_month"] == "2026-10"
     # 다음 날: 체결 반영, 같은 달 다시 사지 않음
     for o in state["orders"]:
@@ -340,26 +340,26 @@ def test_m3_first_month_buys_whole_shares_then_settles(
     n_sent = len(fake.sent)
     assert mod.run(telegram=False) == 0
     assert not any(o[4].startswith("M3") for o in fake.sent[n_sent:])
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["qty"] == {"TQQQ": 1.0, "SCHD": 3.0}
     assert abs(state["cash_usd"] - (300_000 / 1350 - 179 - 0.2)) < 1e-6
 
 
-def test_m3_insufficient_usd_retries_next_day(
+def test_deneb_insufficient_usd_retries_next_day(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake = FakeToss(outcome="insufficient-buying-power")
     mod = _mod(monkeypatch, tmp_path, fake)
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
     _seed(mod)
     mod.run(telegram=False)
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["done_month"] == ""
     assert len(state["deposits"]) == 1
 
 
-def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
+def test_deneb_telegram_amount_sets_month_and_asks_on_buy_day(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     from auto_trading.notify import inbox as inbox_mod
@@ -369,8 +369,8 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     fake = FakeToss(usd="2000")
     mod = _mod(monkeypatch, tmp_path, fake)
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
     monkeypatch.setattr(mod, "load_telegram_credentials", lambda path: object())
     inbox: list[InboxMessage] = []
 
@@ -389,19 +389,19 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 0, tzinfo=UTC))
     assert mod.fx(telegram=True) == 0
     assert any("입금 안내" in x and "예시 답: 100만" in x and "Deneb 80" in x for x in sent)
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["ask_month"] == "2026-10"
     # 답 "50만"(세 곳 합계) → Deneb 몫 40만 · Vega 5만 · AG4S2 5만 안내 + 오늘 밤 계획 답장
     monkeypatch.setattr(mod, "_usdt_krw", lambda: 1_400.0)
     sent.clear()
     inbox.append(InboxMessage(1, 9_999_999_999, "50만"))
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 9, 5, tzinfo=UTC))
-    assert mod.m3_chat(telegram=True) == 0
+    assert mod.deneb_chat(telegram=True) == 0
     plan = [x for x in sent if "오늘(2026-10-06) 밤 매수 예정" in x and "비율 TQQQ" in x]
     assert plan, sent
     assert "이유: QQQ 20일 변동성" in plan[0] and "현재 보유 달러 $2,000.00 → 필요 달러" in plan[0]
     assert "📦 현재 보유 (Deneb 몫)" in plan[0] and "💰 배당" in plan[0]
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["amounts"] == {"2026-10": 400_000.0}
     split = [x for x in sent if "입금 500,000원 → 이렇게 넣어 주세요" in x]
     assert split and "Deneb · 토스 증권  400,000원" in split[0]
@@ -410,7 +410,7 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
     # 밤 21:00 실행이 그 금액으로 산다
     monkeypatch.setattr(mod, "_kst_now", lambda: NOW_KST)
     assert mod.run(telegram=True) == 0
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["deposits"][0][1] == 400_000.0
     # 같은 달은 다시 묻지 않는다 · 대화 실행도 할 일 없음
     sent.clear()
@@ -421,43 +421,45 @@ def test_m3_telegram_amount_sets_month_and_asks_on_buy_day(
         )
     assert mod.fx(telegram=True) == 0
     assert not any("입금 안내" in x for x in sent)
-    assert mod.m3_chat(telegram=True) == 0
+    assert mod.deneb_chat(telegram=True) == 0
 
 
-def test_m3_retry_command_buys_after_funds_arrive(
+def test_deneb_retry_command_buys_after_funds_arrive(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake = FakeToss(outcome="insufficient-buying-power")
     mod = _mod(monkeypatch, tmp_path, fake)
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
     _seed(mod)
     mod.run(telegram=False)
     fake.outcome = "ok"
     # 같은 날 23:40, 그리고 자정 넘은 03:30 은 전날 일로 본다
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 3, 30, tzinfo=UTC))
     n = len(fake.sent)
-    assert mod.m3_only(telegram=False) == 0
-    m3 = [o for o in fake.sent[n:] if o[4].startswith("M3")]
-    assert sorted((o[0], o[2]) for o in m3) == [("SCHD", 3), ("TQQQ", 1)]
-    state = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    assert mod.deneb_only(telegram=False) == 0
+    deneb = [o for o in fake.sent[n:] if o[4].startswith("M3")]
+    assert sorted((o[0], o[2]) for o in deneb) == [("SCHD", 3), ("TQQQ", 1)]
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["done_month"] == "2026-10" and len(state["deposits"]) == 1
     # 한 번 더 불러도 같은 달은 다시 사지 않는다
     n = len(fake.sent)
-    assert mod.m3_only(telegram=False) == 0
+    assert mod.deneb_only(telegram=False) == 0
     assert len(fake.sent) == n
 
 
-def test_m3_no_ask_when_amount_already_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_deneb_no_ask_when_amount_already_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     sent: list[str] = []
     fake = FakeToss(usd="2000")
     mod = _mod(monkeypatch, tmp_path, fake)
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-06")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
     _seed(mod)
-    m3 = mod._load_m3()
-    m3.amounts["2026-10"] = 300_000.0
-    mod._save_m3(m3)
-    assert mod._m3_ask_today("2026-10-06", True) is False
+    deneb = mod._load_deneb()
+    deneb.amounts["2026-10"] = 300_000.0
+    mod._save_deneb(deneb)
+    assert mod._deneb_ask_today("2026-10-06", True) is False
     assert not sent

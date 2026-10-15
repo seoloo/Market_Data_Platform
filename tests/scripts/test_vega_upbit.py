@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import scripts.live_t2_upbit as mod
+import scripts.vega_upbit as mod
 
 from auto_trading.core.types import Candle
 from auto_trading.exchange.upbit import UpbitOrder
@@ -92,8 +92,8 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Any, FakeUpbit
     monkeypatch.setattr(mod, "_client", lambda: fake)
     monkeypatch.setattr(mod, "_notify", sent.append)
     monkeypatch.setenv("CRUISE_UPBIT", "on")  # 2026-10-15 바이낸스로 옮긴 뒤엔 켜야만 돈다
-    monkeypatch.setattr("scripts.live_t2_upbit.time.sleep", lambda s: None)
-    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 300 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.vega_upbit.time.sleep", lambda s: None)
+    monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 300 * DAY / 1000 + 3600)
     return mod, fake, sent
 
 
@@ -125,7 +125,7 @@ def test_deposit_detected_without_nav_jump(
     m, fake, sent = env
     m.main(["run"])
     fake.krw += Decimal(300_000)  # 다음 달 입금
-    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
     m.main(["run"])
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     assert Decimal(st["last_nav"]) == pytest.approx(Decimal(1000), rel=Decimal("0.01"))
@@ -142,9 +142,9 @@ def test_same_day_rerun_does_not_double_count_a_deposit(
     fake.krw += Decimal(569)  # 첫 실행 뒤 잔고에 소액이 보임
     assert m.main(["run"]) == 0  # 같은 날 다시 → 장부 그대로
     assert json.loads(m.STATE.read_text(encoding="utf-8")) == before
-    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 301 * DAY / 1000 + 3600)
     m.main(["run"])
-    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 302 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 302 * DAY / 1000 + 3600)
     m.main(["run"])
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     paid = sum(Decimal(str(d[1])) for d in st["deposits"])
@@ -168,7 +168,7 @@ def test_stop_reminds_at_30_days_and_release_clears(
     st.update(stopped=True, stopped_since=day0, stop_reminded=[])
     m.STATE.write_text(json.dumps(st), encoding="utf-8")
     sent.clear()
-    monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 330 * DAY / 1000 + 3600)
+    monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 330 * DAY / 1000 + 3600)
     m.main(["run"])
     assert any("정지 30일째" in x for x in sent)
     st = json.loads(m.STATE.read_text(encoding="utf-8"))

@@ -59,8 +59,8 @@ def _history(raw: Any, now_ms: int) -> tuple[tuple[int, float], ...] | None:
     return tuple(points)
 
 
-def glide_card(data: DashboardData) -> str:
-    state = _read(data.root / "data/toss/M3.json") if data.root else None
+def deneb_card(data: DashboardData) -> str:
+    state = _read(data.root / "data/toss/DENEB.json") if data.root else None
     month = datetime.fromtimestamp(data.now_ms / 1000, UTC).strftime("%Y-%m")
     amounts = state.get("amounts") if state else None
     amount = _number(amounts.get(month)) if isinstance(amounts, dict) else None
@@ -75,24 +75,24 @@ def glide_card(data: DashboardData) -> str:
         else False
     )
     status = "체결 기록 있음 · 평가 이력 별도" if fills else "첫 체결 확인 대기"
-    if data.root and (data.root / "data/toss/M3.json").exists() and state is None:
+    if data.root and (data.root / "data/toss/DENEB.json").exists() and state is None:
         status = "장부 읽기 실패 · 체결 상태 미확인"
     return (
-        '<section class="panel glide-hero"><div class="glide-main">'
+        '<section class="panel deneb-hero"><div class="deneb-main">'
         '<div><div class="eyebrow">STOCKS / 토스</div><h2>Deneb</h2>'
         '<div class="hero-status"><span>실거래 등록 설정</span>'
         f'<span class="pending">{status}</span></div>'
         '<div class="sub">이번 달 설정 납입금</div>'
-        f'<strong class="glide-amount">{amount:,.0f}<small> 원 / 월</small></strong>'
+        f'<strong class="deneb-amount">{amount:,.0f}<small> 원 / 월</small></strong>'
         '<p class="mute">변동성에 따라 비중 조절</p></div>'
-        '<div class="glide-assets"><div><span class="asset-glyph">T</span>'
+        '<div class="deneb-assets"><div><span class="asset-glyph">T</span>'
         "<b>TQQQ</b><small>나스닥 3배 레버리지 ETF</small></div>"
         '<div><span class="asset-glyph">S</span><b>SCHD</b><small>미국 배당주 ETF</small>'
-        '</div></div></div><div class="glide-meta">'
+        '</div></div></div><div class="deneb-meta">'
         "<span>월 1회<small>첫 실행일</small></span>"
         "<span>달러 이월<small>남는 재원 보관</small></span>"
         "<span>배당 재투자<small>기존 등록 규칙</small></span></div>"
-        '<div class="glide-pending">브레이크 연결 상태는 실행 현황에서 확인'
+        '<div class="deneb-pending">브레이크 연결 상태는 실행 현황에서 확인'
         '<a href="/running">운용 기록 보기 →</a></div>'
         '<div class="foot">등록 설정 2026-10-09 기준 · 설정·주문을 변경하지 않습니다.</div>'
         "</section>"

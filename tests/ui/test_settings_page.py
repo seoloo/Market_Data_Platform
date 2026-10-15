@@ -37,7 +37,7 @@ def _form(values: dict[str, object], **over: str) -> dict[str, str]:
 
 def test_defaults_are_todays_values(tmp_path: Path) -> None:
     v = us.load(tmp_path)
-    assert v["fire.target_krw"] == 100_000_000 and v["glide.monthly_krw"] == 300_000
+    assert v["fire.target_krw"] == 100_000_000 and v["deneb.monthly_krw"] == 300_000
     assert v["acc.WQTM.usd"] == 1.0 and v["acc.QS.on"] is True and v["safety.halt"] is False
     assert us.acc_history(tmp_path, "BTQ") == []
 
@@ -50,8 +50,8 @@ def test_validate_ranges_and_order(tmp_path: Path) -> None:
     assert "acc.BTQ.usd" in err
     _, err = us.validate(_form(v, **{"fire.rate_mid": "30"}), v)
     assert "fire.rate_mid" in err  # 좋을 때 ≥ 보통
-    _, err = us.validate(_form(v, **{"glide.monthly_krw": "6,000,000"}), v)
-    assert "glide.monthly_krw" in err
+    _, err = us.validate(_form(v, **{"deneb.monthly_krw": "6,000,000"}), v)
+    assert "deneb.monthly_krw" in err
     form = _form(v)
     form.pop("acc.QS.on")  # 스위치를 끄면 칸이 안 온다
     new, err = us.validate(form, v)
@@ -105,12 +105,12 @@ def test_toss_plans_follow_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(mod, "REPO", tmp_path)
     before = {p.symbol: p for p in mod._plans()}
     v = us.load(tmp_path)
-    new, _ = us.validate(_form(v, **{"acc.BTQ.usd": "3", "glide.monthly_krw": "500,000"}), v)
+    new, _ = us.validate(_form(v, **{"acc.BTQ.usd": "3", "deneb.monthly_krw": "500,000"}), v)
     us.apply(tmp_path, us.diff(v, new), NOW)
     plan = next(p for p in mod._plans() if p.symbol == "BTQ")
     assert plan.rate_on("2026-10-10") == before["BTQ"].rate_on("2026-10-10")  # 오늘은 그대로
     assert plan.rate_on("2026-10-11") == 3.0
-    assert mod._m3_monthly() == 500_000.0
+    assert mod._deneb_monthly() == 500_000.0
 
 
 def test_pages_render_without_scripts() -> None:
@@ -308,15 +308,15 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
     try:
         assert post(base, "/settings/tasks", {"token": token, "action": "on"})[0] == 303
         assert "하나 이상" in server.task_note[1]  # type: ignore[attr-defined]
-        form = {"token": token, "g_cruise": "on", "action": "on"}
+        form = {"token": token, "g_vega": "on", "action": "on"}
         assert post(base, "/settings/tasks", form)[0] == 303
         reg = [c for c in calls if "Register-ScheduledTask" in c]
-        assert len(reg) == 1 and "AutoTrading_Binance_Cruise" in reg[0]
+        assert len(reg) == 1 and "AutoTrading_Vega" in reg[0]
         assert "새로 만든 예약 1개" in server.task_note[0]  # type: ignore[attr-defined]
-        made = {"n": "AutoTrading_Binance_Cruise", "s": "Ready", "nx": "", "lr": "", "res": 0}
+        made = {"n": "AutoTrading_Vega", "s": "Ready", "nx": "", "lr": "", "res": 0}
         live[0] = json.dumps([row, made])
         assert post(base, "/settings/tasks", {**form, "action": "off"})[0] == 303
-        off = "Disable-ScheduledTask -TaskName 'AutoTrading_Binance_Cruise'"
+        off = "Disable-ScheduledTask -TaskName 'AutoTrading_Vega'"
         assert any(off in c for c in calls)
         with urllib.request.urlopen(base + "/settings") as r:
             page = r.read().decode()
@@ -344,9 +344,9 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
         tok = token.group(1)
         assert post(base, "/settings/liquidate", {"token": "x", "scope": "all"})[0] == 403
         assert post(base, "/settings/liquidate", {"token": tok, "scope": "nope"})[0] == 400
-        assert post(base, "/settings/liquidate", {"token": tok, "scope": "cruise"})[0] == 303
-        assert calls == [["start", "cruise", "오르빗"]]
-        halt = tmp_path / "data" / "HALT_cruise"
+        assert post(base, "/settings/liquidate", {"token": tok, "scope": "vega"})[0] == 303
+        assert calls == [["start", "vega", "오르빗"]]
+        halt = tmp_path / "data" / "HALT_vega"
         halt.parent.mkdir(parents=True, exist_ok=True)
         halt.write_text("전부 정리(Vega 만) · 오르빗\n", encoding="utf-8")
         with urllib.request.urlopen(base + "/settings?liq=1") as r:
@@ -354,7 +354,7 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
         assert "정리를 시작했어요" in after and "Vega 정지 중" in after
         assert 'action="/settings/unhalt"' in after
         assert post(base, "/settings/unhalt", {"token": tok, "group": "bad"})[0] == 400
-        assert post(base, "/settings/unhalt", {"token": tok, "group": "cruise"})[0] == 303
+        assert post(base, "/settings/unhalt", {"token": tok, "group": "vega"})[0] == 303
         assert not halt.exists()
         request = urllib.request.Request(
             base + "/settings/liquidate",
@@ -364,7 +364,7 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
         )
         with pytest.raises(urllib.error.HTTPError) as err:
             urllib.request.urlopen(request)
-        assert err.value.code == 403 and calls == [["start", "cruise", "오르빗"]]
+        assert err.value.code == 403 and calls == [["start", "vega", "오르빗"]]
     finally:
         server.shutdown()
         server.server_close()

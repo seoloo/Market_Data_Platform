@@ -75,9 +75,9 @@ def test_register_only_missing_and_reenable(tmp_path: Path) -> None:
         "AutoTrading_Toss_FX": TaskState("AutoTrading_Toss_FX", "Disabled"),
     }
     ps = FakePS()
-    made, enabled = task_setup.register_missing(tmp_path, ["glide"], existing, ps)
-    # glide 는 toss 묶음도 함께
-    assert made == ["AutoTrading_Toss_M3_Chat", "AutoTrading_Toss_M3_Retry"]
+    made, enabled = task_setup.register_missing(tmp_path, ["deneb"], existing, ps)
+    # deneb 는 toss 묶음도 함께
+    assert made == ["AutoTrading_Deneb_Chat", "AutoTrading_Deneb_Retry"]
     assert enabled == ["AutoTrading_Toss_FX"]
     assert not any("AutoTrading_Toss_Accumulate" in c for c in ps.calls)  # 있던 예약은 그대로
     assert sum("Register-ScheduledTask" in c for c in ps.calls) == 2
@@ -85,11 +85,11 @@ def test_register_only_missing_and_reenable(tmp_path: Path) -> None:
 
 def test_disable_only_enabled_ones() -> None:
     existing = {
-        "AutoTrading_Binance_Cruise": TaskState("AutoTrading_Binance_Cruise", "Ready"),
+        "AutoTrading_Vega": TaskState("AutoTrading_Vega", "Ready"),
         "AutoTrading_Info_Bot": TaskState("AutoTrading_Info_Bot", "Disabled"),
     }
     ps = FakePS()
-    assert task_setup.disable(["cruise", "info"], existing, ps) == ["AutoTrading_Binance_Cruise"]
+    assert task_setup.disable(["vega", "info"], existing, ps) == ["AutoTrading_Vega"]
     assert len(ps.calls) == 1 and "Disable-ScheduledTask" in ps.calls[0]
 
 

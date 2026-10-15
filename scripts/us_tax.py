@@ -7,7 +7,8 @@
 
 토스 체결 기록(주문 목록 CLOSED) · 보유 · 한국은행 ECOS 매매기준율(``ECOS_API_KEY``)로
 ``auto_trading.ops.us_capital_gains`` 를 돌려 올해 실현 손익 · 남은 250 만 원 공제 · 예상 세금,
-지금 보유를 팔면 생길 손익을 보여 준다. M3 주문(``data/toss/M3.json`` 의 주문 번호)은 따로 묶는다.
+지금 보유를 팔면 생길 손익을 보여 준다. Deneb 주문(``data/toss/DENEB.json`` 의 주문 번호,
+앞머리 M3)은 따로 묶는다.
 보고 ``reports/us_tax/<KST 날짜>.json``.
 """
 
@@ -37,7 +38,7 @@ from auto_trading.ops.us_capital_gains import (
 
 REPO = Path(__file__).resolve().parent.parent
 TOKEN = REPO / "data" / "toss_token.json"
-M3_STATE = REPO / "data" / "toss" / "M3.json"
+DENEB_STATE = REPO / "data" / "toss" / "DENEB.json"
 REPORTS = REPO / "reports" / "us_tax"
 ECOS = "https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/{n}/731Y001/D/{a}/{b}/0000001"
 
@@ -65,14 +66,14 @@ def ecos_usd_krw(key: str, start: str, end: str) -> dict[str, float]:
     return out
 
 
-def _m3_ids() -> set[str]:
-    if not M3_STATE.is_file():
+def _deneb_ids() -> set[str]:
+    if not DENEB_STATE.is_file():
         return set()
-    state = json.loads(M3_STATE.read_text(encoding="utf-8"))
+    state = json.loads(DENEB_STATE.read_text(encoding="utf-8"))
     return {str(o.get("order_id")) for o in state.get("orders") or [] if o.get("order_id")}
 
 
-def trades_from(fills: list[TossFill], m3_ids: set[str]) -> list[Trade]:
+def trades_from(fills: list[TossFill], deneb_ids: set[str]) -> list[Trade]:
     out = []
     for f in fills:
         if f.currency != "USD":
@@ -86,7 +87,7 @@ def trades_from(fills: list[TossFill], m3_ids: set[str]) -> list[Trade]:
                 float(f.commission + f.tax),
                 tax_settle(f.filled_at),
                 f.filled_at,
-                "M3" if f.order_id in m3_ids else "",
+                "M3" if f.order_id in deneb_ids else "",
             )
         )
     return out
@@ -96,12 +97,12 @@ def _won(x: float) -> str:
     return f"{x:+,.0f}원" if x else "0원"
 
 
-def compute(reader: TossReader, key: str, m3_ids: set[str], year: str) -> dict[str, Any]:
+def compute(reader: TossReader, key: str, deneb_ids: set[str], year: str) -> dict[str, Any]:
     """토스 체결 · 보유 · ECOS 환율 → 그해 양도소득 추정 (조회만). 텔레그램 알림에서도 쓴다."""
     fills = reader.fills()
     hold = {s: p for s, p in reader.holdings().items() if p.currency == "USD"}
     fx_now = float(reader.usd_krw())
-    trades = trades_from(fills, m3_ids)
+    trades = trades_from(fills, deneb_ids)
     first = min([t.settle for t in trades] + [_today_kst()])
     rates = ecos_usd_krw(
         key, (datetime.fromisoformat(first) - timedelta(days=10)).date().isoformat(), _today_kst()
@@ -144,7 +145,7 @@ def main(argv: list[str]) -> int:
         return 1
     reader = TossReader(load_toss_credentials(REPO / ".env"), TossTokenCache(TOKEN))
     try:
-        res = compute(reader, key, _m3_ids(), year)
+        res = compute(reader, key, _deneb_ids(), year)
     finally:
         reader.close()
     book, s, tags, per_sym = res["book"], res["summary"], res["by_tag"], res["by_symbol"]

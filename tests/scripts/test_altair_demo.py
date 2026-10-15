@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from auto_trading.ops.ag_short_paper import DAY, H4
-from scripts import ag4s2_testnet as m
+from scripts import altair_demo as m
 
 
 def test_short_size_is_smaller_of_margin_cap_and_one_percent_risk() -> None:

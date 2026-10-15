@@ -32,7 +32,7 @@ from auto_trading.ui.overview import overview_attention
 from auto_trading.ui.qndx_render import toss_page
 from auto_trading.ui.qs_render import qs_paper_page
 from auto_trading.ui.running import running_page
-from auto_trading.ui.stock_home import glide_card, paper_links, stock_performance, stock_settings
+from auto_trading.ui.stock_home import deneb_card, paper_links, stock_performance, stock_settings
 
 __all__ = ["ASSET_DIR", "PAGES", "render_page"]
 
@@ -488,7 +488,7 @@ def _overview(data: DashboardData) -> str:
         + note
     )
     return (
-        f'<div class="stock-home-grid"><div>{glide_card(data)}</div>'
+        f'<div class="stock-home-grid"><div>{deneb_card(data)}</div>'
         f"<div>{overview_attention(data)}</div></div>"
         f'{stock_performance(data)}<div class="stock-home-grid">'
         f"<div>{stock_settings(data)}</div><div>{paper_links()}</div></div>"

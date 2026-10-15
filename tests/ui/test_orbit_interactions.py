@@ -58,7 +58,7 @@ def test_all_popups_have_fixed_header_close_and_matching_targets() -> None:
 
 @pytest.mark.parametrize("pending", [(), ("BTC 지정가 체결 확인",)])
 def test_pending_banner_only_when_records_exist(pending: tuple[str, ...]) -> None:
-    book = Book("cruise", "Vega", "업비트", 100, 100, (), pending=pending)
+    book = Book("vega", "Vega", "업비트", 100, 100, (), pending=pending)
     html = render_live([book], Quotes(), 0)
     assert ('class="orbit-alert"' in html) == bool(pending)
     assert ("먼저 확인해 주세요" in html) == bool(pending)
@@ -67,7 +67,7 @@ def test_pending_banner_only_when_records_exist(pending: tuple[str, ...]) -> Non
 
 
 def test_hiding_pending_banner_does_not_hide_data_or_risk_warnings() -> None:
-    book = Book("cruise", "Vega", "업비트", 100, 100, (), notes=("낙폭 정지 중",))
+    book = Book("vega", "Vega", "업비트", 100, 100, (), notes=("낙폭 정지 중",))
     html = render_live([book], Quotes(errors=("시세 조회 실패",)), 0)
     assert 'class="orbit-alert"' not in html
     assert 'class="orbit-data-note"' in html
@@ -141,7 +141,7 @@ def test_original_light_art_and_mascot_are_not_desktop_icon() -> None:
 
 def test_dark_hero_does_not_change_live_records_or_light_art() -> None:
     body = render_live(
-        [Book("cruise", "Vega", "업비트", 100, 100, (), pending=("체결 확인 대기",))],
+        [Book("vega", "Vega", "업비트", 100, 100, (), pending=("체결 확인 대기",))],
         Quotes(errors=("시세 확인 필요",)),
         0,
     )
@@ -164,8 +164,8 @@ def test_unknown_instrument_never_becomes_asset_path() -> None:
 @pytest.mark.parametrize(
     "key,symbols",
     [
-        ("glide", ("TQQQ", "SCHD")),
-        ("cruise", ("BTC", "ETH", "SOL")),
+        ("deneb", ("TQQQ", "SCHD")),
+        ("vega", ("BTC", "ETH", "SOL")),
         ("accumulate", ("BTQ", "QNDX")),
     ],
 )

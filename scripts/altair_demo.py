@@ -1,8 +1,8 @@
 """Altair(옛 AG4S2) 바이낸스 선물 **데모(가짜 돈)** 실행 — AG-CR4 롱 + 232 숏 2 배를 실제 주문으로.
 
-    python -m scripts.ag4s2_testnet plan     # 지금 낼 주문 미리 보기 (주문 없음)
-    python -m scripts.ag4s2_testnet tick     # 할 차례면 실행 (현황 봇이 2 분마다 부른다)
-    python -m scripts.ag4s2_testnet status
+    python -m scripts.altair_demo plan     # 지금 낼 주문 미리 보기 (주문 없음)
+    python -m scripts.altair_demo tick     # 할 차례면 실행 (현황 봇이 2 분마다 부른다)
+    python -m scripts.altair_demo status
 
 사용자 (2026-10-15): "내가 100달러 넣을테니까 ags2를 실거래 할 수 있어?" → 100 달러는
 최소 주문 금액(BTC 선물 100 USDC · ETH 20 USDC)에 걸려 규칙이 빠진다고 답함 →
@@ -23,7 +23,7 @@
   크기 = min(장부 10% × 2 배, 거래 위험 1% ÷ (3% + 0.39%)). 3% STOP_MARKET · 48 시간 뒤 정리 ·
   롱 목표가 다시 생기면 먼저 정리 · 청산 뒤 60 분 · 4 연패 240 분 쉼 · 하루 손실 2% 면 새 숏 금지 ·
   닫힌 숏 누적 손실이 고점 × 2.5% 면 숏 영구 차단(232 OWN).
-* 일반 주문은 **지정가 IOC 만**(표시 가격 ± 0.3%). 상태 ``data/ag4s2_testnet/state.json``.
+* 일반 주문은 **지정가 IOC 만**(표시 가격 ± 0.3%). 상태 ``data/altair_demo/state.json``.
 """
 
 from __future__ import annotations
@@ -48,9 +48,9 @@ from auto_trading.ops.ag_short_paper import DAY, H4, Bar, short_signals
 from auto_trading.strategy.spot_trend import spot_trend_targets
 
 REPO = Path(__file__).resolve().parent.parent
-DATA = REPO / "data" / "ag4s2_testnet"
+DATA = REPO / "data" / "altair_demo"
 STATE = DATA / "state.json"
-REPORTS = REPO / "reports" / "ag4s2_testnet"
+REPORTS = REPO / "reports" / "altair_demo"
 ALLOC = 2_000.0
 """가상 장부 크기 — 2026-10-15 사용자 "2000달러 기준으로해서 데모 진행해줘" (처음 1,000)."""
 EXPOSURE = 4.0
@@ -269,7 +269,7 @@ def _replace_stop(
             c.cancel_stop(sym, old)
     tick = c.filters(sym).tick_size
     trig = (trigger / tick).to_integral_value(rounding=ROUND_DOWN) * tick
-    ident = f"ag4s2-st-{coin}-{int(time.time())}"
+    ident = f"altair-st-{coin}-{int(time.time())}"
     try:
         c.place_stop_market(sym, side, trig, ident)
     except AutoTradingError as exc:
@@ -427,7 +427,7 @@ def long_block(
 
 
 def _id(kind: str, coin: str, now_ms: int) -> str:
-    return f"ag4s2-{kind}-{coin}-{now_ms // MINUTE}"
+    return f"altair-{kind}-{coin}-{now_ms // MINUTE}"
 
 
 def _close_short(st: dict[str, Any], coin: str, at_ms: int, px: float, reason: str) -> float:
@@ -709,7 +709,7 @@ def main(argv: list[str]) -> int:
     elif argv == ["status"]:
         out = status()
     else:
-        raise SystemExit("usage: python -m scripts.ag4s2_testnet plan | tick | status")
+        raise SystemExit("usage: python -m scripts.altair_demo plan | tick | status")
     sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n")
     return 0
 

@@ -15,7 +15,7 @@ from auto_trading.ui.stock_home import (
     _history,
     _paper_series,
     _transformed,
-    glide_card,
+    deneb_card,
     stock_performance,
 )
 
@@ -40,10 +40,10 @@ def test_stock_first_home_and_no_fake_live_curve(tmp_path: Path) -> None:
     assert not (tmp_path / "data").exists()
 
 
-def test_glide_uses_fill_evidence_not_deposit(tmp_path: Path) -> None:
+def test_deneb_uses_fill_evidence_not_deposit(tmp_path: Path) -> None:
     path = _save(
         tmp_path,
-        "data/toss/M3.json",
+        "data/toss/DENEB.json",
         {
             "amounts": {"2026-10": 450000},
             "deposits": [["2026-10-09", 450000]],
@@ -52,17 +52,17 @@ def test_glide_uses_fill_evidence_not_deposit(tmp_path: Path) -> None:
         },
     )
     before = path.read_bytes()
-    html = glide_card(load_dashboard(tmp_path, NOW))
+    html = deneb_card(load_dashboard(tmp_path, NOW))
     assert "450,000" in html and "첫 체결 확인 대기" in html
     assert "778899" not in html and path.read_bytes() == before
-    _save(tmp_path, "data/toss/M3.json", {"orders": [{"filled_qty": 1}]})
-    assert "체결 기록 있음" in glide_card(load_dashboard(tmp_path, NOW))
+    _save(tmp_path, "data/toss/DENEB.json", {"orders": [{"filled_qty": 1}]})
+    assert "체결 기록 있음" in deneb_card(load_dashboard(tmp_path, NOW))
 
 
-def test_corrupt_glide_not_presented_as_pending(tmp_path: Path) -> None:
-    path = _save(tmp_path, "data/toss/M3.json", {})
+def test_corrupt_deneb_not_presented_as_pending(tmp_path: Path) -> None:
+    path = _save(tmp_path, "data/toss/DENEB.json", {})
     path.write_text("broken", encoding="utf-8")
-    assert "장부 읽기 실패" in glide_card(load_dashboard(tmp_path, NOW))
+    assert "장부 읽기 실패" in deneb_card(load_dashboard(tmp_path, NOW))
 
 
 @pytest.mark.parametrize(

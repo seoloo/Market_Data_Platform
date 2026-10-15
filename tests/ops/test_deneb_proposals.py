@@ -12,7 +12,7 @@ import pytest
 
 from auto_trading.exchange.toss import TossOrderStatus
 from auto_trading.notify.inbox import InboxMessage
-from auto_trading.ops.m3_live import M3Order, M3State
+from auto_trading.ops.deneb_live import DenebOrder, DenebState
 from tests.ops.test_toss_accumulate import FakeToss, _FixedDT, _mod, _seed
 
 TAX = {
@@ -48,13 +48,13 @@ class FakeBot:
 
 
 def _setup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, m3: M3State
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, deneb: DenebState
 ) -> tuple[Any, FakeToss, FakeBot, list[InboxMessage]]:
     from auto_trading.notify import inbox as inbox_mod
 
     fake = FakeToss(usd="5000")
     mod = _mod(monkeypatch, tmp_path, fake)
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
     monkeypatch.setattr(mod, "QS_LIVE", False)
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     bot = FakeBot()
@@ -74,12 +74,14 @@ def _setup(
 
     monkeypatch.setattr(inbox_mod, "TelegramInbox", FakeInbox)
     _seed(mod)
-    mod._save_m3(m3)
+    mod._save_deneb(deneb)
     return mod, fake, bot, box
 
 
 def _state(tmp_path: Path) -> dict[str, Any]:
-    state: dict[str, Any] = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state: dict[str, Any] = json.loads(
+        (tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8")
+    )
     return state
 
 
@@ -92,38 +94,38 @@ def _night(monkeypatch: pytest.MonkeyPatch, mod: Any, fake: FakeToss, d: str) ->
     assert mod.run(telegram=True) == 0
 
 
-def _glide_state(**kw: Any) -> M3State:
-    m3 = M3State("2026-10-01", cash_usd=0.0, qty={"TQQQ": 10.0, "SCHD": 5.0}, **kw)
-    m3.orders.append(
-        M3Order(
+def _deneb_state(**kw: Any) -> DenebState:
+    deneb = DenebState("2026-10-01", cash_usd=0.0, qty={"TQQQ": 10.0, "SCHD": 5.0}, **kw)
+    deneb.orders.append(
+        DenebOrder(
             "2026-10-02", "TQQQ", "BUY", 10, 52.0, "c0", "OID-X", "FILLED", "", 10.0, 500.0, 1.0
         )
     )
-    return m3
+    return deneb
 
 
 def test_december_harvest_notice_input_qty_sell_then_buy_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    mod, fake, bot, box = _setup(monkeypatch, tmp_path, _glide_state(done_month="2026-12"))
+    mod, fake, bot, box = _setup(monkeypatch, tmp_path, _deneb_state(done_month="2026-12"))
     # 12-01(화) 09:00 아침 확인 → 메시지 + 아래 버튼 (2026-10-11 부터 공지 고정 안 함)
     # 주당 이익 (81.07 − 50.1) × 1350 ≈ 41,810원 → 100,000원 안에서 2 주
     now = datetime(2026, 12, 1, 9, 0, tzinfo=UTC)
-    mod._glide_morning(now, True)
+    mod._deneb_morning(now, True)
     notice = bot.sent[-1]
     assert "공제 남은 100,000원" in notice["text"] and "TQQQ 2주" in notice["text"]
     assert [b["text"] for b in notice["buttons"][0]] == ["전부 진행", "직접입력", "이번엔 안 함"]
     assert bot.pinned == []
-    mod._glide_morning(now, True)  # 다시 불러도 두 번 보내지 않는다
+    mod._deneb_morning(now, True)  # 다시 불러도 두 번 보내지 않는다
     assert len(bot.sent) == 1
     # [직접입력] → 입력칸 알림 → "1" → 접수 + [취소]
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 12, 1, 10, 0, tzinfo=UTC))
     box.append(InboxMessage(1, 0, "", data="h2026:input", callback_id="cb1", message_id=101))
-    mod._m3_poll("2026-12-01", True)
+    mod._deneb_poll("2026-12-01", True)
     assert bot.answered == ["cb1"] and bot.sent[-1]["force_reply"] is True
     assert "몇 주 팔까요" in bot.sent[-1]["text"]
     box.append(InboxMessage(2, 0, "1", reply_to=bot.sent[-1].get("reply_to", 0)))
-    mod._m3_poll("2026-12-01", True)
+    mod._deneb_poll("2026-12-01", True)
     assert "오늘 밤 TQQQ 1주" in bot.sent[-1]["text"]
     assert bot.sent[-1]["buttons"][0][0]["callback_data"] == "h2026:cancel"
     p = _state(tmp_path)["proposals"][0]
@@ -157,10 +159,12 @@ def test_december_harvest_notice_input_qty_sell_then_buy_back(
 def test_dividend_step_partial_then_cancel_restores_cap(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    m3 = _glide_state(done_month="2026-10")
-    m3.dividends.append(["2026-09-20", "SCHD", 100, 0.3, 900.0])  # 900 × 1350 ÷ 12 ≈ 월 101,250원
-    mod, _, bot, box = _setup(monkeypatch, tmp_path, m3)
-    mod._glide_morning(datetime(2026, 10, 12, 9, 0, tzinfo=UTC), True)
+    deneb = _deneb_state(done_month="2026-10")
+    deneb.dividends.append(
+        ["2026-09-20", "SCHD", 100, 0.3, 900.0]
+    )  # 900 × 1350 ÷ 12 ≈ 월 101,250원
+    mod, _, bot, box = _setup(monkeypatch, tmp_path, deneb)
+    mod._deneb_morning(datetime(2026, 10, 12, 9, 0, tzinfo=UTC), True)
     text = bot.sent[-1]["text"]
     # 전체 976.45 달러 × 50% = 488 → TQQQ 810.7 중 322 초과 → 4 주 팔고 SCHD 9 주
     assert "배당 단계 도달 (월 10만 원)" in text and "TQQQ 목표 60% → 50%" in text
@@ -169,23 +173,23 @@ def test_dividend_step_partial_then_cancel_restores_cap(
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 12, 10, 0, tzinfo=UTC))
     box.append(InboxMessage(1, 0, "", data=f"{pid}:input", callback_id="c", message_id=101))
     box.append(InboxMessage(2, 0, "2"))
-    mod._m3_poll("2026-10-12", True)
+    mod._deneb_poll("2026-10-12", True)
     st = _state(tmp_path)
     assert abs(st["lev_cap"] - 0.55) < 1e-12 and st["div_steps"] == 1  # 4 주 중 2 주 → 절반만 낮춤
     box.append(InboxMessage(3, 0, "", data=f"{pid}:cancel", callback_id="d", message_id=101))
-    mod._m3_poll("2026-10-12", True)
+    mod._deneb_poll("2026-10-12", True)
     st = _state(tmp_path)
     assert st["lev_cap"] == 0.6 and st["div_steps"] == 0 and st["proposals"][0]["status"] == "open"
     box.append(InboxMessage(4, 0, "", data=f"{pid}:no", callback_id="e", message_id=101))
-    mod._m3_poll("2026-10-12", True)
+    mod._deneb_poll("2026-10-12", True)
     st = _state(tmp_path)
     assert st["div_steps"] == 1 and st["lev_cap"] == 0.6 and 101 in bot.unpinned
     assert "TQQQ 60%를 그대로" in bot.sent[-1]["text"] and "30만 원" in bot.sent[-1]["text"]
 
 
 def test_monthly_message_has_tax_lines(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    mod, _, _, _ = _setup(monkeypatch, tmp_path, _glide_state())
-    text = mod._m3_preview(datetime(2026, 11, 2, 9, 0, tzinfo=UTC))
+    mod, _, _, _ = _setup(monkeypatch, tmp_path, _deneb_state())
+    text = mod._deneb_preview(datetime(2026, 11, 2, 9, 0, tzinfo=UTC))
     assert "🧾 올해 해외주식 양도" in text and "실현 손익 -2,518,746원" in text
     assert "세금 없이 더 실현할 수 있는 이익 100,000원" in text
 
@@ -193,15 +197,15 @@ def test_monthly_message_has_tax_lines(monkeypatch: pytest.MonkeyPatch, tmp_path
 def test_amount_answer_still_works_with_open_proposal(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    m3 = _glide_state(done_month="2026-11")
-    mod, _, _, box = _setup(monkeypatch, tmp_path, m3)
-    mod._glide_morning(datetime(2026, 12, 1, 9, 0, tzinfo=UTC), True)  # 공제 제안 열림
-    st = mod._load_m3()
+    deneb = _deneb_state(done_month="2026-11")
+    mod, _, _, box = _setup(monkeypatch, tmp_path, deneb)
+    mod._deneb_morning(datetime(2026, 12, 1, 9, 0, tzinfo=UTC), True)  # 공제 제안 열림
+    st = mod._load_deneb()
     st.ask_month, st.ask_ts = "2026-12", 0
-    mod._save_m3(st)
+    mod._save_deneb(st)
     box.append(InboxMessage(1, 5, "50만"))  # 세 곳 합계 → Deneb 몫 40만 (시안 A)
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 12, 1, 9, 5, tzinfo=UTC))
     monkeypatch.setattr(mod, "_usdt_krw", lambda: None)
-    mod._m3_poll("2026-12-01", True)
+    mod._deneb_poll("2026-12-01", True)
     assert _state(tmp_path)["amounts"] == {"2026-12": 400_000.0}
     assert _state(tmp_path)["proposals"][0]["status"] == "open"

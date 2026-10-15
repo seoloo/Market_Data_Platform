@@ -23,8 +23,8 @@ from auto_trading.ops.liquidate import (
     Store,
     build_items,
     choose_price,
+    deneb_to_book,
     floor_price,
-    glide_to_book,
     groups_of,
     job_text,
     run_toss_item,
@@ -44,10 +44,10 @@ def _plan(groups: tuple[str, ...], **over: object) -> tuple[list[Item], list[str
     kw: dict[str, object] = {
         "upbit_balances": {"BTC": D("0.01"), "ETH": D("0.00001"), "XRP": D(100), "KRW": D(5)},
         "upbit_prices": {"BTC": D(100_000_000), "ETH": D(5_000_000)},
-        "cruise_coins": ("BTC", "ETH", "SOL"),
+        "vega_coins": ("BTC", "ETH", "SOL"),
         "toss_holdings": {"TQQQ": D(3), "SCHD": D(3), "BTQ": D("1.5"), "005930": D(2)},
         "toss_sellable": {"TQQQ": D(3), "SCHD": D(3), "BTQ": D("1.5"), "005930": D(2)},
-        "glide_qty": {"TQQQ": D(1), "SCHD": D(3)},
+        "deneb_qty": {"TQQQ": D(1), "SCHD": D(3)},
         "acc_qty": {"TQQQ": D(9), "BTQ": D("1.5"), "005930": D(2)},
         "is_kr": _kr,
     }
@@ -56,39 +56,39 @@ def _plan(groups: tuple[str, ...], **over: object) -> tuple[list[Item], list[str
 
 
 def test_scopes() -> None:
-    assert groups_of("all") == ("cruise", "glide", "acc")
-    assert groups_of("glide") == ("glide",)
+    assert groups_of("all") == ("vega", "deneb", "acc")
+    assert groups_of("deneb") == ("deneb",)
     with pytest.raises(ValueError):
         groups_of("everything")
 
 
-def test_plan_cruise_only_sells_cruise_coins_and_skips_dust() -> None:
-    items, notes = _plan(("cruise",))
+def test_plan_vega_only_sells_vega_coins_and_skips_dust() -> None:
+    items, notes = _plan(("vega",))
     assert [(i.venue, i.symbol, i.want) for i in items] == [("upbit", "BTC", D("0.01"))]
     assert any("ETH" in n and "5,000" in n for n in notes)  # 50 원어치 → 남김
     assert all(i.symbol != "XRP" for i in items)  # Vega 밖 코인은 건드리지 않음
 
 
-def test_plan_splits_glide_and_accumulation() -> None:
-    g, _ = _plan(("glide",))
-    assert {(i.symbol, i.want, i.glide_part) for i in g} == {
+def test_plan_splits_deneb_and_accumulation() -> None:
+    g, _ = _plan(("deneb",))
+    assert {(i.symbol, i.want, i.deneb_part) for i in g} == {
         ("TQQQ", D(1), D(1)),
         ("SCHD", D(3), D(3)),
     }
     a, notes = _plan(("acc",))
     got = {(i.symbol, i.venue, i.want) for i in a}
     assert got == {("TQQQ", "toss_us", D(2)), ("BTQ", "toss_us", D(1)), ("005930", "toss_kr", D(2))}
-    assert all(i.glide_part == 0 for i in a)
+    assert all(i.deneb_part == 0 for i in a)
     assert any("BTQ" in n and "소수점" in n for n in notes)
-    every, _ = _plan(("cruise", "glide", "acc"))
+    every, _ = _plan(("vega", "deneb", "acc"))
     tqqq = next(i for i in every if i.symbol == "TQQQ")
-    assert (tqqq.want, tqqq.glide_part, tqqq.groups) == (D(3), D(1), ["glide", "acc"])
+    assert (tqqq.want, tqqq.deneb_part, tqqq.groups) == (D(3), D(1), ["deneb", "acc"])
 
 
 def test_plan_leaves_manual_holdings_alone() -> None:
     held = {"APH": D(65), "BTQ": D(2), "122630": D(90), "SCHD": D(3)}
     items, notes = _plan(
-        ("cruise", "glide", "acc"),
+        ("vega", "deneb", "acc"),
         toss_holdings=held,
         toss_sellable=held,
         acc_qty={"BTQ": D(1)},
@@ -163,7 +163,7 @@ class _Upbit:
 
 
 def test_upbit_ioc_rounds_until_sold() -> None:
-    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    item = Item("upbit", "BTC", ["vega"], D("0.01"))
     c = _Upbit([D("0.004"), D("0.006"), D(1)], unknown_on=1)
     log = run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
     assert item.sold == D("0.01") and item.status == "done"
@@ -174,7 +174,7 @@ def test_upbit_ioc_rounds_until_sold() -> None:
 
 
 def test_upbit_fill_read_from_order_query_not_ack() -> None:
-    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    item = Item("upbit", "BTC", ["vega"], D("0.01"))
     c = _Upbit([D("0.01")], ack_wait=True)
     run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
     assert item.sold == D("0.01") and item.status == "done" and len(c.sent) == 1
@@ -182,7 +182,7 @@ def test_upbit_fill_read_from_order_query_not_ack() -> None:
 
 def test_upbit_old_zero_record_refreshed_without_new_order() -> None:
     """2026-10-13: 첫 주문에 다 팔렸는데 0 으로 적혀 같은 수량을 다시 팔려 했다."""
-    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    item = Item("upbit", "BTC", ["vega"], D("0.01"))
     c = _Upbit([D("0.01")], ack_wait=True)
     c.known["liq-J-BTC-0"] = _UFill(D("0.01"), D(1_000_000), D(500))
     item.orders.append(
@@ -193,7 +193,7 @@ def test_upbit_old_zero_record_refreshed_without_new_order() -> None:
 
 
 def test_upbit_no_balance_ends_item() -> None:
-    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    item = Item("upbit", "BTC", ["vega"], D("0.01"))
     c = _Upbit([D(0)])
     c.empty = True
     log = run_upbit_item(item, c, "J", lambda: 0, lambda _s: None)
@@ -201,7 +201,7 @@ def test_upbit_no_balance_ends_item() -> None:
 
 
 def test_upbit_stops_with_leftover_after_rounds() -> None:
-    item = Item("upbit", "BTC", ["cruise"], D("0.01"))
+    item = Item("upbit", "BTC", ["vega"], D("0.01"))
     c = _Upbit([D(0)] * 10)
     run_upbit_item(item, c, "J", lambda: 0, lambda _s: None, rounds=3)
     assert item.status == "working" and len(c.sent) == 3 and item.remaining == D("0.01")
@@ -261,7 +261,7 @@ class _Toss:
 
 
 def test_toss_waits_for_session_then_sells_day_limit() -> None:
-    item = Item("toss_us", "SCHD", ["glide"], D(3), glide_part=D(3))
+    item = Item("toss_us", "SCHD", ["deneb"], D(3), deneb_part=D(3))
     t = _Toss()
     run_toss_item(item, t, "J1", 0, session_open=False)
     assert item.status == "waiting" and not t.sent
@@ -271,10 +271,10 @@ def test_toss_waits_for_session_then_sells_day_limit() -> None:
     t.orders["o0"] = _TStatus("FILLED", D(3), D(150), D("0.15"))
     run_toss_item(item, t, "J1", 2_000, session_open=True)
     assert item.status == "done" and item.sold == D(3)
-    take, usd = glide_to_book(item)
+    take, usd = deneb_to_book(item)
     assert take == D(3) and usd == D("149.85")
-    item.glide_booked += take
-    assert glide_to_book(item) == (D(0), D(0))
+    item.deneb_booked += take
+    assert deneb_to_book(item) == (D(0), D(0))
 
 
 def test_toss_cancels_stale_partial_and_replaces_rest() -> None:
@@ -325,13 +325,13 @@ def test_toss_blocked_order_marks_failed() -> None:
 
 def test_store_roundtrip_requests_and_lock(tmp_path: Path) -> None:
     st = Store(tmp_path / "liq")
-    it = Item("toss_us", "TQQQ", ["glide", "acc"], D(3), glide_part=D(1))
+    it = Item("toss_us", "TQQQ", ["deneb", "acc"], D(3), deneb_part=D(1))
     it.orders.append(Order("o1", "c1", D(3), D("50.1"), 5, filled=D(2), amount=D("100.2")))
     job = Job("20261011T2300", "all", "텔레그램", 1, [it], notes=["n"])
     st.put(job)
     back = st.jobs()[0]
     assert back.items[0].orders[0].amount == D("100.2") and back.items[0].sold == D(2)
-    assert back.items[0].glide_part == D(1) and st.active()[0].job_id == job.job_id
+    assert back.items[0].deneb_part == D(1) and st.active()[0].job_id == job.job_id
     n = st.new_request(0, "liq")
     assert not st.use_request(n, 1, "unh")  # 종류가 다르면 안 됨 (번호는 버려짐)
     n = st.new_request(0, "liq")
@@ -346,21 +346,21 @@ def test_store_roundtrip_requests_and_lock(tmp_path: Path) -> None:
 
 def test_group_halts_and_text(tmp_path: Path) -> None:
     halt = tmp_path / "data" / "HALT"
-    assert halted_for(halt, "cruise") is None
-    made = set_group_halts(halt, ("cruise", "glide"), "전부 정리 테스트")
-    assert made == ["cruise", "glide"] and set_group_halts(halt, ("cruise",), "x") == []
-    assert halted_for(halt, "cruise") == "전부 정리 테스트" and halted_for(halt, "acc") is None
+    assert halted_for(halt, "vega") is None
+    made = set_group_halts(halt, ("vega", "deneb"), "전부 정리 테스트")
+    assert made == ["vega", "deneb"] and set_group_halts(halt, ("vega",), "x") == []
+    assert halted_for(halt, "vega") == "전부 정리 테스트" and halted_for(halt, "acc") is None
     halt.write_text("전체\n", encoding="utf-8")
     assert halted_for(halt, "acc") == "전체"
     assert group_path(halt, "acc").name == "HALT_acc"
-    job = Job("J", "glide", "오르빗", 0, [Item("toss_us", "SCHD", ["glide"], D(3))])
+    job = Job("J", "deneb", "오르빗", 0, [Item("toss_us", "SCHD", ["deneb"], D(3))])
     text = job_text(job)
     assert "Deneb 만" in text and "토스 미국 SCHD 0/3" in text and "정지풀기" in text
 
 
 def test_toss_unknown_end_status_closes_order() -> None:
     """장 마감에 만료된 당일 주문처럼 모르는 끝 상태도 끝난 주문 — 정리가 멈추지 않는다."""
-    item = Item("toss_us", "TQQQ", ["glide"], D(3), glide_part=D(3))
+    item = Item("toss_us", "TQQQ", ["deneb"], D(3), deneb_part=D(3))
     item.orders.append(Order("o0", "c0", D(3), D(50), 0))
     t = _Toss()
     t.orders["o0"] = _TStatus("EXPIRED", D(1), D(50), D("0.05"))
@@ -368,9 +368,9 @@ def test_toss_unknown_end_status_closes_order() -> None:
     assert item.orders[0].closed and item.status == "waiting" and item.remaining == D(2)
 
 
-def test_cruise_includes_binance_coins_and_skips_dust() -> None:
+def test_vega_includes_binance_coins_and_skips_dust() -> None:
     items, notes = _plan(
-        ("cruise",),
+        ("vega",),
         upbit_balances={},
         binance_balances={"BTC": D("0.002"), "ETH": D("0.0001"), "BNB": D(1)},
         binance_prices={"BTC": D(60_000), "ETH": D(3_000)},
@@ -405,7 +405,7 @@ def test_binance_runner_sells_with_ioc_and_reads_fills() -> None:
         def get_order(self, symbol: str, ident: str) -> SpotOrderResult | None:
             return self.book.get(ident)
 
-    item = Item("binance", "BTC", ["cruise"], D("0.002"))
+    item = Item("binance", "BTC", ["vega"], D("0.002"))
     log = run_binance_item(
         item, Fake(), "j1", lambda: 0, lambda s: None, step=D("0.00001"), min_notional=D(5)
     )

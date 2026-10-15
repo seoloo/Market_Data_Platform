@@ -53,8 +53,8 @@ D = Decimal
 ZERO = D(0)
 SCOPES: dict[str, str] = {
     "all": "전부",
-    "cruise": "Vega 만",
-    "glide": "Deneb 만",
+    "vega": "Vega 만",
+    "deneb": "Deneb 만",
     "acc": "자동 적립만",
 }
 FLOOR_PCT = D("0.01")
@@ -106,9 +106,9 @@ class Item:
     symbol: str
     groups: list[str]
     want: Decimal
-    glide_part: Decimal = ZERO
+    deneb_part: Decimal = ZERO
     """Deneb 장부 몫 (토스 미국 TQQQ · SCHD). 팔린 만큼 Deneb 장부에서 뺀다."""
-    glide_booked: Decimal = ZERO
+    deneb_booked: Decimal = ZERO
     status: str = "waiting"
     """waiting · working · done · failed."""
     note: str = ""
@@ -175,7 +175,7 @@ class Job:
                 )
                 for o in x.pop("orders", [])
             ]
-            for k in ("want", "glide_part", "glide_booked"):
+            for k in ("want", "deneb_part", "deneb_booked"):
                 x[k] = D(str(x.get(k, "0")))
             items.append(Item(**x, orders=orders))
         return cls(
@@ -307,10 +307,10 @@ def build_items(
     *,
     upbit_balances: Mapping[str, Decimal],
     upbit_prices: Mapping[str, Decimal],
-    cruise_coins: Sequence[str],
+    vega_coins: Sequence[str],
     toss_holdings: Mapping[str, Decimal],
     toss_sellable: Mapping[str, Decimal],
-    glide_qty: Mapping[str, Decimal],
+    deneb_qty: Mapping[str, Decimal],
     acc_qty: Mapping[str, Decimal],
     is_kr: Callable[[str], bool],
     binance_balances: Mapping[str, Decimal] | None = None,
@@ -328,8 +328,8 @@ def build_items(
     """
     items: list[Item] = []
     notes: list[str] = []
-    if "cruise" in groups:
-        for coin in cruise_coins:
+    if "vega" in groups:
+        for coin in vega_coins:
             qty = upbit_balances.get(coin, ZERO)
             if qty <= 0:
                 continue
@@ -337,8 +337,8 @@ def build_items(
             if qty * px < UPBIT_MIN_KRW:
                 notes.append(f"{coin} {_n(qty)} — 5,000 원 미만이라 업비트 최소 주문 아래 (남김)")
                 continue
-            items.append(Item("upbit", coin, ["cruise"], qty))
-        for coin in cruise_coins:
+            items.append(Item("upbit", coin, ["vega"], qty))
+        for coin in vega_coins:
             qty = (binance_balances or {}).get(coin, ZERO)
             if qty <= 0:
                 continue
@@ -347,22 +347,22 @@ def build_items(
             if qty * px < least:
                 notes.append(f"{coin} {_n(qty)} — 바이낸스 최소 주문 {least} USDT 아래 (남김)")
                 continue
-            items.append(Item("binance", coin, ["cruise"], qty))
+            items.append(Item("binance", coin, ["vega"], qty))
     manual: list[str] = []
     for sym in sorted(toss_holdings):
         held = toss_holdings[sym]
-        g_ledger = min(glide_qty.get(sym, ZERO), held)
+        g_ledger = min(deneb_qty.get(sym, ZERO), held)
         a_ledger = min(acc_qty.get(sym, ZERO), held - g_ledger)
         rest = held - g_ledger - a_ledger
-        if rest > 0 and ("glide" in groups or "acc" in groups):
+        if rest > 0 and ("deneb" in groups or "acc" in groups):
             manual.append(f"{sym} {_n(rest)}")
         parts: list[str] = []
         want = ZERO
-        glide_part = ZERO
-        if "glide" in groups and g_ledger > 0:
+        deneb_part = ZERO
+        if "deneb" in groups and g_ledger > 0:
             want += g_ledger
-            glide_part = g_ledger
-            parts.append("glide")
+            deneb_part = g_ledger
+            parts.append("deneb")
         if "acc" in groups and a_ledger > 0:
             want += a_ledger
             parts.append("acc")
@@ -377,7 +377,7 @@ def build_items(
         if whole <= 0:
             continue
         venue = "toss_kr" if is_kr(sym) else "toss_us"
-        items.append(Item(venue, sym, parts, whole, glide_part=min(glide_part, whole)))
+        items.append(Item(venue, sym, parts, whole, deneb_part=min(deneb_part, whole)))
     if manual:
         notes.append("수동 보유 (자동매매 장부 밖) — 건드리지 않음: " + ", ".join(manual))
     return items, notes
@@ -698,13 +698,13 @@ def run_toss_item(
     return log
 
 
-def glide_to_book(item: Item) -> tuple[Decimal, Decimal]:
-    """아직 Deneb 장부에 안 뺀 (수량, 달러 순수령액). 장부에 쓴 뒤 ``glide_booked`` 를 올린다."""
+def deneb_to_book(item: Item) -> tuple[Decimal, Decimal]:
+    """아직 Deneb 장부에 안 뺀 (수량, 달러 순수령액). 장부에 쓴 뒤 ``deneb_booked`` 를 올린다."""
     closed = [o for o in item.orders if o.closed and o.filled > 0]
     sold = sum((o.filled for o in closed), ZERO)
-    if sold <= 0 or item.glide_part <= item.glide_booked:
+    if sold <= 0 or item.deneb_part <= item.deneb_booked:
         return ZERO, ZERO
-    take = min(sold, item.glide_part) - item.glide_booked
+    take = min(sold, item.deneb_part) - item.deneb_booked
     if take <= 0:
         return ZERO, ZERO
     net = sum((o.amount - o.fee for o in closed), ZERO)

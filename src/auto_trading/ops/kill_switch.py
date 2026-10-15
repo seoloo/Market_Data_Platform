@@ -4,7 +4,7 @@
 사람이 탐색기·메모장만으로 켜고 끌 수 있게 파일로 둔다. 정지 중에도 위험 축소(청산)는 막지 않는
 것이 원칙이다(AGENTS §2).
 
-**그룹 정지** (2026-10-11, 사용자 '전부 정리' 요청): ``data/HALT_cruise`` · ``HALT_glide`` ·
+**그룹 정지** (2026-10-11, 사용자 '전부 정리' 요청): ``data/HALT_vega`` · ``HALT_deneb`` ·
 ``HALT_acc`` 는 그 그룹(Vega · Deneb · 자동 적립)의 새 주문만 멈춘다. 실행기는
 :func:`halted_for` 로 전체 정지와 자기 그룹 정지를 함께 본다.
 
@@ -16,10 +16,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["GROUPS", "group_path", "halted_for", "halted_reason"]
+__all__ = [
+    "GROUPS",
+    "LEGACY",
+    "group_halted",
+    "group_path",
+    "halted_for",
+    "halted_reason",
+    "legacy_path",
+]
 
-GROUPS: dict[str, str] = {"cruise": "Vega", "glide": "Deneb", "acc": "자동 적립"}
+GROUPS: dict[str, str] = {"vega": "Vega", "deneb": "Deneb", "acc": "자동 적립"}
 """그룹 키 → 보이는 이름."""
+LEGACY: dict[str, str] = {"vega": "cruise", "deneb": "glide"}
+"""2026-10-15 이름 변경 전 그룹 키 — 옛 정지 파일(``HALT_glide`` 등)이 남아 있으면
+그것도 정지로 본다."""
 
 
 def halted_reason(path: Path) -> str | None:
@@ -34,12 +45,26 @@ def halted_reason(path: Path) -> str | None:
 
 
 def group_path(halt: Path, group: str) -> Path:
-    """``data/HALT`` 옆의 그룹 정지 파일 (``data/HALT_cruise`` 등)."""
+    """``data/HALT`` 옆의 그룹 정지 파일 (``data/HALT_vega`` 등)."""
     if group not in GROUPS:
         raise ValueError(f"모르는 그룹: {group}")
     return halt.with_name(f"{halt.name}_{group}")
 
 
+def legacy_path(halt: Path, group: str) -> Path | None:
+    """이름 변경 전 그룹 정지 파일 (없으면 None)."""
+    old = LEGACY.get(group)
+    return halt.with_name(f"{halt.name}_{old}") if old else None
+
+
+def group_halted(halt: Path, group: str) -> str | None:
+    """그 그룹 정지 사유(전체 정지는 빼고) — 옛 이름 정지 파일 포함."""
+    old = legacy_path(halt, group)
+    return halted_reason(group_path(halt, group)) or (
+        halted_reason(old) if old is not None else None
+    )
+
+
 def halted_for(halt: Path, group: str) -> str | None:
-    """전체 정지 또는 그 그룹 정지면 사유, 아니면 None."""
-    return halted_reason(halt) or halted_reason(group_path(halt, group))
+    """전체 정지 또는 그 그룹 정지면 사유, 아니면 None (옛 이름 정지 파일 포함)."""
+    return halted_reason(halt) or group_halted(halt, group)

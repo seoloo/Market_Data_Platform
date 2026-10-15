@@ -52,7 +52,9 @@ def inbox_path(root: Path = REPO) -> Path:
 def _start_offset(root: Path) -> int:
     """대기열이 처음 생길 때 — Deneb 이 쓰던 offset 에서 잇는다."""
     try:
-        return int(json.loads((root / "data" / "toss" / "M3.json").read_text("utf-8"))["tg_offset"])
+        return int(
+            json.loads((root / "data" / "toss" / "DENEB.json").read_text("utf-8"))["tg_offset"]
+        )
     except (OSError, ValueError, KeyError, TypeError):
         return 0
 
@@ -132,7 +134,7 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
 
     return [
         [b("🧯 전부 정리", "all")],
-        [b("Vega 만", "cruise"), b("Deneb 만", "glide")],
+        [b("Vega 만", "vega"), b("Deneb 만", "deneb")],
         [b("자동 적립만", "acc")],
         [b("취소", "cancel")],
     ]
@@ -253,7 +255,7 @@ def run(root: Path = REPO) -> int:
     _resume_liquidation()
     _event_alert(root)
     _namu_follow(root)
-    _ag4s2_demo(root)
+    _altair_demo(root)
     _paper_daily(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
@@ -314,14 +316,14 @@ def _namu_follow(root: Path) -> None:
         print(f"나무 모의 따라가기 건너뜀: {type(exc).__name__}: {exc}")
 
 
-def _ag4s2_demo(root: Path) -> None:
+def _altair_demo(root: Path) -> None:
     """Altair(옛 AG4S2) 선물 데모(가짜 돈) — 하루 한 번 롱 맞추기 · 4 시간봉마다 숏 점검."""
-    if not user_settings.get(root, "demo.ag4s2"):
+    if not user_settings.get(root, "demo.altair"):
         return
     try:
-        from scripts import ag4s2_testnet
+        from scripts import altair_demo
 
-        done = ag4s2_testnet.tick()
+        done = altair_demo.tick()
         if done:
             print(f"Altair 데모: {len(done)} 줄")
     except Exception as exc:  # 데모 문제로 봇을 멈추지 않는다

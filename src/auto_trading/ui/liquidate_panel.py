@@ -18,8 +18,8 @@ __all__ = ["liquidate_panel"]
 
 _ASK = {
     "all": "Vega · Deneb · 자동 적립을 모두",
-    "cruise": "Vega(업비트 BTC · ETH · SOL)를",
-    "glide": "Deneb(토스 TQQQ · SCHD Deneb 몫)를",
+    "vega": "Vega(업비트 BTC · ETH · SOL)를",
+    "deneb": "Deneb(토스 TQQQ · SCHD Deneb 몫)를",
     "acc": "자동 적립(미국 · 국내)을",
 }
 

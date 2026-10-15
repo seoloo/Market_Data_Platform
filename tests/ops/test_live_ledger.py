@@ -33,7 +33,7 @@ def _write(root: Path, rel: str, obj: dict[str, Any]) -> None:
 def _seed(root: Path, *, status: str = "SENT", filled: float = 0.0) -> None:
     _write(
         root,
-        "data/toss/M3.json",
+        "data/toss/DENEB.json",
         {
             "deposits": [["2026-10-09", 300_000.0, 223.13, 1344.5]],
             "orders": [
@@ -85,15 +85,15 @@ def test_rows_have_stable_ids_and_status_updates_in_place(tmp_path: Path) -> Non
     first = event_rows(build_books(tmp_path, Quotes()), now="t1")
     ids = {r["id"] for r in first}
     assert {
-        "glide:deposit:2026-10-09:0",
-        "glide:order:M3SCHD-2026-10-09-2",
-        "cruise:deposit:2026-10-08:0",
-        "cruise:order:t2u-2026-10-08-BTC-B",
+        "deneb:deposit:2026-10-09:0",
+        "deneb:order:M3SCHD-2026-10-09-2",
+        "vega:deposit:2026-10-08:0",
+        "vega:order:t2u-2026-10-08-BTC-B",
         "accumulate:BTQ:buy:2026-10-08:0",
     } == ids
-    schd = next(r for r in first if r["id"] == "glide:order:M3SCHD-2026-10-09-2")
+    schd = next(r for r in first if r["id"] == "deneb:order:M3SCHD-2026-10-09-2")
     assert schd["status"].startswith("접수") and schd["currency"] == "USD"
-    dep = next(r for r in first if r["id"] == "glide:deposit:2026-10-09:0")
+    dep = next(r for r in first if r["id"] == "deneb:deposit:2026-10-09:0")
     assert dep["fx"] == 1344.5 and dep["amount"] == 300_000.0
     db = tmp_path / "data/live_ledger.db"
     assert write_sqlite(db, first, []) == (5, 0)
@@ -103,7 +103,7 @@ def test_rows_have_stable_ids_and_status_updates_in_place(tmp_path: Path) -> Non
     assert write_sqlite(db, second, []) == (5, 0)
     with sqlite3.connect(db) as c:
         status, qty, fee = c.execute(
-            "SELECT status, qty, fee FROM ledger_events WHERE id='glide:order:M3SCHD-2026-10-09-2'"
+            "SELECT status, qty, fee FROM ledger_events WHERE id='deneb:order:M3SCHD-2026-10-09-2'"
         ).fetchone()
     assert (status, qty, fee) == ("체결", 3.0, 0.1)
 
@@ -136,7 +136,7 @@ def test_snapshots_and_supabase_upsert_requests(tmp_path: Path) -> None:
         calls.append((url, dict(headers), body))
         return 201
 
-    events = [{"id": "a", "account": "glide"}]
+    events = [{"id": "a", "account": "deneb"}]
     assert push_supabase("https://p.supabase.co/", "sb_secret_x", events, snaps, post) == (1, 1)
     assert calls[0][0] == "https://p.supabase.co/rest/v1/ledger_events?on_conflict=id"
     assert calls[1][0].endswith("/daily_snapshots?on_conflict=date")

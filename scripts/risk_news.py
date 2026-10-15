@@ -33,8 +33,8 @@ from auto_trading.config.secrets import (
     read_env_file,
 )
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
+from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.laya_client import choice_of, from_env
-from auto_trading.ops.m3_live import SYMBOLS as GLIDE_SYMBOLS
 from auto_trading.ops.news_rss import parse_feed
 from auto_trading.ops.risk_news import (
     ALERT_MIN,
@@ -80,7 +80,7 @@ def _us(sym: str, group: str) -> Asset:
 
 
 def assets(root: Path = REPO) -> list[Asset]:
-    out = [_us(s, "Deneb") for s in GLIDE_SYMBOLS]
+    out = [_us(s, "Deneb") for s in DENEB_SYMBOLS]
     acc: list[str] = []
     for f in sorted((root / "data" / "toss").glob("*.json")):
         try:
@@ -89,7 +89,7 @@ def assets(root: Path = REPO) -> list[Asset]:
             continue
         if isinstance(d, dict) and "baseline_qty" in d and d.get("symbol"):
             acc.append(str(d["symbol"]).upper())
-    out += [_us(s, "토스 적립") for s in sorted(set(acc)) if s not in GLIDE_SYMBOLS]
+    out += [_us(s, "토스 적립") for s in sorted(set(acc)) if s not in DENEB_SYMBOLS]
     out += list(CRYPTO)
     known = {a.key for a in out}
     try:  # 그 밖 미국 보유 (수동) — 조회만, 실패하면 건너뜀

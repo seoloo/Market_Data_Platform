@@ -29,7 +29,7 @@ _NAMES = {
 }
 _KST = timedelta(hours=9)
 _HIDDEN = "•••••"
-STALE_HOURS = {"cruise": 30, "accumulate": 30, "glide": 24 * 35}
+STALE_HOURS = {"vega": 30, "accumulate": 30, "deneb": 24 * 35}
 """장부가 이 시간보다 오래되면 '오래된 기록' (Vega · 적립은 매일, Deneb 은 매달 돈다)."""
 PERIODS = (
     ("w1", "1주", 7),
@@ -424,7 +424,7 @@ def _spark(history: Sequence[Mapping[str, Any]], key: str) -> str:
 def _holding_popup(book: Book, j: int, quotes: Quotes, hide: bool) -> tuple[str, str]:
     h = book.holdings[j]
     pid = f"orbit-h-{book.key}-{j}"
-    unit = "주" if book.key != "cruise" else ""
+    unit = "주" if book.key != "vega" else ""
     avg = h.cost_krw / h.qty if h.qty > 0 else 0.0
     rows = [
         ("보유 수량", _HIDDEN if hide else f"{h.qty:,.8g}{unit}"),
@@ -464,10 +464,10 @@ def _card(
     head_extra: str = "",
     pad_rows: int = 0,
 ) -> str:
-    key = book.key if book.key in {"glide", "cruise", "accumulate"} else "other"
+    key = book.key if book.key in {"deneb", "vega", "accumulate"} else "other"
     category, subtitle, glyph = {
-        "glide": ("미국 주식", "Deneb", "chart"),
-        "cruise": ("코인", "Vega", "coins"),
+        "deneb": ("미국 주식", "Deneb", "chart"),
+        "vega": ("코인", "Vega", "coins"),
         "accumulate": ("자동 적립", "자동 적립", "leaf"),
     }.get(key, ("투자 장부", book.title, "wallet"))
     priced = _priced(book, quotes)
@@ -565,7 +565,7 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
     """(타일 4 칸, 아래 왼쪽 일정 칩). 장부 값만 쓰고 없으면 '—'."""
     info = book.info
     cash = f"{_won(book.cash_krw, hide)}원"
-    if book.key == "cruise":
+    if book.key == "vega":
         dd = info.get("dd")
         stopped = bool(info.get("stopped"))
         tiles = [
@@ -579,7 +579,7 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
         last = str(info.get("last_decision") or "")
         chip = "매일 09:05 판단" + (f" · 마지막 {last[5:].replace('-', '/')}" if last else "")
         return "".join(tiles), chip
-    if book.key == "glide":
+    if book.key == "deneb":
         month = str(info.get("month") or "")
         amount = info.get("month_amount")
         lev = info.get("lev_target")
@@ -647,7 +647,7 @@ def _detail(
         else:
             avg = f"{h.cost_krw / h.qty:,.0f}" if h.qty > 0 and h.cost_krw > 0 else "—"
             now = f"{h.value_krw / h.qty:,.0f}" if h.qty > 0 and h.value_krw is not None else "—"
-        unit = "" if book.key == "cruise" else "주"
+        unit = "" if book.key == "vega" else "주"
         qty = _HIDDEN if hide else f"{h.qty:,.8g}{unit}"
         if h.target is not None:
             off = abs(w - h.target) >= 0.10
@@ -803,8 +803,8 @@ def _accounts(books: Sequence[Book], now_ms: int) -> str:
     by_key = {b.key: b for b in books}
     rows = []
     for key, name, venue in (
-        ("glide", "Deneb", "토스증권 · 미국 주식"),
-        ("cruise", "Vega", "업비트 · 코인"),
+        ("deneb", "Deneb", "토스증권 · 미국 주식"),
+        ("vega", "Vega", "업비트 · 코인"),
         ("accumulate", "자동 적립", "토스증권 · 주식 모으기"),
     ):
         b = by_key.get(key)
@@ -978,7 +978,7 @@ def render_live(
             show_detail=show_detail,
             pad_rows=pad,
         )
-        for i, k in enumerate(("glide", "cruise", "accumulate"))
+        for i, k in enumerate(("deneb", "vega", "accumulate"))
     )
     trades = sorted((t for b in books for t in b.trades), key=lambda t: t.date, reverse=True)
     return (

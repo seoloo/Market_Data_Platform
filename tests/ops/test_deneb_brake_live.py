@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from auto_trading.exchange.toss import TossOrderStatus
-from auto_trading.ops.m3_live import M3Order, M3State
+from auto_trading.ops.deneb_live import DenebOrder, DenebState
 from tests.ops.test_toss_accumulate import FakeToss, _FixedDT, _mod, _seed
 
 TQQQ_CLOSES = [
@@ -29,8 +29,8 @@ def _setup(
     sent_msgs: list[str] = []
     fake = FakeToss(usd="2000")
     mod = _mod(monkeypatch, tmp_path, fake)
-    monkeypatch.setattr(mod, "M3_ENABLED", True)
-    monkeypatch.setattr(mod, "M3_START", "2026-10-01")
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-01")
     monkeypatch.setattr(mod, "QS_LIVE", False)
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent_msgs.append(text))
@@ -48,9 +48,11 @@ def _setup(
 
     monkeypatch.setattr(fake, "daily_closes", closes)
     _seed(mod)
-    m3 = M3State("2026-10-01", cash_usd=0.0, qty={"TQQQ": 10.0, "SCHD": 5.0}, done_month="2026-10")
-    m3.orders.append(
-        M3Order(
+    deneb = DenebState(
+        "2026-10-01", cash_usd=0.0, qty={"TQQQ": 10.0, "SCHD": 5.0}, done_month="2026-10"
+    )
+    deneb.orders.append(
+        DenebOrder(
             "2026-10-01",
             "TQQQ",
             "BUY",
@@ -65,12 +67,14 @@ def _setup(
             1.0,
         )
     )
-    mod._save_m3(m3)
+    mod._save_deneb(deneb)
     return mod, fake, ctl, sent_msgs
 
 
 def _state(tmp_path: Path) -> dict[str, Any]:
-    state: dict[str, Any] = json.loads((tmp_path / "data" / "M3.json").read_text(encoding="utf-8"))
+    state: dict[str, Any] = json.loads(
+        (tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8")
+    )
     return state
 
 
@@ -112,7 +116,7 @@ def test_brake_sells_half_quietly_books_reserve_then_rebuys_after_trend_cycle(
     assert not [o for o in fake.sent[n0:] if o[0] == "TQQQ"]
     assert not any("브레이크" in m or "보관금" in m for m in msgs)
     report = json.loads(
-        (tmp_path / "reports" / "M3_BRAKE" / "2026-10-07.json").read_text(encoding="utf-8")
+        (tmp_path / "reports" / "DENEB_BRAKE" / "2026-10-07.json").read_text(encoding="utf-8")
     )
     assert any("보관금 $424.57" in x for x in report["lines"])
     # 3) 10-08 추세 꺼짐 → 기억. 10-09 다시 켜짐 → 보관금으로 TQQQ 되사기
@@ -145,24 +149,24 @@ def test_monthly_target_halves_in_stage_one_and_preview_shows_brake(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     mod, fake, _, _ = _setup(monkeypatch, tmp_path)
-    m3 = mod._load_m3()
+    deneb = mod._load_deneb()
     day = mod.Day(fake, datetime(2026, 11, 2, 21, 0, tzinfo=UTC), dry=True)
-    _, _, base, _ = mod._m3_plan(day, copy.deepcopy(m3), [])
-    m3.brake = {
+    _, _, base, _ = mod._deneb_plan(day, copy.deepcopy(deneb), [])
+    deneb.brake = {
         "ref": "T",
         "stage": 1,
         "lev_peak": 100.0,
         "reserve_usd": 400.0,
         "sales": [{"date": "2026-10-06", "dd": 0.16, "qty": 5, "usd": 400.0}],
     }
-    _, _, half, _ = mod._m3_plan(day, copy.deepcopy(m3), [])
+    _, _, half, _ = mod._deneb_plan(day, copy.deepcopy(deneb), [])
     assert abs(half - base * 0.5) < 1e-12
-    m3.brake["stage"] = 2
-    _, _, zero, _ = mod._m3_plan(day, copy.deepcopy(m3), [])
+    deneb.brake["stage"] = 2
+    _, _, zero, _ = mod._deneb_plan(day, copy.deepcopy(deneb), [])
     assert zero == 0
-    m3.brake["stage"] = 1
-    mod._save_m3(m3)
-    text = mod._m3_preview(datetime(2026, 11, 2, 9, 0, tzinfo=UTC))
+    deneb.brake["stage"] = 1
+    mod._save_deneb(deneb)
+    text = mod._deneb_preview(datetime(2026, 11, 2, 9, 0, tzinfo=UTC))
     assert (
         "🛑 브레이크 매도 내역" in text
         and "고점 대비 −16.0%" in text
@@ -184,13 +188,13 @@ def test_rejected_brake_sale_reverts_stage_and_alerts(
 
 def test_retry_command_does_not_run_brake(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     mod, _, _, _ = _setup(monkeypatch, tmp_path)
-    st = mod._load_m3()
+    st = mod._load_deneb()
     st.done_month = ""
-    st.orders.append(M3Order("2026-10-06", "SCHD", "BUY", 1, 34.0, "c", "", "REJECTED"))
-    mod._save_m3(st)
+    st.orders.append(DenebOrder("2026-10-06", "SCHD", "BUY", 1, 34.0, "c", "", "REJECTED"))
+    mod._save_deneb(st)
     _at(monkeypatch, mod, "2026-10-06")
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 6, 23, 40, tzinfo=UTC))
-    mod.m3_only(telegram=False)
+    mod.deneb_only(telegram=False)
     st2 = _state(tmp_path)
     assert not [o for o in st2["orders"] if o["kind"]]  # 매달 맞추기만, 브레이크 주문 없음
     assert not st2["brake"]  # 브레이크 판단 자체를 하지 않았다
@@ -211,7 +215,7 @@ def test_late_run_after_midnight_ignores_unfinished_us_bar(
     assert not [o for o in fake.sent if o[0] == "TQQQ" and o[1] == "SELL"]
     assert _state(tmp_path)["brake"]["stage"] == 0
     report = json.loads(
-        (tmp_path / "reports" / "M3_BRAKE" / "2026-10-07.json").read_text(encoding="utf-8")
+        (tmp_path / "reports" / "DENEB_BRAKE" / "2026-10-07.json").read_text(encoding="utf-8")
     )
     assert any("TQQQ 2026-10-05 종가" in x for x in report["lines"])
 

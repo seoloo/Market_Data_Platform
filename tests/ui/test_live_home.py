@@ -38,7 +38,7 @@ def _write(root: Path, rel: str, obj: dict[str, Any]) -> None:
 def _seed(root: Path) -> None:
     _write(
         root,
-        "data/toss/M3.json",
+        "data/toss/DENEB.json",
         {
             "cash_usd": 10.0,
             "qty": {"TQQQ": 1.0, "SCHD": 0.0},
@@ -105,13 +105,13 @@ def _seed(root: Path) -> None:
 def test_books_value_with_public_quotes(tmp_path: Path) -> None:
     _seed(tmp_path)
     books = {b.key: b for b in build_books(tmp_path, _Q)}
-    assert set(books) == {"glide", "cruise", "accumulate"}  # QS_SWITCH(Paper) 제외
-    g = books["glide"]
+    assert set(books) == {"deneb", "vega", "accumulate"}  # QS_SWITCH(Paper) 제외
+    g = books["deneb"]
     assert g.deposits_krw == 130_000
     assert g.value_krw == pytest.approx(10 * 1300 + 80 * 1300)
     assert g.holdings[0].cost_krw == pytest.approx(85 * 1300)
     assert g.pending == ("SCHD 3주 · 지정가 $34.00",)
-    c = books["cruise"]
+    c = books["vega"]
     assert c.value_krw == pytest.approx(50_000 + 0.0005 * 110_000_000)
     assert c.holdings[0].cost_krw == pytest.approx(50_025)
     assert "🟢" in c.holdings[0].note
@@ -124,8 +124,8 @@ def test_missing_quotes_fall_back_to_cost(tmp_path: Path) -> None:
     _seed(tmp_path)
     q = Quotes(errors=("업비트 시세 실패: ConnectError",))
     books = build_books(tmp_path, q)
-    cruise = next(b for b in books if b.key == "cruise")
-    assert cruise.value_krw == pytest.approx(50_000 + 50_025)
+    vega = next(b for b in books if b.key == "vega")
+    assert vega.value_krw == pytest.approx(50_000 + 50_025)
     html = render_live(books, q, _NOW)
     assert "원가로 셈" in html and "업비트 시세 실패" in html
 
@@ -205,7 +205,7 @@ def test_missing_prices_hide_aggregate_profit_not_fabricate_a_return(tmp_path: P
 
 
 def test_missing_fx_does_not_mark_dollar_cash_as_confirmed() -> None:
-    book = live_home.glide_book(
+    book = live_home.deneb_book(
         {"deposits": [["2026-10-09", 130_000.0, 100.0, 1300.0]], "cash_usd": 100.0},
         Quotes(),
     )
@@ -227,7 +227,7 @@ def test_stopped_book_is_warning_not_live_health_status(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("value", [0.0, -10.0])
 def test_nonpositive_values_do_not_break_display(value: float) -> None:
-    book = Book("glide", "Deneb", "토스", 0.0, value, ())
+    book = Book("deneb", "Deneb", "토스", 0.0, value, ())
     html = render_live([book], _Q, _NOW)
     assert "nan" not in html.lower() and "inf" not in html.lower()
     assert f"{value:,.0f}" in html
@@ -414,7 +414,7 @@ def test_kr_accumulate_state_is_valued_in_krw(tmp_path: Path) -> None:
     assert book.holdings[0].name == "KODEX 200"
 
 
-def test_binance_cruise_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> None:
+def test_binance_vega_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> None:
     """2026-10-15 Vega 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로."""
     up = tmp_path / "data" / "upbit_t2"
     up.mkdir(parents=True)
@@ -422,7 +422,7 @@ def test_binance_cruise_replaces_upbit_book_and_converts_usdt(tmp_path: Path) ->
         json.dumps({"expected": {"KRW": "296483"}, "deposits": [["2026-10-08", "298024"]]}),
         encoding="utf-8",
     )
-    bn = tmp_path / "data" / "binance_t2"
+    bn = tmp_path / "data" / "vega"
     bn.mkdir(parents=True)
     state = {
         "expected": {"USDT": "100", "BTC": "0.001", "ETH": "0", "SOL": "0"},
@@ -444,9 +444,9 @@ def test_binance_cruise_replaces_upbit_book_and_converts_usdt(tmp_path: Path) ->
     _coins, tickers = live_home.needed(tmp_path)
     assert "BTC-USD" in tickers
     q = Quotes(usd={"BTC-USD": 60_000.0}, fx=1_400.0)
-    (cruise,) = [b for b in build_books(tmp_path, q) if b.key == "cruise"]
-    assert cruise.venue.startswith("바이낸스")
-    assert cruise.cash_krw == pytest.approx(140_000)
-    assert cruise.holdings[0].value_krw == pytest.approx(84_000)  # 0.001 × 60,000 × 1,400
-    assert cruise.deposits_krw == pytest.approx(224_000)
-    assert cruise.holdings[0].cost_krw == pytest.approx(60.06 * 1_400)
+    (vega,) = [b for b in build_books(tmp_path, q) if b.key == "vega"]
+    assert vega.venue.startswith("바이낸스")
+    assert vega.cash_krw == pytest.approx(140_000)
+    assert vega.holdings[0].value_krw == pytest.approx(84_000)  # 0.001 × 60,000 × 1,400
+    assert vega.deposits_krw == pytest.approx(224_000)
+    assert vega.holdings[0].cost_krw == pytest.approx(60.06 * 1_400)

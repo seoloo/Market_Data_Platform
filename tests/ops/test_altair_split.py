@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from auto_trading.ops.falcon_split import falcon_share, move_amount
+from auto_trading.ops.altair_split import altair_share, move_amount
 
 
 def test_share_is_half_for_10_10() -> None:
-    assert falcon_share() == Decimal("0.5")
+    assert altair_share() == Decimal("0.5")
 
 
 def test_small_account_moves_nothing() -> None:

@@ -16,7 +16,7 @@ from auto_trading.core.errors import ConfigError
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
 from auto_trading.exchange.spot import OrderStatus, SpotFilters, SpotOrderResult
-from scripts import live_t2_binance as m
+from scripts import vega_live as m
 
 DAY = 86_400_000
 NOW = 1_792_000_000_000 - 1_792_000_000_000 % DAY + 5 * 60_000  # 어떤 날 00:05 UTC
@@ -129,9 +129,9 @@ _SPLIT = m._split
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(m, "_split", lambda *a, **k: [])  # Altair 분배는 아래 시험에서만
     monkeypatch.setattr(m, "REPO", tmp_path)
-    monkeypatch.setattr(m, "DATA", tmp_path / "data" / "binance_t2")
-    monkeypatch.setattr(m, "STATE", tmp_path / "data" / "binance_t2" / "state.json")
-    monkeypatch.setattr(m, "REPORTS", tmp_path / "reports" / "binance_t2")
+    monkeypatch.setattr(m, "DATA", tmp_path / "data" / "vega")
+    monkeypatch.setattr(m, "STATE", tmp_path / "data" / "vega" / "state.json")
+    monkeypatch.setattr(m, "REPORTS", tmp_path / "reports" / "vega")
     monkeypatch.setattr(m, "HALT", tmp_path / "data" / "HALT")
     monkeypatch.setattr(time, "time", lambda: NOW / 1000)
     monkeypatch.setattr(time, "sleep", lambda s: None)
@@ -152,14 +152,14 @@ def test_first_run_buys_three_coins_with_ioc_at_third_level(
     assert m.run_cmd() == 0 and len(fake.sent) == 3  # 같은 날 다시: 주문 없음
 
 
-def test_halt_cruise_blocks_orders(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_halt_vega_blocks_orders(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (env / "data").mkdir(parents=True)
-    (env / "data" / "HALT_cruise").write_text("전부 정리", encoding="utf-8")
+    (env / "data" / "HALT_vega").write_text("전부 정리", encoding="utf-8")
     fake = FakeBinance(Decimal(1000))
     monkeypatch.setattr(m, "_client", lambda **_: fake)
     assert m.run_cmd() == 0
     assert fake.sent == []
-    outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
+    outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
     assert "긴급 정지" in outbox
 
 
@@ -235,7 +235,7 @@ def _db(env: Path) -> None:
         conn.executescript((sql / "009_wallet_transfers.sql").read_text(encoding="utf-8"))
 
 
-def test_falcon_split_moves_half_once_big_enough(
+def test_altair_split_moves_half_once_big_enough(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _db(env)
@@ -246,11 +246,11 @@ def test_falcon_split_moves_half_once_big_enough(
     assert fake.moved == [Decimal("600.00")]  # 첫 분배: 선물 목표 50%
     st = json.loads(m.STATE.read_text(encoding="utf-8"))
     assert st["deposits"][0][1] == "600.00"  # Vega 는 남은 600 만 자기 돈으로 본다
-    outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
+    outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
     assert "Altair 몫 600.00 USDT 현물 → 선물 이체" in outbox
 
 
-def test_falcon_split_small_account_and_rejected(
+def test_altair_split_small_account_and_rejected(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from auto_trading.core.errors import OrderRejectedError
@@ -266,5 +266,5 @@ def test_falcon_split_small_account_and_rejected(
     monkeypatch.setattr(m, "_client", lambda **_: big)
     monkeypatch.setattr(time, "time", lambda: NOW / 1000 + 86_400)
     assert m.run_cmd() == 0  # 거부돼도 Vega 는 돈다
-    outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
+    outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
     assert "Altair 이체 거부" in outbox and "Universal Transfer" in outbox

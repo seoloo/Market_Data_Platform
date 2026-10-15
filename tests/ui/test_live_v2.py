@@ -40,7 +40,7 @@ def _write(root: Path, rel: str, obj: dict[str, Any]) -> Path:
     return path
 
 
-def _book(key: str = "cruise", *, updated_ms: int = _NOW - _H, value: float | None = 120.0) -> Book:
+def _book(key: str = "vega", *, updated_ms: int = _NOW - _H, value: float | None = 120.0) -> Book:
     return Book(
         key,
         key.title(),
@@ -76,7 +76,7 @@ def test_update_stamps_and_stale_ledger_are_visible() -> None:
     assert "오래된 기록" in old and "오래된 장부 1개" in old and "orbit-stale" in old
     assert "장부가 오래됨" in old  # 확인할 사항에도
     # Deneb 은 매달 도니 40 시간은 오래된 게 아니다
-    assert "오래된" not in render_live([_book("glide", updated_ms=_NOW - 40 * _H)], Quotes(), _NOW)
+    assert "오래된" not in render_live([_book("deneb", updated_ms=_NOW - 40 * _H)], Quotes(), _NOW)
 
 
 def test_missing_price_gets_estimate_badge_not_confirmed_value() -> None:
@@ -87,8 +87,8 @@ def test_missing_price_gets_estimate_badge_not_confirmed_value() -> None:
 
 def test_holding_detail_popup_has_numbers_and_no_order_button() -> None:
     html = render_live([_book()], Quotes(usd={}, at_ms=_NOW), _NOW)
-    assert 'popovertarget="orbit-h-cruise-0"' in html and 'id="orbit-h-cruise-0"' in html
-    pop = html.split('id="orbit-h-cruise-0"', 1)[1].split("</section>", 1)[0]
+    assert 'popovertarget="orbit-h-vega-0"' in html and 'id="orbit-h-vega-0"' in html
+    pop = html.split('id="orbit-h-vega-0"', 1)[1].split("</section>", 1)[0]
     for label in ("보유 수량", "평균 매입단가", "현재 가격", "평가금액", "평가손익", "가격 기준"):
         assert label in pop
     assert "200원" in pop and "240원" in pop  # 원가 100 ÷ 0.5 · 평가 120 ÷ 0.5
@@ -111,7 +111,7 @@ def test_trades_have_details_status_and_filter() -> None:
 
 
 def test_accounts_show_last_success_missing_and_stale() -> None:
-    html = render_live([_book(), _book("glide", updated_ms=_NOW - 900 * _H)], Quotes(), _NOW)
+    html = render_live([_book(), _book("deneb", updated_ms=_NOW - 900 * _H)], Quotes(), _NOW)
     pop = html.split('id="orbit-accounts"', 1)[1].split("</section>", 1)[0]
     assert "마지막 조회 성공 · 10/10 14:00" in pop
     assert "오래된 장부" in pop and "연결 미확인 · 장부 없음" in pop
@@ -233,8 +233,8 @@ class TestLiveServer:
 
 
 def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
-    cruise = Book(
-        "cruise",
+    vega = Book(
+        "vega",
         "Vega",
         "업비트",
         300.0,
@@ -251,8 +251,8 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
             "last_decision": "2026-10-09",
         },
     )
-    html = render_live([cruise], Quotes(at_ms=_NOW), _NOW, show_detail=True)
-    dt = html.split('data-live="card-cruise-detail"', 1)[1].split("</details>", 1)[0]
+    html = render_live([vega], Quotes(at_ms=_NOW), _NOW, show_detail=True)
+    dt = html.split('data-live="card-vega-detail"', 1)[1].split("</details>", 1)[0]
     for text in (
         "현금",
         "남은 돈",
@@ -270,8 +270,8 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
         assert text in dt, text
     assert "50 / 41%" in dt  # BTC 150 / 300
     assert 'class="warn">17 / 0%' in dt  # 목표에서 10%p 넘게 벗어나면 노랑
-    glide = Book(
-        "glide",
+    deneb = Book(
+        "deneb",
         "Deneb",
         "토스",
         300_000.0,
@@ -285,8 +285,8 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
             "brake_stage": 1,
         },
     )
-    g = render_live([glide], Quotes(usd={"TQQQ": 80.98}, at_ms=_NOW), _NOW, show_detail=True)
-    gd = g.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
+    g = render_live([deneb], Quotes(usd={"TQQQ": 80.98}, at_ms=_NOW), _NOW, show_detail=True)
+    gd = g.split('data-live="card-deneb-detail"', 1)[1].split("</details>", 1)[0]
     for text in (
         "남은 달러 $42.55",
         "10월 첫 거래일",
@@ -299,13 +299,13 @@ def test_detail_tiles_bar_and_table_follow_approved_layout() -> None:
     ):
         assert text in gd, text
     assert "시장이 잔잔해" not in gd
-    hidden = render_live([glide], Quotes(usd={"TQQQ": 80.98}), _NOW, hide=True)
-    hd = hidden.split('data-live="card-glide-detail"', 1)[1].split("</details>", 1)[0]
+    hidden = render_live([deneb], Quotes(usd={"TQQQ": 80.98}), _NOW, hide=True)
+    hd = hidden.split('data-live="card-deneb-detail"', 1)[1].split("</details>", 1)[0]
     assert "57,057" not in hd and "300,000" not in hd and "42.55" not in hd and "60%" in hd
 
 
 def test_one_toggle_opens_all_three_details_and_words_stay_whole() -> None:
-    closed = render_live([_book(), _book("glide")], Quotes(), _NOW)
+    closed = render_live([_book(), _book("deneb")], Quotes(), _NOW)
     assert closed.count("orbit-book-detail") == 3 and closed.count('-detail" hidden>') == 3
     assert 'href="/live?detail=open"' in closed and "상세 보기" in closed
     assert "orbit-detail-open" not in closed  # 카드마다 있던 링크는 없다
@@ -316,10 +316,10 @@ def test_one_toggle_opens_all_three_details_and_words_stay_whole() -> None:
 
 def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> None:
     two = Book(
-        "glide", "Deneb", "토스", 1.0, 0.0, (Holding("TQQQ", 1, 1, 1), Holding("SCHD", 1, 1, 1))
+        "deneb", "Deneb", "토스", 1.0, 0.0, (Holding("TQQQ", 1, 1, 1), Holding("SCHD", 1, 1, 1))
     )
     three = Book(
-        "cruise",
+        "vega",
         "Vega",
         "업비트",
         1.0,
@@ -327,10 +327,10 @@ def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> N
         tuple(Holding(c, 1, 1, 1) for c in ("BTC", "ETH", "SOL")),
     )
     html = render_live([two, three], Quotes(), _NOW, show_detail=True)
-    glide = html.split('id="live-book-0"', 1)[1].split('id="live-book-1"', 1)[0]
+    deneb = html.split('id="live-book-0"', 1)[1].split('id="live-book-1"', 1)[0]
     acc = html.split('id="live-book-2"', 1)[1]
-    assert glide.count('<li class="orbit-pad"') == 1  # 3 종목 카드에 맞춰 한 줄 채움
-    assert glide.count('<tr class="orbit-pad"') == 1
+    assert deneb.count('<li class="orbit-pad"') == 1  # 3 종목 카드에 맞춰 한 줄 채움
+    assert deneb.count('<tr class="orbit-pad"') == 1
     assert acc.count('<li class="orbit-pad"') == 2  # 기록 없음 한 줄 + 빈 줄 둘
     # 버튼은 카드 밖, 화면 읽는 법 카드와 카드들 사이 줄에 (오른쪽 선 맞춤은 CSS)
     tools = html.split('class="orbit-cards-tools"', 1)[1].split('class="orbit-cards"', 1)[0]
@@ -338,7 +338,7 @@ def test_cards_pad_rows_so_lines_match_and_toggle_sits_in_accumulate_card() -> N
     assert "flex:" in html.split('class="orbit-dt-bar"', 1)[1][:200]  # 비율대로 꽉 채움
 
 
-def test_glide_brake_reserve_counts_in_value_summary_and_tiles() -> None:
+def test_deneb_brake_reserve_counts_in_value_summary_and_tiles() -> None:
     from auto_trading.ui import live_home
 
     state = {
@@ -348,7 +348,7 @@ def test_glide_brake_reserve_counts_in_value_summary_and_tiles() -> None:
         "brake": {"stage": 1, "reserve_usd": 90.0},
     }
     q = Quotes(usd={"SCHD": 30.0}, fx=1300.0, at_ms=_NOW)
-    book = live_home.glide_book(state, q)
+    book = live_home.deneb_book(state, q)
     # 남은 달러 10 + 보관 90 = 100 달러 → 130,000원, SCHD 3 × 30 × 1300 = 117,000원
     assert book.cash_krw == pytest.approx(130_000.0)
     assert book.value_krw == pytest.approx(247_000.0)
@@ -356,7 +356,7 @@ def test_glide_brake_reserve_counts_in_value_summary_and_tiles() -> None:
     assert any("브레이크 보관 달러 $90.00" in n for n in book.notes)
     assert "247,000원" in live_home.summary_text([book], q, _NOW)  # 텔레그램 현황도 같은 합
     html = render_live([book], q, _NOW, show_detail=True)
-    dt = html.split('data-live="card-glide-detail"', 1)[1].split("</section>", 1)[0]
+    dt = html.split('data-live="card-deneb-detail"', 1)[1].split("</section>", 1)[0]
     assert "보관 $90.00 포함" in dt and "판 돈 $90.00 보관" in dt and "절반 팖" in dt
     hidden = render_live([book], q, _NOW, show_detail=True, hide=True)
-    assert "90.00" not in hidden.split('data-live="card-glide-detail"', 1)[1]
+    assert "90.00" not in hidden.split('data-live="card-deneb-detail"', 1)[1]

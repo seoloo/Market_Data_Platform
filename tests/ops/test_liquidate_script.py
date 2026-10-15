@@ -131,15 +131,15 @@ class FakeToss:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     FakeUpbit.sent, FakeToss.sent, FakeToss.canceled, FakeToss.orders = [], [], [], {}
-    m3 = tmp_path / "M3.json"
-    m3.write_text(
+    deneb = tmp_path / "DENEB.json"
+    deneb.write_text(
         json.dumps({"start": "2026-10-01", "cash_usd": 10.0, "qty": {"TQQQ": 1.0, "SCHD": 3.0}}),
         encoding="utf-8",
     )
     sent: list[str] = []
     monkeypatch.setattr(liq, "STORE", Store(tmp_path / "liq"))
     monkeypatch.setattr(liq, "HALT", tmp_path / "HALT")
-    monkeypatch.setattr(liq, "M3_FILE", m3)
+    monkeypatch.setattr(liq, "DENEB_FILE", deneb)
     monkeypatch.setattr(liq, "TOSS_DATA", tmp_path)  # 진짜 장부를 읽지 않게
     (tmp_path / "BTQ.json").write_text(
         json.dumps({"symbol": "BTQ", "baseline_qty": 0.0, "last_qty": 1.0}), encoding="utf-8"
@@ -150,14 +150,14 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(liq, "_us_open", lambda r, now: FakeToss.open_session)
     monkeypatch.setattr(liq, "_notify", sent.append)
     monkeypatch.setattr("scripts.liquidate.time.sleep", lambda _s: None)
-    return {"tmp": tmp_path, "m3": m3, "sent": sent}
+    return {"tmp": tmp_path, "m3": deneb, "sent": sent}
 
 
-def test_glide_only_halts_cancels_buys_and_waits_for_session(env: dict[str, Any]) -> None:
-    text = liq.start("glide", "텔레그램")
+def test_deneb_only_halts_cancels_buys_and_waits_for_session(env: dict[str, Any]) -> None:
+    text = liq.start("deneb", "텔레그램")
     tmp = env["tmp"]
-    assert group_path(tmp / "HALT", "glide").exists()
-    assert not group_path(tmp / "HALT", "cruise").exists()
+    assert group_path(tmp / "HALT", "deneb").exists()
+    assert not group_path(tmp / "HALT", "vega").exists()
     assert FakeToss.canceled == ["b2"]  # Deneb 종목 매수만 (BTQ 적립 매수는 그대로)
     assert not FakeUpbit.sent and not FakeToss.sent  # 장 닫힘 → 대기
     assert "⏳ 장 열리면 토스 미국 TQQQ 0/1" in text and "SCHD 0/3" in text
@@ -174,23 +174,23 @@ def test_glide_only_halts_cancels_buys_and_waits_for_session(env: dict[str, Any]
         liq.resume()
     finally:
         FakeToss.open_session = False
-    m3 = json.loads(env["m3"].read_text(encoding="utf-8"))
-    assert m3["qty"] == {"TQQQ": 0.0, "SCHD": 0.0}
-    assert m3["cash_usd"] == pytest.approx(10 + 81 - 0.081 + 27 - 0.027)
+    deneb = json.loads(env["m3"].read_text(encoding="utf-8"))
+    assert deneb["qty"] == {"TQQQ": 0.0, "SCHD": 0.0}
+    assert deneb["cash_usd"] == pytest.approx(10 + 81 - 0.081 + 27 - 0.027)
     job = liq.STORE.jobs()[-1]
     assert job.done and job.reported and "✅ 정리 끝" in env["sent"][-1]
     liq.resume()  # 끝난 작업은 다시 보내지 않는다
     assert sum("정리 끝" in s for s in env["sent"]) == 1
 
 
-def test_cruise_sells_upbit_now_and_unhalt(env: dict[str, Any]) -> None:
-    text = liq.start("cruise", "오르빗")
+def test_vega_sells_upbit_now_and_unhalt(env: dict[str, Any]) -> None:
+    text = liq.start("vega", "오르빗")
     assert FakeUpbit.sent == [("KRW-BTC", D("0.01"), D(99_998_000))]
     assert "✅ 끝 업비트 BTC 0.01/0.01" in text and not FakeToss.canceled
     assert liq.STORE.jobs()[-1].done
-    assert "정지 풀림" in liq.unhalt("cruise", "텔레그램")
-    assert not group_path(env["tmp"] / "HALT", "cruise").exists()
-    assert "정지 중이 아니에요" in liq.unhalt("cruise", "텔레그램")
+    assert "정지 풀림" in liq.unhalt("vega", "텔레그램")
+    assert not group_path(env["tmp"] / "HALT", "vega").exists()
+    assert "정지 중이 아니에요" in liq.unhalt("vega", "텔레그램")
 
 
 def test_acc_scope_sells_only_ledger_share(env: dict[str, Any]) -> None:

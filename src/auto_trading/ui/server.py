@@ -40,7 +40,12 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from auto_trading.ops import env_keys, phone_link, task_setup, user_settings
-from auto_trading.ops.kill_switch import GROUPS, group_path, halted_reason
+from auto_trading.ops.kill_switch import (
+    GROUPS,
+    group_halted,
+    group_path,
+    legacy_path,
+)
 from auto_trading.ops.kr_accumulate import read_universe
 from auto_trading.ops.liquidate import SCOPES, Store, job_text
 from auto_trading.ui.catchup import CatchupRunner
@@ -485,6 +490,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(400, "<!doctype html><meta charset='utf-8'><p>모르는 그룹</p>")
                 return
             group_path(root / "data" / "HALT", group).unlink(missing_ok=True)
+            old = legacy_path(root / "data" / "HALT", group)
+            if old is not None:
+                old.unlink(missing_ok=True)
             self._redirect("/settings?unhalt=1#set-liquidate")
             return
         current = user_settings.load(root)
@@ -622,7 +630,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 def _liq_panel(root: Path, token: str) -> tuple[str, str]:
     halt = root / "data" / "HALT"
-    halts = {g: halted_reason(group_path(halt, g)) for g in GROUPS}
+    halts = {g: group_halted(halt, g) for g in GROUPS}
     jobs = Store(root / "data" / "liquidate").jobs()
     return liquidate_panel(token, halts, job_text(jobs[-1]) if jobs else "")
 
@@ -706,9 +714,9 @@ def _default_groups(
     for g, _, _ in task_setup.GROUPS:
         names = {t.name for t in task_setup.TASKS if t.group == g}
         need = {
-            "glide": ("TOSS_CLIENT_ID",),
+            "deneb": ("TOSS_CLIENT_ID",),
             "toss": ("TOSS_CLIENT_ID",),
-            "cruise": ("UPBIT_API_KEY",),
+            "vega": ("UPBIT_API_KEY",),
             "common": ("TELEGRAM_BOT_TOKEN",),
             "info": ("TELEGRAM_INFO_BOT_TOKEN",),
         }.get(g, ())

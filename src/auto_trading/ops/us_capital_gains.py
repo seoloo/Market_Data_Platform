@@ -207,7 +207,7 @@ def unrealized(
 
 
 def tax_lines(
-    *, gain_krw: float, glide_krw: float, tax_krw: float, room_krw: float, unreal_krw: float
+    *, gain_krw: float, deneb_krw: float, tax_krw: float, room_krw: float, unreal_krw: float
 ) -> list[str]:
     """매달 Deneb 알림 아래 양도세 줄 (순수)."""
     from auto_trading.notify.style import sub
@@ -215,7 +215,7 @@ def tax_lines(
     return [
         "🧾 올해 해외주식 양도 (추정 · 토스 결제일 환율)",
         f"· 실현 손익 {gain_krw:+,.0f}원",
-        sub(f"Deneb {glide_krw:+,.0f}원 · 그 밖 {gain_krw - glide_krw:+,.0f}원"),
+        sub(f"Deneb {deneb_krw:+,.0f}원 · 그 밖 {gain_krw - deneb_krw:+,.0f}원"),
         f"· 예상 세금 {tax_krw:,.0f}원 (250만 원 공제 뒤 22%)",
         f"· 세금 없이 더 실현할 수 있는 이익 {room_krw:,.0f}원",
         f"· 아직 안 판 평가 손익 {unreal_krw:+,.0f}원",

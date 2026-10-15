@@ -47,7 +47,7 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]
 
     monkeypatch.setattr(liq, "start", start)
     monkeypatch.setattr(liq, "unhalt", unhalt)
-    monkeypatch.setattr(liq, "halts", lambda: {"cruise": "전부 정리", "glide": None, "acc": None})
+    monkeypatch.setattr(liq, "halts", lambda: {"vega": "전부 정리", "deneb": None, "acc": None})
     return calls
 
 
@@ -61,12 +61,12 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
     kind, (text, buttons) = bot.out[-1]
     assert kind == "buttons" and "미리 보기" in text and not fake["start"]
     data = [b["callback_data"] for row in buttons for b in row]
-    assert [d.rsplit(":", 1)[1] for d in data] == ["all", "cruise", "glide", "acc", "cancel"]
-    glide = next(d for d in data if d.endswith(":glide"))
-    assert not tb.handle_liquidation(bot, _press(glide))  # type: ignore[arg-type]
-    assert fake["start"] == [("glide", "텔레그램")]
-    tb.handle_liquidation(bot, _press(glide))  # type: ignore[arg-type]  # 두 번째 누름
-    assert fake["start"] == [("glide", "텔레그램")] and "지난 버튼" in bot.out[-1][1]
+    assert [d.rsplit(":", 1)[1] for d in data] == ["all", "vega", "deneb", "acc", "cancel"]
+    deneb = next(d for d in data if d.endswith(":deneb"))
+    assert not tb.handle_liquidation(bot, _press(deneb))  # type: ignore[arg-type]
+    assert fake["start"] == [("deneb", "텔레그램")]
+    tb.handle_liquidation(bot, _press(deneb))  # type: ignore[arg-type]  # 두 번째 누름
+    assert fake["start"] == [("deneb", "텔레그램")] and "지난 버튼" in bot.out[-1][1]
 
 
 def test_cancel_button_and_forged_nonce(fake: dict[str, list[Any]]) -> None:
@@ -85,7 +85,7 @@ def test_unhalt_lists_only_halted_groups(fake: dict[str, list[Any]]) -> None:
     text, buttons = bot.out[-1][1]
     assert "Vega" in text and len(buttons) == 2  # Vega 풀기 + 취소
     tb.handle_liquidation(bot, _press(buttons[0][0]["callback_data"]))  # type: ignore[arg-type]
-    assert fake["unhalt"] == [("cruise", "텔레그램")]
+    assert fake["unhalt"] == [("vega", "텔레그램")]
 
 
 def test_help_words_route_to_bot_and_pin_help(

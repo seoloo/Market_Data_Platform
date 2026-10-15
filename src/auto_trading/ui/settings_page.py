@@ -121,14 +121,14 @@ SECTIONS = (
     ("tasks", "자동 실행"),
     ("phone", "휴대폰"),
     ("goal", "목표 · 보고"),
-    ("glide", "Deneb"),
-    ("cruise", "Vega"),
+    ("deneb", "Deneb"),
+    ("vega", "Vega"),
     ("toss", "자동 적립"),
     ("alerts", "알림"),
     ("screen", "화면"),
     ("safety", "안전 · 기록"),
 )
-FORM_TABS = ("goal", "glide", "cruise", "toss", "alerts", "screen")
+FORM_TABS = ("goal", "deneb", "vega", "toss", "alerts", "screen")
 """큰 설정 폼(확인 → 저장)을 쓰는 쪽 — 아래 '저장…' 막대는 이 쪽에서만 보인다."""
 
 
@@ -269,37 +269,37 @@ def render_settings(
         )
         + "</section>"
     )
-    glide = (
-        '<section class="set-card" id="set-glide"><h2>Deneb · 토스</h2>'
+    deneb = (
+        '<section class="set-card" id="set-deneb"><h2>Deneb · 토스</h2>'
         '<p class="set-sub">TQQQ + SCHD, 매달 첫 거래일 밤 장 마감 지정가</p><div class="set-grid">'
         + _num(
-            "glide.monthly_krw",
+            "deneb.monthly_krw",
             "기본 월 납입",
-            v["glide.monthly_krw"],
+            v["deneb.monthly_krw"],
             "원",
             "텔레그램 답이 없을 때 쓰는 금액 · 답하면 그 달만 바뀌어요",
             errors,
         )
         + _num(
-            "glide.max_krw",
+            "deneb.max_krw",
             "한 달 상한",
-            v["glide.max_krw"],
+            v["deneb.max_krw"],
             "원",
             "이보다 큰 답은 잘못 친 걸로 보고 다시 물어요",
             errors,
         )
         + "</div>"
         + _toggle(
-            "glide.ask_on",
+            "deneb.ask_on",
             "매수 전날 금액 묻기",
             "끄면 기본 월 납입으로 바로 사요",
-            v["glide.ask_on"],
+            v["deneb.ask_on"],
         )
         + _toggle(
-            "glide.harvest_on",
+            "deneb.harvest_on",
             "12월 양도세 공제 실현",
             "12월 공지 · 버튼으로 진행",
-            v["glide.harvest_on"],
+            v["deneb.harvest_on"],
         )
         + '<div class="set-toggle"><div><b>매수 · 체결 알림</b><small>실거래라 항상 켜져 있어요'
         '</small></div><input type="checkbox" class="set-switch" checked disabled '
@@ -316,8 +316,8 @@ def render_settings(
             "연구 182 · 183 ~ 189 로 정한 값이에요. 바꾸려면 새 연구로 확인한 뒤에.",
         )
     )
-    cruise = (
-        '<section class="set-card" id="set-cruise"><h2>Vega · 업비트</h2>'
+    vega = (
+        '<section class="set-card" id="set-vega"><h2>Vega · 업비트</h2>'
         '<p class="set-sub">BTC · ETH · SOL 추세 비중, 매일 지정가</p><div class="set-grid">'
         '<div class="set-field"><span class="set-label">매일 실행 시각'
         '<span class="set-soon">준비 중</span></span>'
@@ -327,16 +327,16 @@ def render_settings(
         '<p class="set-help">계좌 단위 가치가 고점보다 30% 내리면 새 매수만 멈춰요. '
         "풀기는 텔레그램 안내의 명령으로 사람이 해요.</p></div></div>"
         + _toggle(
-            "alerts.cruise_trade",
+            "alerts.vega_trade",
             "매매한 날 알림",
             "비중 바뀐 이유 · 코인별 손익",
-            v["alerts.cruise_trade"],
+            v["alerts.vega_trade"],
         )
         + _toggle(
-            "alerts.cruise_weekly",
+            "alerts.vega_weekly",
             "토요일 주간 요약",
             "토 09:30 · 김프 한 줄",
-            v["alerts.cruise_weekly"],
+            v["alerts.vega_weekly"],
         )
         + "</section>"
         + _locked(
@@ -538,8 +538,8 @@ def render_settings(
     )
     parts = {
         "goal": goal,
-        "glide": glide,
-        "cruise": cruise,
+        "deneb": deneb,
+        "vega": vega,
         "toss": toss,
         "alerts": alerts,
         "screen": screen,

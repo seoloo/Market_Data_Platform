@@ -14,17 +14,17 @@ def _write(root: Path, rel: str, data: object) -> None:
     p.write_text(json.dumps(data), encoding="utf-8")
 
 
-def test_upbit_hidden_and_falcon_card(tmp_path: Path) -> None:
+def test_upbit_hidden_and_altair_card(tmp_path: Path) -> None:
     q = Quotes(fx=1400.0)
     _write(tmp_path, "data/upbit_t2/state.json", {"expected": {"KRW": "296482"}, "deposits": []})
     assert build_books(tmp_path, q) == []  # 업비트 장부는 실거래 화면에 안 나온다
     _write(
         tmp_path,
-        "data/binance_t2/state.json",
+        "data/vega/state.json",
         {
             "expected": {"USDT": "100"},
             "deposits": [["2026-10-15", "1200"]],
-            "falcon": {
+            "altair": {
                 "futures_usdt": "600",
                 "checked": "2026-10-15",
                 "transfers": [["2026-10-15", "600.00"]],
@@ -32,7 +32,7 @@ def test_upbit_hidden_and_falcon_card(tmp_path: Path) -> None:
         },
     )
     books = {b.key: b for b in build_books(tmp_path, q)}
-    assert set(books) == {"cruise", "falcon"}
-    f = books["falcon"]
+    assert set(books) == {"vega", "altair"}
+    f = books["altair"]
     assert f.title == "Altair" and f.cash_krw == 600 * 1400.0 and f.deposits_krw == 600 * 1400.0
     assert any("선물 지갑 600.00 USDT" in n for n in f.notes)
