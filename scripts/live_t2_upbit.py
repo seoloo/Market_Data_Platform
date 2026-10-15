@@ -218,6 +218,13 @@ def _send(
 
 
 def run_cmd() -> int:
+    # 2026-10-15 Cruise 를 바이낸스로 옮김(scripts.live_t2_binance) — 옛 예약이 남아 있어도 업비트에
+    # 남은 원화로 사지 않게, 환경변수 CRUISE_UPBIT=on 일 때만 업비트에서 주문한다.
+    import os
+
+    if os.environ.get("CRUISE_UPBIT", "").strip().lower() != "on":
+        print("Cruise 는 바이낸스로 옮겼어요(2026-10-15) — 업비트 실행은 하지 않아요")
+        return 0
     now_ms = int(time.time() * 1000)
     st = _load()
     halted = halted_for(HALT, "cruise")  # 전체 정지 또는 Cruise 정지(전부 정리 뒤)

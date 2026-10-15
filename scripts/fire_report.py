@@ -35,15 +35,28 @@ def _read(path: Path) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
+def _fx_now() -> float:
+    """원/달러 (USDT 입금을 원화로) — 실거래 홈과 같은 시세. 못 받으면 0 (그 입금은 0 원으로 셈)."""
+    return fetch_quotes((), ()).fx or 0.0
+
+
 def dated_deposits(root: Path) -> list[tuple[str, float]]:
     """(날짜, 원) — Glide 입금 · Cruise 입금 · 토스 적립 원가."""
     out: list[tuple[str, float]] = []
     for row in _read(root / "data" / "toss" / "M3.json").get("deposits") or []:
         if isinstance(row, list) and len(row) >= 2:
             out.append((str(row[0]), float(row[1])))
-    for row in _read(root / "data" / "upbit_t2" / "state.json").get("deposits") or []:
-        if isinstance(row, list) and len(row) >= 2:
-            out.append((str(row[0]), float(row[1])))
+    binance = _read(root / "data" / "binance_t2" / "state.json")
+    # Cruise 를 바이낸스로 옮긴 뒤(2026-10-15): 같은 돈을 두 번 세지 않게 업비트 입금은 뺀다
+    if binance:
+        fx = _fx_now()
+        for row in binance.get("deposits") or []:
+            if isinstance(row, list) and len(row) >= 2:
+                out.append((str(row[0]), float(row[1]) * fx))
+    else:
+        for row in _read(root / "data" / "upbit_t2" / "state.json").get("deposits") or []:
+            if isinstance(row, list) and len(row) >= 2:
+                out.append((str(row[0]), float(row[1])))
     for path in sorted((root / "data" / "toss").glob("*.json")):
         if path.stem in ("M3", "QS_SWITCH"):
             continue

@@ -91,6 +91,7 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Any, FakeUpbit
     monkeypatch.setattr(mod, "HALT", tmp_path / "HALT")
     monkeypatch.setattr(mod, "_client", lambda: fake)
     monkeypatch.setattr(mod, "_notify", sent.append)
+    monkeypatch.setenv("CRUISE_UPBIT", "on")  # 2026-10-15 바이낸스로 옮긴 뒤엔 켜야만 돈다
     monkeypatch.setattr("scripts.live_t2_upbit.time.sleep", lambda s: None)
     monkeypatch.setattr("scripts.live_t2_upbit.time.time", lambda: 300 * DAY / 1000 + 3600)
     return mod, fake, sent
@@ -189,3 +190,13 @@ def test_kimp_line_and_failure_does_not_block() -> None:
         raise OSError("down")
 
     assert "확인 실패" in mod.kimp_line(Decimal(1), bad)
+
+
+def test_retired_upbit_run_orders_nothing_without_flag(
+    env: tuple[Any, FakeUpbit, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-15 Cruise 를 바이낸스로 옮김 — 옛 업비트 예약이 남아 있어도 주문하지 않는다."""
+    m, fake, sent = env
+    monkeypatch.delenv("CRUISE_UPBIT")
+    assert m.run_cmd() == 0
+    assert fake.sent == [] and sent == []

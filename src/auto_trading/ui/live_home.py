@@ -22,6 +22,8 @@ from auto_trading.ui.data import DashboardData
 __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_history"]
 
 CRUISE_COINS = ("BTC", "ETH", "SOL")
+BINANCE_CRUISE = Path("data") / "binance_t2" / "state.json"
+"""바이낸스 Cruise 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
 GLIDE_TICKERS = ("TQQQ", "SCHD")
 _SKIP = frozenset({"M3", "QS_SWITCH"})
 """data/toss 안에서 적립 장부가 아닌 파일 (Glide 는 따로, QS_SWITCH 는 Paper)."""
@@ -437,6 +439,122 @@ def cruise_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
+CRUISE_USD = {c: f"{c}-USD" for c in CRUISE_COINS}
+"""바이낸스 Cruise 코인 시세 — 야후 달러 시세(USDT ≈ USD)로 재고 원/달러로 원화 환산."""
+
+
+def cruise_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
+    """바이낸스 Cruise (2026-10-15 업비트에서 옮김, ``data/binance_t2/state.json``) — 원화로 환산.
+
+    USDT 는 1 달러로 보고 지금 원/달러로 바꾼다. 입금 · 원가도 지금 환율로 바꾼 값이다(근사)."""
+    fx = q.fx
+    exp = state.get("expected") or {}
+    orders = [o for o in state.get("orders") or [] if isinstance(o, Mapping)]
+    qty = dict.fromkeys(CRUISE_COINS, 0.0)
+    cost = dict.fromkeys(CRUISE_COINS, 0.0)
+    trades = []
+    for o in orders:
+        parts = str(o.get("id") or "").split("-")
+        coin = parts[-2] if len(parts) >= 3 and parts[-2] in CRUISE_COINS else ""
+        vol, funds, fee = _f(o.get("executed_qty")), _f(o.get("quote_qty")), _f(o.get("fee_usdt"))
+        buy = parts[-1:] == ["B"]
+        if coin and vol > 0:
+            if buy:
+                qty[coin] += vol
+                cost[coin] += funds + fee
+            else:
+                avg = cost[coin] / qty[coin] if qty[coin] > 0 else 0.0
+                sold = min(vol, qty[coin])
+                cost[coin] -= avg * sold
+                qty[coin] -= sold
+        trades.append(
+            Trade(
+                str(o.get("id", ""))[4:14],
+                "buy" if buy else "sell",
+                coin or "?",
+                vol,
+                funds / vol if vol > 0 else None,
+                funds,
+                fee,
+                "USDT",
+                "체결" if vol > 0 else "체결 없음" if o.get("status") else "결과 확인 안 됨",
+                ref=f"cruise:order:{o.get('id')}",
+            )
+        )
+    sig = state.get("last_trade_signals") or {}
+    holdings = []
+    for coin in CRUISE_COINS:
+        n = _f(exp.get(coin))
+        if n <= 0:
+            continue
+        usd = q.usd.get(CRUISE_USD[coin])
+        w = _f((sig.get(coin) or {}).get("weight"))
+        holdings.append(
+            Holding(
+                coin,
+                n,
+                cost[coin] * (fx or 0.0),
+                None if usd is None or fx is None else n * usd * fx,
+                f"바이낸스 · {n:g} {coin}",
+                target=w or None,
+            )
+        )
+    rows = [d for d in state.get("deposits") or [] if isinstance(d, list) and len(d) >= 2]
+    deposits = sum(_f(d[1]) for d in rows) * (fx or 0.0)
+    cash = _f(exp.get("USDT")) * (fx or 0.0)
+    notes = []
+    units, peak = _f(state.get("units")), _f(state.get("peak"))
+    dd: float | None = None
+    if units > 0 and peak > 0 and fx:
+        nav_usdt = (
+            _f(exp.get("USDT"))
+            + sum(_f(exp.get(c)) * (q.usd.get(CRUISE_USD[c]) or 0.0) for c in CRUISE_COINS)
+        ) / units
+        dd = max(0.0, 1 - nav_usdt / peak)
+        notes.append(
+            f"고점 대비 −{dd:.1%} (30% 면 새 매수 멈춤)" if dd >= 0.0005 else "고점 대비 0%"
+        )
+    if state.get("stopped"):
+        notes.append("⛔ 낙폭 정지 중 — 해제는 사람이")
+    if state.get("last_decision"):
+        notes.append(f"마지막 결정 {state['last_decision']} · 매일 09:05 · USDT 를 원화로 환산")
+    activity = [
+        (str(o.get("id", ""))[4:14], str(o.get("line", ""))) for o in orders if o.get("line")
+    ]
+    activity += [(str(d[0]), f"💵 입금 {_f(d[1]):,.2f} USDT") for d in rows]
+    trades += [
+        Trade(
+            str(d[0]),
+            "deposit",
+            "USDT",
+            amount=_f(d[1]),
+            status="입금 기록",
+            ref=f"cruise:deposit:{d[0]}:{i}",
+        )
+        for i, d in enumerate(rows)
+    ]
+    info = {
+        "buying": sum(1 for c in CRUISE_COINS if _f((sig.get(c) or {}).get("weight")) > 0),
+        "coins": len(CRUISE_COINS),
+        "dd": dd,
+        "stopped": bool(state.get("stopped")),
+        "last_decision": str(state.get("last_decision") or ""),
+    }
+    return Book(
+        "cruise",
+        "Cruise",
+        "바이낸스 · BTC · ETH · SOL",
+        deposits,
+        cash,
+        tuple(holdings),
+        tuple(notes),
+        (),
+        tuple(activity),
+        tuple(trades),
+        info=info,
+    )
+
+
 def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     holdings = []
     activity: list[tuple[str, str]] = []
@@ -548,6 +666,8 @@ def needed(root: Path) -> tuple[set[str], set[str]]:
     tickers = set(GLIDE_TICKERS) | {
         kr_ticker(d) if d.get("currency") == "KRW" else str(d["symbol"]) for d in _toss_states(root)
     }
+    if (root / BINANCE_CRUISE).exists():
+        tickers |= set(CRUISE_USD.values())
     return set(CRUISE_COINS), tickers
 
 
@@ -567,9 +687,14 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
     glide = _read(toss / "M3.json")
     if glide:
         out.append(replace(glide_book(glide, q), updated_ms=_mtime_ms(toss / "M3.json")))
+    binance = _read(root / BINANCE_CRUISE)
     cruise_path = root / "data" / "upbit_t2" / "state.json"
     cruise = _read(cruise_path)
-    if cruise:
+    if binance:  # 2026-10-15 바이낸스로 옮김 — 업비트 장부는 더 이상 갱신되지 않아 보이지 않는다
+        out.append(
+            replace(cruise_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_CRUISE))
+        )
+    elif cruise:
         out.append(replace(cruise_book(cruise, q), updated_ms=_mtime_ms(cruise_path)))
     acc = _toss_states(root)
     if acc:

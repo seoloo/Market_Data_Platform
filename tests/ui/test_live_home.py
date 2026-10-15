@@ -404,3 +404,41 @@ def test_kr_accumulate_state_is_valued_in_krw(tmp_path: Path) -> None:
     book = accumulate_book([st], Quotes(usd={"069500.KS": 26_000.0}, fx=1300.0))
     assert book.deposits_krw == 50_000 and book.value_krw == pytest.approx(52_000)
     assert book.holdings[0].name == "KODEX 200"
+
+
+def test_binance_cruise_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> None:
+    """2026-10-15 Cruise 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로."""
+    up = tmp_path / "data" / "upbit_t2"
+    up.mkdir(parents=True)
+    (up / "state.json").write_text(
+        json.dumps({"expected": {"KRW": "296483"}, "deposits": [["2026-10-08", "298024"]]}),
+        encoding="utf-8",
+    )
+    bn = tmp_path / "data" / "binance_t2"
+    bn.mkdir(parents=True)
+    state = {
+        "expected": {"USDT": "100", "BTC": "0.001", "ETH": "0", "SOL": "0"},
+        "deposits": [["2026-10-16", "160"]],
+        "units": "0.16",
+        "peak": "1000",
+        "orders": [
+            {
+                "id": "t2b-2026-10-16-BTC-B",
+                "line": "🛒 BTC 매수",
+                "executed_qty": "0.001",
+                "quote_qty": "60",
+                "fee_usdt": "0.06",
+                "status": "FILLED",
+            }
+        ],
+    }
+    (bn / "state.json").write_text(json.dumps(state), encoding="utf-8")
+    _coins, tickers = live_home.needed(tmp_path)
+    assert "BTC-USD" in tickers
+    q = Quotes(usd={"BTC-USD": 60_000.0}, fx=1_400.0)
+    (cruise,) = [b for b in build_books(tmp_path, q) if b.key == "cruise"]
+    assert cruise.venue.startswith("바이낸스")
+    assert cruise.cash_krw == pytest.approx(140_000)
+    assert cruise.holdings[0].value_krw == pytest.approx(84_000)  # 0.001 × 60,000 × 1,400
+    assert cruise.deposits_krw == pytest.approx(224_000)
+    assert cruise.holdings[0].cost_krw == pytest.approx(60.06 * 1_400)

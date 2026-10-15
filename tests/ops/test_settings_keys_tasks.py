@@ -85,11 +85,11 @@ def test_register_only_missing_and_reenable(tmp_path: Path) -> None:
 
 def test_disable_only_enabled_ones() -> None:
     existing = {
-        "AutoTrading_Upbit_T2_Live": TaskState("AutoTrading_Upbit_T2_Live", "Ready"),
-        "AutoTrading_Upbit_T2_Weekly": TaskState("AutoTrading_Upbit_T2_Weekly", "Disabled"),
+        "AutoTrading_Binance_Cruise": TaskState("AutoTrading_Binance_Cruise", "Ready"),
+        "AutoTrading_Info_Bot": TaskState("AutoTrading_Info_Bot", "Disabled"),
     }
     ps = FakePS()
-    assert task_setup.disable(["cruise"], existing, ps) == ["AutoTrading_Upbit_T2_Live"]
+    assert task_setup.disable(["cruise", "info"], existing, ps) == ["AutoTrading_Binance_Cruise"]
     assert len(ps.calls) == 1 and "Disable-ScheduledTask" in ps.calls[0]
 
 

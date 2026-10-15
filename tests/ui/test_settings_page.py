@@ -296,11 +296,11 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
         (tdir / f"{t.name}.xml").write_text("<Task>{REPO}</Task>", encoding="utf-8")
     calls: list[str] = []
     row = {"n": "AutoTrading_Upbit_T2_Live", "s": "Ready", "nx": "", "lr": "", "res": 0}
-    live = json.dumps([row])
+    live = [json.dumps([row])]
 
     def runner(script: str) -> str:
         calls.append(script)
-        return live if "Get-ScheduledTask -TaskName 'AutoTrading_*'" in script else ""
+        return live[0] if "Get-ScheduledTask -TaskName 'AutoTrading_*'" in script else ""
 
     server, base, token = _serve(tmp_path)
     server.task_runner = runner  # type: ignore[attr-defined]
@@ -311,10 +311,12 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
         form = {"token": token, "g_cruise": "on", "action": "on"}
         assert post(base, "/settings/tasks", form)[0] == 303
         reg = [c for c in calls if "Register-ScheduledTask" in c]
-        assert len(reg) == 1 and "AutoTrading_Upbit_T2_Weekly" in reg[0]
+        assert len(reg) == 1 and "AutoTrading_Binance_Cruise" in reg[0]
         assert "새로 만든 예약 1개" in server.task_note[0]  # type: ignore[attr-defined]
+        made = {"n": "AutoTrading_Binance_Cruise", "s": "Ready", "nx": "", "lr": "", "res": 0}
+        live[0] = json.dumps([row, made])
         assert post(base, "/settings/tasks", {**form, "action": "off"})[0] == 303
-        off = "Disable-ScheduledTask -TaskName 'AutoTrading_Upbit_T2_Live'"
+        off = "Disable-ScheduledTask -TaskName 'AutoTrading_Binance_Cruise'"
         assert any(off in c for c in calls)
         with urllib.request.urlopen(base + "/settings") as r:
             page = r.read().decode()
