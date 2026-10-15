@@ -252,6 +252,7 @@ def run(root: Path = REPO) -> int:
     _resume_liquidation()
     _event_alert(root)
     _namu_follow(root)
+    _ag4s2_demo(root)
     _paper_daily(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
@@ -310,6 +311,20 @@ def _namu_follow(root: Path) -> None:
             print(f"나무 모의 따라가기: 주문 {len(out['orders'])} 건, 평가 {out['equity']:,}원")
     except Exception as exc:  # 모의 따라가기 문제로 봇을 멈추지 않는다
         print(f"나무 모의 따라가기 건너뜀: {type(exc).__name__}: {exc}")
+
+
+def _ag4s2_demo(root: Path) -> None:
+    """AG4S2 바이낸스 선물 데모(가짜 돈) — 하루 한 번 롱 맞추기 · 4 시간봉마다 숏 점검."""
+    if not user_settings.get(root, "demo.ag4s2"):
+        return
+    try:
+        from scripts import ag4s2_testnet
+
+        done = ag4s2_testnet.tick()
+        if done:
+            print(f"AG4S2 데모: {len(done)} 줄")
+    except Exception as exc:  # 데모 문제로 봇을 멈추지 않는다
+        print(f"AG4S2 데모 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _event_alert(root: Path) -> None:

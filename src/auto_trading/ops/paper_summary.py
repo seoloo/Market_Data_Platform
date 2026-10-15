@@ -158,6 +158,11 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
         lines.append(f"• 고르게 들기 {_won(paper.get('equal_weight_krw'))}")
         above = (kr or {}).get("kospi_above_200d")
         lines.append(f"  KOSPI 200 일선 {'위 — 살 수 있음' if above else '아래 — 새로 안 삼'}")
+    demo = _read(root / "data" / "ag4s2_testnet" / "state.json")
+    dh = (demo or {}).get("history") or []
+    if dh:
+        v = float(dh[-1][1])
+        lines.append(f"• AG4S2 선물 데모(가짜 돈, 시작 1,000) {v:,.0f} USDC ({_pct(v / 1000 - 1)})")
     namu = _read(root / "data" / "namu_follow" / "ledger.json")
     hist = (namu or {}).get("history") or []
     if hist:
