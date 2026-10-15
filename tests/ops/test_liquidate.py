@@ -366,3 +366,48 @@ def test_toss_unknown_end_status_closes_order() -> None:
     t.orders["o0"] = _TStatus("EXPIRED", D(1), D(50), D("0.05"))
     run_toss_item(item, t, "J", 1, session_open=False)
     assert item.orders[0].closed and item.status == "waiting" and item.remaining == D(2)
+
+
+def test_cruise_includes_binance_coins_and_skips_dust() -> None:
+    items, notes = _plan(
+        ("cruise",),
+        upbit_balances={},
+        binance_balances={"BTC": D("0.002"), "ETH": D("0.0001"), "BNB": D(1)},
+        binance_prices={"BTC": D(60_000), "ETH": D(3_000)},
+        binance_min={"BTC": D(5), "ETH": D(5)},
+    )
+    assert [(i.venue, i.symbol, i.want) for i in items] == [("binance", "BTC", D("0.002"))]
+    assert items[0].currency == "USDT"
+    assert any("ETH" in n and "바이낸스 최소 주문" in n for n in notes)
+
+
+def test_binance_runner_sells_with_ioc_and_reads_fills() -> None:
+    from auto_trading.exchange.spot import OrderStatus, SpotOrderResult
+    from auto_trading.ops.liquidate import run_binance_item
+
+    class Fake:
+        def __init__(self) -> None:
+            self.book: dict[str, SpotOrderResult] = {}
+
+        def order_book(self, symbol: str, limit: int = 20) -> tuple[list, list]:  # type: ignore[type-arg]
+            return [(D(60_000) - i, D(1)) for i in range(10)], []
+
+        def place_limit_ioc(
+            self, symbol: str, side: str, qty: D, price: D, ident: str
+        ) -> SpotOrderResult:
+            assert side == "SELL" and price == D(59_998)  # 매수 호가 세 번째 칸
+            r = SpotOrderResult(
+                ident, "1", symbol, side, OrderStatus("FILLED"), qty, qty, qty * price, D(0), ""
+            )
+            self.book[ident] = r
+            return r
+
+        def get_order(self, symbol: str, ident: str) -> SpotOrderResult | None:
+            return self.book.get(ident)
+
+    item = Item("binance", "BTC", ["cruise"], D("0.002"))
+    log = run_binance_item(
+        item, Fake(), "j1", lambda: 0, lambda s: None, step=D("0.00001"), min_notional=D(5)
+    )
+    assert item.status == "done" and item.sold == D("0.002")
+    assert "USDT" in log[-1]

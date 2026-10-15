@@ -28,7 +28,8 @@ from auto_trading.config.secrets import (
     load_toss_credentials,
     read_env_file,
 )
-from auto_trading.core.errors import AutoTradingError
+from auto_trading.core.errors import AutoTradingError, ConfigError
+from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
 from auto_trading.exchange.toss import (
     TossPosition,
     TossReader,
@@ -48,6 +49,7 @@ from auto_trading.ops.liquidate import (
     glide_to_book,
     groups_of,
     job_text,
+    run_binance_item,
     run_toss_item,
     run_upbit_item,
     set_group_halts,
@@ -78,6 +80,15 @@ def _kst(ms: int) -> datetime:
 def _upbit() -> UpbitClient:
     env = read_env_file(REPO / ".env")
     return UpbitClient(env["UPBIT_API_KEY"], env["UPBIT_AOU_SECRET"])
+
+
+def _binance() -> BinanceSpotLive | None:
+    """Cruise 바이낸스 거래 키(2026-10-15 이전). 키가 없으면 None — 바이낸스 몫은 없다고 본다."""
+    try:
+        creds, enabled = load_live_spot(REPO / ".env")
+    except ConfigError:
+        return None
+    return BinanceSpotLive(creds, trading_enabled=enabled)
 
 
 def _reader() -> TossReader:
@@ -164,6 +175,20 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
             notes.append(f"업비트 조회 실패: {exc}")
         finally:
             c.close()
+    b_bal: dict[str, Decimal] = {}
+    b_px: dict[str, Decimal] = {}
+    b_min: dict[str, Decimal] = {}
+    if "cruise" in groups and (b := _binance()) is not None:
+        try:
+            b_bal = b.balances()
+            for k in COINS:
+                if b_bal.get(k, Decimal(0)) > 0:
+                    b_px[k] = b.last_price(f"{k}USDT")
+                    b_min[k] = b.filters(f"{k}USDT").min_notional
+        except AutoTradingError as exc:
+            notes.append(f"바이낸스 조회 실패: {exc}")
+        finally:
+            b.close()
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
     if "glide" in groups or "acc" in groups:
@@ -186,13 +211,21 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         glide_qty={s: q for s, q in _glide_qty().items() if s in GLIDE_SYMBOLS},
         acc_qty=_acc_qty(holdings),
         is_kr=is_kr_symbol,
+        binance_balances=b_bal,
+        binance_prices=b_px,
+        binance_min=b_min,
     )
     return items, notes + more
 
 
 def preview_text(scope: str = "all") -> str:
     items, notes = plan(scope)
-    names = {"upbit": "업비트", "toss_us": "토스 미국", "toss_kr": "토스 국내"}
+    names = {
+        "upbit": "업비트",
+        "binance": "바이낸스",
+        "toss_us": "토스 미국",
+        "toss_kr": "토스 국내",
+    }
     lines = [f"🧯 전부 정리 미리 보기 · {SCOPES[scope]} (아직 아무것도 안 팔았어요)"]
     for g in groups_of(scope):
         rows = [it for it in items if g in it.groups]
@@ -279,7 +312,35 @@ def step(job: Job) -> list[str]:
                     log.append(f"{it.symbol} 업비트 오류: {exc} — 다음 확인 때 다시")
         finally:
             c.close()
-    toss = [it for it in job.items if it.venue != "upbit" and it.status not in ("done", "failed")]
+    bins = [it for it in job.items if it.venue == "binance" and it.status not in ("done", "failed")]
+    if bins:
+        b = _binance()
+        if b is None:
+            log.append("바이낸스 거래 키 없음 — Cruise 바이낸스 몫은 앱에서 직접 팔아 주세요")
+        else:
+            try:
+                for it in bins:
+                    try:
+                        f = b.filters(f"{it.symbol}USDT")
+                        log += run_binance_item(
+                            it,
+                            b,
+                            job.job_id,
+                            _now_ms,
+                            time.sleep,
+                            step=f.step_size,
+                            min_notional=f.min_notional,
+                        )
+                    except AutoTradingError as exc:
+                        it.status = "working"  # 코인은 24 시간 — 다음 확인 때 다시
+                        log.append(f"{it.symbol} 바이낸스 오류: {exc} — 다음 확인 때 다시")
+            finally:
+                b.close()
+    toss = [
+        it
+        for it in job.items
+        if it.venue in ("toss_us", "toss_kr") and it.status not in ("done", "failed")
+    ]
     groups = groups_of(job.scope)
     first = not job.log and (
         "glide" in groups or "acc" in groups

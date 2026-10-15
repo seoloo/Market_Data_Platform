@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -81,8 +82,18 @@ class FakeBinance:
         self.bal[coin] = self.bal.get(coin, Decimal(0)) + sign * done
         self.bal["USDT"] -= sign * done * price
         status = OrderStatus("FILLED" if self.fill else "EXPIRED")
-        r = SpotOrderResult(ident, str(len(self.orders)), symbol, side, status, qty, done,
-                            done * price, Decimal(0), "")
+        r = SpotOrderResult(
+            ident,
+            str(len(self.orders)),
+            symbol,
+            side,
+            status,
+            qty,
+            done,
+            done * price,
+            Decimal(0),
+            "",
+        )
         self.orders[ident] = r
         return r
 
@@ -100,8 +111,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(m, "STATE", tmp_path / "data" / "binance_t2" / "state.json")
     monkeypatch.setattr(m, "REPORTS", tmp_path / "reports" / "binance_t2")
     monkeypatch.setattr(m, "HALT", tmp_path / "data" / "HALT")
-    monkeypatch.setattr(m.time, "time", lambda: NOW / 1000)
-    monkeypatch.setattr(m.time, "sleep", lambda s: None)
+    monkeypatch.setattr(time, "time", lambda: NOW / 1000)
+    monkeypatch.setattr(time, "sleep", lambda s: None)
     return tmp_path
 
 
@@ -144,7 +155,7 @@ def test_unfilled_ioc_is_reported_and_ledger_unchanged(
 def test_live_key_needed_and_orders_need_enable_flag(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         load_live_spot(tmp_path / ".env", environ={})
-    creds, on = load_live_spot(
+    _creds, on = load_live_spot(
         tmp_path / ".env",
         environ={"BINANCE_LIVE_API_KEY": "k", "BINANCE_LIVE_API_SECRET": "s"},
     )

@@ -34,6 +34,7 @@ from auto_trading.ops.kill_switch import GROUPS, group_path
 
 __all__ = [
     "SCOPES",
+    "VENUE_NAMES",
     "Item",
     "Job",
     "Store",
@@ -42,6 +43,7 @@ __all__ = [
     "floor_price",
     "groups_of",
     "job_text",
+    "run_binance_item",
     "run_toss_item",
     "run_upbit_item",
     "set_group_halts",
@@ -58,6 +60,12 @@ SCOPES: dict[str, str] = {
 FLOOR_PCT = D("0.01")
 """최우선 매수 호가에서 이만큼 아래까지만 판다 (한 번 주문에서)."""
 UPBIT_MIN_KRW = D(5000)
+VENUE_NAMES = {
+    "upbit": "업비트",
+    "binance": "바이낸스",
+    "toss_us": "토스 미국",
+    "toss_kr": "토스 국내",
+}
 UPBIT_ROUNDS = 8
 TOSS_REPLACE_MS = 10 * 60_000
 TOSS_MAX_ORDERS = 12
@@ -94,7 +102,7 @@ class Order:
 @dataclass
 class Item:
     venue: str
-    """upbit · toss_us · toss_kr."""
+    """upbit · binance · toss_us · toss_kr."""
     symbol: str
     groups: list[str]
     want: Decimal
@@ -124,6 +132,8 @@ class Item:
 
     @property
     def currency(self) -> str:
+        if self.venue == "binance":
+            return "USDT"
         return "USD" if self.venue == "toss_us" else "KRW"
 
 
@@ -303,10 +313,14 @@ def build_items(
     glide_qty: Mapping[str, Decimal],
     acc_qty: Mapping[str, Decimal],
     is_kr: Callable[[str], bool],
+    binance_balances: Mapping[str, Decimal] | None = None,
+    binance_prices: Mapping[str, Decimal] | None = None,
+    binance_min: Mapping[str, Decimal] | None = None,
 ) -> tuple[list[Item], list[str]]:
     """그룹 → 팔 것 · 못 파는 것 (먼지 · 소수점 · 묶인 수량 · 수동 보유).
 
-    * Cruise = 업비트의 BTC · ETH · SOL 전량 (다른 코인은 건드리지 않는다).
+    * Cruise = 업비트 · 바이낸스 현물의 BTC · ETH · SOL 전량 (다른 코인은 건드리지 않는다).
+      Cruise 는 2026-10-15 바이낸스로 옮겼다 — 업비트에 남은 몫도 Cruise 로 함께 판다.
     * Glide = 토스 TQQQ · SCHD 중 Glide 장부 수량.
     * 토스 적립 = 적립 장부가 산 몫(``acc_qty``) — 장부 밖 보유(사람이 직접 산 종목 · 적립 시작 전
       수량)는 **수동 보유로 남긴다**.
@@ -324,6 +338,16 @@ def build_items(
                 notes.append(f"{coin} {_n(qty)} — 5,000 원 미만이라 업비트 최소 주문 아래 (남김)")
                 continue
             items.append(Item("upbit", coin, ["cruise"], qty))
+        for coin in cruise_coins:
+            qty = (binance_balances or {}).get(coin, ZERO)
+            if qty <= 0:
+                continue
+            px = (binance_prices or {}).get(coin, ZERO)
+            least = (binance_min or {}).get(coin, D(5))
+            if qty * px < least:
+                notes.append(f"{coin} {_n(qty)} — 바이낸스 최소 주문 {least} USDT 아래 (남김)")
+                continue
+            items.append(Item("binance", coin, ["cruise"], qty))
     manual: list[str] = []
     for sym in sorted(toss_holdings):
         held = toss_holdings[sym]
@@ -486,6 +510,74 @@ def run_upbit_item(
     return log
 
 
+class BinanceLike(Protocol):
+    def order_book(self, symbol: str, limit: int = ...) -> tuple[list[Any], list[Any]]: ...
+    def place_limit_ioc(
+        self, symbol: str, side: str, quantity: Decimal, price: Decimal, client_order_id: str
+    ) -> Any: ...
+    def get_order(self, symbol: str, client_order_id: str) -> Any: ...
+
+
+BINANCE_FINAL = frozenset({"FILLED", "CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH"})
+
+
+def run_binance_item(
+    item: Item,
+    client: BinanceLike,
+    job_id: str,
+    now_ms: Callable[[], int],
+    sleep: Callable[[float], None],
+    *,
+    step: Decimal,
+    min_notional: Decimal,
+    rounds: int = UPBIT_ROUNDS,
+) -> list[str]:
+    """바이낸스 현물(Cruise) — 업비트와 같은 방식: 매수 호가 ``2 + 2 × 회차`` 칸(1% 안) 지정가 IOC.
+
+    체결은 주문 조회로 확인하고, 예전 주문도 다시 조회해 고친다(업비트 10-13 교훈)."""
+    log: list[str] = []
+    symbol = f"{item.symbol}USDT"
+    for o in item.orders:
+        if o.status == "IOC" and (seen := client.get_order(symbol, o.client_id)) is not None:
+            o.filled, o.amount = seen.executed_qty, seen.quote_qty
+    start = len(item.orders)
+    for r in range(rounds):
+        bids, _asks = client.order_book(symbol, limit=20)
+        price = upbit_level_price([b[0] for b in bids], r)
+        rem = (item.remaining / step).to_integral_value(rounding=ROUND_DOWN) * step
+        if price is None:
+            log.append(f"{item.symbol} 바이낸스 매수 호가 없음 — 다음 확인 때 다시")
+            break
+        if rem * price < min_notional:
+            break
+        ident = f"liq-{job_id}-{item.symbol}-{start + r}"[:36]
+        try:
+            got = client.place_limit_ioc(symbol, "SELL", rem, price, ident)
+        except OrderStateUnknownError:
+            got = None
+        for _ in range(10):
+            if got is not None and got.status.value in BINANCE_FINAL:
+                break
+            sleep(0.5)
+            got = client.get_order(symbol, ident) or got
+        o = Order(ident, ident, rem, price, now_ms(), closed=True, status="IOC")
+        if got is not None:
+            o.filled, o.amount = got.executed_qty, got.quote_qty
+            o.fee = got.quote_qty * D("0.001")
+        item.orders.append(o)
+        if item.remaining * price < min_notional:
+            break
+        sleep(1.5)
+    rest = item.remaining
+    bid = item.orders[-1].price if item.orders else ZERO
+    item.status = "done" if rest <= 0 or rest * bid < min_notional else "working"
+    log.append(
+        f"{item.symbol} {_n(item.sold)} 팜 · {item.amount:,.2f} USDT"
+        + (f" · 남음 {_n(rest)}" if item.status != "done" else "")
+    )
+    return log
+
+
 class TossStatus(Protocol):
     @property
     def status(self) -> str: ...
@@ -632,11 +724,18 @@ def job_text(job: Job) -> str:
     """텔레그램 · 화면용 요약 (순수)."""
     head = f"🧯 전부 정리 · {SCOPES.get(job.scope, job.scope)} · {job.job_id}"
     lines = [head]
-    names = {"upbit": "업비트", "toss_us": "토스 미국", "toss_kr": "토스 국내"}
+    names = {
+        "upbit": "업비트",
+        "binance": "바이낸스",
+        "toss_us": "토스 미국",
+        "toss_kr": "토스 국내",
+    }
     word = {"waiting": "⏳ 장 열리면", "working": "🔄 진행 중", "done": "✅ 끝", "failed": "⚠ 실패"}
     for it in job.items:
-        cur = "원" if it.currency == "KRW" else "$"
-        amt = f"{it.amount:,.0f} 원" if cur == "원" else f"${it.amount:,.2f}"
+        amt = {
+            "KRW": f"{it.amount:,.0f} 원",
+            "USDT": f"{it.amount:,.2f} USDT",
+        }.get(it.currency, f"${it.amount:,.2f}")
         lines.append(
             f"{word.get(it.status, it.status)} {names[it.venue]} {it.symbol} "
             f"{_n(it.sold)}/{_n(it.want)} · {amt}" + (f" · {it.note}" if it.note else "")
