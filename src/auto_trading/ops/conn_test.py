@@ -80,7 +80,34 @@ def _supabase(root: Path) -> str:
     return "연결됨 · Data API 응답"
 
 
+def _binance(root: Path) -> str:
+    """거래 키 권한 확인 — 현물 거래 켜짐 · 출금 꺼짐 · IP 제한이어야 '안전' (조회만, 주문 없음)."""
+    from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
+
+    creds, enabled = load_live_spot(root / ".env")
+    client = BinanceSpotLive(creds, trading_enabled=False)
+    try:
+        r = client.api_restrictions()
+    finally:
+        client.close()
+    problems = []
+    if not r.get("enableSpotAndMarginTrading"):
+        problems.append("현물 거래 권한이 꺼져 있어요")
+    if r.get("enableWithdrawals"):
+        problems.append("⚠ 출금 권한이 켜져 있어요 — 꺼 주세요")
+    if not r.get("ipRestrict"):
+        problems.append("⚠ IP 제한이 없어요 — 이 PC 공인 IP 로 묶어 주세요")
+    if r.get("enableFutures"):
+        problems.append("선물 권한은 Cruise 에 필요 없어요")
+    if problems:
+        raise RuntimeError(" · ".join(problems))
+    return "연결됨 · 권한 안전(현물 거래만 · 출금 꺼짐 · IP 제한)" + (
+        " · 실제 주문 허용 켜짐" if enabled else " · 실제 주문은 꺼져 있음"
+    )
+
+
 TESTS: dict[str, Callable[[Path], str]] = {
+    "binance": _binance,
     "toss": _toss,
     "upbit": _upbit,
     "telegram": _telegram,

@@ -5,6 +5,15 @@
 
 옮긴 기록: 2026-09 이전 작업(2026-09-29 이하 날짜 절과 '이전 작업' 절)은 [docs/archive/PROGRESS_2026-09.md](docs/archive/PROGRESS_2026-09.md) 로 그대로 옮겼다(2026-10-15, 내용 수정 없음). 맨 아래 '다음 작업 · 단계 상태 · 미해결 · 검증 기록' 은 이 파일에 남아 있다.
 
+## 2026-10-15 — Cruise 업비트 → 바이낸스 이전 (Claude)
+
+사용자: "cruise는 그냥 바이낸스로 옮기면 돼" (바이낸스 vs 바이비트 비교 뒤 바이낸스). 업비트 Cruise 는 10-13 전부 정리 뒤 정지 · 원화 약 29.6 만 원.
+- `scripts/live_t2_binance.py` + `exchange/binance_spot_live.py`(문서 85 L3): 같은 규칙(`ops/t2_upbit`), USDT, 지정가 IOC(호가 세 번째 칸)만,
+  거래 키 `BINANCE_LIVE_API_KEY/SECRET` + `BINANCE_LIVE_TRADING_ENABLED=true` 일 때만 주문. `plan` 은 거래 키 없으면 읽기 키로 미리 보기(10-15 확인: 잔돈 0.44 USDT).
+- '정리' 가 바이낸스 몫도 판다 · 현황 · 화면 · 파이어 보고가 바이낸스 장부(USDT → 원화)를 읽음 · 자동 실행 묶음 cruise = `AutoTrading_Binance_Cruise` ·
+  설정 '연결 · 키' 에 바이낸스(권한 점검: 현물만 · 출금 꺼짐 · IP 제한) · 옛 업비트 실행은 `CRUISE_UPBIT=on` 일 때만 주문.
+- 사용자 할 일: 거래 키 만들기 · 업비트 원화를 바이낸스로 · `.env` 주문 허용 · 예약 등록(옛 업비트 예약 끄기) · Cruise 정지풀기. 주간 요약은 아직 바이낸스판 없음.
+
 ## 2026-10-15 — 나무증권(NH) 모의투자 주문 경로 · 실적 발표일 경고 · 국장 섹터 이름 (Claude)
 
 - 나무 모의투자: `src/auto_trading/exchange/namu.py`(모의 주소 · 03 계좌만, 지정가만) · `scripts/namu_mock.py`. 시험 2 가지 통과 —

@@ -39,8 +39,14 @@ SERVICES: tuple[tuple[str, str, str], ...] = (
         "주문은 아래 '실제 주문 허용' 을 켜야 나가요.",
     ),
     (
+        "binance",
+        "바이낸스 (Cruise, 2026-10-15 업비트에서 옮김)",
+        "바이낸스 → API 관리 → API 만들기(시스템 생성). 권한은 '읽기' 와 '현물 거래' 만, 출금은 끄고, "
+        "IP 제한에 이 PC 의 공인 IP 를 넣어요. 주문은 .env 의 BINANCE_LIVE_TRADING_ENABLED=true 일 때만 나가요.",
+    ),
+    (
         "upbit",
-        "업비트 (Cruise)",
+        "업비트 (옛 Cruise)",
         "업비트 웹 → 마이페이지 → Open API 관리에서 '자산 조회 · 주문 조회 · 주문하기' 만 고르고, "
         "허용 IP 에 이 PC 의 공인 IP 를 넣어요(출금 권한은 켜지 마세요).",
     ),
@@ -58,6 +64,8 @@ SERVICES: tuple[tuple[str, str, str], ...] = (
 KEYS: tuple[KeySpec, ...] = (
     KeySpec("TOSS_CLIENT_ID", "toss", "Client ID"),
     KeySpec("TOSS_CLIENT_SECRET", "toss", "Client Secret"),
+    KeySpec("BINANCE_LIVE_API_KEY", "binance", "API Key"),
+    KeySpec("BINANCE_LIVE_API_SECRET", "binance", "Secret Key"),
     KeySpec("UPBIT_API_KEY", "upbit", "Access Key"),
     KeySpec("UPBIT_AOU_SECRET", "upbit", "Secret Key"),
     KeySpec("TELEGRAM_BOT_TOKEN", "telegram", "봇 토큰", r"\d{5,12}:[A-Za-z0-9_\-]{20,80}"),
