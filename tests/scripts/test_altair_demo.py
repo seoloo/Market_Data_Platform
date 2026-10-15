@@ -95,3 +95,14 @@ def test_alert_text_has_position_block_and_no_short_reason() -> None:
     assert " 현금 452 · 장부 2,000.6 USDC (시작 2,000)" in text
     skipped = m.alert_text(0, ["x"], ["BTC(롱 목표 있음)"], {}, False, [], 2000.0, 2000.0)
     assert "🚫 숏 신호 났지만 안 함: BTC(롱 목표 있음)" in skipped
+
+
+def test_liquidation_distance_in_cross_account() -> None:
+    # 장부 2,000 · 롱 1,550 (오늘): 노출이 계좌보다 작아 청산 없음
+    assert m.liquidation_drop(2000.0, 1550.0, 0.0) is None
+    # 롱 5,000 (최대 2.5 배 근처): 약 -40% 에서 청산 → 비상 스톱 -20% 가 먼저
+    d = m.liquidation_drop(2000.0, 5000.0, 0.0)
+    assert d is not None and 0.38 < d < 0.41
+    rows = [("BTC", 0.04, 80_000.0, 80_000.0), ("ETH", 0.8, 2_250.0, 2_250.0)]
+    assert "비상 스톱 -20% 이 먼저" in m.liquidation_line(2000.0, rows)
+    assert m.liquidation_drop(2000.0, 0.0, 400.0) is None  # 숏만이면 아래로는 청산 없음

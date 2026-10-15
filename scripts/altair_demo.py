@@ -223,7 +223,46 @@ def position_lines(
     if len(out) == 1:
         out.append(" 없음 (모두 현금)")
     out.append(f" 현금 {eq - long_value:,.0f} · 장부 {eq:,.1f} USDC (시작 {alloc:,.0f})")
+    out.append(liquidation_line(eq, rows))
     return out
+
+
+MMR = 0.005
+"""유지 증거금률 근사 — 바이낸스 BTC · ETH 선물의 작은 금액 구간(0.4 ~ 0.5%) 중 보수적인 쪽."""
+
+
+def liquidation_drop(equity: float, long_value: float, short_value: float) -> float | None:
+    """BTC · ETH 가 **함께** 몇 % 움직이면 cross 계좌가 강제 청산되는지 (순수, 근사).
+
+    계좌에 장부 돈(``equity``)만 있다고 보고, 순노출(롱 − 숏) 방향으로 같은 비율 d 만큼 움직일 때
+    equity − d × 순노출 = 유지 증거금(MMR × 총명목 × (1 ∓ d)) 이 되는 d. 순노출이 0 이하거나
+    100% 넘게 움직여야 하면 None(사실상 청산 없음)."""
+    net = long_value - short_value
+    gross = long_value + short_value
+    if net <= 0 or equity <= 0:
+        return None
+    d = (equity - MMR * gross) / (net - MMR * gross)
+    return d if 0 < d < 1 else None
+
+
+def liquidation_line(equity: float, rows: list[tuple[str, float, float, float]]) -> str:
+    longs = sum(q * m for _c, q, _e, m in rows if q > 0)
+    shorts = sum(-q * m for _c, q, _e, m in rows if q < 0)
+    d = liquidation_drop(equity, longs, shorts)
+    if longs <= 0 and shorts <= 0:
+        return " 청산 거리: 포지션 없음"
+    exposure = (longs + shorts) / equity if equity > 0 else 0.0
+    if d is None:
+        return (
+            f" 청산 거리: 노출 {exposure:.0%} — 코인 값이 0 이 돼도 청산 없음"
+            f" ({equity:,.0f} 계좌 기준)"
+        )
+    return (
+        f" 청산 거리: BTC · ETH 함께 -{d:.0%} ({equity:,.0f} 계좌 · cross · 노출 {exposure:.0%})"
+        f" — 비상 스톱 -{LONG_STOP:.0%} 이 먼저"
+        if d > LONG_STOP
+        else f" ⚠ 청산 거리: BTC · ETH 함께 -{d:.0%} — 비상 스톱(-{LONG_STOP:.0%})보다 가깝다"
+    )
 
 
 def kst(ms: int) -> str:
@@ -283,6 +322,21 @@ def _clear_stop(c: BinanceUsdmTestnet, st: dict[str, Any], coin: str) -> None:
     if old:
         with contextlib.suppress(AutoTradingError):
             c.cancel_stop(TRADE[coin], old)
+
+
+def _ensure_cross(c: BinanceUsdmTestnet) -> bool:
+    """두 종목이 cross 인지 보고, 아니면 cross 로 바꾼다. 걸린 주문이 있으면 거래소가 바꾸기를
+    거절하므로(-4067) 그때는 False — 다음 실행에서 다시 본다."""
+    ok = True
+    for sym in TRADE.values():
+        rows = c._request("/fapi/v2/positionRisk", {"symbol": sym}, signed=True)
+        if all(str(r.get("marginType")).lower() == "cross" for r in rows):
+            continue
+        try:
+            c.set_margin_type(sym, "CROSSED")
+        except AutoTradingError:
+            ok = False
+    return ok
 
 
 def _equity(c: BinanceUsdmTestnet, st: dict[str, Any]) -> tuple[float, dict[str, float]]:
@@ -646,6 +700,8 @@ def tick(now_ms: int | None = None) -> list[str]:
                 c.set_leverage(sym, LEVERAGE)
             st["setup"] = True
             st["start_ms"] = now_ms
+        if not st.get("cross"):  # 거래소 기본값에 기대지 않고 cross 로 못 박는다(10-15 사용자 논의)
+            st["cross"] = _ensure_cross(c)
         if due_long:
             lines += rebalance_long(c, st, now_ms, alert=alert)
             st["long_day"] = day
@@ -694,6 +750,7 @@ def status() -> dict[str, Any]:
     return {
         "start": _iso(st["start_ms"]) if st.get("start_ms") else None,
         "equity": hist[-1][1] if hist else None,
+        "margin": "CROSSED" if st.get("cross") else "아직 설정 전",
         "long_w": st.get("long_w"),
         "shorts": st.get("shorts"),
         "short_trades": len(st.get("short_trades") or []),
