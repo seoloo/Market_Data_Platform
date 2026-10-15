@@ -108,6 +108,13 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
     Field("demo.altair", "Altair 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
     Field(
+        "live.altair",
+        "Altair 실거래 (바이낸스 선물 USDC) — .env 주문 허용도 켜야 주문",
+        "bool",
+        False,
+        "다음 4 시간봉부터",
+    ),
+    Field(
         "namu.follow",
         "나무 모의 — 국장 수급 Paper 따라가기",
         "bool",

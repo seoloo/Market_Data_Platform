@@ -340,10 +340,15 @@ def _ensure_cross(c: BinanceUsdmTestnet) -> bool:
 
 
 def _equity(c: BinanceUsdmTestnet, st: dict[str, Any]) -> tuple[float, dict[str, float]]:
-    """가상 장부 평가액 = ALLOC + (USDC 지갑 변화) + 우리 포지션 미실현 손익. (코인 → 부호 수량)."""
+    """장부 평가액과 (코인 → 부호 수량).
+
+    데모: 가상 장부 = ALLOC + (USDC 지갑 변화) + 우리 포지션 미실현 손익.
+    실계좌(``st["live"]``): USDC 선물 지갑 + 미실현 손익 — 지갑에 Altair 돈만 둔다."""
     wallet = float(c.asset_balance("USDC"))
-    st.setdefault("wallet0", wallet)
-    st["alloc"] = ALLOC
+    live = bool(st.get("live"))
+    if not live:
+        st.setdefault("wallet0", wallet)
+        st["alloc"] = ALLOC
     acct = c.account()
     pos: dict[str, float] = {}
     unreal = 0.0
@@ -354,6 +359,8 @@ def _equity(c: BinanceUsdmTestnet, st: dict[str, Any]) -> tuple[float, dict[str,
         q = float(p.quantity)
         pos[coin] = q
         unreal += q * (float(c.mark_price(sym)) - float(p.entry_price))
+    if live:
+        return wallet + unreal, pos
     return ALLOC + wallet - float(st["wallet0"]) + unreal, pos
 
 
@@ -398,6 +405,10 @@ def rebalance_long(
         cur = max(held, 0.0) * mark
         diff = target - cur
         if abs(diff) < max(BAND * eq, float(f.min_notional)) and not (target == 0 and cur > 0):
+            continue
+        if diff > 0 and st.get("no_new"):  # 실계좌 정지(낙폭 · 전체 정지) — 줄이기 · 정리만
+            lines.append(f"⛔ {coin} 롱 늘리기 {diff:+,.0f} USDC 안 함 — {st['no_new']}")
+            alert.append(f"⛔ {coin} 롱 늘리기 안 함 — {st['no_new']}")
             continue
         plans.append((coin, diff))
         side = "BUY" if diff > 0 else "SELL"
@@ -600,7 +611,9 @@ def check_shorts(
             if not signal_now(h4, daily):
                 continue
             why = None
-            if float(w.get(coin, 0)) > 0:
+            if st.get("no_new"):
+                why = str(st["no_new"])
+            elif float(w.get(coin, 0)) > 0:
                 why = "롱 목표 있음"
             elif st.get("own_halted") is not None:
                 why = "숏 영구 차단 · 누적 손실 2.5%"
@@ -664,12 +677,13 @@ def alert_text(
     rows: list[tuple[str, float, float, float]],
     eq: float,
     alloc: float,
+    title: str = "🧪 ☄️ Altair 선물 데모 · 가짜 돈",
 ) -> str:
     """텔레그램 한 통 (순수) — 무엇을 · 왜 · 지금 포지션."""
     body = list(blocks)
     while body and not body[-1]:
         body.pop()
-    out = [f"🧪 ☄️ Altair 선물 데모 · 가짜 돈 · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
+    out = [f"{title} · {kst(now_ms)}", "━━━━━━━━━━━━", *body, ""]
     if skipped:
         out.append("🚫 숏 신호 났지만 안 함: " + " · ".join(skipped))
     elif not shorts_open and long_w and all(v > 0 for v in long_w.values()):

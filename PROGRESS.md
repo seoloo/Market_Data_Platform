@@ -5,6 +5,17 @@
 
 옮긴 기록: 2026-09 이전 작업(2026-09-29 이하 날짜 절과 '이전 작업' 절)은 [docs/archive/PROGRESS_2026-09.md](docs/archive/PROGRESS_2026-09.md) 로 그대로 옮겼다(2026-10-15, 내용 수정 없음). 맨 아래 '다음 작업 · 단계 상태 · 미해결 · 검증 기록' 은 이 파일에 남아 있다.
 
+## 2026-10-16 — Altair 실거래 실행기 (Claude, 꺼진 채로 준비)
+
+- 계정 B 세션이 끝나며 실행기 작업이 남지 않아(파일 없음) 이어받음. 사용자 "실행기 작업해줘" — 데모 2 주 이상 본 뒤 켠다.
+- `scripts/altair_live.py` (plan · tick · status · unhalt): 규칙 · 주문은 `scripts/altair_demo` 그대로(롱 T/v2 × 4 · 비상 스톱 −20%, 숏 232 · 2 배, 지정가 IOC).
+  다른 점: 장부 = USDC 선물 지갑 + 미실현(그 지갑엔 Altair 돈만), 이체(TRANSFER)는 단위로 바꿔 손익 아님, 단위 가치 낙폭 30% 면 새 노출(롱 늘리기 · 새 숏) 금지 · `unhalt` 로만 풂, `data/HALT` 중에도 새 노출 금지, 헤지 · 다중 자산 모드면 시작 안 함, 배율 5 · cross.
+- `exchange/binance_usdm_live.py`: 실계좌 주소만, `BINANCE_FUTURES_LIVE_TRADING_ENABLED=true` 아니면 조회만, 시장가 · 목표가 시장가 언제나 막음(비상 STOP_MARKET 만 예외). 키 `BINANCE_FUTURES_LIVE_API_*`, 없으면 Vega 키.
+- **켜기 스위치 둘**: `.env` 주문 허용 + 설정 `live.altair`(기본 꺼짐). 예약 `AutoTrading_Altair`(5 분마다, 꺼져 있으면 거래소에 연결도 안 함, 오르빗 '자동 실행' 묶음 'Altair').
+- 실계좌 조회 확인(Vega 키): 헤지 아님 · 다중 자산 아님 · USDC 0 · 최소 주문 BTCUSDC 50 · ETHUSDC 20(데모 100 · 20).
+- 사용자 할 일(켤 때): 선물 거래 권한 키(출금 금지 · IP 제한) → USDT 를 USDC 로 바꿔 USDⓈ-M 선물 지갑으로 → 예약 등록 → 데모 2 주(10/29 무렵) 확인 뒤 `.env` 주문 허용 + 설정 켜기.
+- 남은 것: 오르빗 Altair 실거래 장부 화면 · 텔레그램 '현황' 연결 · '전부 정리' 에 선물 포지션 넣기(지금은 정리 대상 아님).
+
 ## 2026-10-15 — 개별주 발표 보류·복귀와 알림 연계 (Codex)
 
 사용자 제안 1~4 승인, [규칙·구현·자료 한계](docs/research/EVENT_ENTRY_INTEGRATION_20261015.md).
