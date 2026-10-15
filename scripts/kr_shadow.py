@@ -48,6 +48,7 @@ from scripts.run_lt_kr import (
     biweekly_day,
     build_panel,
     equal_weight_pit,
+    ksic_sector,
     leaders_pit,
     members,
     simulate_kr,
@@ -194,6 +195,19 @@ def flows() -> dict[str, object]:
     return {"flows": done, "failed": failed, "pool": len(pool), "to": hi}
 
 
+def shown_sector(ksic: str) -> str:
+    """화면 · 보고서에 적는 섹터.
+
+    연구 표(:func:`ksic_sector`)는 중분류 27(의료 · 정밀 · 광학기기)을 통째로 헬스케어로 묶어
+    반도체 검사 장비(디아이 · 케이씨텍, 소분류 272)까지 헬스케어로 보였다
+    (사용자 지적 2026-10-15). 27 은 의료용 기기(271)만 헬스케어, 나머지(272 · 273)는 IT 로 적는다.
+    Paper · 목록을 고르는 규칙은 검증한 그대로 :func:`ksic_sector` 를 쓴다.
+    """
+    if ksic[2:4] == "27" and ksic[4:6] != "01":
+        return "IT"
+    return ksic_sector(ksic)
+
+
 def _sector_rank(scores: dict[str, float], sector: dict[str, str]) -> list[dict[str, object]]:
     import statistics
 
@@ -311,6 +325,7 @@ def run() -> dict[str, object]:
     info = json.loads((ROOT / "info.json").read_text(encoding="utf-8"))
     names = {c: str(v.get("name", c)) for c, v in info.items()}
     panel, index_ok = build_panel(ROOT, to="9999-12-31")
+    shown = {c: shown_sector(str(info.get(c, {}).get("ksic", ""))) for c in panel.close}
     f = load_flows(panel, FLOWS)
     ff = load_flows(panel, FLOWS, who="foreign")  # 외국인만 (사용자 2026-10-15)
     t = len(panel.days) - 1
@@ -338,7 +353,7 @@ def run() -> dict[str, object]:
             {
                 "code": s,
                 "name": names.get(s, s),
-                "sector": panel.sector[s],
+                "sector": shown[s],
                 "score": round(v, 3),
                 "trend": trend_up(panel.close[s], t),
             }
@@ -353,9 +368,9 @@ def run() -> dict[str, object]:
         "price_leaders": listed(price),
         "flow_leaders": listed(flow),
         "foreign_leaders": listed(foreign),
-        "price_sectors": _sector_rank(dict(price_scores), panel.sector),
-        "flow_sectors": _sector_rank(flow_scores(f, t, pool), panel.sector),
-        "foreign_sectors": _sector_rank(flow_scores(ff, t, pool), panel.sector),
+        "price_sectors": _sector_rank(dict(price_scores), shown),
+        "flow_sectors": _sector_rank(flow_scores(f, t, pool), shown),
+        "foreign_sectors": _sector_rank(flow_scores(ff, t, pool), shown),
         "flow_coverage": sum(1 for s in pool if s in f.net),
         "universe_median_6m": round(
             statistics.median(panel.close[s][t] / panel.close[s][t - 126] - 1 for s in pool),  # type: ignore[operator]

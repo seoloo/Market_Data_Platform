@@ -69,3 +69,12 @@ def test_ai_basket_uses_month_end_record_or_recent_one(
     known = {"005930", "000660"}
     assert ks._ai_basket(days, days.index("2026-10-30"), known) == ["005930"]  # 3 일 전 기록
     assert ks._ai_basket(days, days.index("2026-10-26"), known) is None  # 그 전엔 기록 없음
+
+
+def test_shown_sector_splits_precision_instruments_from_healthcare() -> None:
+    from scripts.kr_shadow import shown_sector
+
+    assert shown_sector("032702") == "IT"  # 디아이 · 케이씨텍 (측정 · 시험 정밀기기)
+    assert shown_sector("032703") == "IT"  # 광학기기
+    assert shown_sector("032701") == "헬스케어"  # 의료용 기기
+    assert shown_sector("032102") == "헬스케어"  # 의약품 — 연구 표 그대로
