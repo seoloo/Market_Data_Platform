@@ -57,7 +57,8 @@ def _plan(groups: tuple[str, ...], **over: object) -> tuple[list[Item], list[str
 
 
 def test_scopes() -> None:
-    assert groups_of("all") == ("vega", "deneb", "acc", "altair")
+    assert groups_of("all") == ("vega", "deneb", "acc", "altair", "stock")
+    assert groups_of("sym:NVDA") == ()  # 한 종목 정리는 그룹을 멈추지 않는다
     assert groups_of("altair") == ("altair",)
     assert groups_of("deneb") == ("deneb",)
     with pytest.raises(ValueError):
@@ -537,3 +538,47 @@ def test_run_futures_item_reduce_only_limit_steps_down_one_percent() -> None:
         tick=Decimal("0.1"),
     )
     assert gone.status == "done" and gone.note == "포지션 없음"
+
+
+def _toss_plan(groups: tuple[str, ...], **kw: object) -> tuple[list[Item], list[str]]:
+    base: dict[str, object] = {
+        "upbit_balances": {},
+        "upbit_prices": {},
+        "vega_coins": (),
+        "toss_holdings": {"NVDA": Decimal(10), "TQQQ": Decimal(12), "APH": Decimal(3)},
+        "toss_sellable": {},
+        "deneb_qty": {"TQQQ": Decimal(10)},
+        "acc_qty": {},
+        "is_kr": lambda s: False,
+        "stock_qty": {"NVDA": Decimal(8), "TQQQ": Decimal(0)},
+    }
+    base.update(kw)
+    return build_items(groups, **base)  # type: ignore[arg-type]
+
+
+def test_stock_group_sells_only_ledger_shares() -> None:
+    items, notes = _toss_plan(("stock",))
+    assert [(i.symbol, i.want, i.groups) for i in items] == [("NVDA", Decimal(8), ["stock"])]
+    assert any("수동 보유" in n and "NVDA 2" in n and "APH 3" in n for n in notes)
+
+
+def test_single_symbol_sells_stock_and_manual_but_not_strategy_shares() -> None:
+    items, _ = _toss_plan((), only_symbol="NVDA")
+    assert [(i.symbol, i.want, i.groups) for i in items] == [
+        ("NVDA", Decimal(10), ["stock", "manual"])
+    ]
+    items, notes = _toss_plan((), only_symbol="TQQQ")
+    assert [(i.symbol, i.want) for i in items] == [("TQQQ", Decimal(2))]
+    assert any("Deneb 몫 10" in n and "남김" in n for n in notes)
+    items, notes = _toss_plan((), only_symbol="MSFT")
+    assert not items and any("보유 없음" in n for n in notes)
+
+
+def test_symbol_scope_label_and_text() -> None:
+    from auto_trading.ops.liquidate import scope_label, symbol_of
+
+    assert symbol_of("sym:nvda") == "NVDA" and symbol_of("all") is None
+    assert scope_label("sym:NVDA") == "NVDA 한 종목" and scope_label("stock") == "개별주만"
+    job = Job("J", "sym:NVDA", "텔레그램", 0, [Item("toss_us", "NVDA", ["stock"], Decimal(10))])
+    text = job_text(job)
+    assert "NVDA 한 종목" in text and "새 매수 정지" not in text

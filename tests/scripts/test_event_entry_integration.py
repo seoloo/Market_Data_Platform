@@ -53,7 +53,7 @@ def setup_guard(
     monkeypatch.setattr(m, "DATA", tmp_path)
     monkeypatch.setattr(m, "STATE", tmp_path / "state.json")
     monkeypatch.setattr(m, "_reader", GuardReader)
-    monkeypatch.setattr(m, "halted_reason", lambda _: None)
+    monkeypatch.setattr(m, "halted_for", lambda *_: None)
     trader = GuardTrader()
     monkeypatch.setattr(m, "_trader", lambda *_: trader)
     m.save_tickets(tickets)

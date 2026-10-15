@@ -21,6 +21,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from auto_trading.config.secrets import (
@@ -61,7 +62,9 @@ from auto_trading.ops.liquidate import (
     run_futures_item,
     run_toss_item,
     run_upbit_item,
+    scope_label,
     set_group_halts,
+    symbol_of,
 )
 from auto_trading.ops.t2_upbit import COINS, MARKETS
 
@@ -132,6 +135,67 @@ def _altair_forget(coin: str) -> None:
     tmp = ALTAIR_STATE.with_suffix(".tmp")
     tmp.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(ALTAIR_STATE)
+
+
+SIZE_STATE = REPO / "data" / "size_guard" / "state.json"
+"""💹 개별주 장부 (scripts/size_guard)."""
+
+
+def _stock_tickets() -> list[dict[str, Any]]:
+    try:
+        d = json.loads(SIZE_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [t for t in d.get("tickets") or [] if isinstance(t, dict)]
+
+
+def _stock_qty() -> dict[str, Decimal]:
+    """개별주 장부가 들고 있는 수량 (보유 · 손절 매도 중) = 산 수량 − 판 수량."""
+    out: dict[str, Decimal] = {}
+    for t in _stock_tickets():
+        if t.get("status") not in ("holding", "selling"):
+            continue
+        sold = sum(float(o.get("filled", 0)) for o in t.get("sells") or [])
+        q = Decimal(str(float(t.get("filled", 0)) - sold))
+        if q > 0:
+            sym = str(t["symbol"]).upper()
+            out[sym] = out.get(sym, Decimal(0)) + q
+    return out
+
+
+def _stock_symbols() -> set[str]:
+    return {
+        str(t["symbol"]).upper()
+        for t in _stock_tickets()
+        if t.get("status") in ("reserved", "buying", "holding", "selling")
+    }
+
+
+def _handover_stock(symbols: set[str], reason: str) -> list[str]:
+    """정리로 넘긴 개별주: 예약 · 매수 중은 취소, 보유 · 손절 중은 감시 해제.
+
+    손절 감시와 정리가 같은 주식을 겹쳐 팔지 않게."""
+    if not symbols:
+        return []
+    from scripts import size_guard as sg
+
+    out: list[str] = []
+    try:
+        lock = sg._Lock().__enter__()
+    except SystemExit:
+        return ["개별주 장부가 잠겨 있어 손절 감시를 못 풀었어요 — 정리 매도는 그대로 해요"]
+    try:
+        tickets = sg.load_tickets()
+        for t in tickets:
+            if t.symbol.upper() not in symbols or not t.active:
+                continue
+            new = "canceled" if t.status in ("reserved", "buying") else "released"
+            t.status, t.note, t.closed_ms = new, reason, _now_ms()
+            out.append(f"개별주 {t.symbol} {'예약 취소' if new == 'canceled' else '손절 감시 끝'}")
+        sg.save_tickets(tickets)
+    finally:
+        lock.__exit__(None, None, None)
+    return out
 
 
 def _reader() -> TossReader:
@@ -246,7 +310,8 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
                 f.close()
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
-    if "deneb" in groups or "acc" in groups:
+    only = symbol_of(scope)
+    if "deneb" in groups or "acc" in groups or "stock" in groups or only:
         r = _reader()
         try:
             held = r.holdings()
@@ -270,6 +335,8 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         binance_prices=b_px,
         binance_min=b_min,
         altair_positions=fut,
+        stock_qty=_stock_qty(),
+        only_symbol=only,
     )
     return items, notes + more
 
@@ -283,7 +350,12 @@ def preview_text(scope: str = "all") -> str:
         "toss_kr": "토스 국내",
         "binance_fut": "바이낸스 선물",
     }
-    lines = [f"🧯 전부 정리 미리 보기 · {SCOPES[scope]} (아직 아무것도 안 팔았어요)"]
+    lines = [f"🧯 전부 정리 미리 보기 · {scope_label(scope)} (아직 아무것도 안 팔았어요)"]
+    if symbol_of(scope):
+        lines.append(
+            ", ".join(f"{names[it.venue]} {it.symbol} {it.want:f}주" for it in items)
+            or "팔 것 없음"
+        )
     for g in groups_of(scope):
         rows = [it for it in items if g in it.groups]
         lines.append(
@@ -294,6 +366,12 @@ def preview_text(scope: str = "all") -> str:
             )
         )
     lines += [f"· {n}" for n in notes]
+    if symbol_of(scope):
+        lines.append(
+            "누르면: ① 그 종목 토스 미체결 매수 취소 ② 지정가로 매도 (그룹 정지 없음 · "
+            "토스는 정규장에서 — 닫혀 있으면 열린 뒤). 💹 개별주 손절 감시는 정리로 넘겨요"
+        )
+        return "\n".join(lines)
     lines.append(
         "누르면: ① 그 그룹 새 매수 정지 ② 토스 미체결 매수 취소 ③ 지정가로 매도 "
         "(업비트 · 바이낸스는 바로, 토스는 정규장에서 — 닫혀 있으면 열린 뒤)"
@@ -340,7 +418,13 @@ def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
     log = []
     for o in trader.open_orders():
         deneb = o.symbol in DENEB_SYMBOLS
-        mine = ("deneb" in groups and deneb) or ("acc" in groups and not deneb)
+        only = symbol_of(job.scope)
+        mine = (
+            ("deneb" in groups and deneb)
+            or ("acc" in groups and not deneb)
+            or ("stock" in groups and o.symbol in _stock_symbols())
+            or (only is not None and o.symbol == only)
+        )
         if o.side != "BUY" or not mine or o.status.startswith("PENDING_CANCEL"):
             continue
         res = trader.cancel(o.order_id)
@@ -450,7 +534,10 @@ def step(job: Job) -> list[str]:
     ]
     groups = groups_of(job.scope)
     first = not job.log and (
-        "deneb" in groups or "acc" in groups
+        "deneb" in groups
+        or "acc" in groups
+        or "stock" in groups
+        or symbol_of(job.scope) is not None
     )  # 팔 것이 없어도 매수 취소는 한 번
     if toss or first:
         r = _reader()
@@ -487,16 +574,23 @@ def step(job: Job) -> list[str]:
 
 
 def start(scope: str, source: str) -> str:
-    if scope not in SCOPES:
-        raise SystemExit(f"범위는 {', '.join(SCOPES)} 중 하나")
+    if scope not in SCOPES and not symbol_of(scope):
+        raise SystemExit(f"범위는 {', '.join(SCOPES)} 또는 sym:종목 중 하나")
     with STORE.running() as ok:
         if not ok:
             return "다른 정리가 실행 중이에요 — 잠시 뒤 결과를 확인해 주세요"
         now = _now_ms()
         job_id = _kst(now).strftime("%Y%m%dT%H%M%S")
-        reason = f"전부 정리({SCOPES[scope]}) {_kst(now):%Y-%m-%d %H:%M} · {source}"
+        reason = f"전부 정리({scope_label(scope)}) {_kst(now):%Y-%m-%d %H:%M} · {source}"
         set_group_halts(HALT, groups_of(scope), reason)
         items, notes = plan(scope)
+        groups = groups_of(scope)
+        handover = (
+            {symbol_of(scope) or ""}
+            if symbol_of(scope)
+            else (_stock_symbols() if "stock" in groups else set())
+        )
+        notes += _handover_stock(handover, reason)
         job = Job(job_id, scope, source, now, items, notes)
         STORE.put(job)  # 주문 전에 남긴다
         step(job)

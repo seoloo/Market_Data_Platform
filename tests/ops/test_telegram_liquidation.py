@@ -66,6 +66,7 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
         "vega",
         "deneb",
         "acc",
+        "stock",
         "altair",
         "cancel",
     ]
@@ -79,7 +80,12 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
 def test_cancel_button_and_forged_nonce(fake: dict[str, list[Any]]) -> None:
     bot = FakeBot()
     tb.handle_liquidation(bot, InboxMessage(1, 0, "전부매도"))  # type: ignore[arg-type]
-    cancel = bot.out[-1][1][1][-1][0]["callback_data"]
+    cancel = next(
+        b["callback_data"]
+        for row in bot.out[-1][1][1]
+        for b in row
+        if b["callback_data"].endswith(":cancel")
+    )
     tb.handle_liquidation(bot, _press(cancel))  # type: ignore[arg-type]
     assert not fake["start"] and "취소했어요" in bot.out[-1][1]
     tb.handle_liquidation(bot, _press("liq:deadbeef:all"))  # type: ignore[arg-type]
@@ -131,3 +137,29 @@ def test_help_words_route_to_bot_and_pin_help(
     assert "고정" in tb.pin_help(tmp_path)
     assert calls[0][0] == "send" and calls[1:3] == [("unpin_all",), ("pin", 55)]
     assert calls[3] == ("menu", ["status", "paper", "stock", "liquidate", "unhalt", "help"])
+
+
+def test_single_symbol_liquidation_button(
+    fake: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.notify.inbox import is_liquidation, liquidation_symbol
+    from scripts import size_guard as sg
+
+    assert liquidation_symbol(InboxMessage(1, 0, "정리 nvda")) == "nvda"
+    assert is_liquidation(InboxMessage(1, 0, "청산 삼성전자"))
+    assert liquidation_symbol(InboxMessage(1, 0, "정리")) == ""
+    monkeypatch.setattr(sg, "resolve", lambda q: ("NVDA", "엔비디아"))
+    previews: list[str] = []
+
+    def preview(scope: str = "all") -> str:
+        previews.append(scope)
+        return "미리"
+
+    monkeypatch.setattr(liq, "preview_text", preview)
+    bot = FakeBot()
+    assert tb.handle_liquidation(bot, InboxMessage(1, 0, "정리 nvda"))  # type: ignore[arg-type]
+    assert previews == ["sym:NVDA"]
+    buttons = bot.out[-1][1][1]
+    assert buttons[0][0]["text"] == "🧯 엔비디아 정리"
+    tb.handle_liquidation(bot, _press(buttons[0][0]["callback_data"]))  # type: ignore[arg-type]
+    assert fake["start"] == [("sym:NVDA", "텔레그램")]

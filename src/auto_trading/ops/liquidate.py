@@ -9,6 +9,10 @@
 * 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만 · Altair 만
   (Altair 는 2026-10-16 사용자 "전부 정리에 altair넣어줘"). Altair 는 바이낸스 USDⓈ-M(USDC)
   포지션을 reduce-only 지정가 IOC 로 닫고, 그 종목의 비상 스톱을 지운다.
+* 개별주(2026-10-16 사용자 "개별주도 자동 정리할 수 있도록"): 💹 개별주 장부(scripts/size_guard)가
+  산 몫. '개별주만' · '전부' 에 들어간다.
+* 한 종목(``sym:NVDA``, 사용자 "정리 nvda 이런식으로"): 그 종목의 토스 보유 중 Deneb · 적립 장부
+  몫을 뺀 전부(개별주 몫 + 수동 보유). 그룹 정지는 걸지 않는다.
 
 순서: 그룹 정지 파일(``data/HALT_<그룹>``)을 먼저 만들어 새 매수를 막고 → 토스의 그 종목 미체결
 **매수** 주문을 취소하고 → 판다. 그룹 정지는 사람이 풀 때까지 남는다(풀면 각 전략이 자기 규칙대로
@@ -49,7 +53,9 @@ __all__ = [
     "run_futures_item",
     "run_toss_item",
     "run_upbit_item",
+    "scope_label",
     "set_group_halts",
+    "symbol_of",
 ]
 
 D = Decimal
@@ -59,8 +65,11 @@ SCOPES: dict[str, str] = {
     "vega": "Vega 만",
     "deneb": "Deneb 만",
     "acc": "자동 적립만",
+    "stock": "개별주만",
     "altair": "Altair 만",
 }
+SYMBOL_SCOPE = "sym:"
+"""한 종목 정리 범위 머리 (``sym:NVDA``)."""
 FLOOR_PCT = D("0.01")
 """최우선 매수 호가에서 이만큼 아래까지만 판다 (한 번 주문에서)."""
 UPBIT_MIN_KRW = D(5000)
@@ -80,7 +89,20 @@ TOSS_MAX_ORDERS = 12
 REQUEST_TTL_MS = 5 * 60_000
 
 
+def symbol_of(scope: str) -> str | None:
+    """한 종목 범위면 그 종목, 아니면 None."""
+    return scope[len(SYMBOL_SCOPE) :].upper() if scope.startswith(SYMBOL_SCOPE) else None
+
+
+def scope_label(scope: str) -> str:
+    sym = symbol_of(scope)
+    return f"{sym} 한 종목" if sym else SCOPES.get(scope, scope)
+
+
 def groups_of(scope: str) -> tuple[str, ...]:
+    """범위 → 정지할 그룹. 한 종목 정리는 그룹을 멈추지 않는다(빈 값)."""
+    if symbol_of(scope):
+        return ()
     scope = _OLD_GROUPS.get(scope, scope)
     if scope == "all":
         return tuple(GROUPS)
@@ -340,6 +362,8 @@ def build_items(
     binance_prices: Mapping[str, Decimal] | None = None,
     binance_min: Mapping[str, Decimal] | None = None,
     altair_positions: Mapping[str, Decimal] | None = None,
+    stock_qty: Mapping[str, Decimal] | None = None,
+    only_symbol: str | None = None,
 ) -> tuple[list[Item], list[str]]:
     """그룹 → 팔 것 · 못 파는 것 (먼지 · 소수점 · 묶인 수량 · 수동 보유).
 
@@ -380,23 +404,44 @@ def build_items(
                 continue
             items.append(Item("binance", coin, ["vega"], qty))
     manual: list[str] = []
+    stocks = stock_qty or {}
+    toss_groups = {"deneb", "acc", "stock"} & set(groups)
+    if only_symbol and only_symbol not in toss_holdings:
+        notes.append(f"{only_symbol} — 토스에 보유 없음")
     for sym in sorted(toss_holdings):
+        if only_symbol and sym != only_symbol:
+            continue
         held = toss_holdings[sym]
         g_ledger = min(deneb_qty.get(sym, ZERO), held)
         a_ledger = min(acc_qty.get(sym, ZERO), held - g_ledger)
-        rest = held - g_ledger - a_ledger
-        if rest > 0 and ("deneb" in groups or "acc" in groups):
-            manual.append(f"{sym} {_n(rest)}")
+        s_ledger = min(stocks.get(sym, ZERO), held - g_ledger - a_ledger)
+        rest = held - g_ledger - a_ledger - s_ledger
         parts: list[str] = []
         want = ZERO
         deneb_part = ZERO
-        if "deneb" in groups and g_ledger > 0:
-            want += g_ledger
-            deneb_part = g_ledger
-            parts.append("deneb")
-        if "acc" in groups and a_ledger > 0:
-            want += a_ledger
-            parts.append("acc")
+        if only_symbol:
+            want = s_ledger + rest
+            parts = (["stock"] if s_ledger > 0 else []) + (["manual"] if rest > 0 else [])
+            kept = [
+                f"{name} 몫 {_n(q)}"
+                for name, q in (("Deneb", g_ledger), ("자동 적립", a_ledger))
+                if q > 0
+            ]
+            if kept:
+                notes.append(f"{sym} 의 {' · '.join(kept)} 는 그 전략 것이라 남김")
+        else:
+            if rest > 0 and toss_groups:
+                manual.append(f"{sym} {_n(rest)}")
+            if "deneb" in groups and g_ledger > 0:
+                want += g_ledger
+                deneb_part = g_ledger
+                parts.append("deneb")
+            if "acc" in groups and a_ledger > 0:
+                want += a_ledger
+                parts.append("acc")
+            if "stock" in groups and s_ledger > 0:
+                want += s_ledger
+                parts.append("stock")
         if want <= 0:
             continue
         can = min(want, toss_sellable.get(sym, held))
@@ -826,7 +871,7 @@ def _n(x: Decimal) -> str:
 
 def job_text(job: Job) -> str:
     """텔레그램 · 화면용 요약 (순수)."""
-    head = f"🧯 전부 정리 · {SCOPES.get(job.scope, job.scope)} · {job.job_id}"
+    head = f"🧯 전부 정리 · {scope_label(job.scope)} · {job.job_id}"
     lines = [head]
     names = {
         "upbit": "업비트",
@@ -852,5 +897,6 @@ def job_text(job: Job) -> str:
         lines.append("취소한 매수 주문: " + ", ".join(job.buys_canceled))
     lines += [f"· {n}" for n in job.notes]
     gs = ", ".join(GROUPS[g] for g in groups_of(job.scope))
-    lines.append(f"⛔ {gs} 새 매수 정지 중 — 풀기: 텔레그램 '정지풀기' 또는 오르빗 설정")
+    if gs:
+        lines.append(f"⛔ {gs} 새 매수 정지 중 — 풀기: 텔레그램 '정지풀기' 또는 오르빗 설정")
     return "\n".join(lines)

@@ -38,7 +38,7 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.entry_events import EntryEvents, company_events, macro_events
 from auto_trading.ops.event_store import earnings_day
-from auto_trading.ops.kill_switch import halted_reason
+from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.kr_accumulate import find, read_universe
 from auto_trading.ops.position_size import (
     Advice,
@@ -410,7 +410,7 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
         trader = _trader(tickets, last)
         fx = float(reader.usd_krw()) if any(not t.kr for t in held) else 1.0
         sess = {kr: session(reader, kr, now) for kr in {t.kr for t in tickets if t.active}}
-        halt = halted_reason(HALT)
+        halt = halted_for(HALT, "stock")  # 전체 정지 또는 개별주 정지(전부 정리)
         try:
             # 보호 매도는 일정 조회보다 먼저 실행한다. 발표 수집 실패가 매도를 막지 않는다.
             for t in held:
@@ -479,6 +479,9 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
 
 
 def reserve(query: str) -> str:
+    halt = halted_for(HALT, "stock")
+    if halt:
+        return f"⛔ 개별주 새 매수 정지 중 ({halt}) — 텔레그램 '정지풀기' 로 풀 수 있어요"
     a = advise(query)
     text = advice_text(a)
     if not a.ok:

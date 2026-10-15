@@ -40,6 +40,7 @@ from auto_trading.notify.inbox import (
     is_command,
     is_liquidation,
     is_stock,
+    liquidation_symbol,
 )
 from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import GROUPS
@@ -84,8 +85,9 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
-  [전부 정리] [Vega 만] [Deneb 만] [자동 적립만] [Altair 만] [취소]
+  [전부 정리] [Vega 만] [Deneb 만] [자동 적립만] [개별주만] [Altair 만] [취소]
   버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
+  정리 NVDA (또는 정리 삼성전자) — 그 종목 하나만 (Deneb · 적립 몫 빼고 전부)
 
 💹 개별주 NVDA (또는 개별주 삼성전자 · /stock)
   얼마나 살지 추천: 현금(원화 + 달러)의 1% 까지만 잃게, 손절 −3% · 한 종목 최대 25%
@@ -147,8 +149,8 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
     return [
         [b("🧯 전부 정리", "all")],
         [b("Vega 만", "vega"), b("Deneb 만", "deneb")],
-        [b("자동 적립만", "acc"), b("Altair 만", "altair")],
-        [b("취소", "cancel")],
+        [b("자동 적립만", "acc"), b("개별주만", "stock")],
+        [b("Altair 만", "altair"), b("취소", "cancel")],
     ]
 
 
@@ -172,7 +174,12 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, "취소했어요 — 아무것도 바꾸지 않았어요")
             return False
-        if kind == "liq" and arg in SCOPES:
+        if kind == "liq" and arg.startswith("s="):
+            sym = arg[2:]
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"🧯 {sym} 정리 시작 — 결과를 곧 보내요")
+            liq.start(f"sym:{sym}", "텔레그램")
+        elif kind == "liq" and arg in SCOPES:
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🧯 {SCOPES[arg]} 정리 시작 — 결과를 곧 보내요")
             liq.start(arg, "텔레그램")  # 결과는 start 가 보낸다
@@ -181,6 +188,25 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
                 bot.edit(msg.message_id, f"▶ {GROUPS[arg]} 정지 풀기")
             liq.unhalt(arg, "텔레그램")
         return False
+    query = liquidation_symbol(msg)
+    if query:
+        from scripts import size_guard as sg
+
+        try:
+            sym, name = sg.resolve(query)
+        except SystemExit as exc:  # 여러 종목이 맞음
+            bot.send(f"⚠ {exc}")
+            return False
+        nonce = liq.STORE.new_request(now, "liq")
+        rows = [
+            [{"text": f"🧯 {name} 정리", "callback_data": f"liq:{nonce}:s={sym}"}],
+            [{"text": "취소", "callback_data": f"liq:{nonce}:cancel"}],
+        ]
+        bot.send_message(
+            liq.preview_text(f"sym:{sym}") + "\n\n누르면 바로 시작해요 (5 분 안, 한 번만)",
+            buttons=rows,
+        )
+        return True
     word = msg.text.strip().lower().replace(" ", "")
     if word in LIQ_WORDS:
         nonce = liq.STORE.new_request(now, "liq")

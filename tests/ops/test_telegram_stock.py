@@ -11,6 +11,7 @@ from auto_trading.notify.inbox import InboxMessage, is_command, is_stock
 from auto_trading.ops import user_settings
 from auto_trading.ops.liquidate import Store
 from auto_trading.ops.position_size import Advice
+from auto_trading.ops.size_order import Ticket
 from scripts import size_guard as sg
 from scripts import telegram_bot as tb
 from tests.ops.test_telegram_liquidation import FakeBot
@@ -113,7 +114,7 @@ def test_bare_word_shows_status_and_release(
     bot = FakeBot()
     assert not tb.handle_stock(bot, _m("개별주"))  # type: ignore[arg-type]
     assert "감시 중인 종목 없음" in bot.out[-1][1]
-    held = sg.Ticket("1016", "NVDA", "엔비디아", "USD", 8, 200.0, 0, status="holding")
+    held = Ticket("1016", "NVDA", "엔비디아", "USD", 8, 200.0, 0, status="holding")
     monkeypatch.setattr(sg, "load_tickets", lambda: [held])
     monkeypatch.setattr(sg, "status", lambda: "🛡 엔비디아 8주")
     assert tb.handle_stock(bot, _m("개별주"))  # type: ignore[arg-type]

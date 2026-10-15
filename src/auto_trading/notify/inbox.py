@@ -150,11 +150,21 @@ def _word(msg: InboxMessage) -> str:
     return msg.text.strip().lower().replace(" ", "")
 
 
+def liquidation_symbol(msg: InboxMessage) -> str:
+    """'정리 NVDA' · '청산 삼성전자' → 'NVDA' · '삼성전자' (한 종목 정리). 아니면 빈 값."""
+    if msg.data:
+        return ""
+    parts = msg.text.strip().split(maxsplit=1)
+    if len(parts) == 2 and parts[0].lower() in LIQ_WORDS:
+        return parts[1].strip()
+    return ""
+
+
 def is_liquidation(msg: InboxMessage) -> bool:
-    """'전부 정리' · '정지풀기' 글 또는 그 버튼."""
+    """'전부 정리' · '정리 종목' · '정지풀기' 글 또는 그 버튼."""
     if msg.data:
         return msg.data.startswith(LIQ_DATA)
-    return _word(msg) in LIQ_WORDS | UNHALT_WORDS
+    return _word(msg) in LIQ_WORDS | UNHALT_WORDS or bool(liquidation_symbol(msg))
 
 
 def is_stock(msg: InboxMessage) -> bool:
