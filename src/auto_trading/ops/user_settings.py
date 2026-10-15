@@ -105,6 +105,7 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.brief", "시장 브리핑", "bool", True, "다음 브리핑부터"),
     Field("alerts.news", "종목 뉴스 답", "bool", True, "바로"),
     Field("alerts.events", "경제 일정 경고", "bool", True, "바로"),
+    Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
     Field(
         "screen.theme",
         "테마",

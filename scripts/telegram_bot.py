@@ -73,7 +73,7 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
   실거래 요약: Glide · Cruise · 자동 적립 + 파이어 목표까지 %
 
 📒 Paper (또는 /paper · 페이퍼)
-  가상 장부 요약: 코인 · AG/AGS · 미국 주식 · 국장 주도주
+  가상 장부 요약: 코인 · AG/AGS · 미국 주식 · 국장 주도주 (매일 21:30 자동으로도 와요)
 
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
@@ -250,6 +250,7 @@ def run(root: Path = REPO) -> int:
         bot.close()
     _resume_liquidation()
     _event_alert(root)
+    _paper_daily(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
@@ -259,6 +260,40 @@ def run(root: Path = REPO) -> int:
         alert=bool(user_settings.get(root, "alerts.bot_down")),
     )
     return 0
+
+
+def _paper_daily(root: Path) -> None:
+    """매일 21:30(KST) 뒤 한 번 — 모든 Paper 요약 (사용자 2026-10-15 '모든 페이퍼들 전부 알림')."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from auto_trading.ops.paper_summary import daily_due
+
+    if not user_settings.get(root, "alerts.paper"):
+        return
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    state_path = root / "data" / "telegram" / "paper_daily.json"
+    try:
+        last = json.loads(state_path.read_text(encoding="utf-8")).get("sent")
+    except (OSError, ValueError):
+        last = None
+    today = now.date().isoformat()
+    if not daily_due((now.hour, now.minute), today, last):
+        return
+    creds = load_telegram_credentials(root / ".env")
+    if creds is None:
+        return
+    bot = TelegramNotifier(creds)
+    try:
+        bot.send(paper_text(root).replace("📒 Paper 요약", f"📒 오늘의 Paper ({today})", 1))
+    except NotifyError as exc:
+        print(f"Paper 요약 실패: {exc}")  # 다음 실행(2 분 뒤)에서 다시
+        return
+    finally:
+        bot.close()
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps({"sent": today}), encoding="utf-8")
+    print("Paper 요약 보냄")
 
 
 def _event_alert(root: Path) -> None:

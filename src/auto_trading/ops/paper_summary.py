@@ -13,7 +13,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-__all__ = ["paper_text"]
+__all__ = ["DAILY_AT", "daily_due", "paper_text"]
+
+DAILY_AT = (21, 30)
+"""매일 자동 요약 시각(KST) — 코인 Paper(21:00 ~ 21:06) · 주식 Paper(21:10 ~ 21:17) 뒤."""
+
+
+def daily_due(now_kst_hm: tuple[int, int], today: str, last_sent: str | None) -> bool:
+    """오늘 21:30 이 지났고 오늘 아직 안 보냈으면 True (늦게 켜져도 그날 안에는 보낸다)."""
+    return now_kst_hm >= DAILY_AT and last_sent != today
+
 
 _MF = (
     ("GBG", "Glide·채권·금"),

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from auto_trading.notify.inbox import InboxMessage, is_command
-from auto_trading.ops.paper_summary import paper_text
+from auto_trading.ops.paper_summary import daily_due, paper_text
 
 
 def _save(root: Path, rel: str, body: object) -> None:
@@ -62,3 +62,10 @@ def test_empty_root_says_nothing_saved(tmp_path: Path) -> None:
 def test_paper_words_are_bot_commands() -> None:
     for word in ("paper", "/paper", "페이퍼", "Paper"):
         assert is_command(InboxMessage(update_id=1, date=0, text=word))
+
+
+def test_daily_summary_once_after_2130() -> None:
+    assert not daily_due((21, 29), "2026-10-15", None)
+    assert daily_due((21, 30), "2026-10-15", None)
+    assert daily_due((23, 50), "2026-10-15", "2026-10-14")  # 늦게 켜져도 그날 안에는
+    assert not daily_due((22, 0), "2026-10-15", "2026-10-15")  # 하루 한 번
