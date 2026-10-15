@@ -158,6 +158,13 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
         lines.append(f"• 고르게 들기 {_won(paper.get('equal_weight_krw'))}")
         above = (kr or {}).get("kospi_above_200d")
         lines.append(f"  KOSPI 200 일선 {'위 — 살 수 있음' if above else '아래 — 새로 안 삼'}")
+    namu = _read(root / "data" / "namu_follow" / "ledger.json")
+    hist = (namu or {}).get("history") or []
+    if hist:
+        last = float(hist[-1][1])
+        lines.append(
+            f"• 나무 모의(② 따라가기, 시작 700 만) {_won(last)} ({_pct(last / 7_000_000 - 1)})"
+        )
 
     if len(lines) == 1:
         lines.append("저장된 Paper 기록이 아직 없어요.")

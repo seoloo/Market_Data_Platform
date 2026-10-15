@@ -251,6 +251,7 @@ def run(root: Path = REPO) -> int:
         bot.close()
     _resume_liquidation()
     _event_alert(root)
+    _namu_follow(root)
     _paper_daily(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
@@ -295,6 +296,20 @@ def _paper_daily(root: Path) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps({"sent": today}), encoding="utf-8")
     print("Paper 요약 보냄")
+
+
+def _namu_follow(root: Path) -> None:
+    """나무 모의 계좌로 국장 수급 Paper 따라가기 — 거래일 15:00 ~ 15:20 하루 한 번 (가상 700 만)."""
+    if not user_settings.get(root, "namu.follow"):
+        return
+    try:
+        from scripts import namu_follow
+
+        out = namu_follow.run(root)
+        if "skip" not in out:
+            print(f"나무 모의 따라가기: 주문 {len(out['orders'])} 건, 평가 {out['equity']:,}원")
+    except Exception as exc:  # 모의 따라가기 문제로 봇을 멈추지 않는다
+        print(f"나무 모의 따라가기 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _event_alert(root: Path) -> None:

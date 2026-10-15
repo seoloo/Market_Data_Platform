@@ -175,6 +175,9 @@ class Run:
     """끝난 날 들고 있는 종목: 수량·원가·진입일·지금 평가 (그림자 기록 보고용)."""
     pending_sells: dict[str, str] = field(default_factory=dict)
     """끝난 날 종가로 정한, 다음 거래일 종가에 팔 종목과 이유."""
+    pending_buys: list[str] | None = None
+    """끝난 날(판단일) 종가로 정한, 다음 거래일 종가에 새로 살 종목. 판단일이 아니면 None —
+    None 이 아니면 그날 들고 있는 종목도 TARGET 비중까지 채운다. 나무 모의 따라가기용(결과 불변)."""
 
 
 def _last_px(panel: KrPanel, sym: str, t: int) -> float:
@@ -303,6 +306,7 @@ def simulate_kr(
         for s, (q, cost, peak, i0) in pos.items()
     }
     run.pending_sells = dict(pending_sell)
+    run.pending_buys = list(pending_buy) if pending_buy is not None else None
     return run
 
 

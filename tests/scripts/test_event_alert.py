@@ -31,7 +31,7 @@ def test_calendar_fetched_once_per_day(tmp_path: Path, monkeypatch: pytest.Monke
         return _Resp([{"symbol": "QS", "time": "time-after-hours", "marketCap": "$5"}])
 
     monkeypatch.setattr(event_alert, "EARNINGS", tmp_path / "earnings.json")
-    monkeypatch.setattr(event_alert.httpx, "get", fake_get)
+    monkeypatch.setattr(httpx, "get", fake_get)
     monkeypatch.setattr(event_alert, "_held", lambda root: [])
     got = event_alert._earnings(tmp_path, date(2026, 10, 20))
     again = event_alert._earnings(tmp_path, date(2026, 10, 20))
@@ -50,5 +50,5 @@ def test_calendar_failure_gives_no_earnings(
         raise httpx.ConnectError("down")
 
     monkeypatch.setattr(event_alert, "EARNINGS", tmp_path / "earnings.json")
-    monkeypatch.setattr(event_alert.httpx, "get", boom)
+    monkeypatch.setattr(httpx, "get", boom)
     assert event_alert._earnings(tmp_path, date(2026, 10, 20)) == []

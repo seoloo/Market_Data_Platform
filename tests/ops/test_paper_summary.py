@@ -69,3 +69,10 @@ def test_daily_summary_once_after_2130() -> None:
     assert daily_due((21, 30), "2026-10-15", None)
     assert daily_due((23, 50), "2026-10-15", "2026-10-14")  # 늦게 켜져도 그날 안에는
     assert not daily_due((22, 0), "2026-10-15", "2026-10-15")  # 하루 한 번
+
+
+def test_namu_mock_follow_line(tmp_path: Path) -> None:
+    _save(tmp_path, "data/namu_follow/ledger.json", {"history": [["2026-10-16", 7_070_000]]})
+    assert "나무 모의(② 따라가기, 시작 700 만) 7,070,000원 (+1.0%)" in paper_text(
+        tmp_path, coins=list
+    )

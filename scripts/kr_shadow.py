@@ -231,10 +231,12 @@ def _paper(run: Any, names: dict[str, str]) -> dict[str, object]:
                 "name": names.get(s, s),
                 "entry": p["entry"],
                 "return": round(float(p["value"]) / float(p["cost"]) - 1, 4),
+                "weight": round(float(p["value"]) / eq[-1], 4) if eq else None,
             }
             for s, p in sorted(run.positions.items())
         ],
         "sell_next_close": dict(run.pending_sells),
+        "buy_next_close": run.pending_buys,
         "trades": run.trades[-10:],
     }
 

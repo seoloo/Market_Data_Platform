@@ -107,6 +107,13 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.events", "경제 일정 · 실적 경고", "bool", True, "바로"),
     Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
     Field(
+        "namu.follow",
+        "나무 모의 — 국장 수급 Paper 따라가기",
+        "bool",
+        True,
+        "다음 거래일 15:00 부터",
+    ),
+    Field(
         "screen.theme",
         "테마",
         "enum",
