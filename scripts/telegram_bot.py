@@ -28,6 +28,7 @@ from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import (
     HELP_WORDS,
     LIQ_WORDS,
+    PAPER_WORDS,
     UNHALT_WORDS,
     InboxMessage,
     InboxQueue,
@@ -38,6 +39,7 @@ from auto_trading.notify.inbox import (
 from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import GROUPS
 from auto_trading.ops.liquidate import SCOPES
+from auto_trading.ops.paper_summary import paper_text
 from auto_trading.ui.live_home import build_books, fetch_quotes, needed, summary_text
 
 REPO = Path(__file__).resolve().parent.parent
@@ -70,6 +72,9 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 📊 현황 (또는 /status · 수익 · 잔고)
   실거래 요약: Glide · Cruise · 자동 적립 + 파이어 목표까지 %
 
+📒 Paper (또는 /paper · 페이퍼)
+  가상 장부 요약: 코인 · AG/AGS · 미국 주식 · 국장 주도주
+
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
   [전부 정리] [Cruise 만] [Glide 만] [자동 적립만] [취소]
@@ -91,6 +96,7 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 종목 뉴스는 정보 봇에 물어보세요."""
 COMMANDS_MENU = [
     ("status", "현황 — 실거래 요약"),
+    ("paper", "Paper — 가상 장부 요약"),
     ("liquidate", "정리 — 보유 팔기 (미리 보기 + 버튼)"),
     ("unhalt", "정지풀기 — 멈춘 그룹 다시 켜기"),
     ("help", "사용법"),
@@ -223,12 +229,17 @@ def run(root: Path = REPO) -> int:
         print(f"텔레그램 받기 실패: {exc}")
         return 1
     helps = [m for m in cmds if not m.data and m.text.strip().lower() in HELP_WORDS]
-    status_cmds = [m for m in cmds if not is_liquidation(m) and m not in helps]
+    papers = [
+        m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in PAPER_WORDS
+    ]
+    status_cmds = [m for m in cmds if not is_liquidation(m) and m not in helps and m not in papers]
     liq_msgs = [m for m in cmds if is_liquidation(m)]
     bot = TelegramNotifier(creds)
     try:
         if helps:
             bot.send(HELP)
+        if papers:
+            bot.send(paper_text(root))  # 여러 번 보내도 한 통
         if status_cmds:
             text = report(root)  # 여러 번 보내도 답은 한 통
             bot.send(text)

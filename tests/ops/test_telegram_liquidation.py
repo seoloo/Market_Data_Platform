@@ -123,4 +123,4 @@ def test_help_words_route_to_bot_and_pin_help(
     monkeypatch.setattr(tb, "TelegramNotifier", Bot)
     assert "고정" in tb.pin_help(tmp_path)
     assert calls[0][0] == "send" and calls[1:3] == [("unpin_all",), ("pin", 55)]
-    assert calls[3] == ("menu", ["status", "liquidate", "unhalt", "help"])
+    assert calls[3] == ("menu", ["status", "paper", "liquidate", "unhalt", "help"])

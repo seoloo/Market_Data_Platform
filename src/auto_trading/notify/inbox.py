@@ -136,6 +136,8 @@ HELP_WORDS = frozenset({"도움", "도움말", "사용법", "/help", "/start", "
 LIQ_WORDS = frozenset({"정리", "/정리", "전부정리", "전부매도", "청산", "/liquidate"})
 """'전부 정리' 요청 (2026-10-11) — 미리 보기와 범위 버튼으로 답한다."""
 UNHALT_WORDS = frozenset({"정지풀기", "/정지풀기", "/unhalt"})
+PAPER_WORDS = frozenset({"paper", "/paper", "페이퍼", "/페이퍼", "가상장부"})
+"""Paper(가상 장부) 요약 (2026-10-15) — 봇 몫."""
 LIQ_DATA = ("liq:", "unh:")
 """정리 · 정지 풀기 버튼의 callback_data 머리."""
 
@@ -153,7 +155,9 @@ def is_liquidation(msg: InboxMessage) -> bool:
 
 def is_command(msg: InboxMessage) -> bool:
     """봇(scripts/telegram_bot.py) 몫 — '현황' 류와 '전부 정리' 류. 나머지는 Glide 대화 몫."""
-    return is_liquidation(msg) or (not msg.data and _word(msg) in COMMANDS | HELP_WORDS)
+    return is_liquidation(msg) or (
+        not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS
+    )
 
 
 KEEP_S = 86_400
