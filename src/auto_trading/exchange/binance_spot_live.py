@@ -28,11 +28,13 @@ from auto_trading.config.secrets import BinanceCredentials, read_env_file
 from auto_trading.core.errors import ConfigError, OrderRejectedError, OrderStateUnknownError
 from auto_trading.exchange.binance_spot import BASE_URL, BinanceSpotReadOnly, sign
 from auto_trading.exchange.spot import OrderStatus, SpotOrderResult
+from auto_trading.exchange.wallet import TransferDirection, TransferRow
 
 __all__ = ["BinanceSpotLive", "LiveFill", "load_live_spot"]
 
 _RECV_WINDOW_MS = 5000
 _UNKNOWN_CODES = frozenset({-1007})
+FUTURES_URL = "https://fapi.binance.com"
 
 
 def _num(value: Decimal) -> str:
@@ -175,3 +177,58 @@ class BinanceSpotLive(BinanceSpotReadOnly):
             )
             for r in rows
         ]
+
+    # ------------------------------------------------------------ 지갑 이체 (Falcon 자동 분배)
+    # 사용자 2026-10-15 "비율 대로 자동 분배 할 수 있도록 해줘" — 문서 53 의 WalletTransfers 계약을
+    # 실계좌로 구현한다. 키에 "Permits Universal Transfer" 권한이 필요하다. 출금 권한은 쓰지 않는다.
+
+    def transfer(self, direction: TransferDirection, asset: str, amount: Decimal) -> str:
+        """현물 ↔ USDⓈ-M 선물 지갑 이체 → tranId.
+
+        거부면 OrderRejectedError, 결과를 모르면 OrderStateUnknownError."""
+        if not self.trading_enabled:
+            raise ConfigError("BINANCE_LIVE_TRADING_ENABLED=true 가 아니라 이체하지 않는다")
+        body = self._send(
+            "POST",
+            "/sapi/v1/asset/transfer",
+            {"type": direction.value, "asset": asset, "amount": _num(amount)},
+        )
+        return str(body["tranId"])
+
+    def transfers(
+        self, direction: TransferDirection, start_ms: int, end_ms: int
+    ) -> list[TransferRow]:
+        body = self._send(
+            "GET",
+            "/sapi/v1/asset/transfer",
+            {"type": direction.value, "startTime": start_ms, "endTime": end_ms, "size": 100},
+        )
+        return [
+            TransferRow(
+                tran_id=str(r["tranId"]),
+                direction=direction,
+                asset=str(r["asset"]),
+                amount=Decimal(str(r["amount"])),
+                status=str(r.get("status", "")),
+                timestamp_ms=int(r["timestamp"]),
+            )
+            for r in body.get("rows") or []
+        ]
+
+    def futures_balance(self, asset: str = "USDT") -> Decimal:
+        """USDⓈ-M 선물 지갑의 ``asset`` 잔고(지갑 잔고, 미실현 손익 제외). 읽기만."""
+        assert self._creds is not None
+        query = {"recvWindow": _RECV_WINDOW_MS, "timestamp": self._clock() + self.clock_offset_ms()}
+        encoded = urlencode(query)
+        sig = sign(self._creds.api_secret, encoded)
+        url = f"{FUTURES_URL}/fapi/v2/balance?{encoded}&signature={sig}"
+        try:
+            r = self._client.get(url, headers={"X-MBX-APIKEY": self._creds.api_key})
+        except httpx.HTTPError as exc:
+            raise OrderStateUnknownError(f"선물 잔고 조회 실패 ({type(exc).__name__})") from None
+        if not r.is_success:
+            raise OrderRejectedError(f"선물 잔고 조회 실패 {r.status_code}")
+        for row in r.json():
+            if row.get("asset") == asset:
+                return Decimal(str(row.get("balance", "0")))
+        return Decimal(0)

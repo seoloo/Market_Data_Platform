@@ -50,6 +50,24 @@ class FakeBinance:
         self.orders: dict[str, SpotOrderResult] = {}
         self.fill = fill
         self.sent: list[tuple[str, str, Decimal, Decimal]] = []
+        self.trading_enabled = True
+        self.fut = Decimal(0)
+        self.moved: list[Decimal] = []
+        self.transfer_error: Exception | None = None
+
+    def futures_balance(self, asset: str = "USDT") -> Decimal:
+        return self.fut
+
+    def transfer(self, direction: Any, asset: str, amount: Decimal) -> str:
+        if self.transfer_error is not None:
+            raise self.transfer_error
+        self.bal["USDT"] -= amount
+        self.fut += amount
+        self.moved.append(amount)
+        return f"T{len(self.moved)}"
+
+    def transfers(self, direction: Any, start_ms: int, end_ms: int) -> list[Any]:
+        return []
 
     def balances(self) -> dict[str, Decimal]:
         return dict(self.bal)
@@ -104,8 +122,12 @@ class FakeBinance:
         return None
 
 
+_SPLIT = m._split
+
+
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(m, "_split", lambda *a, **k: [])  # Falcon 분배는 아래 시험에서만
     monkeypatch.setattr(m, "REPO", tmp_path)
     monkeypatch.setattr(m, "DATA", tmp_path / "data" / "binance_t2")
     monkeypatch.setattr(m, "STATE", tmp_path / "data" / "binance_t2" / "state.json")
@@ -202,3 +224,47 @@ def test_order_posts_limit_ioc(tmp_path: Path) -> None:
     q = seen[0].url.params
     assert seen[0].method == "POST" and q["type"] == "LIMIT" and q["timeInForce"] == "IOC"
     assert q["price"] == "100000" and r.executed_qty == Decimal("0.001")
+
+
+def _db(env: Path) -> None:
+    import sqlite3
+
+    sql = Path(m.__file__).resolve().parent.parent / "src" / "auto_trading" / "storage" / "sql"
+    (env / "data").mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(env / "data" / "trading.db") as conn:
+        conn.executescript((sql / "009_wallet_transfers.sql").read_text(encoding="utf-8"))
+
+
+def test_falcon_split_moves_half_once_big_enough(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _db(env)
+    monkeypatch.setattr(m, "_split", _SPLIT)
+    fake = FakeBinance(Decimal(1200))
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    assert fake.moved == [Decimal("600.00")]  # 첫 분배: 선물 목표 50%
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert st["deposits"][0][1] == "600.00"  # Cruise 는 남은 600 만 자기 돈으로 본다
+    outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
+    assert "Falcon 몫 600.00 USDT 현물 → 선물 이체" in outbox
+
+
+def test_falcon_split_small_account_and_rejected(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.core.errors import OrderRejectedError
+
+    _db(env)
+    monkeypatch.setattr(m, "_split", _SPLIT)
+    small = FakeBinance(Decimal(218))
+    monkeypatch.setattr(m, "_client", lambda **_: small)
+    assert m.run_cmd() == 0
+    assert small.moved == []  # 선물 목표 109 < 500 → 안 옮김
+    big = FakeBinance(Decimal(1200))
+    big.transfer_error = OrderRejectedError("code=-1002")
+    monkeypatch.setattr(m, "_client", lambda **_: big)
+    monkeypatch.setattr(time, "time", lambda: NOW / 1000 + 86_400)
+    assert m.run_cmd() == 0  # 거부돼도 Cruise 는 돈다
+    outbox = (env / "reports" / "binance_t2" / "outbox.log").read_text(encoding="utf-8")
+    assert "Falcon 이체 거부" in outbox and "Universal Transfer" in outbox

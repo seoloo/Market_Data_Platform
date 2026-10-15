@@ -1,11 +1,13 @@
-"""달마다 넣을 돈(합계)을 Glide · Cruise · AG4S2 로 나눠 알려 주기 — 시안 A (사용자 2026-10-15).
+"""달마다 넣을 돈(합계)을 Glide · Cruise · Falcon(옛 AG4S2)으로 나눠 알리기 — 시안 A.
+
+사용자 2026-10-15 요청.
 
 사용자: "달마다 얼마씩 넣을지 지금처럼 알림을 주되, 그 금액으로 분배를 하려면 얼마로 각각
 입금해야하는지 알려주면 좋겠어" → 시안 A(목표 비율대로 단순히 나누기) 선택.
 
 순수 함수만. 돈을 옮기거나 주문하지 않는다 — 금액만 계산해 알린다. 입금은 사용자가 직접 한다.
 Glide 몫은 그달 Glide 매수 금액이 된다(토스).
-Cruise · AG4S2 몫은 바이낸스 현물 · USDⓈ-M 선물로 보낼 원화다.
+Cruise · Falcon 몫은 바이낸스 현물 · USDⓈ-M 선물로 보낼 원화다.
 """
 
 from __future__ import annotations
@@ -14,14 +16,16 @@ from collections.abc import Mapping
 
 __all__ = ["MIX", "ask_text", "default_total", "split", "split_text"]
 
-MIX: tuple[tuple[str, float], ...] = (("Glide", 0.80), ("Cruise", 0.10), ("AG4S2", 0.10))
-"""목표 비율 (사용자 2026-10-15 "80 10 10"). 합 1."""
+MIX: tuple[tuple[str, float], ...] = (("Glide", 0.80), ("Cruise", 0.10), ("Falcon", 0.10))
+"""목표 비율 (사용자 2026-10-15 "80 10 10"). 합 1.
+
+Falcon = 옛 AG4S2 (사용자 2026-10-15 이름)."""
 UNIT = 1_000
 """원 단위 반올림 — 나머지는 Glide 에 붙인다(합계가 정확히 맞게)."""
 _WHERE = {
     "Glide": ("📈", "토스 증권", "오늘 밤 이 금액으로 매수해요"),
     "Cruise": ("🪙", "바이낸스 현물", ""),
-    "AG4S2": ("⚡", "바이낸스 선물(USDⓈ-M)", ""),
+    "Falcon": ("🦅", "바이낸스 선물(USDⓈ-M)", "현물로 보내면 자동 이체 (선물 몫 500 USDT 부터)"),
 }
 
 
@@ -88,11 +92,7 @@ def split_text(month: str, total_krw: float, usdt_krw: float | None) -> str:
     if coin > 0:
         lines += ["", RULE, "🧭 바이낸스로 보내는 법"]
         lines.append(sub(f"업비트에서 USDT {coin:,.0f}원어치 사서 바이낸스 현물로 보내기"))
-        if parts.get("AG4S2", 0) > 0:
-            ag = parts["AG4S2"]
-            amount = f"{usdt['AG4S2']:,.0f} USDT" if "AG4S2" in usdt else f"{ag:,.0f}원어치"
-            lines.append(sub(f"AG4S2 몫 {amount} 는 현물 → USDⓈ-M 선물로 이체"))
-            lines.append(sub("현물에 두면 Cruise 가 자기 돈으로 보고 먼저 써요"))
+        lines.append(sub("Cruise · Falcon 몫을 모두 현물로 보내면 비율대로 자동으로 나눠요"))
         if usdt_krw:
             lines.append(sub(f"USDT 값: 업비트 {usdt_krw:,.0f}원 기준"))
     lines += ["", "✏️ 금액을 바꾸려면 오늘 21:00 전에 다시 보내 주세요"]

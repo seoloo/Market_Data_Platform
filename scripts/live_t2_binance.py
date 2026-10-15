@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 import time
 from datetime import UTC, date, datetime, timedelta
@@ -36,9 +37,12 @@ from auto_trading.core.errors import (
 )
 from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
 from auto_trading.exchange.spot import SpotFilters, SpotOrderResult
+from auto_trading.exchange.wallet import TransferDirection
+from auto_trading.execution.wallet_transfers import WalletTransferManager
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops import user_settings
+from auto_trading.ops.falcon_split import falcon_share, move_amount
 from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.t2_upbit import (
     COINS,
@@ -50,6 +54,7 @@ from auto_trading.ops.t2_upbit import (
     stop_reminder,
     targets,
 )
+from auto_trading.storage.repositories.wallet_transfers import WalletTransferRepository
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "binance_t2"
@@ -262,6 +267,56 @@ def _record(
     st["orders"].append(row)
 
 
+def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
+    """Falcon 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
+
+    판단은 :func:`auto_trading.ops.falcon_split.move_amount`. 이체는 문서 53 규약(선기록 ·
+    결과 모르면 재전송 안 함, :class:`WalletTransferManager`). 실패해도 Cruise 실행은 계속한다.
+    """
+    dms, _day = _decision(now_ms)
+    cash, hold, prices = _snapshot(c)
+    eq = equity(cash, hold, prices)
+    exp = st.get("expected")
+    if exp:
+        before = Decimal(exp.get(CASH, "0")) + sum(
+            (Decimal(exp.get(k, "0")) * prices[k] for k in COINS), Decimal(0)
+        )
+        new_money = eq - before
+    else:
+        new_money = eq
+    fut = c.futures_balance()
+    amount = move_amount(spot_equity=eq, futures_balance=fut, new_money=new_money, free_usdt=cash)
+    if amount <= 0:
+        return []
+    with sqlite3.connect(REPO / "data" / "trading.db") as conn:
+        manager = WalletTransferManager(
+            c,
+            WalletTransferRepository(conn),
+            mode="live",
+            strategy_id="falcon-split",
+            strategy_tag="falcon-split",
+            clock=lambda: int(time.time() * 1000),
+        )
+        manager.recover()
+        if manager.blocked():
+            return ["⚠ Falcon 이체 결과를 아직 모르는 건이 있어 이번엔 옮기지 않음 (확인 필요)"]
+        rec = manager.transfer(
+            decision_ms=dms, direction=TransferDirection.SPOT_TO_FUTURES, amount=amount
+        )
+    share = f"{falcon_share():.0%}"
+    if rec.state == "CONFIRMED":
+        return [
+            f"🦅 Falcon 몫 {_usd(amount)} 현물 → 선물 이체",
+            sub(f"목표 선물 {share} · 선물 지갑 {_usd(fut + amount)}"),
+        ]
+    if rec.state == "REJECTED":
+        return [
+            f"⚠ Falcon 이체 거부 — {rec.error}",
+            sub("키에 '내부 이체(Universal Transfer)' 권한이 필요해요"),
+        ]
+    return [f"⚠ Falcon 이체 결과 모름 ({_usd(amount)}) — 다음 실행 때 이력으로 확인해요"]
+
+
 def run_cmd() -> int:
     now_ms = int(time.time() * 1000)
     st = _load()
@@ -270,11 +325,16 @@ def run_cmd() -> int:
     lines: list[str] = []
     fill_lines: list[str] = []
     try:
+        if st.get("last_decision") == _decision(now_ms)[1]:
+            print(f"{_decision(now_ms)[1]} 이미 실행함")
+            return 0
+        if not halted and c.trading_enabled:
+            try:
+                lines += _split(c, st, now_ms)
+            except (AutoTradingError, sqlite3.Error) as exc:  # 분배 실패는 Cruise 를 멈추지 않는다
+                lines.append(f"⚠ Falcon 자동 분배 실패: {exc}")
         p, filters = _plan_today(c, st, now_ms)
         ns = p["nav"]
-        if st.get("last_decision") == p["day"]:
-            print(f"{p['day']} 이미 실행함")
-            return 0
         deposits = st.setdefault("deposits", [])
         if Decimal(st["units"]) <= 0 and not deposits:
             deposits.append([p["day"], str(p["equity"])])

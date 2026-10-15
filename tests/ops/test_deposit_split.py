@@ -6,11 +6,11 @@ from auto_trading.ops.deposit_split import ask_text, default_total, split, split
 
 
 def test_split_sums_exactly_and_rounds_others() -> None:
-    assert split(1_000_000) == {"Glide": 800_000.0, "Cruise": 100_000.0, "AG4S2": 100_000.0}
+    assert split(1_000_000) == {"Glide": 800_000.0, "Cruise": 100_000.0, "Falcon": 100_000.0}
     odd = split(333_333)
-    assert odd["Cruise"] == odd["AG4S2"] == 33_000.0
+    assert odd["Cruise"] == odd["Falcon"] == 33_000.0
     assert sum(odd.values()) == 333_333
-    assert split(0) == {"Glide": 0.0, "Cruise": 0.0, "AG4S2": 0.0}
+    assert split(0) == {"Glide": 0.0, "Cruise": 0.0, "Falcon": 0.0}
 
 
 def test_default_total_and_texts() -> None:
@@ -19,9 +19,9 @@ def test_default_total_and_texts() -> None:
     assert "2026년 11월 입금 안내" in ask and "합계 375,000원" in ask
     text = split_text("2026-11", 1_000_000, 1_400.0)
     assert "Glide · 토스 증권  800,000원" in text
-    assert "AG4S2 · 바이낸스 선물(USDⓈ-M)  100,000원 ≈ 71 USDT" in text
-    assert "현물 → USDⓈ-M 선물로 이체" in text
+    assert "Falcon · 바이낸스 선물(USDⓈ-M)  100,000원 ≈ 71 USDT" in text
+    assert "비율대로 자동으로 나눠요" in text
     no_rate = split_text("2026-11", 1_000_000, None)
-    assert "USDT" not in no_rate.split("🧭")[0]
+    assert "≈" not in no_rate
     only_glide = split_text("2026-11", 0, 1_400.0)
     assert "바이낸스로 보내는 법" not in only_glide
