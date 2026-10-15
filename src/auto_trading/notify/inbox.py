@@ -140,6 +140,10 @@ PAPER_WORDS = frozenset({"paper", "/paper", "페이퍼", "/페이퍼", "가상�
 """Paper(가상 장부) 요약 (2026-10-15) — 봇 몫."""
 LIQ_DATA = ("liq:", "unh:")
 """정리 · 정지 풀기 버튼의 callback_data 머리."""
+STOCK_PREFIXES = ("개별주", "/개별주", "/stock", "비중", "/비중")
+"""개별주 비중 추천 (2026-10-16) — '개별주 NVDA' 처럼 앞에 붙인다(종목만 보내면 Deneb 대화 몫)."""
+STOCK_DATA = ("stk:", "stkr:")
+"""개별주 [이대로 매수] · [손절 해제] 버튼의 callback_data 머리."""
 
 
 def _word(msg: InboxMessage) -> str:
@@ -153,10 +157,23 @@ def is_liquidation(msg: InboxMessage) -> bool:
     return _word(msg) in LIQ_WORDS | UNHALT_WORDS
 
 
+def is_stock(msg: InboxMessage) -> bool:
+    """'개별주 …' 글 또는 그 버튼."""
+    if msg.data:
+        return msg.data.startswith(STOCK_DATA)
+    first = (msg.text.strip().split() or [""])[0].lower()
+    return first in STOCK_PREFIXES or any(
+        first.startswith(p) and first[len(p) :].isascii() and first[len(p) :].isalnum()
+        for p in STOCK_PREFIXES
+    )
+
+
 def is_command(msg: InboxMessage) -> bool:
-    """봇(scripts/telegram_bot.py) 몫 — '현황' 류와 '전부 정리' 류. 나머지는 Deneb 대화 몫."""
-    return is_liquidation(msg) or (
-        not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS
+    """봇(scripts/telegram_bot.py) 몫 — 현황 · 전부 정리 · 개별주 류. 나머지는 Deneb 대화 몫."""
+    return (
+        is_liquidation(msg)
+        or is_stock(msg)
+        or (not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS)
     )
 
 

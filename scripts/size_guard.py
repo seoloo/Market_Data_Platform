@@ -13,7 +13,7 @@
 규칙: :mod:`auto_trading.ops.position_size` · :mod:`~auto_trading.ops.size_order` ·
 :mod:`~auto_trading.ops.stop_guard`. 주문은 ``TOSS_TRADING_ENABLED=true`` 일 때만, 예약 매수는
 ``data/HALT`` (전체 정지) 면 하지 않는다 — 손절 매도는 정지 중에도 한다(보호 매도).
-텔레그램 메뉴(📐 비중)는 나중에 이 함수들을 부른다.
+텔레그램 💹 개별주(scripts/telegram_bot.handle_stock)가 이 함수들을 부르고, 봇이 2 분마다 tick 한다.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ NY = ZoneInfo("America/New_York")
 KST = ZoneInfo("Asia/Seoul")
 INDEX = {"US": ("SPY", "S&P500(SPY)"), "KR": ("069500", "KOSPI200(KODEX 200)")}
 LOCK_STALE_MS = 10 * 60_000
-TAG = "📐 [비중 · 손절]"
+TAG = "💹 [개별주 · 손절]"
 
 
 # ------------------------------------------------------------------ 장부

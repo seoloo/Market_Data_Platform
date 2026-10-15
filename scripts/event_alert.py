@@ -83,7 +83,9 @@ def _earnings_status(root: Path, today: date, now_ms: int) -> tuple[list[Earning
     warnings: list[str] = []
     for snapshot in rows:
         if not snapshot.ok:
-            warnings.append(f"⚠️ {snapshot.day} {snapshot.error} — 발표 없음으로 보지 않아요")
+            # 알림에는 넣지 않는다(사용자 2026-10-16 "일정 자동으로 하기 힘들면 그냥 지워줘").
+            # 매수 쪽은 그대로 막는다 — 개별주 추천 · 예약이 주문 직전에 다시 확인한다.
+            print(f"실적 일정 확인 실패 {snapshot.day}: {snapshot.error}")
         else:
             out += parse_earnings(snapshot.rows, snapshot.day, held, WATCH)
     return out, warnings
@@ -143,7 +145,7 @@ def _texts(now: datetime, root: Path = REPO) -> dict[str, str | None]:
     warnings += [b for b in calendar_risk.blocked if "확인 불가" in b]
     extra = warnings + _ticket_lines(root, events)
     if extra:
-        tail = "\n\n📐 개별주 일정·예약 확인\n" + "\n".join(extra)
+        tail = "\n\n💹 개별주 예약 · 손절 확인\n" + "\n".join(extra)
         texts = {slot: (text or "🗓 미국 주요 일정 확인") + tail for slot, text in texts.items()}
     return texts
 

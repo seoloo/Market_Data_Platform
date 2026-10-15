@@ -61,7 +61,14 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
     kind, (text, buttons) = bot.out[-1]
     assert kind == "buttons" and "미리 보기" in text and not fake["start"]
     data = [b["callback_data"] for row in buttons for b in row]
-    assert [d.rsplit(":", 1)[1] for d in data] == ["all", "vega", "deneb", "acc", "cancel"]
+    assert [d.rsplit(":", 1)[1] for d in data] == [
+        "all",
+        "vega",
+        "deneb",
+        "acc",
+        "altair",
+        "cancel",
+    ]
     deneb = next(d for d in data if d.endswith(":deneb"))
     assert not tb.handle_liquidation(bot, _press(deneb))  # type: ignore[arg-type]
     assert fake["start"] == [("deneb", "텔레그램")]
@@ -123,4 +130,4 @@ def test_help_words_route_to_bot_and_pin_help(
     monkeypatch.setattr(tb, "TelegramNotifier", Bot)
     assert "고정" in tb.pin_help(tmp_path)
     assert calls[0][0] == "send" and calls[1:3] == [("unpin_all",), ("pin", 55)]
-    assert calls[3] == ("menu", ["status", "paper", "liquidate", "unhalt", "help"])
+    assert calls[3] == ("menu", ["status", "paper", "stock", "liquidate", "unhalt", "help"])

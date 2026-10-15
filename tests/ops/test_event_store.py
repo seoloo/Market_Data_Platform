@@ -79,3 +79,12 @@ def test_force_refresh_detects_changed_calendar(tmp_path: Path) -> None:
         tmp_path, DAY, NOW + 1, force=True, fetch=lambda _: {"data": {"rows": [{"symbol": "NVDA"}]}}
     )
     assert changed.rows[0]["symbol"] == "NVDA"
+
+
+def test_weekend_has_no_earnings_without_fetch(tmp_path: Path) -> None:
+    def boom(_: date) -> dict[str, Any]:
+        raise AssertionError("주말은 받지 않는다")
+
+    for d in (date(2026, 10, 17), date(2026, 10, 18)):  # 토 · 일 — Nasdaq 은 rows:null
+        r = earnings_day(tmp_path, d, NOW, fetch=boom)
+        assert r.ok and r.rows == ()

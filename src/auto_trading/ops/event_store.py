@@ -73,8 +73,13 @@ def earnings_day(
     fetch: Callable[[date], Mapping[str, Any]] = fetch_earnings,
     force: bool = False,
 ) -> EarningsDay:
-    """성공/확인 실패·출처·시각·digest 공유. 오래된 성공으로 실패를 가리지 않는다."""
+    """성공/확인 실패·출처·시각·digest 공유. 오래된 성공으로 실패를 가리지 않는다.
+
+    토 · 일은 미국 장이 쉬어 실적 발표가 없다 — 받지 않고 빈 날로 본다(Nasdaq 은 rows:null 을
+    준다, 2026-10-16 아침 알림의 '10-17 확인 실패' 원인)."""
     source = NASDAQ_EARNINGS.format(d=day.isoformat())
+    if day.weekday() >= 5:
+        return EarningsDay(day, (), now_ms, source, _digest(()))
     path = root / "data" / "event_calendar" / "earnings" / f"{day.isoformat()}.json"
     try:
         cached = json.loads(path.read_text(encoding="utf-8"))

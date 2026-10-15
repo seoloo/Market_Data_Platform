@@ -267,7 +267,7 @@ def _won(v: float) -> str:
 
 def advice_text(a: Advice) -> str:
     """텔레그램용 추천 (순수)."""
-    head = f"📐 {a.name} ({a.symbol}) 매수 비중 추천"
+    head = f"💹 {a.name} ({a.symbol}) 매수 비중 추천"
     if a.ok:
         top = (
             f"추천: {a.weight:.0%} · {_won(a.amount_krw)} · {a.qty}주 "

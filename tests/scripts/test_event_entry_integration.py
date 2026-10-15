@@ -126,7 +126,12 @@ def test_real_sessions_holiday_early_close_and_next_day() -> None:
     assert m._session_days(reader, False, _ms("2026-11-28T03:01:00"))[0] == date(2026, 11, 30)
 
 
-def test_alert_unknown_not_silent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_alert_hides_earnings_fetch_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """사용자 2026-10-16 "일정 자동으로 하기 힘들면 그냥 지워줘" — 알림에는 안 넣는다.
+
+    매수 쪽(추천 · 예약)은 여전히 실패를 '발표 모름' 으로 막는다(위 시험들)."""
     calls: list[date] = []
 
     def snapshot(root: Path, day: date, now_ms: int, **kwargs: Any) -> EarningsDay:
@@ -136,7 +141,7 @@ def test_alert_unknown_not_silent(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(event_alert, "earnings_day", snapshot)
     monkeypatch.setattr(event_alert, "_held", lambda _: [])
     text = event_alert._texts(datetime(2026, 10, 20, 17, tzinfo=KST), tmp_path)["premarket"]
-    assert text is not None and "발표 없음으로 보지 않아요" in text
+    assert text is None or "실적 확인 실패" not in text
     assert calls == [date(2026, 10, 20), date(2026, 10, 21)]
 
 
