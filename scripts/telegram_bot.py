@@ -37,10 +37,13 @@ from auto_trading.notify.inbox import (
     InboxMessage,
     InboxQueue,
     TelegramInbox,
+    clear_stock_ask,
     is_command,
     is_liquidation,
     is_stock,
+    is_stock_answer,
     liquidation_symbol,
+    set_stock_ask,
 )
 from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import GROUPS
@@ -93,7 +96,8 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
   얼마나 살지 추천: 현금(원화 + 달러)의 1% 까지만 잃게, 손절 −3% · 한 종목 최대 25%
   실적 3거래일 안 · 추세 아님 · 지수 200일선 아래(절반)면 안 사거나 줄여요
   → [🛒 이대로 매수] 누르면 정규장 시작 직후 지정가로 사고, −3% 면 자동으로 팔아요
-  '개별주' 만 보내면 지금 예약 · 손절 현황 + [손절 해제] 버튼
+  메뉴(/stock)나 '개별주' 만 보내면 "어떤 종목을 살까요?" 라고 물어요 → 종목 이름으로 답장
+  (예약 · 손절 중인 종목이 있으면 현황 + [손절 해제] 버튼도)
 
 ▶ 정지풀기 (또는 /unhalt)
   정리 뒤 멈춘 그룹 다시 켜기 → 다음 실행부터 규칙대로 다시 사요
@@ -287,21 +291,34 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
             except SystemExit as exc:
                 bot.send(f"⚠ 해제 못 함 — {exc}")
         return False
-    query = _stock_query(msg.text)
+    if is_stock_answer(msg):  # '어떤 종목을 살까요?' 에 대한 답
+        clear_stock_ask()
+        query = msg.text.strip()
+    else:
+        query = _stock_query(msg.text)
     if not query:
         act = [t for t in sg.load_tickets() if t.active]
-        head = "💹 개별주 — 종목을 붙여 보내 주세요 (예: 개별주 NVDA · 개별주 삼성전자)"
-        if not act:
-            bot.send(head + "\n\n지금 예약 · 손절 감시 중인 종목 없음")
-            return False
-        nonce = STOCK_STORE.new_request(now, "stkr")
-        rows = [
-            [{"text": f"{t.name} 손절 해제", "callback_data": f"stkr:{nonce}:{t.id}"}]
-            for t in act
-            if t.status == "holding"
-        ]
-        bot.send_message(head + "\n\n" + sg.status(), buttons=rows or None)
-        return bool(rows)
+        holding = [t for t in act if t.status == "holding"]
+        if act:
+            nonce = STOCK_STORE.new_request(now, "stkr")
+            rows = [
+                [{"text": f"{t.name} 손절 해제", "callback_data": f"stkr:{nonce}:{t.id}"}]
+                for t in holding
+            ]
+            bot.send_message(
+                "💹 지금 예약 · 손절 현황" + "\n\n" + sg.status(), buttons=rows or None
+            )
+        mid = bot.send_message(
+            "💹 어떤 종목을 살까요?"
+            + "\n\n"
+            + "종목 이름이나 기호를 답장해 주세요 (예: 삼성전자 · 현대차 · NVDA)"
+            + "\n"
+            + "5분 안에 답하면 얼마나 살지 추천해 드려요",
+            force_reply=True,
+            placeholder="종목 이름 (예: 삼성전자)",
+        )
+        set_stock_ask(mid, int(time.time()))
+        return True
     try:
         a = sg.advise(query)
     except SystemExit as exc:
@@ -335,8 +352,10 @@ def _stock(
         while waiting and time.monotonic() < deadline:
             time.sleep(3)
             for m in queue.take(inbox, is_stock):
-                handle_stock(bot, m)
-                if m.data:
+                more = handle_stock(bot, m)
+                if more:  # 질문에 답해 추천 버튼을 보냄 → 버튼을 다시 기다린다
+                    deadline = time.monotonic() + STOCK_WAIT_S
+                elif m.data:
                     waiting = False
     except (AutoTradingError, KeyError, OSError, ValueError) as exc:
         bot.send(f"⚠ 개별주 처리 오류: {type(exc).__name__} {exc}"[:500])

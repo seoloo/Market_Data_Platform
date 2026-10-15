@@ -132,6 +132,7 @@ class TelegramNotifier:
         buttons: list[list[dict[str, str]]] | None = None,
         force_reply: bool = False,
         reply_to: int = 0,
+        placeholder: str = "숫자만 (예: 2)",
     ) -> int:
         """보내고 메시지 번호를 돌려준다.
 
@@ -145,7 +146,7 @@ class TelegramNotifier:
         elif force_reply:
             payload["reply_markup"] = {
                 "force_reply": True,
-                "input_field_placeholder": "숫자만 (예: 2)",
+                "input_field_placeholder": placeholder,
             }
         if reply_to:
             payload["reply_parameters"] = {

@@ -167,10 +167,65 @@ def is_liquidation(msg: InboxMessage) -> bool:
     return _word(msg) in LIQ_WORDS | UNHALT_WORDS or bool(liquidation_symbol(msg))
 
 
+STOCK_ASK_TTL_S = 300
+"""봇이 '어떤 종목을 살까요?' 를 물은 뒤 이 시간 안의 답만 종목으로 본다."""
+
+
+def stock_ask_path() -> Path:
+    """'어떤 종목?' 질문 기록 — Deneb 대화(다른 실행기)도 같은 판단을 하도록 파일로 둔다."""
+    return Path(__file__).resolve().parents[3] / "data" / "telegram" / "stock_ask.json"
+
+
+def stock_ask(path: Path | None = None) -> tuple[int, int] | None:
+    """(질문 메시지 번호, 물은 시각 유닉스 초). 없으면 None."""
+    try:
+        d = json.loads((path or stock_ask_path()).read_text(encoding="utf-8"))
+        return int(d["message_id"]), int(d["at"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def set_stock_ask(message_id: int, at_s: int, path: Path | None = None) -> None:
+    p = path or stock_ask_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"message_id": message_id, "at": at_s}), encoding="utf-8")
+
+
+def clear_stock_ask(path: Path | None = None) -> None:
+    (path or stock_ask_path()).unlink(missing_ok=True)
+
+
+def is_stock_answer(msg: InboxMessage, path: Path | None = None) -> bool:
+    """'어떤 종목을 살까요?' 에 대한 답 (2026-10-16 사용자 '메뉴 누르면 … 내가 대답하는 식').
+
+    그 질문에 답장했거나, 질문 뒤 5 분 안에 보낸 글 중 **금액이 아닌** 것 — 숫자 · '30만' · '쉬기'
+    는 Deneb 금액 답이라 Deneb 몫으로 남긴다."""
+    if msg.data:
+        return False
+    ask = stock_ask(path)
+    if ask is None:
+        return False
+    mid, at = ask
+    if not at <= msg.date <= at + STOCK_ASK_TTL_S:  # 시각 없는 글(0)은 답으로 안 봄
+        return False
+    if msg.reply_to:
+        return msg.reply_to == mid
+    t = msg.text.strip()
+    others = COMMANDS | HELP_WORDS | PAPER_WORDS | LIQ_WORDS | UNHALT_WORDS
+    return (
+        0 < len(t) <= 30
+        and parse_krw(t) is None
+        and _word(msg) not in others
+        and not any(w in t for w in SKIP_WORDS)
+    )
+
+
 def is_stock(msg: InboxMessage) -> bool:
-    """'개별주 …' 글 또는 그 버튼."""
+    """'개별주 …' 글 · 그 버튼 · '어떤 종목?' 질문의 답."""
     if msg.data:
         return msg.data.startswith(STOCK_DATA)
+    if is_stock_answer(msg):
+        return True
     first = (msg.text.strip().split() or [""])[0].lower()
     return first in STOCK_PREFIXES or any(
         first.startswith(p) and first[len(p) :].isascii() and first[len(p) :].isalnum()

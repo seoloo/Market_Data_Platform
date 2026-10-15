@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 
-from auto_trading.notify.inbox import InboxMessage, is_command, is_stock
+from auto_trading.notify import inbox
+from auto_trading.notify.inbox import InboxMessage, is_command, is_stock, is_stock_answer
 from auto_trading.ops import user_settings
 from auto_trading.ops.liquidate import Store
 from auto_trading.ops.position_size import Advice
@@ -33,6 +34,14 @@ def _advice(ok: bool = True) -> Advice:
         lines=["✅ 추세 좋음"],
         blocked=[] if ok else ["추세 아님 — 50일선 아래 (-2.9%)"],
     )
+
+
+@pytest.fixture(autouse=True)
+def ask_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """'어떤 종목?' 질문 기록을 임시 폴더로 — 진짜 data/telegram 을 건드리지 않는다."""
+    path = tmp_path / "stock_ask.json"
+    monkeypatch.setattr(inbox, "stock_ask_path", lambda: path)
+    return path
 
 
 @pytest.fixture
@@ -108,16 +117,46 @@ def test_setting_off_blocks_everything(
     assert "꺼져 있어요" in bot.out[-1][1] and not fake["advise"]
 
 
+def test_bare_word_asks_which_stock_then_answer_gets_advice(
+    fake: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bot = FakeBot()
+    assert tb.handle_stock(bot, _m("/stock"))  # type: ignore[arg-type]
+    kind, (text, buttons) = bot.out[-1]
+    assert kind == "buttons" and "어떤 종목을 살까요?" in text and buttons is None
+    ask = inbox.stock_ask()
+    assert ask is not None and ask[0] == 7  # FakeBot 의 메시지 번호
+    mid, at = ask
+    answer = InboxMessage(2, at + 30, "현대차", reply_to=mid)
+    assert is_stock(answer) and is_command(answer)  # Deneb 대화가 가져가지 않는다
+    assert tb.handle_stock(bot, answer)  # type: ignore[arg-type]
+    assert fake["advise"] == ["현대차"] and inbox.stock_ask() is None  # 한 번 쓰면 지움
+    assert "🛒 이대로 매수" in bot.out[-1][1][1][0][0]["text"]
+
+
+def test_answer_window_and_amounts_stay_with_deneb() -> None:
+    inbox.set_stock_ask(50, 1_000)
+    assert is_stock_answer(InboxMessage(1, 1_100, "삼성전자"))  # 답장 안 해도 5 분 안이면
+    assert is_stock_answer(InboxMessage(1, 1_100, "아무거나", reply_to=50))
+    assert not is_stock_answer(InboxMessage(1, 1_100, "삼성전자", reply_to=49))  # 다른 글에 답장
+    assert not is_stock_answer(InboxMessage(1, 1_400, "삼성전자"))  # 5 분 지남
+    assert not is_stock_answer(InboxMessage(1, 999, "삼성전자"))  # 묻기 전
+    for amount in ("30만", "1000000", "0", "쉬기", "현황"):
+        assert not is_stock_answer(InboxMessage(1, 1_100, amount)), amount
+    inbox.clear_stock_ask()
+    assert not is_stock_answer(InboxMessage(1, 1_100, "삼성전자"))
+
+
 def test_bare_word_shows_status_and_release(
     fake: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     bot = FakeBot()
-    assert not tb.handle_stock(bot, _m("개별주"))  # type: ignore[arg-type]
-    assert "감시 중인 종목 없음" in bot.out[-1][1]
     held = Ticket("1016", "NVDA", "엔비디아", "USD", 8, 200.0, 0, status="holding")
     monkeypatch.setattr(sg, "load_tickets", lambda: [held])
     monkeypatch.setattr(sg, "status", lambda: "🛡 엔비디아 8주")
     assert tb.handle_stock(bot, _m("개별주"))  # type: ignore[arg-type]
-    rel = bot.out[-1][1][1][0][0]["callback_data"]
+    status_msg = bot.out[-2][1]
+    assert "예약 · 손절 현황" in status_msg[0] and "어떤 종목" in bot.out[-1][1][0]
+    rel = status_msg[1][0][0]["callback_data"]
     tb.handle_stock(bot, _m(data=rel))  # type: ignore[arg-type]
     assert fake["release"] == [("1016", "released")] and "손절 해제" in bot.out[-1][1]
