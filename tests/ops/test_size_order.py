@@ -1,0 +1,129 @@
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import Any
+
+from auto_trading.core.errors import OrderStateUnknownError
+from auto_trading.ops import size_order as m
+from auto_trading.ops.size_order import Ticket
+
+
+@dataclass
+class R:
+    accepted: bool
+    code: str
+    message: str = ""
+
+
+@dataclass
+class S:
+    status: str
+    filled_qty: Decimal
+    avg_price: Decimal | None
+    filled_amount: Decimal | None
+    commission: Decimal | None = Decimal(0)
+
+
+@dataclass
+class FakeTrader:
+    ask: float = 100.0
+    bid: float = 99.9
+    fills: dict[str, tuple[str, float, float]] = field(default_factory=dict)
+    """order_id → (상태, 체결 수량, 체결가)."""
+    placed: list[dict[str, Any]] = field(default_factory=list)
+    canceled: list[str] = field(default_factory=list)
+    fail: Exception | None = None
+
+    def asks(self, symbol: str) -> list[tuple[Any, Any]]:
+        return [(Decimal(str(self.ask)), Decimal(100))] if self.ask else []
+
+    def bids(self, symbol: str) -> list[tuple[Any, Any]]:
+        return [(Decimal(str(self.bid)), Decimal(1000))]
+
+    def order(self, symbol: str, side: str, qty: int, limit: Any, **kw: Any) -> R:
+        if self.fail:
+            raise self.fail
+        oid = f"o{len(self.placed)}"
+        self.placed.append({"id": oid, "side": side, "qty": qty, "limit": float(limit), **kw})
+        self.fills.setdefault(oid, ("PENDING", 0.0, 0.0))
+        return R(True, oid)
+
+    def order_status(self, order_id: str) -> S:
+        st, q, px = self.fills[order_id]
+        return S(st, Decimal(str(q)), Decimal(str(px)), Decimal(str(q * px)))
+
+    def cancel(self, order_id: str) -> R:
+        self.canceled.append(order_id)
+        _st, q, px = self.fills[order_id]
+        self.fills[order_id] = ("CANCELED", q, px)
+        return R(True, order_id)
+
+
+def _t(qty: int = 10, ref: float = 100.0, symbol: str = "NVDA") -> Ticket:
+    return Ticket("1015220000", symbol, symbol, "USD", qty, ref, 0)
+
+
+def test_waits_until_session_then_buys_at_ask_plus_chase() -> None:
+    t, tr = _t(), FakeTrader(ask=100.0)
+    assert m.step_buy(t, tr, 1, session="US:2026-10-15", live=False) == []
+    assert t.status == "reserved" and not tr.placed
+    m.step_buy(t, tr, 2, session="US:2026-10-15", live=True)
+    assert t.status == "buying" and t.session == "US:2026-10-15"
+    o = tr.placed[0]
+    assert (o["side"], o["qty"], o["limit"], o["time_in_force"]) == ("BUY", 10, 100.3, "DAY")
+    tr.fills["o0"] = ("FILLED", 10.0, 100.2)
+    msgs = m.step_buy(t, tr, 3, session="US:2026-10-15", live=True)
+    assert t.status == "holding" and t.filled == 10 and abs(t.avg - 100.2) < 1e-9
+    assert t.stop == 97.19  # 100.2 × 0.97 = 97.194 → 내림
+    assert "체결" in msgs[0] and "손절 등록" in msgs[0]
+
+
+def test_gap_up_over_3_percent_cancels() -> None:
+    t, tr = _t(ref=100.0), FakeTrader(ask=103.5)
+    msgs = m.step_buy(t, tr, 1, session="US:d", live=True)
+    assert t.status == "canceled" and not tr.placed and "갭 상승" in msgs[0]
+
+
+def test_reprice_up_to_three_then_partial() -> None:
+    t, tr = _t(qty=10), FakeTrader(ask=100.0)
+    m.step_buy(t, tr, 0, session="US:d", live=True)
+    tr.fills["o0"] = ("PARTIAL_FILLED", 4.0, 100.1)
+    m.step_buy(t, tr, 60_000, session="US:d", live=True)  # 2 분 안 — 기다림
+    assert tr.canceled == [] and len(tr.placed) == 1
+    m.step_buy(t, tr, m.REPRICE_MS, session="US:d", live=True)  # 2 분 — 취소
+    assert tr.canceled == ["o0"]
+    tr.ask = 100.9  # 시작 가격 +1% 상한 = 101.00
+    m.step_buy(t, tr, m.REPRICE_MS + 1, session="US:d", live=True)
+    assert tr.placed[1]["qty"] == 6 and tr.placed[1]["limit"] == 101.0
+    tr.fills["o1"] = ("CANCELED", 0.0, 0.0)
+    m.step_buy(t, tr, m.REPRICE_MS + 2, session="US:d", live=True)
+    tr.fills["o2"] = ("CANCELED", 2.0, 100.8)
+    msgs = m.step_buy(t, tr, m.REPRICE_MS + 3, session="US:d", live=True)
+    assert len(tr.placed) == m.MAX_BUY_ORDERS
+    assert t.status == "holding" and t.filled == 6 and "나머지 취소" in msgs[0]
+
+
+def test_reservation_expires_after_its_session() -> None:
+    t, tr = _t(), FakeTrader(ask=0.0)  # 호가 없음 — 장은 시작했지만 못 냄
+    m.step_buy(t, tr, 1, session="US:d1", live=True)
+    assert t.status == "reserved" and t.session == "US:d1"
+    msgs = m.step_buy(t, tr, 2, session="US:d2", live=True)
+    assert t.status == "canceled" and "예약 만료" in msgs[0]
+
+
+def test_block_and_unknown_result() -> None:
+    t = _t()
+    msgs = m.step_buy(t, FakeTrader(), 1, session="US:d", live=True, block="실적 발표 10/16")
+    assert t.status == "canceled" and "실적" in msgs[0]
+    t2, tr = _t(), FakeTrader(fail=OrderStateUnknownError("x"))
+    msgs = m.step_buy(t2, tr, 1, session="US:d", live=True)
+    assert t2.status == "failed" and "결과 모름" in msgs[0]
+
+
+def test_no_fill_cancels_and_dict_roundtrip() -> None:
+    t, tr = _t(), FakeTrader()
+    m.step_buy(t, tr, 0, session="US:d", live=True)
+    tr.fills["o0"] = ("CANCELED", 0.0, 0.0)
+    m.step_buy(t, tr, 1, session="US:d", live=False)  # 장 끝 — 다시 안 냄
+    assert t.status == "canceled"
+    back = Ticket.from_dict(t.to_dict())
+    assert back == t and back.buys[0].order_id == "o0"

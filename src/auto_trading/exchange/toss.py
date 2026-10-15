@@ -233,6 +233,16 @@ class TossReader:
                 out.append((px, vol))
         return out
 
+    def asks(self, symbol: str) -> list[tuple[Decimal, Decimal]]:
+        """매도 호가 [(가격, 잔량)] 낮은 가격 순. 없으면 빈 목록."""
+        data = self._get("/api/v1/orderbook", {"symbol": symbol}) or {}
+        out = []
+        for row in data.get("asks") or []:
+            px, vol = _dec(row.get("price")), _dec(row.get("volume"))
+            if px is not None and px > 0 and vol is not None and vol > 0:
+                out.append((px, vol))
+        return sorted(out)
+
     def usd_krw(self) -> Decimal:
         row = self._get("/api/v1/exchange-rate", {"baseCurrency": "USD", "quoteCurrency": "KRW"})
         rate = _dec((row or {}).get("rate"))

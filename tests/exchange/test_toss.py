@@ -252,7 +252,8 @@ def test_liquidation_reads_and_cancel(tmp_path: Path) -> None:
             }
         },
         "GET /api/v1/orderbook": {
-            "bids": [{"price": "50.1", "volume": "3"}, {"price": "0", "volume": "1"}]
+            "bids": [{"price": "50.1", "volume": "3"}, {"price": "0", "volume": "1"}],
+            "asks": [{"price": "50.4", "volume": "2"}, {"price": "50.2", "volume": "5"}],
         },
         "POST /api/v1/orders/A1/cancel": {"orderId": "C1"},
     }
@@ -268,6 +269,7 @@ def test_liquidation_reads_and_cancel(tmp_path: Path) -> None:
     )
     assert t.us_regular_session("2026-10-13") is None  # 날짜가 다르면(휴장 등) 없음
     assert t.bids("TQQQ") == [(Decimal("50.1"), Decimal("3"))]
+    assert t.asks("TQQQ") == [(Decimal("50.2"), Decimal("5")), (Decimal("50.4"), Decimal("2"))]
     res = t.cancel("A1")
     assert res.accepted and res.code == "C1"
     assert seen[-1].headers["X-Tossinvest-Account"] == "1"
