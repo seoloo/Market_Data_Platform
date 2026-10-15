@@ -50,7 +50,8 @@ def test_gate_off_on_decision_day_sells_everything(monkeypatch: pytest.MonkeyPat
 
 def test_equal_weight_and_fee() -> None:
     days = _days(40)
-    etf: dict[str, list[float | None]] = {"A": [10.0] * 40, "B": [10.0] * 33 + [20.0] * 7}
+    b: list[float | None] = [10.0 if i < 33 else 20.0 for i in range(40)]
+    etf: dict[str, list[float | None]] = {"A": [10.0] * 40, "B": b}
     ends = m.month_ends(days)
     res = m.simulate(days, etf, {ends[0]: ["A", "B"]}, [True] * 40, 0.01, top=2, use_trend=False)
     # 11 월 첫날 0.99 를 반씩 → B 가 두 배 된 뒤 0.495 + 0.99 = 1.485

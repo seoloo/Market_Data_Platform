@@ -55,8 +55,13 @@ def plan(
     equity: Decimal,
     *,
     allow_buy: bool,
+    step: Mapping[str, Decimal] | None = None,
+    min_notional: Mapping[str, Decimal] | None = None,
 ) -> list[SpotOrderIntent]:
-    """주문 의도 (매도 먼저). ``allow_buy`` 가 False 면(낙폭 정지) 매수는 뺀다."""
+    """주문 의도 (매도 먼저). ``allow_buy`` 가 False 면(낙폭 정지) 매수는 뺀다.
+
+    ``step`` · ``min_notional`` 을 주지 않으면 업비트 값(0.00000001 · 5,000 원). 바이낸스 Cruise 는
+    종목별 LOT_SIZE · NOTIONAL 을 넘긴다(2026-10-15)."""
     tg = {c: SpotTarget(c, w) for c, w in weights.items()}
     intents = plan_spot_orders(
         tg,
@@ -64,8 +69,10 @@ def plan(
         prices=prices,
         equity=equity,
         cfg=SpotTrendConfig(),
-        step_size=dict.fromkeys(COINS, STEP),
-        min_notional=dict.fromkeys(COINS, MIN_KRW),
+        step_size=dict(step) if step is not None else dict.fromkeys(COINS, STEP),
+        min_notional=(
+            dict(min_notional) if min_notional is not None else dict.fromkeys(COINS, MIN_KRW)
+        ),
     )
     return [i for i in intents if allow_buy or i.side.value == "SELL"]
 
