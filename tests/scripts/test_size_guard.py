@@ -26,6 +26,13 @@ class Reader:
             return None
         return (f"{us_date}T22:30:00+09:00", f"{_next(us_date)}T05:00:00+09:00")
 
+    def checked_regular_session(self, day: str, *, kr: bool) -> tuple[str, str] | None:
+        if date.fromisoformat(day).weekday() >= 5:
+            return None
+        if kr:
+            return (f"{day}T09:00:00+09:00", f"{day}T15:30:00+09:00") if self.kr_open else None
+        return self.us_regular_session(day)
+
 
 def _next(d: str) -> str:
     return date.fromordinal(date.fromisoformat(d).toordinal() + 1).isoformat()
@@ -50,10 +57,13 @@ def test_kr_session_window() -> None:
     )
 
 
-def test_trading_days_skip_weekend() -> None:
-    fri = date(2026, 10, 16)
-    assert m._trading_days(fri, fri) == 0
-    assert m._trading_days(fri, date(2026, 10, 19)) == 1  # 월요일
+def test_session_days_skip_weekend() -> None:
+    assert m._session_days(Reader(), False, _ms("2026-10-16T20:00:00")) == [  # type: ignore[arg-type]
+        date(2026, 10, 16),
+        date(2026, 10, 19),
+        date(2026, 10, 20),
+        date(2026, 10, 21),
+    ]
 
 
 def test_blocked_symbols_from_toss_ledgers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

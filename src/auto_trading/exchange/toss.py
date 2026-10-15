@@ -223,6 +223,57 @@ class TossReader:
             return None
         return str(reg["startTime"]), str(reg["endTime"])
 
+    def checked_regular_session(self, day: str, *, kr: bool) -> tuple[str, str] | None:
+        """개별주 도구용: 명시적 휴장과 손상/날짜 불일치를 구분한다."""
+        market = "KR" if kr else "US"
+        data = self._get(f"/api/v1/market-calendar/{market}", {"date": day})
+        today = data.get("today") if isinstance(data, dict) else None
+        if not isinstance(today, dict) or today.get("date") != day:
+            raise ExchangeError("거래일 달력 날짜 미확인")
+        body = today.get("integrated") if kr else today
+        if kr and "integrated" in today and body is None:
+            return None
+        if not isinstance(body, dict) or "regularMarket" not in body:
+            raise ExchangeError("거래일 정규장 필드 미확인")
+        reg = body["regularMarket"]
+        if reg is None:
+            return None
+        if not isinstance(reg, dict) or not reg.get("startTime") or not reg.get("endTime"):
+            raise ExchangeError("거래일 정규장 시각 미확인")
+        return str(reg["startTime"]), str(reg["endTime"])
+
+    def regular_open(self, symbol: str, start_ms: int) -> Decimal | None:
+        """정규장 첫 1분봉의 시가. 시작 시각과 일치하는 유량 있는 봉만 인정한다."""
+        from datetime import UTC, datetime
+
+        data = self._get(
+            "/api/v1/candles",
+            {
+                "symbol": symbol,
+                "interval": "1m",
+                "count": 2,
+                "adjusted": "false",
+                "before": datetime.fromtimestamp(start_ms / 1000, UTC).isoformat(),
+            },
+        )
+        for row in (data or {}).get("candles") or []:
+            try:
+                stamp = datetime.fromisoformat(str(row["timestamp"]))
+                if stamp.tzinfo is None or int(stamp.timestamp() * 1000) != start_ms:
+                    continue
+                px, volume = _dec(row.get("openPrice")), _dec(row.get("volume"))
+                if (
+                    px is not None
+                    and px.is_finite()
+                    and px > 0
+                    and volume is not None
+                    and volume > 0
+                ):
+                    return px
+            except (ValueError, TypeError, KeyError):
+                continue
+        return None
+
     def bids(self, symbol: str) -> list[tuple[Decimal, Decimal]]:
         """매수 호가 [(가격, 잔량)] 높은 가격 순. 없으면 빈 목록."""
         data = self._get("/api/v1/orderbook", {"symbol": symbol}) or {}
@@ -250,16 +301,30 @@ class TossReader:
             raise ExchangeError("토스 환율을 읽지 못했다")
         return rate
 
-    def daily_closes(self, symbol: str, count: int = 200) -> list[tuple[str, Decimal]]:
+    def daily_closes(
+        self, symbol: str, count: int = 200, *, before_day: str | None = None
+    ) -> list[tuple[str, Decimal]]:
         """수정주가 일봉 종가 (미국 거래일, 오래된 것 먼저). 정규장 공식 종가다(FAQ)."""
-        data = self._get(
-            "/api/v1/candles",
-            {"symbol": symbol, "interval": "1d", "count": min(count, 200), "adjusted": "true"},
-        )
+        params = {
+            "symbol": symbol,
+            "interval": "1d",
+            "count": str(min(count, 200)),
+            "adjusted": "true",
+        }
+        if before_day is not None:
+            from datetime import date, timedelta
+
+            previous = date.fromisoformat(before_day) - timedelta(days=1)
+            params["before"] = f"{previous}T23:59:59+09:00"
+        data = self._get("/api/v1/candles", params)
         out = []
         for c in (data or {}).get("candles") or []:
             px = _dec(c.get("closePrice"))
-            if px is not None and px > 0:
+            if (
+                px is not None
+                and px > 0
+                and (before_day is None or str(c["timestamp"])[:10] < before_day)
+            ):
                 out.append((str(c["timestamp"])[:10], px))
         return sorted(out)
 

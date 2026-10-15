@@ -19,6 +19,66 @@ from auto_trading.exchange.toss import TossApiError, TossReader, TossTokenCache,
 NOW = 1_790_000_000_000
 
 
+def test_checked_calendar_distinguishes_holiday_from_broken_data(tmp_path: Path) -> None:
+    from auto_trading.core.errors import ExchangeError
+
+    path = "GET /api/v1/market-calendar/US"
+    for body in (
+        {},
+        {"today": {"date": "2026-10-15"}},
+        {"today": {"date": "2026-10-14", "regularMarket": None}},
+    ):
+        r = _make(tmp_path, {path: body}, [])
+        with pytest.raises(ExchangeError):
+            r.checked_regular_session("2026-10-15", kr=False)
+        r.close()
+    r = _make(tmp_path, {path: {"today": {"date": "2026-10-15", "regularMarket": None}}}, [])
+    assert r.checked_regular_session("2026-10-15", kr=False) is None
+    r.close()
+
+
+def test_regular_open_requires_matching_regular_minute(tmp_path: Path) -> None:
+    from datetime import datetime
+
+    start_ms = int(datetime.fromisoformat("2026-10-15T22:30:00+09:00").timestamp() * 1000)
+    route = "GET /api/v1/candles"
+    rows = [
+        {"timestamp": "2026-10-15T22:29:00+09:00", "openPrice": "90", "volume": "3"},
+        {"timestamp": "2026-10-15T22:30:00+09:00", "openPrice": "100", "volume": "3"},
+    ]
+    seen: list[httpx.Request] = []
+    r = _make(tmp_path, {route: {"candles": rows}}, seen)
+    assert r.regular_open("TQQQ", start_ms) == Decimal("100")
+    request = next(q for q in seen if q.url.path == "/api/v1/candles")
+    assert request.url.params["adjusted"] == "false" and request.url.params["interval"] == "1m"
+    r.close()
+    for bad in (rows[:1], [{**rows[1], "volume": "0"}], [{**rows[1], "openPrice": None}]):
+        r = _make(tmp_path, {route: {"candles": bad}}, [])
+        assert r.regular_open("TQQQ", start_ms) is None
+        r.close()
+
+
+@pytest.mark.leakage
+def test_completed_daily_request_excludes_current_session(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    r = _make(
+        tmp_path,
+        {
+            "GET /api/v1/candles": {
+                "candles": [
+                    {"timestamp": "2026-10-15T13:00:00+09:00", "closePrice": "999"},
+                    {"timestamp": "2026-10-14T13:00:00+09:00", "closePrice": "100"},
+                ]
+            }
+        },
+        seen,
+    )
+    assert r.daily_closes("TQQQ", before_day="2026-10-15") == [("2026-10-14", Decimal("100"))]
+    request = next(q for q in seen if q.url.path == "/api/v1/candles")
+    assert request.url.params["before"] == "2026-10-14T23:59:59+09:00"
+    r.close()
+
+
 def _creds(enabled: bool = True) -> TossCredentials:
     return TossCredentials("client-abcdef123456", "secret-xyz", 1, enabled)
 

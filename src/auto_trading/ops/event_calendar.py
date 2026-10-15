@@ -201,6 +201,7 @@ def morning_text(
     lines += [
         "",
         "자동 매매 장부(Deneb · Vega · 자동 적립)는 원래 규칙대로 돌아요 — 직접 매매용 경고예요.",
+        "개별주 비중·예약 도구는 별도 발표 보류 규칙을 적용하고, 주문 직전에 다시 확인해요.",
     ]
     return "\n".join(lines) + _stale(until, today)
 

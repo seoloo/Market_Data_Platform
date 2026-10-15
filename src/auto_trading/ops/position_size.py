@@ -18,6 +18,8 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from auto_trading.ops.entry_events import EntryEvents
+
 __all__ = [
     "CAP",
     "EARN_BLOCK_DAYS",
@@ -141,6 +143,7 @@ class Inputs:
     """지금 들고 있는 미국 주식 평가액 (원)."""
     blocked_symbol: str = ""
     """자동 전략이 쓰는 종목이면 그 이름 (예: 'Deneb')."""
+    event_risk: EntryEvents | None = None
 
 
 @dataclass(slots=True)
@@ -162,6 +165,7 @@ class Advice:
     """확인한 것 (✅ · ⚠️ · ⛔)."""
     blocked: list[str] = field(default_factory=list)
     """사지 않는 이유 — 비어 있어야 매수 버튼."""
+    entry_session: str = ""
 
     @property
     def ok(self) -> bool:
@@ -174,30 +178,35 @@ def recommend(inp: Inputs) -> Advice:
     base = base_krw(inp.krw_cash, inp.usd_cash, inp.fx, inp.deneb_usd)
     lines: list[str] = []
     blocked: list[str] = []
+    if inp.event_risk is None:
+        blocked.append("발표 위험 미확인 — 신규 매수 보류")
+    else:
+        blocked.extend(inp.event_risk.blocked)
+        lines.extend(inp.event_risk.lines)
     weight = min(RISK / STOP, CAP)
     if inp.blocked_symbol:
         blocked.append(f"{inp.blocked_symbol} 가 자동으로 사고파는 종목 — 같은 계좌라 섞여요")
     idx_up = above_long(inp.index_closes)
     if idx_up is None:
-        lines.append(f"⚠️ {inp.index_name or '지수'} 200일선 확인 못 함 — 보정 없음")
+        blocked.append(f"{inp.index_name or '지수'} 200일선 확인 못 함 — 신규 매수 보류")
     elif idx_up:
         lines.append(f"✅ {inp.index_name} 200일선 위")
     else:
         weight /= 2
         lines.append(f"⚠️ {inp.index_name} 200일선 아래 → 비중 절반")
     if inp.earnings_in_days is None:
-        lines.append("⚠️ 실적 발표일 모름" + (" (국내 종목)" if kr else ""))
+        blocked.append("실적 발표일 미확인" + (" (국내 원천 미확보)" if kr else ""))
     elif inp.earnings_in_days <= EARN_BLOCK_DAYS:
         blocked.append(
             f"실적 발표 {inp.earnings_date} ({inp.earnings_in_days} 거래일 뒤) — 발표 뒤에 사세요"
         )
     elif not inp.earnings_date:
-        lines.append("✅ 실적 발표 다음 8일 안에 없음")
+        lines.append("✅ 실적 발표 조회 범위 내 명단에 없음 (확정 공시 보증 아님)")
     else:
         lines.append(f"✅ 실적 발표 {inp.earnings_date} ({inp.earnings_in_days} 거래일 뒤)")
     score, trend_ok = trend_check(inp.closes)
     if trend_ok is None:
-        lines.append("⚠️ 일봉이 모자라 추세 확인 못 함")
+        blocked.append("일봉이 모자라 추세 확인 못 함 — 신규 매수 보류")
     elif trend_ok:
         lines.append(f"✅ 추세 좋음 (20·60·120일 점수 {score:+.2f}, 50일선 위)")
     else:
@@ -240,6 +249,11 @@ def recommend(inp: Inputs) -> Advice:
         risk_krw=qty * (limit - stop) * fx,
         lines=lines,
         blocked=blocked,
+        entry_session=(
+            f"{'KR' if kr else 'US'}:{inp.event_risk.entry_day}"
+            if inp.event_risk is not None and inp.event_risk.entry_day is not None
+            else ""
+        ),
     )
 
 
@@ -269,13 +283,15 @@ def advice_text(a: Advice) -> str:
         "",
         top,
         f"• 기준 돈: {_won(a.base_krw)} (원화 + 달러 현금, Deneb 이월 제외)",
-        f"• 손절: 산 값보다 −{STOP:.0%} (지금 기준 {_px(a.stop, a.currency)}) 이면 자동 매도",
-        f"• 틀리면 손실: {_won(a.risk_krw)} = 기준의 {a.risk_krw / max(a.base_krw, 1):.1%} "
-        + cap_note,
+        f"• 손절: 산 값보다 −{STOP:.0%} (지금 기준 {_px(a.stop, a.currency)}) "
+        "이면 지정가 매도 시도",
+        f"• 계획 손실(보장 아님): {_won(a.risk_krw)} "
+        f"= 기준의 {a.risk_krw / max(a.base_krw, 1):.1%} " + cap_note,
         "",
         "확인한 것",
         *a.lines,
         "",
-        "매수는 정규장 시작 직후 지정가로 (장중이면 바로). 밤사이 갭 하락은 −3% 로 못 막아요.",
+        "매수는 정규장 첫 1분봉 시가 확인 후 지정가로 (장중이면 재확인). "
+        "갭·미체결·PC 꺼짐으로 −3%보다 더 잃을 수 있어요. 보류 후에는 새 추천·예약이 필요해요.",
     ]
     return "\n".join(body)

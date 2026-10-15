@@ -66,7 +66,7 @@ def test_waits_until_session_then_buys_at_ask_plus_chase() -> None:
     t, tr = _t(), FakeTrader(ask=100.0)
     assert m.step_buy(t, tr, 1, session="US:2026-10-15", live=False) == []
     assert t.status == "reserved" and not tr.placed
-    m.step_buy(t, tr, 2, session="US:2026-10-15", live=True)
+    m.step_buy(t, tr, 2, session="US:2026-10-15", live=True, regular_open=100.0)
     assert t.status == "buying" and t.session == "US:2026-10-15"
     o = tr.placed[0]
     assert (o["side"], o["qty"], o["limit"], o["time_in_force"]) == ("BUY", 10, 100.3, "DAY")
@@ -79,13 +79,13 @@ def test_waits_until_session_then_buys_at_ask_plus_chase() -> None:
 
 def test_gap_up_over_3_percent_cancels() -> None:
     t, tr = _t(ref=100.0), FakeTrader(ask=103.5)
-    msgs = m.step_buy(t, tr, 1, session="US:d", live=True)
+    msgs = m.step_buy(t, tr, 1, session="US:d", live=True, regular_open=103.5)
     assert t.status == "canceled" and not tr.placed and "갭 상승" in msgs[0]
 
 
 def test_reprice_up_to_three_then_partial() -> None:
     t, tr = _t(qty=10), FakeTrader(ask=100.0)
-    m.step_buy(t, tr, 0, session="US:d", live=True)
+    m.step_buy(t, tr, 0, session="US:d", live=True, regular_open=100.0)
     tr.fills["o0"] = ("PARTIAL_FILLED", 4.0, 100.1)
     m.step_buy(t, tr, 60_000, session="US:d", live=True)  # 2 분 안 — 기다림
     assert tr.canceled == [] and len(tr.placed) == 1
@@ -104,7 +104,7 @@ def test_reprice_up_to_three_then_partial() -> None:
 
 def test_reservation_expires_after_its_session() -> None:
     t, tr = _t(), FakeTrader(ask=0.0)  # 호가 없음 — 장은 시작했지만 못 냄
-    m.step_buy(t, tr, 1, session="US:d1", live=True)
+    m.step_buy(t, tr, 1, session="US:d1", live=True, regular_open=100.0)
     assert t.status == "reserved" and t.session == "US:d1"
     msgs = m.step_buy(t, tr, 2, session="US:d2", live=True)
     assert t.status == "canceled" and "예약 만료" in msgs[0]
@@ -115,15 +115,56 @@ def test_block_and_unknown_result() -> None:
     msgs = m.step_buy(t, FakeTrader(), 1, session="US:d", live=True, block="실적 발표 10/16")
     assert t.status == "canceled" and "실적" in msgs[0]
     t2, tr = _t(), FakeTrader(fail=OrderStateUnknownError("x"))
-    msgs = m.step_buy(t2, tr, 1, session="US:d", live=True)
+    msgs = m.step_buy(t2, tr, 1, session="US:d", live=True, regular_open=100.0)
     assert t2.status == "failed" and "결과 모름" in msgs[0]
 
 
 def test_no_fill_cancels_and_dict_roundtrip() -> None:
     t, tr = _t(), FakeTrader()
-    m.step_buy(t, tr, 0, session="US:d", live=True)
+    m.step_buy(t, tr, 0, session="US:d", live=True, regular_open=100.0)
     tr.fills["o0"] = ("CANCELED", 0.0, 0.0)
     m.step_buy(t, tr, 1, session="US:d", live=False)  # 장 끝 — 다시 안 냄
     assert t.status == "canceled"
     back = Ticket.from_dict(t.to_dict())
     assert back == t and back.buys[0].order_id == "o0"
+
+
+def test_missing_regular_open_does_not_substitute_observed_ask() -> None:
+    t, tr = _t(), FakeTrader(ask=100)
+    m.step_buy(t, tr, 1, session="US:d", live=True)
+    assert t.status == "reserved" and not tr.placed
+
+
+def test_actual_open_not_late_observed_ask_sets_cap() -> None:
+    t, tr = _t(), FakeTrader(ask=110)
+    m.step_buy(t, tr, 1, session="US:d", live=True, regular_open=100)
+    assert tr.placed[0]["limit"] == 101
+
+
+def test_changed_event_cancels_then_keeps_partial_without_reentry() -> None:
+    t, tr = _t(), FakeTrader()
+    m.step_buy(t, tr, 0, session="US:d", live=True, regular_open=100)
+    tr.fills["o0"] = ("PARTIAL_FILLED", 4, 100)
+    m.step_buy(t, tr, 1, session="US:d", live=True, block="새 CPI 발표")
+    assert tr.canceled == ["o0"] and t.status == "buying"
+    m.step_buy(t, tr, 2, session="US:d", live=True)  # 차단 사유가 사라져도 남은 매수 재개 금지
+    assert len(tr.placed) == 1 and t.status == "holding" and t.filled == 4 and t.stop == 97
+
+
+def test_cancel_ack_is_not_final_and_unknown_status_never_reorders() -> None:
+    class SlowCancel(FakeTrader):
+        def cancel(self, order_id: str) -> R:
+            self.canceled.append(order_id)
+            return R(True, order_id)
+
+    t, tr = _t(), SlowCancel()
+    m.step_buy(t, tr, 0, session="US:d", live=True, regular_open=100)
+    m.step_buy(t, tr, 1, session="US:d", live=True, block="일정 미확인")
+    m.step_buy(t, tr, 2, session="US:d", live=True)
+    assert t.status == "buying" and len(tr.placed) == 1
+    tr.fills["o0"] = ("UNKNOWN", 0, 0)
+    import pytest
+
+    with pytest.raises(OrderStateUnknownError):
+        m.step_buy(t, tr, 3, session="US:d", live=True)
+    assert len(tr.placed) == 1

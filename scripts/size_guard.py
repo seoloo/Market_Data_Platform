@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -28,38 +29,37 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import httpx
+import yaml
 
 from auto_trading.config.secrets import load_telegram_credentials, load_toss_credentials
+from auto_trading.core.errors import AutoTradingError
 from auto_trading.exchange.toss import TossReader, TossTokenCache, TossTrader
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
+from auto_trading.ops.entry_events import EntryEvents, company_events, macro_events
+from auto_trading.ops.event_store import earnings_day
 from auto_trading.ops.kill_switch import halted_reason
 from auto_trading.ops.kr_accumulate import find, read_universe
 from auto_trading.ops.position_size import (
-    EARN_BLOCK_DAYS,
     Advice,
     Inputs,
     advice_text,
     is_kr,
     recommend,
 )
-from auto_trading.ops.size_order import Ticket, new_ticket, step_buy
+from auto_trading.ops.size_order import Ticket, new_ticket, refresh, step_buy
 from auto_trading.ops.stop_guard import check_stop, register_app, status_lines, step_sell
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "size_guard"
 STATE = DATA / "state.json"
 LOCK = DATA / "lock"
-EARN_CACHE = DATA / "earnings"
 OUTBOX = REPO / "reports" / "size_guard" / "outbox.log"
 TOKEN = REPO / "data" / "toss_token.json"
 HALT = REPO / "data" / "HALT"
 TOSS_DATA = REPO / "data" / "toss"
 NY = ZoneInfo("America/New_York")
 KST = ZoneInfo("Asia/Seoul")
-NASDAQ_EARNINGS = "https://api.nasdaq.com/api/calendar/earnings?date={d}"
-BROWSER = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 INDEX = {"US": ("SPY", "S&P500(SPY)"), "KR": ("069500", "KOSPI200(KODEX 200)")}
 LOCK_STALE_MS = 10 * 60_000
 TAG = "📐 [비중 · 손절]"
@@ -148,25 +148,20 @@ def _trader(tickets: list[Ticket], last: dict[str, float]) -> TossTrader:
 
 def session(reader: Any, kr: bool, now_ms: int) -> tuple[str, bool, bool]:
     """(정규장 이름, 지금 살 수 있음, 지금 팔 수 있음). 시작 1 분 뒤부터, 끝 5 분 · 2 분 전까지."""
-    if kr:
-        k = datetime.fromtimestamp(now_ms / 1000, KST)
-        day = k.strftime("%Y-%m-%d")
-        hm = k.strftime("%H:%M")
-        if not "09:01" <= hm < "15:18":
-            return f"KR:{day}", False, False
-        if not reader.kr_open_today(day):
-            return f"KR:{day}", False, False
-        return f"KR:{day}", hm < "15:15", True
-    ny_day = datetime.fromtimestamp(now_ms / 1000, NY).strftime("%Y-%m-%d")
-    sess = reader.us_regular_session(ny_day)
+    day = datetime.fromtimestamp(now_ms / 1000, KST if kr else NY).strftime("%Y-%m-%d")
+    key = f"{'KR' if kr else 'US'}:{day}"
+    sess = reader.checked_regular_session(day, kr=kr)
     if sess is None:
-        return f"US:{ny_day}", False, False
-    start = datetime.fromisoformat(sess[0]).timestamp() * 1000 + 60_000
-    end = datetime.fromisoformat(sess[1]).timestamp() * 1000
+        return key, False, False
+    opening, closing = (datetime.fromisoformat(s) for s in sess)
+    if opening.tzinfo is None or closing.tzinfo is None or closing <= opening:
+        raise ValueError("정규장 시각 미확인")
+    start = opening.timestamp() * 1000 + 60_000
+    end = closing.timestamp() * 1000
     return (
-        f"US:{ny_day}",
-        start <= now_ms < end - 5 * 60_000,
-        start <= now_ms < end - 2 * 60_000,
+        key,
+        start <= now_ms < end - (15 if kr else 5) * 60_000,
+        start <= now_ms < end - (12 if kr else 2) * 60_000,
     )
 
 
@@ -193,51 +188,111 @@ def _deneb_usd() -> float:
     return float(d.get("cash_usd") or 0.0)
 
 
-def _trading_days(a: date, b: date) -> int:
-    """a 다음 날부터 b 까지 평일 수 (a == b 면 0). 공휴일은 무시."""
-    n, d = 0, a
-    while d < b:
-        d += timedelta(days=1)
-        n += d.weekday() < 5
-    return n
+def _session_days(reader: TossReader, kr: bool, now_ms: int) -> list[date]:
+    """다음 진입 세션 + 그 뒤 3세션. 주말/공휴일을 요일로 추측하지 않는다."""
+    today = datetime.fromtimestamp(now_ms / 1000, KST if kr else NY).date()
+    days: list[date] = []
+    for k in range(16):
+        day = today + timedelta(days=k)
+        hours = reader.checked_regular_session(day.isoformat(), kr=kr)
+        if hours is None:
+            continue
+        start, end = (datetime.fromisoformat(s) for s in hours)
+        if start.tzinfo is None or end.tzinfo is None or end <= start:
+            raise ValueError("정규장 시각 오류")
+        if start.astimezone(KST if kr else NY).date() != day:
+            raise ValueError("정규장 날짜 불일치")
+        if now_ms < end.timestamp() * 1000 - 5 * 60_000:
+            days.append(day)
+        if len(days) == 4:
+            return days
+    raise ValueError("다음 3거래일 범위 미확인")
 
 
-def _earnings_rows(d: date) -> list[dict[str, Any]]:
-    """그 미국 날짜 Nasdaq 실적 캘린더 (날짜마다 하루 한 번 받는다)."""
-    EARN_CACHE.mkdir(parents=True, exist_ok=True)
-    path = EARN_CACHE / f"{d.isoformat()}.json"
-    today = datetime.now(NY).date().isoformat()
+def event_risk(reader: TossReader, symbol: str, now_ms: int, *, force: bool = False) -> EntryEvents:
+    """알림과 같은 실적 캐시·거시 원천을 사용한다. 실패는 신규 진입만 차단."""
+    kr = is_kr(symbol)
     try:
-        cached = json.loads(path.read_text(encoding="utf-8"))
-        if cached.get("fetched") == today:
-            return list(cached.get("rows") or [])
-    except (OSError, ValueError):
-        pass
-    r = httpx.get(NASDAQ_EARNINGS.format(d=d.isoformat()), headers=BROWSER, timeout=30)
-    r.raise_for_status()
-    rows = list(((r.json().get("data") or {}).get("rows")) or [])
-    path.write_text(
-        json.dumps({"fetched": today, "rows": rows}, ensure_ascii=False), encoding="utf-8"
-    )
-    return rows
+        days = _session_days(reader, kr, now_ms)
+        if kr:
+            return _record_event_check(
+                symbol,
+                now_ms,
+                EntryEvents(("국내 실적 일정 원천 미확보 — 신규 매수 보류",), entry_day=days[0]),
+                {},
+            )
+        raw = yaml.safe_load((REPO / "config" / "event_calendar.yaml").read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("거시 일정 형식 오류")
+        macro = macro_events(raw, days[0], now_ms)
+        snapshots = {}
+        cursor = days[0]
+        while cursor <= days[-1]:
+            snapshots[cursor] = earnings_day(REPO, cursor, now_ms, force=force)
+            cursor += timedelta(days=1)
+        company = company_events(symbol, days, snapshots)
+        result = EntryEvents(
+            macro.blocked + company.blocked,
+            macro.lines + company.lines,
+            days[0],
+            company.earnings_date,
+            company.earnings_in_days,
+        )
+        evidence = {
+            "macro_digest": hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest(),
+            "earnings": {
+                str(d): {
+                    "digest": s.digest,
+                    "fetched_at_ms": s.fetched_at_ms,
+                    "source": s.source,
+                    "error": s.error,
+                }
+                for d, s in snapshots.items()
+            },
+            "sessions": [str(d) for d in days],
+        }
+        return _record_event_check(symbol, now_ms, result, evidence)
+    except (AutoTradingError, OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
+        return _record_event_check(
+            symbol,
+            now_ms,
+            EntryEvents((f"발표·거래일 확인 실패 ({type(exc).__name__}) — 신규 매수 보류",)),
+            {},
+        )
 
 
-def earnings(symbol: str, today: date | None = None) -> tuple[str | None, int | None]:
-    """(가장 가까운 실적 발표일, 거래일 수) — 다음 8 일 안. 국내 · 못 받으면 (None, None)."""
-    if is_kr(symbol):
-        return None, None
-    today = today or datetime.now(NY).date()
+def _record_event_check(
+    symbol: str, now_ms: int, risk: EntryEvents, evidence: dict[str, Any]
+) -> EntryEvents:
+    """주문 여부와 무관하게 당시 일정 입력·판정·소스 식별자를 보존한다."""
+    from dataclasses import asdict
+    from uuid import uuid4
+
     try:
-        for k in range(9):
-            d = today + timedelta(days=k)
-            if d.weekday() >= 5:
-                continue
-            if any(str(r.get("symbol") or "").upper() == symbol for r in _earnings_rows(d)):
-                return d.isoformat(), _trading_days(today, d)
-    except (httpx.HTTPError, ValueError) as exc:
-        print(f"실적 캘린더 건너뜀: {type(exc).__name__}")
-        return None, None
-    return "", EARN_BLOCK_DAYS + 5
+        code = hashlib.sha256()
+        for source in (
+            Path(__file__),
+            REPO / "src/auto_trading/ops/entry_events.py",
+            REPO / "src/auto_trading/ops/event_store.py",
+        ):
+            if source.is_file():
+                code.update(source.read_bytes())
+        payload = {
+            "rule_version": "entry-events-v1",
+            "code_digest": code.hexdigest(),
+            "as_of_ms": now_ms,
+            "symbol": symbol,
+            "decision": asdict(risk),
+            "evidence": evidence,
+        }
+        path = REPO / "data/event_calendar/checks" / f"{now_ms}-{uuid4().hex}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8")
+        return risk
+    except OSError:
+        return EntryEvents(
+            (*risk.blocked, "발표 판정 기록 실패 — 신규 매수 보류"), risk.lines, risk.entry_day
+        )
 
 
 def resolve(query: str) -> tuple[str, str]:
@@ -255,9 +310,13 @@ def resolve(query: str) -> tuple[str, str]:
     return q.upper(), q.upper()
 
 
-def _closes(reader: TossReader, symbol: str) -> list[float]:
+def _closes(reader: TossReader, symbol: str, before_day: date) -> list[float]:
     try:
-        return [float(c) for _, c in reader.daily_closes(symbol, 200)]
+        return [
+            float(c)
+            for d, c in reader.daily_closes(symbol, 200, before_day=before_day.isoformat())
+            if d < before_day.isoformat()
+        ]
     except Exception as exc:  # 일봉 하나 못 받아도 추천은 낸다(확인 못 함으로 표시)
         print(f"{symbol} 일봉 건너뜀: {type(exc).__name__}")
         return []
@@ -265,18 +324,34 @@ def _closes(reader: TossReader, symbol: str) -> list[float]:
 
 def advise(query: str) -> Advice:
     symbol, name = resolve(query)
-    kr = is_kr(symbol)
     reader = _reader()
     try:
-        px = reader.prices([symbol]).get(symbol)
-        if px is None:
-            raise SystemExit(f"{symbol} 가격을 못 읽었어요 — 기호를 확인해 주세요")
-        fx = float(reader.usd_krw())
-        holdings = reader.holdings()
-        idx_sym, idx_name = INDEX["KR" if kr else "US"]
-        us_stock = sum(float(p.qty * p.last) for s, p in holdings.items() if not is_kr(s)) * fx
-        e_day, e_n = earnings(symbol)
-        inp = Inputs(
+        return _advise(reader, symbol, name, _now_ms())
+    finally:
+        reader.close()
+
+
+def _advise(
+    reader: TossReader, symbol: str, name: str, now_ms: int, *, force: bool = False
+) -> Advice:
+    kr = is_kr(symbol)
+    risk = event_risk(reader, symbol, now_ms, force=force)
+    day = risk.entry_day or datetime.fromtimestamp(now_ms / 1000, KST if kr else NY).date()
+    # 다음 장을 추천하는 장 마감 직전에도 현재 미완성 일봉은 사용하지 않는다.
+    today = datetime.fromtimestamp(now_ms / 1000, KST if kr else NY).date()
+    hours = reader.checked_regular_session(today.isoformat(), kr=kr)
+    cutoff = day
+    if hours is not None and now_ms < datetime.fromisoformat(hours[1]).timestamp() * 1000:
+        cutoff = min(day, today)
+    px = reader.prices([symbol]).get(symbol)
+    if px is None:
+        raise ValueError(f"{symbol} 가격 미확인")
+    fx = float(reader.usd_krw())
+    holdings = reader.holdings()
+    idx_sym, idx_name = INDEX["KR" if kr else "US"]
+    us_stock = sum(float(p.qty * p.last) for s, p in holdings.items() if not is_kr(s)) * fx
+    return recommend(
+        Inputs(
             symbol=symbol,
             name=name,
             price=float(px),
@@ -284,18 +359,17 @@ def advise(query: str) -> Advice:
             usd_cash=float(reader.buying_power("USD")),
             fx=fx,
             deneb_usd=_deneb_usd(),
-            closes=_closes(reader, symbol),
+            closes=_closes(reader, symbol, cutoff),
             index_name=idx_name,
-            index_closes=_closes(reader, idx_sym),
-            earnings_date=e_day,
-            earnings_in_days=e_n,
+            index_closes=_closes(reader, idx_sym, cutoff),
+            earnings_date=risk.earnings_date,
+            earnings_in_days=risk.earnings_in_days,
             held_qty=float(holdings[symbol].qty) if symbol in holdings else 0.0,
             us_stock_krw=us_stock,
             blocked_symbol=_blocked().get(symbol, ""),
+            event_risk=risk,
         )
-    finally:
-        reader.close()
-    return recommend(inp)
+    )
 
 
 # ------------------------------------------------------------------ 알림
@@ -338,25 +412,62 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
         sess = {kr: session(reader, kr, now) for kr in {t.kr for t in tickets if t.active}}
         halt = halted_reason(HALT)
         try:
-            for t in tickets:
-                if not t.active:
-                    continue
-                key, buy_live, sell_live = sess[t.kr]
-                if t.status in ("reserved", "buying"):
-                    block = None
-                    if t.status == "reserved" and buy_live:
-                        if halt:
-                            block = f"전체 정지 중 ({halt})"
-                        else:
-                            e_day, e_n = earnings(t.symbol)
-                            if e_n is not None and e_n <= EARN_BLOCK_DAYS:
-                                block = f"실적 발표 {e_day} ({e_n} 거래일 뒤)"
-                    out += step_buy(t, trader, now, session=key, live=buy_live, block=block)
+            # 보호 매도는 일정 조회보다 먼저 실행한다. 발표 수집 실패가 매도를 막지 않는다.
+            for t in held:
+                _key, _buy_live, sell_live = sess[t.kr]
                 if t.status == "holding" and sell_live:
                     check_stop(t, last.get(t.symbol))
                 if t.status == "selling":
                     sellable = float(reader.sellable(t.symbol)) if sell_live else 0.0
                     out += step_sell(t, trader, now, live=sell_live, sellable=sellable, fx=fx)
+            for t in tickets:
+                if not t.active:
+                    continue
+                key, buy_live, _sell_live = sess[t.kr]
+                if t.status in ("reserved", "buying"):
+                    block = None
+                    opening = t.open_px or None
+                    if buy_live:
+                        if halt:
+                            block = f"전체 정지 중 ({halt})"
+                        else:
+                            try:
+                                if t.status == "buying":
+                                    refresh(t.buys, trader, now, live=True)
+                                pending = any(not o.closed for o in t.buys)
+                                if pending:
+                                    risk = event_risk(reader, t.symbol, now, force=True)
+                                    if not risk.ok:
+                                        block = " · ".join(risk.blocked)
+                                else:
+                                    fresh = _advise(reader, t.symbol, t.name, now, force=True)
+                                    rem = t.qty - int(sum(o.filled for o in t.buys))
+                                    if not fresh.ok:
+                                        block = " · ".join(fresh.blocked)
+                                    elif rem > fresh.qty:
+                                        block = "다시 확인한 수량 상한 감소 — 새 추천 필요"
+                                if t.status == "reserved" and not block:
+                                    hours = reader.checked_regular_session(
+                                        key.split(":", 1)[1], kr=t.kr
+                                    )
+                                    if hours is None:
+                                        raise ValueError("정규장 시각 미확인")
+                                    start_ms = int(
+                                        datetime.fromisoformat(hours[0]).timestamp() * 1000
+                                    )
+                                    px = reader.regular_open(t.symbol, start_ms)
+                                    opening = float(px) if px is not None else None
+                            except (AutoTradingError, ValueError, OSError) as exc:
+                                block = f"주문 직전 재확인 실패 ({type(exc).__name__})"
+                    out += step_buy(
+                        t,
+                        trader,
+                        now,
+                        session=key,
+                        live=buy_live,
+                        block=block,
+                        regular_open=opening,
+                    )
         finally:
             trader.close()
     finally:

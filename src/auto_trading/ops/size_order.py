@@ -128,6 +128,8 @@ class Ticket:
     session: str = ""
     """매수를 시작한 정규장 (예: ``US:2026-10-15``)."""
     open_px: float = 0.0
+    buy_block: str = ""
+    """차단 후 같은 예약으로 다시 사지 않는다. 남은 주문 취소 확인까지 유지."""
     buys: list[Order] = field(default_factory=list)
     sells: list[Order] = field(default_factory=list)
     filled: float = 0.0
@@ -165,7 +167,9 @@ class Ticket:
 
 
 def new_ticket(a: Advice, now_ms: int, tid: str) -> Ticket:
-    return Ticket(tid, a.symbol, a.name, a.currency, a.qty, a.price, now_ms)
+    return Ticket(
+        tid, a.symbol, a.name, a.currency, a.qty, a.price, now_ms, session=a.entry_session
+    )
 
 
 def _f(x: Any) -> float:
@@ -178,6 +182,8 @@ def refresh(orders: Sequence[Order], trader: TraderLike, now_ms: int, *, live: b
         if o.closed or not o.order_id:
             continue
         st = trader.order_status(o.order_id)
+        if st.status not in _OPEN | {"FILLED", "CANCELED", "REJECTED", "EXPIRED"} or not st.status:
+            raise OrderStateUnknownError("주문 상태 미확인 — 신규 주문 금지")
         o.status = st.status
         o.filled = _f(st.filled_qty)
         o.amount = _f(st.filled_amount) or o.filled * _f(st.avg_price)
@@ -244,10 +250,12 @@ def step_buy(
     session: str,
     live: bool,
     block: str | None = None,
+    regular_open: float | None = None,
 ) -> list[str]:
     """한 번 확인. ``session`` = 지금(또는 다음) 정규장 이름, ``live`` = 지금 살 수 있는 시간.
 
-    ``block`` 은 장 시작 직전 다시 본 막는 이유(실적 발표 · 정지). 돌려주는 것은 알림 글."""
+    ``block`` 은 각 매수 전 다시 본 이유. 취소 확인·부분 체결 보호를 먼저 한다.
+    ``regular_open`` 은 실제 첫 정규장 1분봉 시가이며 최초 관측 호가로 대체하지 않는다."""
     if t.status == "reserved":
         if not live:
             return []
@@ -258,24 +266,38 @@ def step_buy(
         if block:
             t.status, t.closed_ms, t.note = "canceled", now_ms, block
             return [f"❎ {t.name} 예약 취소 — {block}"]
+        if regular_open is None or regular_open <= 0:
+            t.note = "정규장 시가 미확인 — 주문하지 않음"
+            return []
+        t.open_px = regular_open
         asks = trader.asks(t.symbol)
         if not asks:
             t.note = "매도 호가 없음 — 다음 확인 때 다시"
             return []
         ask = float(asks[0][0])
-        t.open_px = t.open_px or ask
-        if ask > t.ref_price * (1 + GAP_UP_LIMIT):
+        if t.open_px > t.ref_price * (1 + GAP_UP_LIMIT):
             t.status, t.closed_ms = "canceled", now_ms
-            t.note = f"장 시작 가격이 추천 때보다 +{ask / t.ref_price - 1:.1%}"
+            t.note = f"정규장 시가가 추천 때보다 +{t.open_px / t.ref_price - 1:.1%}"
             return [
                 f"❎ {t.name} 사지 않았어요 — {t.note} "
-                f"({_px(t.ref_price, t.kr)} → {_px(ask, t.kr)}). "
+                f"({_px(t.ref_price, t.kr)} → {_px(t.open_px, t.kr)}). "
                 "갭 상승 추격 방지, 다시 추천 받아 주세요"
             ]
         t.status = "buying"
         return _place(t, trader, now_ms, t.qty, _buy_limit(t, ask))
     if t.status != "buying":
         return []
+    if block or t.buy_block:
+        t.buy_block = t.buy_block or block or "신규 매수 보류"
+        t.note = t.buy_block
+        # 취소 요청 성공을 취소 완료로 간주하지 않는다. 다음 조회로 종결을 확인한다.
+        refresh(t.buys, trader, now_ms, live=False)
+        for order in t.buys:
+            if not order.closed and order.order_id:
+                trader.cancel(order.order_id)
+        if any(not order.closed for order in t.buys):
+            return []
+        return _finish(t, now_ms)
     refresh(t.buys, trader, now_ms, live=live and session == t.session)
     if any(not o.closed for o in t.buys):
         return []

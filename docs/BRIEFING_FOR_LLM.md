@@ -6,6 +6,20 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-15 — 개별주 발표 일정과 추천·예약 연계 (Codex)
+
+사용자 제안 1~4 승인. [고정 규칙·구현·자료 한계](research/EVENT_ENTRY_INTEGRATION_20261015.md).
+사전 고정 `287e6f4` 후 개별주 도구에만 적용: CPI·PCE·NFP·FOMC 미국 세션 신규 매수 보류,
+PPI·GDP 주의만, 실적은 진입일+다음 실제 3거래일 확인. 결측·추세/지수 미확인도 신규 보류.
+발표 다음 정규장부터 재확인하되 취소된 예약 자동 이월 없음, 새 추천·예약이 복귀 조건이다.
+실적 공유 캐시 5분·오류 1분, 주문 전 강제 재조회. 거시 검증 30일 만료 차단·자동 갱신 없음.
+첫 정규장 1분봉 시가 확인·미완성 일봉 제외·판정 digest 기록, 부분 체결 취소 확인·기존 손절 경로 유지.
+기존 알림에는 예약·보유 문구 추가. 실제 주문·발송·예약 활성화 없음, 다른 세션의 봇 파일 불변이므로
+개별주 메뉴·2분 tick 연결은 여전히 미완료. 국내 실적 미확보 → 국내 신규 매수 보류, 보유 손절은 별도.
+Deneb·Vega·Altair·적립·Paper/연구판정·운영Phase6 불변. 시장 건강검진 자동 해석기는 여전히 미구현.
+세이브티커는 뉴스·예상치 해설·캘린더 후보 확인, 상세 로그인/API·재사용권 미확인으로 참고 검토만.
+크롤러·본문 재배포·뉴스에 의한 주문 차단 없음. 검증 수치는 PROGRESS의 이번 작업 절을 따른다.
+
 ## 2026-10-15 — 시장 건강검진·중요 경제일정 알림 명세 (Codex)
 
 [명세](research/MARKET_HEALTHCHECK_SPEC_DRAFT_20261015.md), IDEAS 29.9. Phase0 / DRAFT / INFORMATION_ONLY.

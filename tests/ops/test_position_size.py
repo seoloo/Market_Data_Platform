@@ -1,4 +1,5 @@
 from auto_trading.ops import position_size as m
+from auto_trading.ops.entry_events import EntryEvents
 
 
 def _up(n: int = 220, start: float = 100.0) -> list[float]:
@@ -19,6 +20,7 @@ def _inp(**kw: object) -> m.Inputs:
         "index_closes": _up(),
         "earnings_date": "2026-11-20",
         "earnings_in_days": 20,
+        "event_risk": EntryEvents(),
     }
     base.update(kw)
     return m.Inputs(**base)  # type: ignore[arg-type]
@@ -79,6 +81,21 @@ def test_round_price_and_text() -> None:
     bad = m.advice_text(m.recommend(_inp(earnings_in_days=1)))
     assert "⛔ 지금은 사지 않아요" in bad and "참고: 조건이 맞았다면 25%" in bad
     none = m.recommend(_inp(earnings_date="", earnings_in_days=8))
-    assert "✅ 실적 발표 다음 8일 안에 없음" in none.lines
+    assert "✅ 실적 발표 조회 범위 내 명단에 없음 (확정 공시 보증 아님)" in none.lines
     down = m.recommend(_inp(closes=list(reversed(_up()))))
     assert "점수 -1.00" in down.blocked[0] and "50일선 아래" in down.blocked[0]
+
+
+def test_unknown_inputs_fail_closed_and_warning_is_not_sizing() -> None:
+    cases: tuple[dict[str, object], ...] = (
+        {"earnings_in_days": None},
+        {"closes": []},
+        {"index_closes": []},
+        {"event_risk": None},
+    )
+    for kw in cases:
+        assert not m.recommend(_inp(**kw)).ok
+    a = m.recommend(_inp(event_risk=EntryEvents(lines=("PPI 주의",))))
+    assert a.ok and a.qty == m.recommend(_inp()).qty
+    b = m.recommend(_inp(event_risk=EntryEvents(blocked=("CPI 보류",))))
+    assert not b.ok and "CPI 보류" in b.blocked
