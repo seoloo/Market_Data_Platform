@@ -281,6 +281,8 @@ def deneb_book(state: Mapping[str, Any], q: Quotes) -> Book:
         last = max(amounts)
         notes.append(f"{last} 납입 {_f(amounts[last]):,.0f} 원")
     notes.append(f"남은 달러 ${_f(state.get('cash_usd')):,.2f}")
+    if not any(_f(qty.get(s)) > 0 for s in DENEB_TICKERS) and _f(state.get("cash_usd")) > 0:
+        notes.append("보유 종목 없음 — 평가액은 남은 달러뿐이라 환율에 따라 움직여요")
     if reserve_usd > 0:
         notes.append(f"브레이크 보관 달러 ${reserve_usd:,.2f} (재매수 때 씀)")
     last_month = max(amounts) if amounts else ""
@@ -729,7 +731,13 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
     toss = root / "data" / "toss"
     deneb = _read(toss / "DENEB.json")
     if deneb:
-        out.append(replace(deneb_book(deneb, q), updated_ms=_mtime_ms(toss / "DENEB.json")))
+        book = deneb_book(deneb, q)
+        halt = root / "data" / "HALT_deneb"
+        # 전부 정리 · 텔레그램 정지 — 새 매수 안 함 (2026-10-16 사용자: 정리했는데 산 것처럼 보임)
+        if halt.exists():
+            why = halt.read_text(encoding="utf-8", errors="replace").strip()[:60]
+            book = replace(book, notes=(f"⏸ 정지 중 — 새 매수 안 함 ({why})", *book.notes))
+        out.append(replace(book, updated_ms=_mtime_ms(toss / "DENEB.json")))
     binance = _read(root / BINANCE_VEGA)
     vega_path = root / "data" / "upbit_t2" / "state.json"
     vega = _read(vega_path) if SHOW_UPBIT else {}

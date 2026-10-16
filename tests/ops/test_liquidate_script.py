@@ -182,6 +182,13 @@ def test_deneb_only_halts_cancels_buys_and_waits_for_session(env: dict[str, Any]
     deneb = json.loads(env["m3"].read_text(encoding="utf-8"))
     assert deneb["qty"] == {"TQQQ": 0.0, "SCHD": 0.0}
     assert deneb["cash_usd"] == pytest.approx(10 + 81 - 0.081 + 27 - 0.027)
+    # 매도도 장부 주문 목록에 남는다 (오르빗 · 양도세가 볼 수 있게, 다시 돌려도 한 번만)
+    sells = [o for o in deneb["orders"] if o["side"] == "SELL"]
+    assert sorted((o["symbol"], o["filled_qty"], o["kind"], o["booked"]) for o in sells) == [
+        ("SCHD", 3.0, "liquidate", True),
+        ("TQQQ", 1.0, "liquidate", True),
+    ]
+    assert {o["order_id"] for o in sells} == {"s0", "s1"}
     job = liq.STORE.jobs()[-1]
     assert job.done and job.reported and "✅ 정리 끝" in env["sent"][-1]
     liq.resume()  # 끝난 작업은 다시 보내지 않는다

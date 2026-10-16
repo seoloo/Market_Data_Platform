@@ -42,7 +42,7 @@ from auto_trading.exchange.toss import (
 from auto_trading.exchange.upbit import UpbitClient, upbit_trading_enabled
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
-from auto_trading.ops.deneb_live import DenebState
+from auto_trading.ops.deneb_live import DenebOrder, DenebState
 from auto_trading.ops.kill_switch import (
     GROUPS,
     group_halted,
@@ -406,11 +406,39 @@ def _kr_open(reader: TossReader, now_ms: int) -> bool:
 # ------------------------------------------------------------------ 실행
 
 
-def _book_deneb(symbol: str, qty: Decimal, usd: Decimal) -> None:
-    """팔린 Deneb 몫을 Deneb 장부(DENEB.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑."""
+def _book_deneb(symbol: str, qty: Decimal, usd: Decimal, item: Any = None) -> None:
+    """팔린 Deneb 몫을 Deneb 장부(DENEB.json)에서 뺀다 — 수량 ↓ · 달러 현금 ↑.
+
+    매도도 장부 주문 목록에 ``kind="liquidate"`` · 체결 · ``booked`` 로 남긴다(2026-10-16 —
+    없으면 오르빗에 산 기록만 보이고, 양도세 계산이 이 매도를 Deneb 몫으로 못 셌다).
+    """
     deneb = DenebState.from_dict(json.loads(DENEB_FILE.read_text(encoding="utf-8")))
     deneb.qty[symbol] = max(0.0, deneb.qty.get(symbol, 0.0) - float(qty))
     deneb.cash_usd += float(usd)
+    closed = [o for o in (item.orders if item is not None else []) if o.closed and o.filled > 0]
+    sold = sum((o.filled for o in closed), Decimal(0))
+    known = {o.client_id for o in deneb.orders}
+    for o in closed:
+        if o.client_id in known or sold <= 0:
+            continue
+        share = float(qty / sold)
+        deneb.orders.append(
+            DenebOrder(
+                date=_kst(o.placed_ms).strftime("%Y-%m-%d"),
+                symbol=symbol,
+                side="SELL",
+                qty=int(o.filled),
+                limit=float(o.price),
+                client_id=o.client_id,
+                order_id=o.order_id,
+                status="FILLED",
+                filled_qty=float(o.filled) * share,
+                filled_usd=float(o.amount) * share,
+                commission=float(o.fee) * share,
+                kind="liquidate",
+                booked=True,
+            )
+        )
     tmp = DENEB_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(deneb.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8")
     tmp.replace(DENEB_FILE)
@@ -562,7 +590,7 @@ def step(job: Job) -> list[str]:
                     )
                     take, usd = deneb_to_book(it)
                     if take > 0:
-                        _book_deneb(it.symbol, take, usd)
+                        _book_deneb(it.symbol, take, usd, it)
                         it.deneb_booked += take
                         log.append(f"Deneb 장부: {it.symbol} {take:f}주 빼고 ${usd:,.2f} 현금")
             finally:
