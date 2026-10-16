@@ -267,14 +267,6 @@ def _record(
     st["orders"].append(row)
 
 
-def _altair_on() -> bool:
-    """Altair 실거래가 켜져 있을 때만 자동 분배한다 (2026-10-16 점검).
-
-    꺼져 있는데 옮기면 선물 지갑에서 놀기만 한다. Altair 실계좌는 USDC 계약이지만 다중 자산
-    모드(2026-10-16 결정)라 옮긴 USDT 가 그대로 증거금 · 장부가 된다(scripts/altair_live)."""
-    return bool(user_settings.get(REPO, "live.altair"))
-
-
 def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
     """Altair 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
 
@@ -341,7 +333,10 @@ def run_cmd() -> int:
         if st.get("last_decision") == _decision(now_ms)[1]:
             print(f"{_decision(now_ms)[1]} 이미 실행함")
             return 0
-        if not halted and c.trading_enabled and _altair_on():
+        # Altair 실거래가 꺼져 있어도 나눠 둔다 — 사용자 2026-10-16 "altair도 거래 가능하게
+        # 자동 분배 해줘야지" (Deneb 80 : Vega 10 : Altair 10). 선물은 다중 자산 모드라 옮긴 USDT 가
+        # 그대로 Altair(USDC 계약) 증거금이 된다.
+        if not halted and c.trading_enabled:
             try:
                 lines += _split(c, st, now_ms)
             except (AutoTradingError, sqlite3.Error) as exc:  # 분배 실패는 Vega 를 멈추지 않는다
