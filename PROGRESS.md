@@ -1,5 +1,11 @@
 # 작업 현황
 
+## 2026-10-17 — 251 · 252 연구 (Claude, 인수인계 이어받음)
+
+- [251](docs/research/251-net-liquidity-preregistration.md) 순유동성(WALCL − TGA − 역레포) 4 주 변화 → 다음 4 주: QQQ +0.77%p(p 0.094) · BTC +4.63%p(p 0.060) → 둘 다 **불명**. 방향은 2008 ~ 2019 · 2020 ~ 2022 뺀 표본도 같음, 크기가 작다. 빠지는 필터는 QQQ 샤프를 깎음 → Deneb · Vega · Altair 에 필터 넣지 않음.
+- [252](docs/research/252-bear-relative-strength-preregistration.md) 국장 하락장에서 덜 빠진 상위 10 → 6 달 우위 평균 +8.1%(중앙값 −2.0%, 이긴 비율 41%) → **불명**. 2020-03 코로나 테마 한 번이 평균을 만듦 → 💹 · 주도주 점수에 넣지 않음.
+- 자료: FRED `WALCL` · `WTREGEN` · `RRPONTSYD`(`data/research/liquidity_251/`, Git 밖, 해시 코드에 고정). 결과 `reports/liquidity_251/` · `reports/bear_rs_252/`.
+
 ## 2026-10-17 — 인수인계 (Claude → 다른 계정)
 
 - 사용자 "토큰이 얼마 남지 않아서 다른 계정으로" → [HANDOVER_20261017](docs/current/HANDOVER_20261017.md): 다음 연구 251(순유동성 → 나스닥 · 비트코인) · 252(하락장 상대 강도 → 다음 주도주, 국장 판정) 설계 메모, 오늘 운영 변경 확인 목록(💤 Vega 첫 예치 09:05 · 💹 0.3% · 10%), 열린 일.

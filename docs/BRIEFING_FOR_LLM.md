@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 251 순유동성 · 252 하락장 상대 강도 (Claude)
+
+- [251](research/251-net-liquidity-preregistration.md) 순유동성(연준 자산 − TGA − 역레포)이 4 주 늘어난 뒤 4 주 수익이 더 큼: QQQ +0.77%p · BTC +4.63%p, 두 반쪽 같은 방향이지만 p 0.09 · 0.06 → **불명**. '줄면 빠진다' 가 아니라 '덜 오른다' — 빠지는 필터는 QQQ 샤프를 깎음. 운영에 안 넣음.
+- [252](research/252-bear-relative-strength-preregistration.md) 국장 −10% 하락장에서 덜 빠진 상위 10 의 반등 뒤 6 달: 평균 +8.1%p 지만 중앙값 −2.0%p · 이긴 비율 41% → **불명**(2020-03 코로나 테마 한 번). 주도주 점수에 안 넣음.
+
 ## 2026-10-17 — 💹 비중 0.3% · 10% · 💤 Vega 유동형 예치 (Claude)
 
 - [249](research/249-stock-size-with-stop3.md) −3% 손절 유지 · 비중만 5 ~ 25%: 미국 샤프 0.61 ~ 0.65(비중과 무관, 25 → 10% 면 손절 한 번 −0.88 → −0.36%), 국장 10% 가 최고(0.34). → 💹 규칙을 손절 한 번 0.3% · 한 종목 10% 로 바꿈(사용자).
