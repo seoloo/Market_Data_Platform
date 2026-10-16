@@ -111,13 +111,74 @@ def _usd(x: Decimal) -> str:
     return f"{x:,.2f} USDT"
 
 
+EARN_KEEP = Decimal(20)
+"""유동형에 넣지 않고 현물에 남겨 두는 USDT (수수료 · 끝수 · 바로 쓸 돈)."""
+EARN_MIN = Decimal(1)
+
+
+def _earn(c: BinanceSpotLive) -> Decimal:
+    """유동형에 넣어 둔 USDT — Vega 현금의 일부로 센다. 세 번 실패하면 멈춘다(장부가 틀어지므로)."""
+    for k in range(3):
+        try:
+            return c.earn_balance(CASH)
+        except ExchangeError:
+            if k == 2:
+                raise
+            time.sleep(1)
+    return Decimal(0)  # pragma: no cover
+
+
 def _snapshot(c: BinanceSpotLive) -> tuple[Decimal, dict[str, Decimal], dict[str, Decimal]]:
+    """(현금 = 현물 USDT + 유동형 USDT, 코인 수량, 가격)."""
     bal = c.balances()
     return (
-        bal.get(CASH, Decimal(0)),
+        bal.get(CASH, Decimal(0)) + _earn(c),
         {k: bal.get(k, Decimal(0)) for k in COINS},
         {k: c.last_price(SYMBOLS[k]) for k in COINS},
     )
+
+
+def _spot_cash(c: BinanceSpotLive) -> Decimal:
+    return c.balances().get(CASH, Decimal(0))
+
+
+def _ensure_spot(c: BinanceSpotLive, need: Decimal) -> list[str]:
+    """현물 USDT 가 ``need`` 보다 적으면 모자란 만큼(+20) 유동형에서 먼저 꺼낸다."""
+    spot = _spot_cash(c)
+    if spot >= need:
+        return []
+    earn = _earn(c)
+    if earn <= 0:
+        return []
+    amount = (need - spot + EARN_KEEP).quantize(Decimal("0.01"))
+    every = amount >= earn
+    c.earn_redeem(CASH, None if every else amount)
+    got = earn if every else amount
+    for _ in range(20):  # 유동형은 보통 바로 들어온다 — 10 초까지 기다린다
+        if _spot_cash(c) >= spot + got - Decimal("0.01"):
+            break
+        time.sleep(0.5)
+    return [f"💤 유동형에서 {_usd(got)} 꺼냄 (살 돈)"]
+
+
+def _sweep(c: BinanceSpotLive, *, halted: bool) -> list[str]:
+    """남는 현물 USDT 를 유동형에 넣는다 (사용자 2026-10-17). 설정 ``vega.earn`` 켜짐일 때만."""
+    if halted or not c.trading_enabled or not user_settings.get(REPO, "vega.earn"):
+        return []
+    spot = _spot_cash(c)
+    amount = (spot - EARN_KEEP).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    if amount < EARN_MIN:
+        return []
+    before = _earn(c)
+    try:
+        c.earn_subscribe(CASH, amount)
+    except AutoTradingError as exc:
+        return [f"⚠ 유동형 예치 실패 — 현물에 그대로 둠 ({exc})"]
+    for _ in range(20):  # 장부가 '돈이 사라졌다' 고 보지 않게 예치가 잡힐 때까지 기다린다
+        if _earn(c) >= before + amount - Decimal("0.01"):
+            break
+        time.sleep(0.5)
+    return [f"💤 남는 {_usd(amount)} 유동형에 넣음 (현물에 {_usd(spot - amount)} 남김)"]
 
 
 def _decision(now_ms: int) -> tuple[int, str]:
@@ -297,6 +358,9 @@ def _split(
     amount = move_amount(spot_equity=eq, futures_balance=fut, new_money=new_money, free_usdt=cash)
     if amount <= 0:
         return []
+    pre = _ensure_spot(c, amount)  # 유동형에 있으면 먼저 꺼낸다
+    if _spot_cash(c) < amount:
+        return [*pre, f"⚠ Altair 몫 {_usd(amount)} — 현물 USDT 가 아직 모자라 다음에 옮겨요"]
     with sqlite3.connect(REPO / "data" / "trading.db") as conn:
         manager = WalletTransferManager(
             c,
@@ -317,6 +381,7 @@ def _split(
         altair["transfers"].append([day, str(amount)])
         altair["futures_usdt"] = str(fut + amount)
         return [
+            *pre,
             f"☄️ Altair 몫 {_usd(amount)} 현물 → 선물 이체",
             sub(f"목표 선물 {share} · 선물 지갑 {_usd(fut + amount)}"),
         ]
@@ -382,6 +447,10 @@ def deposit_check(now_ms: int | None = None, *, force: bool = False) -> list[str
         # Vega 09:05 실행이 장부(expected)를 새로 쓰기 전까지 이 잔고를 '처리한 입금' 으로 기억
         st["deposit_seen"] = {"exp": exp_key, "eq": str(equity(cash2, hold2, prices2))}
         _save(st)
+        try:  # Vega 몫은 09:05 까지 유동형에서 이자 (예치는 현금 합계를 바꾸지 않는다)
+            lines += _sweep(c, halted=False)
+        except AutoTradingError as exc:
+            lines.append(f"⚠ 유동형 예치 건너뜀: {exc}")
     finally:
         c.close()
     head = f"💰 입금 감지 약 {_usd(new_money)} (현물 {_usd(eq)})"
@@ -456,7 +525,8 @@ def run_cmd() -> int:
         buys = [x for x in intents if x.side.value == "BUY"]
         if buys:
             cash, _h, prices = _snapshot(c)
-            budget = cash * Decimal("0.995")
+            lines += _ensure_spot(c, cash)  # 유동형에 둔 USDT 를 먼저 꺼내 살 돈으로
+            budget = _spot_cash(c) * Decimal("0.995")
             for i in buys:
                 f = filters[i.symbol]
                 qty = min(i.quantity, budget / (prices[i.symbol] * (1 + FEE * 4)))
@@ -472,10 +542,16 @@ def run_cmd() -> int:
                     budget -= o.quote_qty + fee
         cash, hold, prices = _snapshot(c)
         eq = equity(cash, hold, prices)
+        # 장부는 예치 전 합계로 — 유동형 예치는 현금 합계(현물 + 유동형)를 바꾸지 않는다
         st["expected"] = {CASH: str(cash), **{k: str(v) for k, v in hold.items()}}
         st["last_decision"] = p["day"]
         st["history"].append([p["day"], str(ns.nav), str(eq), str(ns.dd)])
         _save(st)
+        try:
+            lines += _sweep(c, halted=bool(halted))
+        except AutoTradingError as exc:
+            lines.append(f"⚠ 유동형 예치 건너뜀: {exc}")
+        parked = _earn(c)
     except AutoTradingError as exc:
         text = f"⚠ {TAG} 실패\n{RULE}\n{exc}"
         _notify(text)
@@ -512,7 +588,11 @@ def run_cmd() -> int:
             f"💼 총 입금 {_usd(invested)} → 평가 {_usd(eq)} · 손익 {pnl:+,.2f}"
             + (f" ({pnl / invested:+.1%})" if invested > 0 else ""),
             *hold_txt,
-            sub(f"USDT {cash:,.2f} · 낙폭 {ns.dd:.1%}"),
+            sub(
+                f"USDT {cash:,.2f}"
+                + (f" (💤 유동형 {parked:,.2f})" if parked > 0 else "")
+                + f" · 낙폭 {ns.dd:.1%}"
+            ),
         ]
     )
     print(text)

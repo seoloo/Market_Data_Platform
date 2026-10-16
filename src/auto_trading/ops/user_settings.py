@@ -115,6 +115,13 @@ FIELDS: tuple[Field, ...] = (
         "바로",
     ),
     Field(
+        "vega.earn",
+        "Vega 남는 USDT 를 바이낸스 유동형(Simple Earn)에 — 살 때 먼저 꺼냄",
+        "bool",
+        False,
+        "다음 Vega 실행 · 입금 확인부터",
+    ),
+    Field(
         "live.altair",
         "Altair 실거래 (바이낸스 선물 USDC) — .env 주문 허용도 켜야 주문",
         "bool",

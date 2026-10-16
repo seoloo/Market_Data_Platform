@@ -215,6 +215,60 @@ class BinanceSpotLive(BinanceSpotReadOnly):
             for r in body.get("rows") or []
         ]
 
+    # ---------------------------------------------------- Simple Earn 유동형 (놀고 있는 USDT)
+    # 사용자 2026-10-17 "그렇게 진행해" — Vega 가 안 쓰는 USDT 를 유동형에 두고, 살 때 먼저 꺼낸다.
+    # 원금은 같은 바이낸스 계정 안에 있고 출금 권한은 쓰지 않는다.
+
+    def earn_product(self, asset: str = "USDT") -> str:
+        """유동형 상품 번호 (예: USDT001). 살 수 없으면 OrderRejectedError."""
+        rows = self._request("/sapi/v1/simple-earn/flexible/list", {"asset": asset}, signed=True)
+        for r in rows.get("rows") or []:
+            if r.get("asset") == asset and r.get("canPurchase") and not r.get("isSoldOut"):
+                return str(r["productId"])
+        raise OrderRejectedError(f"{asset} 유동형 상품을 지금 살 수 없다")
+
+    def _position(self, asset: str) -> Any:
+        return self._request(
+            "/sapi/v1/simple-earn/flexible/position", {"asset": asset}, signed=True
+        )
+
+    def earn_balance(self, asset: str = "USDT") -> Decimal:
+        """유동형에 넣어 둔 ``asset`` 합계 (이자 포함). 읽기만."""
+        body = self._position(asset)
+        return sum(
+            (Decimal(str(r["totalAmount"])) for r in body.get("rows") or [] if r["asset"] == asset),
+            Decimal(0),
+        )
+
+    def earn_subscribe(self, asset: str, amount: Decimal) -> str:
+        """현물 → 유동형 → purchaseId."""
+        if not self.trading_enabled:
+            raise ConfigError("BINANCE_LIVE_TRADING_ENABLED=true 가 아니라 예치하지 않는다")
+        if amount <= 0:
+            raise ValueError(f"잘못된 예치 금액: {amount}")
+        body = self._send(
+            "POST",
+            "/sapi/v1/simple-earn/flexible/subscribe",
+            {"productId": self.earn_product(asset), "amount": _num(amount)},
+        )
+        return str(body.get("purchaseId", ""))
+
+    def earn_redeem(self, asset: str, amount: Decimal | None = None) -> str:
+        """유동형 → 현물 (``amount`` 없으면 전부) → redeemId."""
+        if not self.trading_enabled:
+            raise ConfigError("BINANCE_LIVE_TRADING_ENABLED=true 가 아니라 꺼내지 않는다")
+        rows = self._position(asset)
+        pid = next((str(r["productId"]) for r in rows.get("rows") or []), "")
+        if not pid:
+            raise OrderRejectedError(f"{asset} 유동형 예치가 없다")
+        params: dict[str, Any] = {"productId": pid, "destAccount": "SPOT"}
+        if amount is None:
+            params["redeemAll"] = "true"
+        else:
+            params["amount"] = _num(amount)
+        body = self._send("POST", "/sapi/v1/simple-earn/flexible/redeem", params)
+        return str(body.get("redeemId", ""))
+
     def futures_balance(self, asset: str = "USDT") -> Decimal:
         """USDⓈ-M 선물 지갑의 ``asset`` 잔고(지갑 잔고, 미실현 손익 제외). 읽기만."""
         assert self._creds is not None

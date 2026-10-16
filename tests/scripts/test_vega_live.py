@@ -54,6 +54,24 @@ class FakeBinance:
         self.fut = Decimal(0)
         self.moved: list[Decimal] = []
         self.transfer_error: Exception | None = None
+        self.earn = Decimal(0)
+        self.earn_log: list[tuple[str, Decimal | None]] = []
+
+    def earn_balance(self, asset: str = "USDT") -> Decimal:
+        return self.earn
+
+    def earn_subscribe(self, asset: str, amount: Decimal) -> str:
+        self.bal["USDT"] -= amount
+        self.earn += amount
+        self.earn_log.append(("in", amount))
+        return "P1"
+
+    def earn_redeem(self, asset: str, amount: Decimal | None = None) -> str:
+        got = self.earn if amount is None else amount
+        self.earn -= got
+        self.bal["USDT"] += got
+        self.earn_log.append(("out", amount))
+        return "R1"
 
     def futures_balance(self, asset: str = "USDT") -> Decimal:
         return self.fut
@@ -305,3 +323,84 @@ def test_deposit_check_ignores_small_moves(env: Path, monkeypatch: pytest.Monkey
     m._save({"expected": {"USDT": "1000"}, "units": "1", "peak": "1000"})
     out = m.deposit_check(NOW + 12 * 3_600_000, force=True)
     assert out[0].startswith("새 입금 없음") and fake.moved == []
+
+
+def _earn_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    from auto_trading.ops import user_settings
+
+    real = user_settings.get
+    monkeypatch.setattr(
+        user_settings, "get", lambda root, key: True if key == "vega.earn" else real(root, key)
+    )
+
+
+def test_earn_parks_rest_after_buying_and_ledger_counts_it(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-17 사용자: 남는 USDT 는 유동형에, 장부는 현물 + 유동형을 현금으로 센다."""
+    _earn_on(monkeypatch)
+    fake = FakeBinance(Decimal(1000), fill=False)  # 매수가 안 차 현금이 그대로 남은 날
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert fake.earn > 0 and fake.bal["USDT"] == m.EARN_KEEP  # 20 USDT 만 현물에
+    assert Decimal(st["expected"]["USDT"]) == fake.earn + fake.bal["USDT"]
+    outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
+    assert "유동형에 넣음" in outbox and "💤 유동형" in outbox
+    # 장부와 같은 합계 → 입금으로 오해하지 않음
+    assert m.deposit_check(NOW + 12 * 3_600_000, force=True)[0].startswith("새 입금 없음")
+
+
+def test_earn_is_redeemed_before_buying(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeBinance(Decimal(100))
+    fake.earn = Decimal(900)  # 설정이 꺼져 있어도 이미 넣어 둔 돈은 현금으로 세고 꺼내 쓴다
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    assert fake.earn_log[0] == ("out", None) and len(fake.sent) == 3
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert st["deposits"][0][1] == "1000"  # 첫 입금 = 현물 100 + 유동형 900
+
+
+def test_altair_split_redeems_from_earn_first(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _db(env)
+    monkeypatch.setattr(m, "_split", _SPLIT)
+    monkeypatch.setattr(m, "ALTAIR_STATE", env / "data" / "altair_live" / "state.json")
+    _earn_on(monkeypatch)
+    fake = FakeBinance(Decimal(20))
+    fake.earn = Decimal(198)
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    m._save({"expected": {"USDT": "218"}, "units": "0.218", "peak": "1000"})
+    fake.earn += Decimal("1487.10")  # 입금이 (예치된 채로) 늘었다고 가정
+    out = m.deposit_check(NOW + 12 * 3_600_000)
+    assert fake.moved == [Decimal("852.55")] and any("유동형에서" in x for x in out)
+    assert fake.bal["USDT"] == m.EARN_KEEP  # 남은 Vega 몫은 다시 유동형에
+
+
+def test_earn_client_needs_enable_flag_and_redeems_to_spot() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/api/v3/time":
+            return httpx.Response(200, json={"serverTime": 1_000})
+        seen.append(req)
+        if req.url.path.endswith("/position"):
+            return httpx.Response(
+                200, json={"rows": [{"asset": "USDT", "productId": "USDT001", "totalAmount": "5"}]}
+            )
+        return httpx.Response(200, json={"redeemId": 9, "success": True})
+
+    def client(on: bool) -> BinanceSpotLive:
+        return BinanceSpotLive(
+            BinanceCredentials("k", "s"),
+            trading_enabled=on,
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            clock=lambda: 1_000,
+        )
+
+    with pytest.raises(ConfigError):
+        client(False).earn_subscribe("USDT", Decimal(1))
+    c = client(True)
+    assert c.earn_balance() == Decimal(5)
+    assert c.earn_redeem("USDT") == "9"
+    q = seen[-1].url.params
+    assert seen[-1].method == "POST" and q["redeemAll"] == "true" and q["destAccount"] == "SPOT"
