@@ -15,6 +15,8 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+from scripts.run_lt_leaders import FROM
+
 from scripts import run_exit_242 as base
 
 REPO = Path(__file__).resolve().parent.parent
@@ -30,7 +32,7 @@ def one(mk: base.Market, w: float) -> dict[str, Any]:
         run = base.simulate_exit(mk, S3)
     finally:
         base.RISK, base.CAP = old
-    start = next(i for i, d in enumerate(mk.days) if d >= base.FROM)
+    start = next(i for i, d in enumerate(mk.days) if d >= FROM)
     span = mk.days[start:]
     row = base._row(span, run.equity)
     stops = [x for x in run.trades if x["reason"] == "stop"]
