@@ -6,6 +6,12 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-16 — 240 실적 갭 따라가기 `지지` · 239 H1 숏 지정가 `불명` · MF Paper TRI3 (Claude)
+
+[240](research/240-earnings-gap-drift-pead.md): S&P 500 504 종목, SEC 8-K 2.02 발표 시각 → 반응일 +5% · 거래량 2 배면 다음 날 시가 20 일 보유, SPY 대비 비용 뒤 +0.59% [+0.23, +0.94](3,946 건), 두 반쪽 + → 사전 규칙 `지지`. 대조와 평균 차이 작고 생존 편향 → Paper 후보, 실거래 근거 아님.
+[239](research/239-h1-short-limit-execution.md): H1 숏 지정가 체결 96.9%, 실제 거래당 +0.098% t 1.55 → `불명`.
+MF Paper TRI3: QQQ · GLDM · IEF 각 1/3, 종목마다 T 추세 꺼지면 현금 — 앞으로의 기록(MA-TREND A 는 REJECT 였음).
+
 ## 2026-10-15 — 개별주 발표 일정과 추천·예약 연계 (Codex)
 
 사용자 제안 1~4 승인. [고정 규칙·구현·자료 한계](research/EVENT_ENTRY_INTEGRATION_20261015.md).
