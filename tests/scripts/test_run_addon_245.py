@@ -9,7 +9,7 @@ from scripts import run_addon_245 as m
 
 
 def test_pull_needs_dip_below_ma_then_recover() -> None:
-    close: list[float | None] = [100.0] * 25 + [90.0, 95.0, 101.0]
+    close: list[float | None] = [*([100.0] * 25), 90.0, 95.0, 101.0]
     p = m.Pos(1.0, 100.0, 100.0, 20, 100.0)
     arm = m.Arm("PULL", 0.05, "pull")
     assert not m.add_signal(arm, p, close, 24)  # 아직 안 눌림 (20 일선 = 100, 종가 100)
@@ -20,7 +20,7 @@ def test_pull_needs_dip_below_ma_then_recover() -> None:
 
 
 def test_up10_and_no_add_arm() -> None:
-    close: list[float | None] = [100.0] * 21 + [110.0, 111.0]
+    close: list[float | None] = [*([100.0] * 21), 110.0, 111.0]
     p = m.Pos(1.0, 100.0, 100.0, 20, 100.0)
     assert not m.add_signal(m.Arm("UP10", 0.05, "up"), p, close, 21)  # 정확히 +10% 는 아님
     assert m.add_signal(m.Arm("UP10", 0.05, "up"), p, close, 22)
@@ -31,7 +31,7 @@ def test_simulate_adds_once_next_day(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(m, "trend_up", lambda xs, t: True)
     monkeypatch.setattr(m, "trend_off", lambda xs, t: False)
     n = 40
-    close: list[float | None] = [100.0] * 21 + [115.0] * 2 + [130.0] * (n - 23)
+    close: list[float | None] = [100.0 if k < 21 else 115.0 if k < 23 else 130.0 for k in range(n)]
     mk = Market(
         [f"2009-{1 + k // 20:02d}-{1 + k % 20:02d}" for k in range(n)],
         {"AAA": close},
