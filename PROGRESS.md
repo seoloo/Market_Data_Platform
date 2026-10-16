@@ -5,6 +5,10 @@
 
 옮긴 기록: 2026-09 이전 작업(2026-09-29 이하 날짜 절과 '이전 작업' 절)은 [docs/archive/PROGRESS_2026-09.md](docs/archive/PROGRESS_2026-09.md) 로 그대로 옮겼다(2026-10-15, 내용 수정 없음). 맨 아래 '다음 작업 · 단계 상태 · 미해결 · 검증 기록' 은 이 파일에 남아 있다.
 
+## 2026-10-16 — 241 PEAD Paper 시작 (Claude, account2)
+
+- 사용자: "응 Paper 기록 시작해줘". [241 등록](docs/research/241-pead-paper-registration.md): 240 규칙 그대로, 가상 10,000 USD · 신호마다 500 USD · 최대 20 자리, 반응일 2026-10-16 부터. `scripts/pead_paper.py` · 예약 `AutoTrading_PEAD_Paper`(화 ~ 토 21:40). 판단: 닫힌 거래 100 건에서 거래당 초과 > 0 · t ≥ 1.0 이면 소액 실거래 검토 자격, ≤ 0 이면 멈춤.
+
 ## 2026-10-16 — 트레이딩 아이디어 1 · 2 · 4: 240 PEAD 지지 · TRI3 Paper · 239 불명 (Claude, account2)
 
 - 사용자: "1, 2, 4 번 진행 부탁해". 각 사전 고정 뒤 1 회.
