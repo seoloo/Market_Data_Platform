@@ -12,8 +12,9 @@
 * **켜기 스위치 둘**: ``.env`` ``BINANCE_FUTURES_LIVE_TRADING_ENABLED=true`` **그리고** 설정
   ``live.altair`` (오르빗 설정 화면, 기본 꺼짐). 하나라도 꺼져 있으면 아무 주문도 내지 않는다
   (걸려 있는 비상 스톱은 거래소에 그대로).
-* **장부 = USDC 선물 지갑 + 미실현 손익** — 그 지갑에 Altair 돈만 둔다(cross 는 지갑 전체가 증거금).
-  다중 자산 모드 · 헤지 모드면 시작하지 않는다.
+* **다중 자산 모드 필수**(2026-10-16 사용자 결정, 인계 D-①): Vega 가 옮기는 USDT 가 USDC 계약의
+  증거금으로 그대로 쓰인다. **장부 = 선물 지갑 전체 증거금 잔고(USDT + USDC, 미실현 포함)** —
+  그 지갑에 Altair 돈만 둔다. 다중 자산 모드가 아니거나 헤지 모드면 시작하지 않는다.
 * **입금 · 출금은 손익이 아니다**: 선물 지갑 이체(``TRANSFER``)를 단위(NAV)로 바꿔 낙폭을 잰다
   (Vega 와 같은 방식).
 * **낙폭 30% 정지**: 단위 가치가 고점에서 30% 빠지면 새 노출(롱 늘리기 · 새 숏) 금지 —
@@ -154,8 +155,11 @@ def _setup(c: BinanceUsdmLive, st: dict[str, Any], now_ms: int) -> str | None:
     """처음 한 번: 헤지 · 다중 자산 모드 아님 확인, 배율 5, cross. 문제면 이유."""
     if c.dual_side_position():
         return "헤지 모드(dual side) — 앱에서 one-way 로 바꿔 주세요"
-    if c.multi_assets_margin():
-        return "다중 자산 모드 — 장부 계산이 달라져 시작하지 않아요 (단일 자산 모드로)"
+    if not c.multi_assets_margin():
+        return (
+            "단일 자산 모드 — Vega 가 옮기는 USDT 가 USDC 계약 증거금이 안 돼요. "
+            "바이낸스 선물 설정에서 '다중 자산 모드(Multi-Assets Mode)' 로 바꿔 주세요"
+        )
     for sym in core.TRADE.values():
         c.set_leverage(sym, core.LEVERAGE)
     st["setup"] = True
@@ -171,6 +175,7 @@ def tick(now_ms: int | None = None) -> list[str]:
         return [f"꺼짐 — {why}"]
     st = _load()
     st["live"] = True
+    st["multi"] = True  # 다중 자산 모드만 지원 (_setup 이 확인)
     day, bar = now_ms // DAY, now_ms // H4
     due_long = st.get("long_day") != day and now_ms % DAY >= 5 * MINUTE
     due_short = st.get("short_bar") != bar and now_ms % H4 >= 3 * MINUTE
@@ -192,7 +197,11 @@ def tick(now_ms: int | None = None) -> list[str]:
         eq, _pos = core._equity(c, st)
         start = int(st.get("flow_ms") or st.get("start_ms") or now_ms) - DAY
         try:
-            flows = [(t, float(a), i) for t, a, i in c.transfers("USDC", start)]
+            flows = [
+                (t, float(a), f"{asset}-{i}")
+                for asset in ("USDT", "USDC")  # 다중 자산 — 달러 스테이블 1:1 로 본다
+                for t, a, i in c.transfers(asset, start)
+            ]
         except AutoTradingError as exc:  # 다음 실행이 같은 구간부터 다시 읽는다
             flows = []
             lines.append(f"이체 기록 못 읽음 — {exc}")
@@ -245,7 +254,7 @@ def tick(now_ms: int | None = None) -> list[str]:
 
 def plan() -> dict[str, Any]:
     now_ms = int(time.time() * 1000)
-    st = {**_load(), "live": True}
+    st = {**_load(), "live": True, "multi": True}
     c = _client()
     try:
         eq, pos = core._equity(c, dict(st))
@@ -257,7 +266,7 @@ def plan() -> dict[str, Any]:
     finally:
         c.close()
     return {
-        "usdc_equity": round(eq, 2),
+        "equity_usd": round(eq, 2),  # 다중 자산 — 선물 지갑 전체 증거금 잔고
         "positions": pos,
         "min_notional": mins,
         "step": steps,

@@ -131,3 +131,32 @@ def test_live_equity_is_real_wallet_and_halt_blocks_long_increase(
     lines = core.rebalance_long(c, st, 1_792_000_000_000, dry=True, alert=alert)  # type: ignore[arg-type]
     assert any("롱 늘리기" in x and "30% 정지" in x for x in lines) and not c.orders
     assert alert and alert[0].startswith("⛔ BTC 롱 늘리기 안 함")
+
+
+def test_multi_asset_mode_required_and_used_for_equity(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Setup:
+        def __init__(self, multi: bool) -> None:
+            self.multi, self.lev = multi, []
+
+        def dual_side_position(self) -> bool:
+            return False
+
+        def multi_assets_margin(self) -> bool:
+            return self.multi
+
+        def set_leverage(self, sym: str, lev: int) -> None:
+            self.lev.append(sym)
+
+    st: dict[str, Any] = {}
+    single = Setup(False)
+    assert "다중 자산 모드" in (m._setup(single, st, 1) or "")  # type: ignore[arg-type]
+    assert not single.lev and not st.get("setup")
+    multi = Setup(True)
+    assert m._setup(multi, st, 1) is None and st["setup"]  # type: ignore[arg-type]
+
+    class Live(FakeLive):
+        def margin_balance(self) -> Decimal:
+            return Decimal("1234.5")  # USDT + USDC + 미실현
+
+    eq, _pos = core._equity(Live(), {"live": True, "multi": True})  # type: ignore[arg-type]
+    assert eq == 1234.5

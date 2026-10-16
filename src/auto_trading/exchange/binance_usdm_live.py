@@ -122,6 +122,25 @@ class BinanceUsdmLive(BinanceUsdmTestnet):
             out.append((int(r["time"]), Decimal(str(r["income"])), str(r.get("tranId", ""))))
         return sorted(out)
 
+    def margin_balance(self) -> Decimal:
+        """선물 지갑 전체의 증거금 잔고(달러, 미실현 손익 포함) — 다중 자산 모드 장부.
+
+        ``/fapi/v2/account`` ``totalMarginBalance``. 다중 자산 모드에선 USDT · USDC 를 함께 센다."""
+        data: Any = self._request("/fapi/v2/account", signed=True)
+        return Decimal(str((data or {}).get("totalMarginBalance") or "0"))
+
+    def set_multi_assets_margin(self, on: bool) -> None:
+        """다중 자산 모드 켜기 · 끄기 (사용자 2026-10-16 '다중 자산 모드로 해주면 돼').
+
+        포지션 · 걸린 주문이 있으면 거래소가 거절한다. 주문 허용이 꺼져 있으면 막는다."""
+        self._guard()
+        self._request(
+            "/fapi/v1/multiAssetsMargin",
+            {"multiAssetsMargin": "true" if on else "false"},
+            signed=True,
+            method="POST",
+        )
+
     def multi_assets_margin(self) -> bool:
         """다중 자산 모드면 True — USDT 도 USDC 계약 증거금이 된다(장부 계산이 달라진다)."""
         data: Any = self._request("/fapi/v1/multiAssetsMargin", signed=True)

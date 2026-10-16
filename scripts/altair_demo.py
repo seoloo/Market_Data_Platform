@@ -359,6 +359,8 @@ def _equity(c: BinanceUsdmTestnet, st: dict[str, Any]) -> tuple[float, dict[str,
         q = float(p.quantity)
         pos[coin] = q
         unreal += q * (float(c.mark_price(sym)) - float(p.entry_price))
+    if live and st.get("multi"):  # 다중 자산 모드 — USDT · USDC 전체(미실현 포함)
+        return float(c.margin_balance()), pos  # type: ignore[attr-defined]
     if live:
         return wallet + unreal, pos
     return ALLOC + wallet - float(st["wallet0"]) + unreal, pos

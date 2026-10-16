@@ -270,8 +270,8 @@ def _record(
 def _altair_on() -> bool:
     """Altair 실거래가 켜져 있을 때만 자동 분배한다 (2026-10-16 점검).
 
-    꺼져 있는데 옮기면 선물 지갑에서 놀기만 한다. 또 Altair 실계좌는 USDC 계약이라
-    (scripts/altair_live) USDT 이체는 Altair 장부에 들어가지 않는다 — 켜기 전에 맞출 것."""
+    꺼져 있는데 옮기면 선물 지갑에서 놀기만 한다. Altair 실계좌는 USDC 계약이지만 다중 자산
+    모드(2026-10-16 결정)라 옮긴 USDT 가 그대로 증거금 · 장부가 된다(scripts/altair_live)."""
     return bool(user_settings.get(REPO, "live.altair"))
 
 

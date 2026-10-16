@@ -76,7 +76,11 @@ def adapter(*, enabled: bool = True) -> tuple[BinanceUsdmLive, list[httpx.Reques
                 ],
             )
         if path == "/fapi/v1/multiAssetsMargin":
+            if request.method == "POST":
+                return httpx.Response(200, json={"code": 200, "msg": "success"})
             return httpx.Response(200, json={"multiAssetsMargin": False})
+        if path == "/fapi/v2/account":
+            return httpx.Response(200, json={"totalMarginBalance": "1999.5", "positions": []})
         if path == "/fapi/v1/leverage":
             return httpx.Response(200, json={"leverage": 5})
         raise AssertionError(path)
@@ -156,3 +160,14 @@ def test_keys_prefer_futures_then_fall_back(tmp_path: Path) -> None:
         },
     )
     assert creds.api_key == "fut" and on is True
+
+
+def test_margin_balance_and_multi_asset_switch() -> None:
+    a, _seen = adapter(enabled=False)
+    assert a.margin_balance() == Decimal("1999.5")
+    with pytest.raises(TradingDisabledError):
+        a.set_multi_assets_margin(True)
+    b, seen_b = adapter()
+    b.set_multi_assets_margin(True)
+    post = next(r for r in seen_b if r.method == "POST")
+    assert _params(post)["multiAssetsMargin"] == "true"

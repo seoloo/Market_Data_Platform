@@ -296,8 +296,8 @@ DATA_NOT_READY/어댑터 미완료, 새 시장성과0. 일반 주문·위험·�
 |---|---|---|---|
 | Deneb · 자동 적립 · 국내 적립 | 토스 | `TOSS_TRADING_ENABLED=true` | 종목 · 수량 · 지정가 상한(`TossTrader`), 그룹 정지 `deneb` · `acc` |
 | Vega | 바이낸스 현물 USDT | `BINANCE_LIVE_TRADING_ENABLED=true` | 지정가 IOC 만, 하루 1 번, 그룹 정지 `vega`, 낙폭 30% 정지 |
-| Vega → Altair 자동 분배 | 바이낸스 현물 → 선물 이체 | 위 + 설정 `live.altair` | 입금 안에서만 · 500 USDT 미만 안 옮김. **USDT 이체라 USDC 장부인 Altair 와 아직 안 맞음 — 켜기 전에 정할 것** |
-| Altair 실거래 | 바이낸스 USDⓈ-M USDC | `BINANCE_FUTURES_LIVE_TRADING_ENABLED=true` + 설정 `live.altair`(기본 꺼짐) | 지정가 IOC · 시장가 막음, 단위 낙폭 30% 새 노출 금지, 그룹 정지 `altair`, 헤지 · 다중 자산 모드 거부 |
+| Vega → Altair 자동 분배 | 바이낸스 현물 → 선물 이체 | 위 + 설정 `live.altair` | 입금 안에서만 · 500 USDT 미만 안 옮김. 선물 계정이 다중 자산 모드(2026-10-16)라 USDT 가 USDC 계약 증거금으로 쓰임 |
+| Altair 실거래 | 바이낸스 USDⓈ-M USDC | `BINANCE_FUTURES_LIVE_TRADING_ENABLED=true` + 설정 `live.altair`(기본 꺼짐) | 지정가 IOC · 시장가 막음, 단위 낙폭 30% 새 노출 금지, 그룹 정지 `altair`, 헤지 모드 거부 · **다중 자산 모드 필수**(장부 = 선물 지갑 전체 증거금) |
 | 💹 개별주 | 토스 | `TOSS_TRADING_ENABLED` + 설정 `stock.orders` + **텔레그램 버튼** | 한 종목 25% · 현금, 정규장 시작 직후 지정가, 손절 −3%, 그룹 정지 `stock` |
 | 전부 정리 | 토스 · 바이낸스 현물 · 바이낸스 선물 · 업비트 | 버튼(5 분 · 한 번) + 각 거래소 스위치 | 지정가(최우선 호가 1% 안), 장부 몫만 |
 | 업비트 | 현물 KRW | `UPBIT_TRADING_ENABLED=true`(2026-10-16 추가, 기본 꺼짐) | 지정가 IOC 만 |
