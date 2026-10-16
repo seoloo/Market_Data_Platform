@@ -7,6 +7,8 @@
   남은 수량은 취소하고 알린다. 시장가는 쓰지 않는다(사용자 규칙).
 * 장 시작 가격이 추천 때보다 3% 넘게 높으면 사지 않고 다시 묻는다(갭 상승 추격 방지).
 * 체결되면 실제 평균 단가 −3% 를 손절가로 적는다(손절 감시는 :mod:`stop_guard`).
+* 이미 들고 있는 종목은 **추가 매수** 장부(``add_to``)로 사고, 체결되면 기존 장부에 합쳐
+  **합친 평균 단가 −3%** 로 손절가를 다시 잡는다(2026-10-16 사용자 "이미 보유하고 있어도 추매").
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ __all__ = [
     "Order",
     "Ticket",
     "TraderLike",
+    "merge_into",
     "new_ticket",
     "refresh",
     "step_buy",
@@ -122,7 +125,7 @@ class Ticket:
     """추천 때 가격."""
     created_ms: int
     status: str = "reserved"
-    """reserved → buying → holding → selling → closed · canceled · failed · released."""
+    """reserved → buying → holding → selling → closed · canceled · failed · released · merged."""
     source: str = "bot"
     """bot (봇 버튼으로 매수) · app (앱에서 사고 손절만 등록)."""
     session: str = ""
@@ -139,6 +142,8 @@ class Ticket:
     closed_ms: int = 0
     override: bool = False
     """사람이 규칙 밖에서 수량을 정해 산 것('그래도 매수') — 주문 직전엔 못 넘는 이유만 본다."""
+    add_to: str = ""
+    """추가 매수면 합칠 기존 장부 번호. 체결 뒤 그 장부에 합치고 이 장부는 ``merged``."""
 
     @property
     def kr(self) -> bool:
@@ -172,6 +177,28 @@ def new_ticket(a: Advice, now_ms: int, tid: str) -> Ticket:
     return Ticket(
         tid, a.symbol, a.name, a.currency, a.qty, a.price, now_ms, session=a.entry_session
     )
+
+
+def merge_into(parent: Ticket, add: Ticket, now_ms: int) -> list[str]:
+    """체결된 추가 매수(``add``)를 기존 장부에 합친다 — 합친 평균 단가 −3% 로 손절가를 다시 잡는다.
+
+    매수 기록(``buys``)은 추가 매수 장부에 남겨 월간 복기에서 따로 센다."""
+    got = add.filled
+    held = parent.filled - parent.sold
+    cost = held * parent.avg + sum(o.amount + o.fee for o in add.buys)
+    old = parent.stop
+    parent.filled += got
+    parent.qty += int(got)
+    parent.avg = cost / (held + got)
+    parent.stop = stop_price(parent.avg, parent.kr)
+    add.status, add.closed_ms = "merged", now_ms
+    add.note = f"{parent.id} 에 합침"
+    part = "" if got >= add.qty else f" (목표 {add.qty}주 중 {got:g}주, 나머지 취소)"
+    return [
+        f"✅ {add.name} {got:g}주 추가 체결 · 평균 {_px(add.avg, add.kr)}{part}\n"
+        f"📦 합계 {held + got:g}주 · 평균 {_px(parent.avg, parent.kr)}\n"
+        f"🛡 손절선 바꿈: {_px(old, parent.kr)} → {_px(parent.stop, parent.kr)} (평균 −3%)"
+    ]
 
 
 def _f(x: Any) -> float:

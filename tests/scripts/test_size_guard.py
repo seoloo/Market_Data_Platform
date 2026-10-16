@@ -159,3 +159,39 @@ def test_summary_lines_for_status_report(tmp_path: Path, monkeypatch: pytest.Mon
 
     monkeypatch.setattr(m, "_reader", boom)
     assert "엔비디아 10주" in m.summary_lines()[1]  # 시세 없어도 칸은 보임
+
+
+def test_reserve_on_held_symbol_is_add_on_and_pending_buy_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.ops.position_size import Advice
+
+    a = Advice(
+        symbol="CRCL",
+        name="써클",
+        currency="USD",
+        price=87.0,
+        base_krw=16_000_000.0,
+        weight=0.25,
+        limit=87.5,
+        qty=21,
+        amount_krw=2_600_000.0,
+        stop=84.8,
+        risk_krw=50_000.0,
+        max_qty=21,
+    )
+    monkeypatch.setattr(m, "DATA", tmp_path)
+    monkeypatch.setattr(m, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(m, "LOCK", tmp_path / "lock")
+    monkeypatch.setattr(m, "halted_for", lambda *_: None)
+    monkeypatch.setattr(m, "tick", lambda now=None, **_: [])
+    monkeypatch.setattr(m, "advise", lambda q: a)
+    held = Ticket("1", "CRCL", "써클", "USD", 10, 84.83, 0, status="holding")
+    held.filled, held.avg, held.stop = 10.0, 86.226, 83.63
+    m.save_tickets([held])
+    out = m.reserve("CRCL")
+    add = m.load_tickets()[1]
+    assert (add.add_to, add.qty, add.status) == ("1", 21, "reserved")
+    assert "추가 매수" in out and "기존 10주와 합쳐" in out
+    out2 = m.reserve("CRCL")  # 추가 매수가 아직 안 끝났으면 또 예약하지 않음
+    assert "이미 매수 중" in out2 and len(m.load_tickets()) == 2

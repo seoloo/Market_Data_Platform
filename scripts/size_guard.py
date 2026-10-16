@@ -53,7 +53,7 @@ from auto_trading.ops.position_size import (
     is_kr,
     recommend,
 )
-from auto_trading.ops.size_order import Ticket, new_ticket, refresh, step_buy
+from auto_trading.ops.size_order import Ticket, merge_into, new_ticket, refresh, step_buy
 from auto_trading.ops.stop_guard import check_stop, register_app, status_lines, step_sell
 
 REPO = Path(__file__).resolve().parent.parent
@@ -529,9 +529,12 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                 if t.status in ("reserved", "buying"):
                     block = None
                     opening = t.open_px or None
+                    parent = next((p for p in tickets if t.add_to and p.id == t.add_to), None)
                     if buy_live:
                         if halt:
                             block = f"전체 정지 중 ({halt})"
+                        elif t.add_to and (parent is None or parent.status != "holding"):
+                            block = "기존 보유분이 손절 · 정리 중 — 추가 매수 취소"
                         else:
                             try:
                                 if t.status == "buying":
@@ -573,7 +576,7 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                                         opening = float(px) if px is not None else None
                             except (AutoTradingError, ValueError, OSError) as exc:
                                 block = f"주문 직전 재확인 실패 ({type(exc).__name__})"
-                    out += step_buy(
+                    msgs = step_buy(
                         t,
                         trader,
                         now,
@@ -582,6 +585,9 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                         block=block,
                         regular_open=opening,
                     )
+                    if t.status == "holding" and parent is not None and parent.status == "holding":
+                        msgs = merge_into(parent, t, now)
+                    out += msgs
         finally:
             trader.close()
     finally:
@@ -615,9 +621,14 @@ def reserve(query: str, qty: int | None = None) -> str:
     now = _now_ms()
     with _Lock():
         tickets = load_tickets()
-        if any(t.active and t.symbol == a.symbol for t in tickets):
-            return text + f"\n\n⚠️ {a.symbol} 는 이미 예약 · 감시 중이라 새로 예약하지 않았어요"
+        same = [t for t in tickets if t.active and t.symbol == a.symbol]
+        parent = same[0] if len(same) == 1 and same[0].status == "holding" else None
+        if same and parent is None:
+            busy = "매수 중" if any(t.status in ("reserved", "buying") for t in same) else "매도 중"
+            return text + f"\n\n⚠️ {a.symbol} 는 이미 {busy}이라 새로 예약하지 않았어요"
         ticket = new_ticket(a, now, _tid(now))
+        if parent is not None:  # 이미 보유 — 추가 매수, 체결되면 합쳐 평균 −3% 손절
+            ticket.add_to = parent.id
         ticket.override = override
         if override:
             ticket.note = "규칙 밖 매수: " + " · ".join(a.blocked)
@@ -625,6 +636,11 @@ def reserve(query: str, qty: int | None = None) -> str:
         save_tickets(tickets)
         msgs = tick(now)
     head = "⏳ 예약했어요 — 정규장 시작 직후(장중이면 바로) 지정가로 삽니다"
+    if parent is not None:
+        head += (
+            f"\n📦 추가 매수 — 체결되면 기존 {parent.filled - parent.sold:g}주와 합쳐 "
+            "평균 단가 −3% 로 손절선을 다시 잡아요"
+        )
     if qty is not None:
         tag = " (규칙 밖 매수 — 기록에 따로 표시)" if override else ""
         return "\n\n".join([f"⏳ {a.name} {qty}주 예약했어요{tag}", head, *msgs])

@@ -22,6 +22,7 @@
 - **💹 개별주:** `/stock` → 종목 답장 → 추천 → [N주 매수] · [수량 바꾸기] · [그래도 매수] → 수량 답장 →
   [예약]. 장부 `data/size_guard/state.json`, 봇이 2 분마다 tick. 명령 `python -m scripts.size_guard
   advise|reserve|status|attach|release|cancel`.
+  이미 보유한 종목은 **추가 매수**(`add_to`) — 체결되면 기존 장부에 합치고 손절선을 합친 평균 단가 −3% 로 다시 잡는다(2026-10-16).
 - **Altair 실거래:** `python -m scripts.altair_live plan|status|unhalt` — plan · status 는 조회만.
 
 ## 데이터·API·복구

@@ -4,6 +4,7 @@ from typing import Any
 
 from auto_trading.core.errors import OrderStateUnknownError
 from auto_trading.ops import size_order as m
+from auto_trading.ops.position_size import stop_price
 from auto_trading.ops.size_order import Ticket
 
 
@@ -182,3 +183,19 @@ def test_cancel_ack_is_not_final_and_unknown_status_never_reorders() -> None:
     with pytest.raises(OrderStateUnknownError):
         m.step_buy(t, tr, 3, session="US:d", live=True)
     assert len(tr.placed) == 1
+
+
+def test_add_on_merges_and_resets_stop_to_merged_average() -> None:
+    """2026-10-16 사용자: 이미 보유해도 추매 — 합친 평균 단가 −3% 로 손절."""
+    parent = Ticket("1", "CRCL", "써클", "USD", 10, 84.83, 0, status="holding")
+    parent.filled, parent.avg, parent.stop = 10.0, 86.226, 83.63
+    add = Ticket("2", "CRCL", "써클", "USD", 21, 87.0, 0, status="holding", add_to="1")
+    add.buys = [m.Order("o", "c", "BUY", 21, 87.4, 0, True, "FILLED", 21.0, 21 * 87.3, 1.83)]
+    add.filled, add.avg = 21.0, (21 * 87.3 + 1.83) / 21
+    msgs = m.merge_into(parent, add, 5)
+    avg = (10 * 86.226 + 21 * 87.3 + 1.83) / 31
+    assert parent.filled == 31.0 and parent.qty == 31 and abs(parent.avg - avg) < 1e-9
+    assert parent.stop == stop_price(avg, False) and parent.stop > 83.63
+    assert (add.status, add.closed_ms, add.active) == ("merged", 5, False)
+    assert "합계 31주" in msgs[0] and "$83.63 →" in msgs[0]
+    assert Ticket.from_dict(add.to_dict()).add_to == "1"
