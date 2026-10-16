@@ -240,6 +240,7 @@ def test_altair_split_moves_half_once_big_enough(
 ) -> None:
     _db(env)
     monkeypatch.setattr(m, "_split", _SPLIT)
+    monkeypatch.setattr(m, "_altair_on", lambda: True)
     fake = FakeBinance(Decimal(1200))
     monkeypatch.setattr(m, "_client", lambda **_: fake)
     assert m.run_cmd() == 0
@@ -257,6 +258,7 @@ def test_altair_split_small_account_and_rejected(
 
     _db(env)
     monkeypatch.setattr(m, "_split", _SPLIT)
+    monkeypatch.setattr(m, "_altair_on", lambda: True)
     small = FakeBinance(Decimal(218))
     monkeypatch.setattr(m, "_client", lambda **_: small)
     assert m.run_cmd() == 0
@@ -268,3 +270,14 @@ def test_altair_split_small_account_and_rejected(
     assert m.run_cmd() == 0  # 거부돼도 Vega 는 돈다
     outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
     assert "Altair 이체 거부" in outbox and "Universal Transfer" in outbox
+
+
+def test_no_split_while_altair_live_is_off(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Altair 실거래가 꺼져 있으면 입금이 커도 선물로 옮기지 않는다 (2026-10-16 점검)."""
+    _db(env)
+    monkeypatch.setattr(m, "_split", _SPLIT)
+    monkeypatch.setattr(m, "_altair_on", lambda: False)
+    fake = FakeBinance(Decimal(1200))
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    assert fake.moved == []

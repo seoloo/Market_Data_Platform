@@ -39,7 +39,7 @@ from auto_trading.exchange.toss import (
     TossTrader,
     is_kr_symbol,
 )
-from auto_trading.exchange.upbit import UpbitClient
+from auto_trading.exchange.upbit import UpbitClient, upbit_trading_enabled
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.deneb_live import DenebState
@@ -89,7 +89,11 @@ def _kst(ms: int) -> datetime:
 
 def _upbit() -> UpbitClient:
     env = read_env_file(REPO / ".env")
-    return UpbitClient(env["UPBIT_API_KEY"], env["UPBIT_AOU_SECRET"])
+    return UpbitClient(
+        env["UPBIT_API_KEY"],
+        env["UPBIT_AOU_SECRET"],
+        trading_enabled=upbit_trading_enabled(env),
+    )
 
 
 def _binance() -> BinanceSpotLive | None:

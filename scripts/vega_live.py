@@ -267,6 +267,14 @@ def _record(
     st["orders"].append(row)
 
 
+def _altair_on() -> bool:
+    """Altair 실거래가 켜져 있을 때만 자동 분배한다 (2026-10-16 점검).
+
+    꺼져 있는데 옮기면 선물 지갑에서 놀기만 한다. 또 Altair 실계좌는 USDC 계약이라
+    (scripts/altair_live) USDT 이체는 Altair 장부에 들어가지 않는다 — 켜기 전에 맞출 것."""
+    return bool(user_settings.get(REPO, "live.altair"))
+
+
 def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
     """Altair 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
 
@@ -333,7 +341,7 @@ def run_cmd() -> int:
         if st.get("last_decision") == _decision(now_ms)[1]:
             print(f"{_decision(now_ms)[1]} 이미 실행함")
             return 0
-        if not halted and c.trading_enabled:
+        if not halted and c.trading_enabled and _altair_on():
             try:
                 lines += _split(c, st, now_ms)
             except (AutoTradingError, sqlite3.Error) as exc:  # 분배 실패는 Vega 를 멈추지 않는다

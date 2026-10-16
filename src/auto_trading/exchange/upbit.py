@@ -13,6 +13,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -54,13 +55,21 @@ def plain(x: Decimal) -> str:
 
 
 class UpbitClient:
-    __slots__ = ("_ak", "_client", "_sk")
+    __slots__ = ("_ak", "_client", "_sk", "trading_enabled")
 
     def __init__(
-        self, access_key: str, secret_key: str, *, client: httpx.Client | None = None
+        self,
+        access_key: str,
+        secret_key: str,
+        *,
+        client: httpx.Client | None = None,
+        trading_enabled: bool = False,
     ) -> None:
         self._ak, self._sk = access_key, secret_key
         self._client = client if client is not None else httpx.Client(timeout=15.0)
+        self.trading_enabled = trading_enabled
+        """주문 허용 — 2026-10-16 점검에서 추가. 기본 꺼짐(조회만), 부르는 쪽이
+        :func:`upbit_trading_enabled` 로 켠다. 예전엔 스위치가 없어 키만 있으면 주문이 나갔다."""
 
     def __repr__(self) -> str:
         return "UpbitClient(***)"
@@ -139,7 +148,9 @@ class UpbitClient:
     def place_limit_ioc(
         self, market: str, side: str, volume: Decimal, price: Decimal, identifier: str
     ) -> UpbitOrder:
-        """지정가 IOC. ``side`` = 'bid'(매수) · 'ask'(매도)."""
+        """지정가 IOC. ``side`` = 'bid'(매수) · 'ask'(매도). 주문 허용이 꺼져 있으면 막는다."""
+        if not self.trading_enabled:
+            raise ExchangeError("UPBIT_TRADING_ENABLED=true 가 아니라 업비트 주문하지 않는다")
         if side not in ("bid", "ask"):
             raise ExchangeError(f"주문 방향 오류: {side}")
         body = {
@@ -180,3 +191,9 @@ def _order(d: Mapping[str, Any]) -> UpbitOrder:
         paid_fee=Decimal(str(d.get("paid_fee") or "0")),
         funds=funds,
     )
+
+
+def upbit_trading_enabled(env: Mapping[str, str]) -> bool:
+    """``UPBIT_TRADING_ENABLED`` 가 정확히 ``true`` 일 때만 (환경 변수가 ``.env`` 값보다 앞선다)."""
+    raw = os.environ.get("UPBIT_TRADING_ENABLED", env.get("UPBIT_TRADING_ENABLED", ""))
+    return raw.strip().lower() == "true"

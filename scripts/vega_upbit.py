@@ -35,7 +35,7 @@ import httpx
 
 from auto_trading.config.secrets import load_telegram_credentials, read_env_file
 from auto_trading.core.errors import AutoTradingError, ExchangeError, OrderStateUnknownError
-from auto_trading.exchange.upbit import UpbitClient, UpbitOrder
+from auto_trading.exchange.upbit import UpbitClient, UpbitOrder, upbit_trading_enabled
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops import user_settings
@@ -79,7 +79,11 @@ Deneb 처럼 보이는 이름만 바꾼다. 내부 파일 · 예약 이름은 �
 
 def _client() -> UpbitClient:
     env = read_env_file(REPO / ".env")
-    return UpbitClient(env["UPBIT_API_KEY"], env["UPBIT_AOU_SECRET"])
+    return UpbitClient(
+        env["UPBIT_API_KEY"],
+        env["UPBIT_AOU_SECRET"],
+        trading_enabled=upbit_trading_enabled(env),
+    )
 
 
 def _notify(text: str) -> None:
