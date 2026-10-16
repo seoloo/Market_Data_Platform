@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-16 — 244 국장 실적 갭 따라가기 `불리` (Claude)
+
+[244](research/244-kr-earnings-gap-drift-pead.md): 240(미국 `지지`)을 폐지 포함 국장 상위 200 · DART 잠정실적으로 재현 → 971 건 20 일 초과 −0.53% [−1.72, +0.50] `불리`(2017 년부터 −1.5%).
+실적 없는 급등(대조)은 20 일 −1.6% 로 되돌림. 240 의 효과 일부는 생존 편향일 수 있어 241 미국 Paper 결과로만 판단, 국장 그림자 기록은 하지 않는다.
+
 ## 2026-10-16 — 242 💹 나가기 규칙 `NONE` · 243 Altair 숏 빈도 (Claude)
 
 [242](research/242-stock-exit-rule-preregistration.md): 238 의 후속. 💹 크기(1% ÷ 손절 폭, 25% 상한)에 나가기만 20 일선 · 3 ATR 따라 올림 · −3% + ATR 로 바꿈.
