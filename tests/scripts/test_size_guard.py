@@ -132,3 +132,30 @@ def test_reserve_with_qty_overrides_soft_rules_only(
     assert "비추천" in m.reserve("삼성전자")  # 수량 없이(추천대로)는 규칙에 걸리면 안 삼
     monkeypatch.setattr(m, "advise", lambda q: advice(["Deneb 종목"], ["Deneb 종목"], 0))
     assert "예약했어요" not in m.reserve("TQQQ", qty=1)
+
+
+def test_summary_lines_for_status_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(m, "DATA", tmp_path)
+    monkeypatch.setattr(m, "STATE", tmp_path / "state.json")
+    assert m.summary_lines() == []  # 장부 비면 현황에 칸 없음
+
+    class R:
+        def prices(self, syms: list[str]) -> dict[str, float]:
+            return {"NVDA": 103.0}
+
+        def close(self) -> None:
+            pass
+
+    held = Ticket("1", "NVDA", "엔비디아", "USD", 10, 100.0, 0, status="holding")
+    held.filled, held.avg, held.stop = 10.0, 100.0, 97.0
+    m.save_tickets([held, Ticket("2", "TSLA", "테슬라", "USD", 3, 200.0, 0)])
+    monkeypatch.setattr(m, "_reader", R)
+    lines = m.summary_lines()
+    assert lines[0] == "💹 개별주" and "엔비디아 10주" in lines[1] and "+3.0%" in lines[1]
+    assert "장 시작에 매수 테슬라 3주" in lines[2]
+
+    def boom() -> None:
+        raise OSError("down")
+
+    monkeypatch.setattr(m, "_reader", boom)
+    assert "엔비디아 10주" in m.summary_lines()[1]  # 시세 없어도 칸은 보임

@@ -568,6 +568,25 @@ def _set_status(tid: str, allowed: tuple[str, ...], status: str) -> str:
     return f"없는 번호: {tid}"
 
 
+def summary_lines() -> list[str]:
+    """'📊 현황' 에 붙일 💹 개별주 칸 (예약 · 보유 · 손절까지 거리). 없으면 빈 목록.
+
+    시세는 토스 시세 조회(계좌 조회 아님). 못 받으면 가격 없이 보여 준다."""
+    act = [t for t in load_tickets() if t.active]
+    if not act:
+        return []
+    last: dict[str, float] = {}
+    try:
+        reader = _reader()
+        try:
+            last = {s: float(v) for s, v in reader.prices(sorted({t.symbol for t in act})).items()}
+        finally:
+            reader.close()
+    except Exception as exc:  # 시세 못 받아도 현황은 보낸다
+        print(f"개별주 시세 건너뜀: {type(exc).__name__}")
+    return ["💹 개별주", *status_lines(act, last)]
+
+
 def status() -> str:
     tickets = load_tickets()
     act = [t for t in tickets if t.active]

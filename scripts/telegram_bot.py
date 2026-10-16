@@ -76,7 +76,20 @@ def report(root: Path = REPO) -> str:
     text = summary_text(books, q, int(time.time() * 1000))
     value = sum(b.value_krw for b in books)
     target = float(user_settings.get(root, "fire.target_krw"))
-    return f"{text}\n🎯 파이어 목표 {target / 1e8:g}억까지 {value / target:.1%}"
+    text += f"\n🎯 파이어 목표 {target / 1e8:g}억까지 {value / target:.1%}"
+    stock = _stock_summary()
+    return text + ("\n\n" + "\n".join(stock) if stock else "")
+
+
+def _stock_summary() -> list[str]:
+    """💹 개별주 예약 · 보유 · 손절 거리 (2026-10-16 '현황에 개별주'). 실패해도 현황은 보낸다."""
+    try:
+        from scripts import size_guard as sg
+
+        return sg.summary_lines()
+    except Exception as exc:
+        print(f"개별주 현황 건너뜀: {type(exc).__name__}: {exc}")
+        return []
 
 
 HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
