@@ -136,9 +136,23 @@ def test_missing_regular_open_does_not_substitute_observed_ask() -> None:
 
 
 def test_actual_open_not_late_observed_ask_sets_cap() -> None:
-    t, tr = _t(), FakeTrader(ask=110)
+    t, tr = _t(), FakeTrader(ask=102)
     m.step_buy(t, tr, 1, session="US:d", live=True, regular_open=100)
-    assert tr.placed[0]["limit"] == 101
+    assert tr.placed[0]["limit"] == 101  # 상한은 실제 시가 +1%, 늦게 본 호가가 아님
+
+
+def test_price_ran_away_after_recommendation_cancels() -> None:
+    """장중 예약: 기준은 추천 때 가격 — 그 뒤 3% 넘게 오르면 추격하지 않는다 (2026-10-16)."""
+    t, tr = _t(ref=100.0), FakeTrader(ask=110)
+    msgs = m.step_buy(t, tr, 1, session="US:d", live=True, regular_open=100.0)
+    assert t.status == "canceled" and not tr.placed and "추격 매수 방지" in msgs[0]
+
+
+def test_intraday_reservation_uses_recommendation_price_as_cap() -> None:
+    """장중에 누른 예약은 opening=추천 가격(size_guard) → 상한 = 추천 가격 +1%."""
+    t, tr = _t(ref=120.0), FakeTrader(ask=120.0)  # 그날 시가는 100 이었어도
+    m.step_buy(t, tr, 1, session="US:d", live=True, regular_open=120.0)
+    assert tr.placed[0]["limit"] == 120.36  # min(120 × 1.003, 121.2)
 
 
 def test_changed_event_cancels_then_keeps_partial_without_reentry() -> None:

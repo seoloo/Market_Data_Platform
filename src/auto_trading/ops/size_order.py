@@ -286,6 +286,14 @@ def step_buy(
                 "갭 상승 추격 방지, 다시 추천 받아 주세요"
             ]
         t.status = "buying"
+        if ask > t.ref_price * (1 + GAP_UP_LIMIT):  # 추천 뒤 이미 3% 넘게 달아남
+            t.status, t.closed_ms = "canceled", now_ms
+            t.note = f"지금 가격이 추천 때보다 +{ask / t.ref_price - 1:.1%}"
+            return [
+                f"❎ {t.name} 사지 않았어요 — {t.note} "
+                f"({_px(t.ref_price, t.kr)} → {_px(ask, t.kr)}). "
+                "추격 매수 방지, 다시 추천 받아 주세요"
+            ]
         return _place(t, trader, now_ms, t.qty, _buy_limit(t, ask))
     if t.status != "buying":
         return []

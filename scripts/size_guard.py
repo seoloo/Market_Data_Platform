@@ -462,8 +462,13 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                                     start_ms = int(
                                         datetime.fromisoformat(hours[0]).timestamp() * 1000
                                     )
-                                    px = reader.regular_open(t.symbol, start_ms)
-                                    opening = float(px) if px is not None else None
+                                    if t.created_ms >= start_ms:
+                                        # 장중에 누른 예약 — 기준은 그날 시가가 아니라 추천 때 가격
+                                        # (2026-10-16 사용자 '장시간이면 그때 바로 매수가에?')
+                                        opening = t.ref_price
+                                    else:
+                                        px = reader.regular_open(t.symbol, start_ms)
+                                        opening = float(px) if px is not None else None
                             except (AutoTradingError, ValueError, OSError) as exc:
                                 block = f"주문 직전 재확인 실패 ({type(exc).__name__})"
                     out += step_buy(
