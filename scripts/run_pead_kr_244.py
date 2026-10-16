@@ -54,7 +54,7 @@ ENTRY_LAG = 2
 COVERAGE_MIN = 0.5
 SEED = 244
 FIRST_END = "2016-12-31"
-EXPECTED_DISC: str | None = None
+EXPECTED_DISC: str | None = "7e0db1bc2f625f3e64f9f029dedab84db9542759bdce7f665305b6624f4b4616"
 """공시 목록 묶음 해시 — audit 뒤 문서 244 에 적고 여기에 고정한다."""
 
 
