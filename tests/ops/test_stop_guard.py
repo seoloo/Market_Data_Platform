@@ -26,6 +26,7 @@ def test_sells_registered_qty_only_capped_by_sellable() -> None:
     o = tr.placed[0]
     assert (o["side"], o["qty"], o["limit"], o["time_in_force"]) == ("SELL", 8, 96.9, "DAY")
     assert "손절 시작" in msgs[0]
+    assert "예상 손해 약: -$31.00 (약 -4.3만 원) · -3.1%" in msgs[0]  # (96.9 − 100) × 10
     tr.fills["o0"] = ("FILLED", 8.0, 96.9)
     m.step_sell(t, tr, 1, live=True, sellable=2.0, fx=1_400.0)
     assert tr.placed[1]["qty"] == 2
@@ -33,7 +34,7 @@ def test_sells_registered_qty_only_capped_by_sellable() -> None:
     msgs = m.step_sell(t, tr, 2, live=True, sellable=0.0, fx=1_400.0)
     assert t.status == "closed" and "손절 매도 끝" in msgs[0]
     # 손익 = (8 × 96.9 + 2 × 96.5 − 10 × 100) × 1,400
-    assert "-4.5만 원" in msgs[0]  # −31.8 × 1,400 = −44,520
+    assert "손해: -$31.80 (약 -4.5만 원) · -3.2%" in msgs[0]  # −31.8 × 1,400 = −44,520
 
 
 def test_waits_when_closed_and_fails_after_max() -> None:
@@ -53,3 +54,11 @@ def test_register_app_and_status_lines() -> None:
     lines = m.status_lines([t, _held()], {"005930": 69_000.0})
     assert "삼성전자 12주" in lines[0] and "-1.4%" in lines[0]
     assert "손절 $97.00" in lines[1] and "2분마다" in lines[-1]
+
+
+def test_kr_stop_alert_shows_won_loss() -> None:
+    t = m.register_app("3", "005930", "삼성전자", 10, 70_000.0, 0)
+    tr = FakeTrader(bid=67_800.0)
+    m.check_stop(t, 67_800.0)
+    msgs = m.step_sell(t, tr, 0, live=True, sellable=10.0)
+    assert "예상 손해 약: -2.2만 원 · -3.1%" in msgs[0]

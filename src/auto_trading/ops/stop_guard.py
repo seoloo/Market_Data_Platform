@@ -40,6 +40,20 @@ def _won(v: float) -> str:
     return f"{v / 10_000:,.1f}만 원" if abs(v) >= 10_000 else f"{v:,.0f}원"
 
 
+def _money(pnl: float, kr: bool, fx: float) -> str:
+    """종목 통화 손익 → '-$31.80 (약 -4.5만 원)' · 국내는 원만."""
+    if kr:
+        return _won(pnl)
+    sign = "-" if pnl < 0 else "+"
+    return f"{sign}${abs(pnl):,.2f} (약 {_won(pnl * fx)})"
+
+
+def _loss_line(pnl: float, pct: float, kr: bool, fx: float, *, done: bool) -> str:
+    """손절 알림의 손해 줄 (사용자 2026-10-16 '손절했을 때 얼마 손해 보는지도 알림에')."""
+    head = ("💸 손해" if pnl < 0 else "💰 손익") if done else "💸 예상 손해 약"
+    return f"{head}: {_money(pnl, kr, fx)} · {pct:+.1%}"
+
+
 def register_app(tid: str, symbol: str, name: str, qty: float, avg: float, now_ms: int) -> Ticket:
     """앱에서 산 종목에 손절만 건다 — 토스 평균 단가 기준."""
     t = Ticket(
@@ -119,7 +133,12 @@ def step_sell(
         return [f"⚠️ {t.name} {t.note}"] if first else []
     t.sells.append(Order(res.code, cid, "SELL", qty, limit, now_ms))
     if first:
-        return [f"🛑 {t.name} 손절 시작 — {t.note}\n{qty}주 지정가 {_px(limit, t.kr)} 매도 주문"]
+        est = (limit - t.avg) * rem
+        return [
+            f"🛑 {t.name} 손절 시작 — {t.note}\n{qty}주 지정가 {_px(limit, t.kr)} 매도 주문\n"
+            + _loss_line(est, limit / t.avg - 1, t.kr, fx, done=False)
+            + f" ({rem}주, 평균 {_px(t.avg, t.kr)} 기준, 수수료 전)"
+        ]
     return []
 
 
@@ -127,10 +146,11 @@ def _done(t: Ticket, now_ms: int, fx: float) -> list[str]:
     t.status, t.closed_ms = "closed", now_ms
     sold = t.sold
     avg = t.sold_amount / sold if sold > 0 else 0.0
-    pnl = (t.sold_amount - t.avg * sold) * (1.0 if t.kr else fx)
+    pnl = t.sold_amount - t.avg * sold
+    pct = pnl / (t.avg * sold) if sold > 0 and t.avg > 0 else 0.0
     return [
         f"🛑 {t.name} 손절 매도 끝 · {sold:g}주 · 평균 {_px(avg, t.kr)} "
-        f"({avg / t.avg - 1:+.1%})\n손익: {_won(pnl)}"
+        f"({avg / t.avg - 1:+.1%})\n" + _loss_line(pnl, pct, t.kr, fx, done=True)
     ]
 
 
