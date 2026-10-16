@@ -23,6 +23,13 @@
   Deneb 몫 안은 LD_M3 와 같은 변동성 맞춤(TQQQ 60% × min(1, 0.20/σ), 나머지 SCHD)
   — T 브레이크는 없다.
   비교 상대는 LD_M3 (같은 Deneb 핵심 100%).
+* TRI3 = QQQ · GLDM · IEF 각 1/3 (사용자 2026-10-16 "다자산 추세 묶음").
+  - 종목마다 T 추세(20 · 60 · 120 거래일 수익 부호 평균 > 0)가 꺼져 있으면 그 몫은 현금
+    (CASH, 가격 1 · 이자 0).
+  - 판단은 직전 달 말 종가까지, 매달 첫 거래일에 맞춘다.
+  - 근거: MA-TREND A 는 낙폭을 크게 줄였지만 샤프 개선이 유의하지 않아 REJECT 였다.
+    판정이 아니라 앞으로의 기록이다.
+  - 현금으로 옮길 때도 회전 비용을 양쪽으로 센다(보수적).
 * 매달 첫 거래일 종가에 목표로 다시 맞춘다. 비용 편도: 미국 ETF 0.15%(수수료 0.10% + 환전 0.05%) ·
   국내 ETF(ISA) 0.02%.
 * 상태 ``data/mf_paper/state.json`` · 보고 ``reports/mf_paper/latest.json``.
@@ -94,6 +101,14 @@ BOOKS["GBG"] = {
     "ccy": "USD",
     "rule": "M3BG",
 }
+TREND_SYMS = ("QQQ", "GLDM", "IEF")
+BOOKS["TRI3"] = {
+    "targets": dict.fromkeys(TREND_SYMS, 1 / 3),
+    "capital": CAPITAL,
+    "cost": COST,
+    "ccy": "USD",
+    "rule": "TREND3",
+}
 SIGNAL = "QQQ"
 FIRST_START = "2026-10-08"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
@@ -108,6 +123,23 @@ def _prices(span: str = "3mo") -> dict[str, dict[str, float]]:
         res = httpx.get(url, headers={"User-Agent": UA}, timeout=60).json()["chart"]["result"][0]
         adj = res["indicators"]["adjclose"][0]["adjclose"]
         # 미국 종가 시각(UTC 20:00 무렵) → 그 거래일 날짜
+        out[sym] = {
+            datetime.fromtimestamp(t, UTC).strftime("%Y-%m-%d"): a
+            for t, a in zip(res["timestamp"], adj, strict=True)
+            if a
+        }
+        time.sleep(0.3)
+    return out
+
+
+def _prices_for(syms: tuple[str, ...], span: str) -> dict[str, dict[str, float]]:
+    import httpx
+
+    out: dict[str, dict[str, float]] = {}
+    for sym in syms:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={span}&interval=1d"
+        res = httpx.get(url, headers={"User-Agent": UA}, timeout=60).json()["chart"]["result"][0]
+        adj = res["indicators"]["adjclose"][0]["adjclose"]
         out[sym] = {
             datetime.fromtimestamp(t, UTC).strftime("%Y-%m-%d"): a
             for t, a in zip(res["timestamp"], adj, strict=True)
@@ -147,11 +179,42 @@ def _filled(
     return out
 
 
+def trend_on(closes: list[float]) -> bool | None:
+    """T 규칙: 마지막 종가가 20 · 60 · 120 거래일 전보다 높은 수 − 낮은 수 > 0.
+
+    이력 부족이면 None."""
+    if len(closes) < 121:
+        return None
+    last = closes[-1]
+    return sum((last > closes[-1 - k]) - (last < closes[-1 - k]) for k in (20, 60, 120)) > 0
+
+
+def trend3_targets(hist: dict[str, dict[str, float]], day: str) -> dict[str, float]:
+    """TRI3: 직전 달 말까지 종가로 종목마다 추세 판단.
+
+    꺼진 몫 · 이력 부족한 몫은 CASH."""
+    out: dict[str, float] = {}
+    for s in TREND_SYMS:
+        closes = [hist[s][d] for d in sorted(hist.get(s, {})) if d[:7] < day[:7]]
+        if trend_on(closes):
+            out[s] = 1 / 3
+    cash = 1 - sum(out.values())
+    if cash > 1e-12:
+        out["CASH"] = cash
+    return out
+
+
 def targets_for(
-    cfg: dict[str, Any], book: Book | None, qqq: dict[str, float], day: str
+    cfg: dict[str, Any],
+    book: Book | None,
+    qqq: dict[str, float],
+    day: str,
+    hist: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, float]:
     """182 장부: ``day`` 가 든 달 직전 달 말까지의 정보로 레버리지 몫을 정한다. 다른 장부는 고정."""
     rule = cfg.get("rule")
+    if rule == "TREND3":
+        return trend3_targets(hist or {}, day)
     if rule not in ("M2", "M3", "M3BG"):
         return dict(cfg["targets"])
     if rule == "M2":
@@ -171,6 +234,7 @@ def targets_for(
 
 def run() -> dict[str, Any]:
     px = _prices()
+    long_px = _prices_for(TREND_SYMS, "1y")
     ROOT.mkdir(parents=True, exist_ok=True)
     st = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {"books": {}}
     if "last_day" in st:  # 장부 하나 날짜 → 장부마다 날짜로 옮긴다(2026-10-09)
@@ -182,6 +246,9 @@ def run() -> dict[str, Any]:
     for name, cfg in BOOKS.items():
         syms = list(cfg["targets"])
         filled = _filled(px, syms, 7 if cfg["ccy"] == "KRW" else 21)
+        if cfg.get("rule") == "TREND3":  # 현금 칸 (가격 1)
+            for row in filled.values():
+                row["CASH"] = 1.0
         if not filled:
             continue
         share = None
@@ -191,18 +258,18 @@ def run() -> dict[str, Any]:
             share = raw.get("lev_share")
         else:
             start = min((d for d in filled if d >= FIRST_START), default=max(filled))
-            tg = targets_for(cfg, None, px[SIGNAL], start)
+            tg = targets_for(cfg, None, px[SIGNAL], start, long_px)
             book = open_book(cfg["capital"], tg, filled[start], cfg["cost"])
-            if "rule" in cfg:
+            if "TQQQ" in tg:
                 share = tg["TQQQ"]
             mark(book, start, filled[start])
             last_day = start
         for d in [d for d in sorted(filled) if d > last_day]:
             if new_month(last_day, d):
-                tg = targets_for(cfg, book, px[SIGNAL], d)
+                tg = targets_for(cfg, book, px[SIGNAL], d, long_px)
                 fee = rebalance(book, tg, filled[d], cfg["cost"])
                 rebal.append([d, name, round(fee, 4)])
-                if "rule" in cfg:
+                if "TQQQ" in tg:
                     share = tg["TQQQ"]
             mark(book, d, filled[d])
             last_day = d
@@ -211,7 +278,7 @@ def run() -> dict[str, Any]:
             "start": start,
             "last_day": last_day,
             "ccy": cfg["ccy"],
-            **({"lev_share": share} if "rule" in cfg else {}),
+            **({"lev_share": share} if share is not None else {}),
         }
     STATE.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
     report = _report(st, rebal)
