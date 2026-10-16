@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 💹 비중 0.3% · 10% · 💤 Vega 유동형 예치 (Claude)
+
+- [249](research/249-stock-size-with-stop3.md) −3% 손절 유지 · 비중만 5 ~ 25%: 미국 샤프 0.61 ~ 0.65(비중과 무관, 25 → 10% 면 손절 한 번 −0.88 → −0.36%), 국장 10% 가 최고(0.34). → 💹 규칙을 손절 한 번 0.3% · 한 종목 10% 로 바꿈(사용자).
+- Vega 남는 USDT 를 바이낸스 유동형(Simple Earn)에, 살 때 먼저 꺼냄(설정 `vega.earn` 켬).
+
 ## 2026-10-16 — 245 · 246 · 247 · 248 밤 연구 (Claude)
 
 - [246](research/246-kr-stop3-slow-exit-preregistration.md) 국장 '−3% + 느린 추세 꺾임' `NONE`: 샤프 0.25 → 0.24, 낙폭 72 → 61%. 💹 성적을 좌우하는 건 −3% 첫 손절 자체.

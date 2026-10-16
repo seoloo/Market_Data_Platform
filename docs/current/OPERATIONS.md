@@ -20,6 +20,7 @@
 - **정지 · 정리:** 텔레그램 '정리'(범위 버튼) · '정리 NVDA'(한 종목) · '정지풀기'. 그룹: vega · deneb ·
   acc · altair · stock. `python -m scripts.liquidate preview <범위|sym:종목>` 은 조회만.
 - **💤 Vega 유동형 예치(2026-10-17):** 설정 `vega.earn` 이 켜져 있으면 Vega 09:05 실행 · 입금 분배 뒤 남는 USDT(현물 20 남김)를 Simple Earn 유동형에 넣고, 살 때 · Altair 로 옮길 때 먼저 꺼낸다. 끄면 새로 넣지 않을 뿐 이미 넣은 돈은 현금으로 계속 세고 살 때 꺼낸다. 전부 꺼내기는 바이낸스 앱 Earn → 유동형 → 상환.
+- **💹 비중 (2026-10-17 사용자 '손절 −12만원이라 좀 큰데'):** 손절 한 번 계획 손실 = 기준 돈의 **0.3%**, 손절 −3% 그대로 → 한 종목 **10%**(상한도 10%, '그래도 매수' 최대도 10%). 상수 `ops/position_size.py` `RISK` · `CAP`. 이미 산 종목은 팔지 않는다.
 - **💹 개별주:** `/stock` → 종목 답장 → 추천 → [N주 매수] · [수량 바꾸기] · [그래도 매수] → 수량 답장 →
   [예약]. 장부 `data/size_guard/state.json`, 봇이 2 분마다 tick. 명령 `python -m scripts.size_guard
   advise|reserve|status|attach|release|cancel`.

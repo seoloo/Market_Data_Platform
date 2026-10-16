@@ -31,19 +31,20 @@ def test_base_excludes_deneb_dollars_and_stocks() -> None:
     assert m.base_krw(1_000.0, 2.0, 1_000.0, 3.0) == 1_000.0
 
 
-def test_cap_25_percent_binds_before_33() -> None:
+def test_weight_is_point3_over_3_equals_10_percent() -> None:
+    """2026-10-17 사용자: 손절 한 번 0.3% — 0.3% ÷ 3% = 10% (상한도 10%)."""
     a = m.recommend(_inp())
-    # 기준 1,000 만 + 2 만 달러 × 1,400 = 3,800 만 → 25% = 950 만 → $6,785.7 ÷ $100.50 = 67 주
-    assert a.ok and a.limit == 100.5 and a.qty == 67
-    assert 0.24 < a.weight <= 0.25
+    # 기준 1,000 만 + 2 만 달러 × 1,400 = 3,800 만 → 10% = 380 만 → $2,714.3 ÷ $100.50 = 27 주
+    assert a.ok and a.limit == 100.5 and a.qty == 27
+    assert 0.09 < a.weight <= 0.10
     assert a.stop == 97.48  # 100.50 × 0.97 = 97.485 → 내림
-    assert abs(a.risk_krw - 67 * (100.5 - 97.48) * 1_400) < 1
+    assert abs(a.risk_krw - 27 * (100.5 - 97.48) * 1_400) < 1
 
 
 def test_index_below_200d_halves() -> None:
     down = list(reversed(_up()))
     a = m.recommend(_inp(index_closes=down))
-    assert a.qty == 33 and any("절반" in x for x in a.lines)
+    assert a.qty == 13 and any("절반" in x for x in a.lines)
 
 
 def test_blocks_earnings_trend_and_strategy_symbols() -> None:
@@ -55,13 +56,13 @@ def test_blocks_earnings_trend_and_strategy_symbols() -> None:
 
 
 def test_dollars_short_reduces_quantity() -> None:
-    a = m.recommend(_inp(usd_cash=2_000.0, deneb_usd=500.0))
-    assert a.qty == 14 and any("모자라" in x for x in a.lines)  # $1,500 ÷ $100.50
+    a = m.recommend(_inp(usd_cash=1_000.0, deneb_usd=500.0))
+    assert a.qty == 4 and any("모자라" in x for x in a.lines)  # $500 ÷ $100.50
 
 
 def test_already_held_tops_up_only() -> None:
-    a = m.recommend(_inp(held_qty=50))
-    assert a.qty == 17  # 950 만 − 50 주 × $100 × 1,400 = 250 만 → $1,785.7 ÷ 100.5
+    a = m.recommend(_inp(held_qty=10))
+    assert a.qty == 17  # 380 만 − 10 주 × $100 × 1,400 = 240 만 → $1,714.3 ÷ 100.5
 
 
 def test_korean_stock_ticks_and_won() -> None:
@@ -69,7 +70,7 @@ def test_korean_stock_ticks_and_won() -> None:
         _inp(symbol="005930", name="삼성전자", price=71_200.0, krw_cash=20_000_000.0, usd_cash=0.0)
     )
     assert a.currency == "KRW" and a.limit == 71_600.0  # 71,556 → 100 원 단위 올림
-    assert a.qty == 69 and a.stop == 69_400.0  # 500 만 ÷ 71,600 · 69,452 → 내림
+    assert a.qty == 27 and a.stop == 69_400.0  # 200 만 ÷ 71,600 · 69,452 → 내림
     assert "⚠️ 실적 발표일 모름" not in a.lines  # 실적일을 줬으니
 
 
@@ -77,9 +78,9 @@ def test_round_price_and_text() -> None:
     assert m.round_price(0.12345, False, up=True) == 0.1235
     assert m.round_price(1999.0, True, up=False) == 1999.0
     text = m.advice_text(m.recommend(_inp()))
-    assert "추천: 25%" in text and "상한 25%" in text and "−3%" in text
+    assert "추천: 10%" in text and "기준의 0.3%" in text and "−3%" in text
     bad = m.advice_text(m.recommend(_inp(earnings_in_days=1)))
-    assert "⚠️ 규칙상 지금은 비추천" in bad and "참고: 조건이 맞았다면 25%" in bad
+    assert "⚠️ 규칙상 지금은 비추천" in bad and "참고: 조건이 맞았다면 10%" in bad
     none = m.recommend(_inp(earnings_date="", earnings_in_days=8))
     assert "✅ 실적 발표 조회 범위 내 명단에 없음 (확정 공시 보증 아님)" in none.lines
     down = m.recommend(_inp(closes=list(reversed(_up()))))
@@ -104,10 +105,10 @@ def test_unknown_inputs_fail_closed_and_warning_is_not_sizing() -> None:
 def test_max_qty_ignores_halving_but_keeps_cap_and_cash() -> None:
     down = list(reversed(_up()))
     a = m.recommend(_inp(index_closes=down))
-    assert a.ok and a.qty == 33 and a.max_qty == 67  # 추천은 절반, 사람이 정할 최대는 25% 상한
-    assert "추천 33주 · 최대 67주" in m.qty_prompt_text(a)
-    assert "추천(33주)보다 많아요" in m.confirm_text(a, 40)
-    assert "보다 많아요" not in m.confirm_text(a, 33)
+    assert a.ok and a.qty == 13 and a.max_qty == 27  # 추천은 절반, 사람이 정할 최대는 10% 상한
+    assert "추천 13주 · 최대 27주" in m.qty_prompt_text(a)
+    assert "추천(13주)보다 많아요" in m.confirm_text(a, 20)
+    assert "보다 많아요" not in m.confirm_text(a, 13)
     hard = m.recommend(_inp(symbol="TQQQ", blocked_symbol="Deneb"))
     assert not hard.can_override and hard.hard
     soft = m.recommend(_inp(earnings_in_days=2, earnings_date="2026-10-20"))

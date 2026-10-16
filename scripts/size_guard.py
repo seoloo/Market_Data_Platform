@@ -47,6 +47,7 @@ from auto_trading.ops.event_store import earnings_day
 from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.kr_accumulate import find, read_universe
 from auto_trading.ops.position_size import (
+    CAP,
     Advice,
     Inputs,
     advice_text,
@@ -602,7 +603,7 @@ def reserve(query: str, qty: int | None = None) -> str:
     """추천대로(``qty`` 없음) 또는 사람이 정한 수량으로 예약.
 
     ``qty`` 를 주면 규칙에 걸려도 예약한다('그래도 매수', 2026-10-16 사용자 승인) — 단 자동 전략
-    종목 · 돈 없음은 넘을 수 없고, 수량은 한 종목 25% · 현금 안(``max_qty``). 손절 −3% 는 그대로."""
+    종목 · 돈 없음은 넘을 수 없고, 수량은 한 종목 상한 · 현금 안(``max_qty``). 손절 −3% 그대로."""
     halt = halted_for(HALT, "stock")
     if halt:
         return f"⛔ 개별주 새 매수 정지 중 ({halt}) — 텔레그램 '정지풀기' 로 풀 수 있어요"
@@ -613,7 +614,7 @@ def reserve(query: str, qty: int | None = None) -> str:
         if not a.can_override:
             return text
         if not 1 <= qty <= a.max_qty:
-            return f"⚠️ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 25% · 현금)"
+            return f"⚠️ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 {CAP:.0%} · 현금)"
         override = not a.ok
         a.qty = qty
     elif not a.ok:

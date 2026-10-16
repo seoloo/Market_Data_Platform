@@ -3,8 +3,10 @@
 사용자 (2026-10-15): "이 종목을 현재 돈의 몇 퍼센트 비율로 구매하면 될지를 파악해서 추천" →
 기준 돈 = 토스 계좌의 원화 현금 + 달러 현금, 한 번에 잃어도 되는 돈 = 기준의 1%,
 손절 = 산 종목이 −3% 면 자동 매도, 한 종목 상한 25%, 매수는 봇 버튼 · 장 시작에.
+2026-10-17 사용자 "손절 −12만원이라 좀 큰데" → 한 번에 잃는 돈 **0.3%** · 한 종목 **10%**
+(연구 249).
 
-* 비중 = min(1% ÷ 3% = 33%, 상한 25%). 손절이 모든 종목 −3% 라 보통은 상한 25% 가 걸린다.
+* 비중 = min(0.3% ÷ 3% = 10%, 상한 10%). 손절 한 번 계획 손실 ≈ 기준 돈의 0.3%.
 * 지수(미국 SPY · 국내 KODEX 200)가 200 일선 아래면 절반 — 연구 237: 개별 주도주 규칙은
   시장 조건 없이 사면 하락장에 크게 잃었다.
 * 실적 발표가 3 거래일 안이면 사지 않는다(발표 갭은 −3% 손절로 못 막는다).
@@ -40,12 +42,12 @@ __all__ = [
     "trend_check",
 ]
 
-RISK = 0.01
-"""한 번에 잃어도 되는 돈 — 기준 돈의 1% (사용자)."""
+RISK = 0.003
+"""한 번에 잃어도 되는 돈 — 기준 돈의 0.3% (사용자 2026-10-17, 처음 1%)."""
 STOP = 0.03
 """손절 — 산 값보다 3% 아래 (사용자, 종목 기준)."""
-CAP = 0.25
-"""한 종목 상한 — 기준 돈의 25% (사용자 2026-10-15)."""
+CAP = 0.10
+"""한 종목 상한 — 기준 돈의 10% (사용자 2026-10-17, 처음 25% · 연구 249)."""
 EARN_BLOCK_DAYS = 3
 """실적 발표가 이 거래일 안이면 사지 않는다."""
 PRICE_BUFFER = 0.005
@@ -169,7 +171,7 @@ class Advice:
     """사지 않는 이유 — 비어 있어야 매수 버튼."""
     entry_session: str = ""
     max_qty: int = 0
-    """사람이 직접 정할 때의 최대 수량 — 한 종목 25% 상한 · 현금 (지수 절반 보정 전)."""
+    """사람이 직접 정할 때의 최대 수량 — 한 종목 상한(CAP) · 현금 (지수 절반 보정 전)."""
     hard: list[str] = field(default_factory=list)
     """'그래도 매수' 로도 넘을 수 없는 이유 (자동 전략 종목 · 돈 없음)."""
     fx: float = 1.0
@@ -247,7 +249,7 @@ def recommend(inp: Inputs) -> Advice:
     cap_qty = int(max(0.0, base * CAP - held_krw) / fx // limit) if limit > 0 else 0
     max_qty = min(cap_qty, can)
     if max_qty <= 0:
-        hard.append("살 수 있는 수량이 0 주 (현금 · 한 종목 25% 상한)")
+        hard.append(f"살 수 있는 수량이 0 주 (현금 · 한 종목 {CAP:.0%} 상한)")
     amount = qty * limit * fx
     if not kr and qty > 0:
         after = (inp.us_stock_krw + amount) / max(1.0, base + inp.us_stock_krw)
@@ -300,7 +302,11 @@ def advice_text(a: Advice) -> str:
         top = word + "\n" + "\n".join(f"• {b}" for b in a.blocked)
         if a.qty > 0:
             top += f"\n(참고: 조건이 맞았다면 {a.weight:.0%} · {_won(a.amount_krw)} · {a.qty}주)"
-    cap_note = f"(1% ÷ 3% = 33% 이지만 한 종목 상한 {CAP:.0%})" if RISK / STOP > CAP else ""
+    cap_note = (
+        f"({RISK:.1%} ÷ {STOP:.0%} = {RISK / STOP:.0%} 이지만 한 종목 상한 {CAP:.0%})"
+        if RISK / STOP > CAP + 1e-9
+        else ""
+    )
     body = [
         head,
         "",

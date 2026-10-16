@@ -108,11 +108,11 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
   정리 NVDA (또는 정리 삼성전자) — 그 종목 하나만 (Deneb · 적립 몫 빼고 전부)
 
 💹 개별주 NVDA (또는 개별주 삼성전자 · /stock)
-  얼마나 살지 추천: 현금(원화 + 달러)의 1% 까지만 잃게, 손절 −3% · 한 종목 최대 25%
+  얼마나 살지 추천: 현금(원화 + 달러)의 0.3% 까지만 잃게, 손절 −3% · 한 종목 최대 10%
   실적 3거래일 안 · 추세 아님 · 지수 200일선 아래(절반)면 안 사거나 줄여요
   → [🛒 N주 매수] 누르면 정규장 시작 직후 지정가로 사고, −3% 면 자동으로 팔아요
   → [✏️ 수량 바꾸기] · 규칙에 걸리면 [✏️ 그래도 매수] — 몇 주인지 답장 → [✅ 예약]
-     (한 종목 25% · 현금 안에서만, 손절 −3% 는 그대로)
+     (한 종목 10% · 현금 안에서만, 손절 −3% 는 그대로)
   메뉴(/stock)나 '개별주' 만 보내면 "어떤 종목을 살까요?" 라고 물어요 → 종목 이름으로 답장
   (예약 · 손절 중인 종목이 있으면 현황 + [손절 해제] 버튼도)
 
@@ -405,7 +405,7 @@ def _ask_qty(bot: TelegramNotifier, symbol: str) -> bool:
 
 def _confirm_qty(bot: TelegramNotifier, symbol: str, text: str) -> bool:
     """'5' · '5주' 답 → 마지막 확인 카드 + [✅ N주 예약] [취소]."""
-    from auto_trading.ops.position_size import confirm_text
+    from auto_trading.ops.position_size import CAP, confirm_text
     from scripts import size_guard as sg
 
     digits = text.strip().removesuffix("주").strip()
@@ -419,7 +419,7 @@ def _confirm_qty(bot: TelegramNotifier, symbol: str, text: str) -> bool:
         bot.send(f"⚠ {exc}")
         return False
     if not a.can_override or not 1 <= n <= a.max_qty:
-        bot.send(f"⚠ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 25% · 현금)")
+        bot.send(f"⚠ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 {CAP:.0%} · 현금)")
         return False
     nonce = STOCK_STORE.new_request(int(time.time() * 1000), "sko")
     rows = [
