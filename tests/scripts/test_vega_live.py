@@ -268,3 +268,40 @@ def test_altair_split_small_account_and_rejected(
     assert m.run_cmd() == 0  # 거부돼도 Vega 는 돈다
     outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
     assert "Altair 이체 거부" in outbox and "Universal Transfer" in outbox
+
+
+def test_deposit_check_splits_once_outside_quiet_window(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """저녁 입금 → 10 분 확인이 바로 Altair 몫을 옮기고, 다시 봐도 또 옮기지 않는다 (2026-10-16)."""
+    _db(env)
+    monkeypatch.setattr(m, "_split", _SPLIT)
+    monkeypatch.setattr(m, "ALTAIR_STATE", env / "data" / "altair_live" / "state.json")
+    fake = FakeBinance(Decimal(218))
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    m._save({"expected": {"USDT": "218"}, "units": "0.218", "peak": "1000"})
+    evening = NOW + 12 * 3_600_000  # 00:05 UTC + 12 시간 = 21:05 KST
+    assert m.deposit_check(evening) == []  # 입금 없음 — 조용히
+    fake.bal["USDT"] = Decimal("1705.10")  # 200 만 원 입금
+    alt = env / "data" / "altair_live" / "state.json"
+    alt.parent.mkdir(parents=True)
+    alt.write_text(json.dumps({"long_day": 1}), encoding="utf-8")
+    out = m.deposit_check(evening)
+    assert out[0].startswith("💰 입금 감지") and fake.moved == [Decimal("852.55")]
+    assert "long_day" not in json.loads(alt.read_text(encoding="utf-8"))  # Altair 바로 맞추기
+    assert m.deposit_check(evening + 600_000) == [] and fake.moved == [Decimal("852.55")]
+    fake.bal["USDT"] += Decimal(
+        500
+    )  # 같은 날 또 입금 → 그 500 만 새로 보고 모자란 Altair 몫을 채움
+    m.deposit_check(evening + 1_200_000)
+    assert fake.moved == [Decimal("852.55"), Decimal("250.00")]
+    quiet = NOW + 60_000  # 09:06 KST — Vega 실행이 나눈다
+    assert m.deposit_check(quiet, force=True) == ["09:05 Vega 실행 시간대라 그 실행이 나눠요"]
+
+
+def test_deposit_check_ignores_small_moves(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeBinance(Decimal(1010))  # 장부보다 10 USDT 많음 — 20 USDT 미만
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    m._save({"expected": {"USDT": "1000"}, "units": "1", "peak": "1000"})
+    out = m.deposit_check(NOW + 12 * 3_600_000, force=True)
+    assert out[0].startswith("새 입금 없음") and fake.moved == []

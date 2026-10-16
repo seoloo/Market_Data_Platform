@@ -138,6 +138,8 @@ LIQ_WORDS = frozenset({"정리", "/정리", "전부정리", "전부매도", "청
 """'전부 정리' 요청 (2026-10-11) — 미리 보기와 범위 버튼으로 답한다."""
 UNHALT_WORDS = frozenset({"정지풀기", "/정지풀기", "/unhalt"})
 PAPER_WORDS = frozenset({"paper", "/paper", "페이퍼", "/페이퍼", "가상장부"})
+DEPOSIT_WORDS = frozenset({"입금확인", "/입금확인", "/deposit", "deposit"})
+"""바이낸스 입금 바로 확인 · 분배 (2026-10-16) — '입금' 만은 Deneb 금액 답과 헷갈려 쓰지 않는다."""
 """Paper(가상 장부) 요약 (2026-10-15) — 봇 몫."""
 LIQ_DATA = ("liq:", "unh:")
 """정리 · 정지 풀기 버튼의 callback_data 머리."""
@@ -257,7 +259,7 @@ def is_command(msg: InboxMessage) -> bool:
     return (
         is_liquidation(msg)
         or is_stock(msg)
-        or (not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS)
+        or (not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS | DEPOSIT_WORDS)
     )
 
 

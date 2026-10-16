@@ -113,3 +113,10 @@ def test_liquidation_words_and_buttons_go_to_bot_not_deneb() -> None:
     assert is_liquidation(m(data="liq:ab12:all")) and is_command(m(data="unh:ab12:vega"))
     assert is_command(m("현황")) and not is_liquidation(m("현황"))
     assert not is_command(m("30만")) and not is_command(m(data="p1:all"))  # Deneb 몫
+
+
+def test_deposit_word_routes_to_bot() -> None:
+    from auto_trading.notify.inbox import InboxMessage, is_command
+
+    assert is_command(InboxMessage(1, 0, "입금확인")) and is_command(InboxMessage(1, 0, "/deposit"))
+    assert not is_command(InboxMessage(1, 0, "입금"))  # Deneb 금액 질문과 헷갈리지 않게

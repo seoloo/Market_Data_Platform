@@ -267,13 +267,19 @@ def _record(
     st["orders"].append(row)
 
 
-def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
+def _split(
+    c: BinanceSpotLive, st: dict[str, Any], now_ms: int, *, intent_ms: int | None = None
+) -> list[str]:
     """Altair 자동 분배 (사용자 2026-10-15): 새 입금에서 선물 몫이 모자라면 현물 → 선물로 옮긴다.
 
     판단은 :func:`auto_trading.ops.altair_split.move_amount`. 이체는 문서 53 규약(선기록 ·
     결과 모르면 재전송 안 함, :class:`WalletTransferManager`). 실패해도 Vega 실행은 계속한다.
     """
     dms, day = _decision(now_ms)
+    if (
+        intent_ms is not None
+    ):  # 입금 확인(10 분마다) — 같은 날 두 번째 입금도 따로 옮기게 분 단위 번호
+        dms = intent_ms
     cash, hold, prices = _snapshot(c)
     eq = equity(cash, hold, prices)
     exp = st.get("expected")
@@ -320,6 +326,83 @@ def _split(c: BinanceSpotLive, st: dict[str, Any], now_ms: int) -> list[str]:
             sub("키에 '내부 이체(Universal Transfer)' 권한이 필요해요"),
         ]
     return [f"⚠ Altair 이체 결과 모름 ({_usd(amount)}) — 다음 실행 때 이력으로 확인해요"]
+
+
+DEPOSIT_MIN = Decimal(20)
+"""이보다 작은 잔고 변화는 입금으로 보지 않는다(코인 값 변동 · 먼지)."""
+DEPOSIT_SHARE = Decimal("0.02")
+QUIET = ("08:55", "09:20")
+"""Vega 09:05 실행과 겹치지 않게 이 시간엔 입금 확인을 건너뛴다 (그 실행이 직접 나눈다)."""
+ALTAIR_STATE = REPO / "data" / "altair_live" / "state.json"
+
+
+def _kst_hm(now_ms: int) -> str:
+    return datetime.fromtimestamp(now_ms / 1000 + 9 * 3600, UTC).strftime("%H:%M")
+
+
+def deposit_check(now_ms: int | None = None, *, force: bool = False) -> list[str]:
+    """입금을 바로 나눈다 (사용자 2026-10-16 "altair는 실시간이 중요한데 9시에 한다는 건
+    말이 안된다").
+
+    현황 봇이 10 분마다 · 텔레그램 '입금확인' 때 부른다. Vega 장부의 '있어야 할 잔고' 보다
+    현물이 20 USDT(또는 2%) 넘게 늘었으면 입금으로 보고, 9 시 실행과 같은 규칙(:func:`_split`)으로
+    Altair 몫을 선물로 옮긴다. Vega 몫은 다음 09:05 에 산다. Altair 실거래가 켜져 있으면 다음
+    Altair 실행(5 분마다)이 오늘 목표 비중 그대로 늘어난 돈을 쓰도록 롱 맞추기를 다시 하게 한다."""
+    now_ms = now_ms or int(time.time() * 1000)
+    hm = _kst_hm(now_ms)
+    if QUIET[0] <= hm < QUIET[1]:
+        return ["09:05 Vega 실행 시간대라 그 실행이 나눠요"] if force else []
+    st = _load()
+    exp = st.get("expected")
+    if not exp:
+        return ["Vega 가 아직 한 번도 안 돌아 장부가 없어요"] if force else []
+    if halted_for(HALT, "vega"):
+        return ["Vega 정지 중이라 나누지 않아요"] if force else []
+    c = _client()
+    try:
+        if not c.trading_enabled:
+            return ["BINANCE_LIVE_TRADING_ENABLED 꺼짐 — 나누지 않아요"] if force else []
+        cash, hold, prices = _snapshot(c)
+        eq = equity(cash, hold, prices)
+        before = Decimal(exp.get(CASH, "0")) + sum(
+            (Decimal(exp.get(k, "0")) * prices[k] for k in COINS), Decimal(0)
+        )
+        exp_key = json.dumps(exp, sort_keys=True)
+        seen = st.get("deposit_seen") or {}
+        if seen.get("exp") == exp_key:  # 이 장부로 이미 처리한 입금 — 그 뒤 잔고부터 센다
+            before = max(before, Decimal(str(seen["eq"])))
+        new_money = eq - before
+        if new_money < max(DEPOSIT_MIN, eq * DEPOSIT_SHARE):
+            return [f"새 입금 없음 (현물 {_usd(eq)})"] if force else []
+        try:
+            lines = _split(c, st, now_ms, intent_ms=now_ms - now_ms % 60_000)
+        except (AutoTradingError, sqlite3.Error) as exc:
+            lines = [f"⚠ Altair 자동 분배 실패: {exc}"]
+        cash2, hold2, prices2 = _snapshot(c)
+        # Vega 09:05 실행이 장부(expected)를 새로 쓰기 전까지 이 잔고를 '처리한 입금' 으로 기억
+        st["deposit_seen"] = {"exp": exp_key, "eq": str(equity(cash2, hold2, prices2))}
+        _save(st)
+    finally:
+        c.close()
+    head = f"💰 입금 감지 약 {_usd(new_money)} (현물 {_usd(eq)})"
+    if not lines:
+        lines = ["Altair 몫은 이미 맞춰져 있어 옮길 게 없어요"]
+    elif any(x.startswith("☄️") for x in lines):
+        _altair_rebalance_now()
+        lines.append(sub("Vega 몫은 다음 09:05 에 규칙대로 사요"))
+    out = [head, *lines]
+    _notify("\n".join([f"🌌 [Vega · 입금 분배] {_kst_hm(now_ms)}", RULE, *out]))
+    return out
+
+
+def _altair_rebalance_now() -> None:
+    """Altair 실거래 장부의 '오늘 롱 맞춤 끝' 표시를 지워 다음 실행(5 분마다)이 다시 맞추게 한다."""
+    try:
+        st = json.loads(ALTAIR_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    st.pop("long_day", None)
+    ALTAIR_STATE.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def run_cmd() -> int:
@@ -468,9 +551,15 @@ def main(argv: list[str]) -> int:
         return run_cmd()
     if argv == ["status"]:
         return status_cmd()
+    if argv == ["deposit"]:
+        for line in deposit_check(force=True):
+            print(line)
+        return 0
     if len(argv) == 2 and argv[0] == "release-dd":
         return release_cmd(argv[1])
-    raise SystemExit("usage: python -m scripts.vega_live plan | run | status | release-dd 사유")
+    raise SystemExit(
+        "usage: python -m scripts.vega_live plan | run | status | deposit | release-dd 사유"
+    )
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
 from auto_trading.notify.heartbeat import beat_and_alert
 from auto_trading.notify.inbox import (
+    DEPOSIT_WORDS,
     HELP_WORDS,
     LIQ_WORDS,
     PAPER_WORDS,
@@ -114,6 +115,9 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
      (한 종목 25% · 현금 안에서만, 손절 −3% 는 그대로)
   메뉴(/stock)나 '개별주' 만 보내면 "어떤 종목을 살까요?" 라고 물어요 → 종목 이름으로 답장
   (예약 · 손절 중인 종목이 있으면 현황 + [손절 해제] 버튼도)
+
+💰 입금확인 (또는 /deposit)
+  바이낸스에 입금했으면 바로 Vega · Altair 로 나눠요 (안 보내도 10분마다 자동 확인)
 
 ▶ 정지풀기 (또는 /unhalt)
   정리 뒤 멈춘 그룹 다시 켜기 → 다음 실행부터 규칙대로 다시 사요
@@ -504,11 +508,18 @@ def run(root: Path = REPO) -> int:
     papers = [
         m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in PAPER_WORDS
     ]
+    deposits = [
+        m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in DEPOSIT_WORDS
+    ]
     stock_msgs = [m for m in cmds if is_stock(m)]
     status_cmds = [
         m
         for m in cmds
-        if not is_liquidation(m) and not is_stock(m) and m not in helps and m not in papers
+        if not is_liquidation(m)
+        and not is_stock(m)
+        and m not in helps
+        and m not in papers
+        and m not in deposits
     ]
     liq_msgs = [m for m in cmds if is_liquidation(m)]
     bot = TelegramNotifier(creds)
@@ -525,6 +536,9 @@ def run(root: Path = REPO) -> int:
             _liquidation(bot, liq_msgs, queue, inbox)
         if stock_msgs:
             _stock(bot, stock_msgs, queue, inbox)
+        if deposits:
+            bot.send("💰 바이낸스 입금 확인 중…")
+            _deposit_watch(root, force=True)
     finally:
         bot.close()
     _resume_liquidation()
@@ -534,6 +548,7 @@ def run(root: Path = REPO) -> int:
     _altair_demo(root)
     _paper_daily(root)
     _safety_daily()
+    _deposit_watch(root)
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
@@ -577,6 +592,37 @@ def _paper_daily(root: Path) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps({"sent": today}), encoding="utf-8")
     print("Paper 요약 보냄")
+
+
+DEPOSIT_EVERY_MS = 10 * 60_000
+
+
+def _deposit_watch(root: Path, *, force: bool = False) -> None:
+    """바이낸스 입금을 10 분마다(또는 '입금확인' 때 바로) 보고 Vega · Altair 로 나눈다."""
+    state = root / "data" / "vega" / "deposit_watch.json"
+    now = int(time.time() * 1000)
+    try:
+        last = int(json.loads(state.read_text(encoding="utf-8")).get("at", 0))
+    except (OSError, ValueError):
+        last = 0
+    if not force and now - last < DEPOSIT_EVERY_MS:
+        return
+    try:
+        from scripts import vega_live
+
+        out = vega_live.deposit_check(now, force=force)
+        if force and out and not out[0].startswith("💰"):
+            creds = load_telegram_credentials(root / ".env")
+            if creds is not None:
+                bot = TelegramNotifier(creds)
+                try:
+                    bot.send("💰 " + " · ".join(out))
+                finally:
+                    bot.close()
+    except Exception as exc:  # 입금 확인 문제로 봇을 멈추지 않는다
+        print(f"입금 확인 건너뜀: {type(exc).__name__}: {exc}")
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"at": now}), encoding="utf-8")
 
 
 def _safety_daily() -> None:
