@@ -6,6 +6,14 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-16 — 245 · 246 · 247 · 248 밤 연구 (Claude)
+
+- [246](research/246-kr-stop3-slow-exit-preregistration.md) 국장 '−3% + 느린 추세 꺾임' `NONE`: 샤프 0.25 → 0.24, 낙폭 72 → 61%. 💹 성적을 좌우하는 건 −3% 첫 손절 자체.
+- [245](research/245-leader-addon-rule-preregistration.md) 주도주 추가 매수 `NONE`: 국장 10% 한 번 0.15 vs 눌림 회복 추가 0.04 · +10% 추가 0.05. 미국 참고도 같음 — 추가 매수 시점의 우위 없음.
+- [247](research/247-kospi-panic-old-data-preregistration.md) 국장 공포 뒤 KOSPI 매수(안 본 1997 ~ 2006) `불명`: 22 번 +0.84% = 아무 날 +0.88%, 이긴 비율 45%.
+- [248](research/248-pead-survivorship-data-audit.md) 240 생존 편향 자료 감사 `DATA_INSUFFICIENT`: 빠진 종목 23% 만 자료 있음 → 241 Paper 로 판단.
+- 운영: 💹 이미 보유한 종목 추가 매수(합친 평균 −3% 손절) · 손절 알림에 손해 금액.
+
 ## 2026-10-16 — 244 국장 실적 갭 따라가기 `불리` (Claude)
 
 [244](research/244-kr-earnings-gap-drift-pead.md): 240(미국 `지지`)을 폐지 포함 국장 상위 200 · DART 잠정실적으로 재현 → 971 건 20 일 초과 −0.53% [−1.72, +0.50] `불리`(2017 년부터 −1.5%).
