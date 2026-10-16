@@ -145,6 +145,11 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         json.dumps({"symbol": "BTQ", "baseline_qty": 0.0, "last_qty": 1.0}), encoding="utf-8"
     )
     monkeypatch.setattr(liq, "_upbit", FakeUpbit)
+    # 바이낸스 현물(Vega) · 선물(Altair) · 개별주 장부도 반드시 가짜로 — 2026-10-16 이 시험이
+    # 진짜 바이낸스 클라이언트로 실계좌 Vega 코인을 팔았다(tests/conftest.py 참고).
+    monkeypatch.setattr(liq, "_binance", lambda: None)
+    monkeypatch.setattr(liq, "_futures", lambda: None)
+    monkeypatch.setattr(liq, "SIZE_STATE", tmp_path / "size_state.json")
     monkeypatch.setattr(liq, "_reader", FakeToss)
     monkeypatch.setattr(liq, "_trader", lambda held, syms: FakeToss())
     monkeypatch.setattr(liq, "_us_open", lambda r, now: FakeToss.open_session)
