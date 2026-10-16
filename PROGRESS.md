@@ -1,5 +1,12 @@
 # 작업 현황
 
+## 2026-10-16 — 242 💹 나가기 규칙 `NONE` · 243 Altair 숏 빈도 (Claude)
+
+- 사용자 "1번 5번 진행해줘"(트레이딩 아이디어 추천 중). 번호 241 은 다른 세션(PEAD Paper)이 써서 242 · 243.
+- [242](docs/research/242-stock-exit-rule-preregistration.md) 사전 등록 `bc6e56d` 뒤 1 회: 20 일선 · 3 ATR 따라 올림 · −3% + ATR 모두 S3 보다 크게 나쁨 → `NONE`. 💹 손절 규칙은 그대로 둔다. 다음 후보는 국장에서 '−3% + 느린 추세 꺾임'.
+- 부수 발견: 113 `leaders` 동점 순서가 해시 시드에 따라 달라 BASE 샤프가 0.87 ~ 0.90 으로 흔들림 — 판정 무관, 수정은 별도 작업(사용자 확인 뒤).
+- [243](docs/research/243-altair-short-frequency.md) 점검: 숏은 하락장에 몰려 나옴(90 일 넘게 없던 때 5 번). 10-29 판단에서 숏은 빼고, 실제 10 건 쌓이면 따로 보기를 제안.
+
 ## 2026-10-16 — 오르빗 소유자 전용 웹 배포 (Codex)
 
 - 사용자 Sites 진행 승인으로 시안 v2를 실제 별도 웹으로 구현·비공개 배포했다. 주소: https://orbit-investment-seolh.workspace-655977.chatgpt.site . project_id `appgprj_6ad219930e5c8191bbcc496e75c6850b`, 소스 `ce9bbee4dbe9bfb2a01e99a65679a1ec5b6785ae`, 배포 `appgdep_6ad223a987008191abcda621b2bf38f5` 성공. 기존 운영 Phase 6·연구 판정 불변이며 웹 작업은 매매 단계 진급이 아니다.

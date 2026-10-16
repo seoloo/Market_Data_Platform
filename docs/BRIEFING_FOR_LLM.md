@@ -6,6 +6,12 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-16 — 242 💹 나가기 규칙 `NONE` · 243 Altair 숏 빈도 (Claude)
+
+[242](research/242-stock-exit-rule-preregistration.md): 238 의 후속. 💹 크기(1% ÷ 손절 폭, 25% 상한)에 나가기만 20 일선 · 3 ATR 따라 올림 · −3% + ATR 로 바꿈.
+미국 샤프 S3 0.64 vs 0.24 · −0.01 · −0.12(1 년 34 ~ 52 매매) → `NONE`, 국장(폐지 포함)도 모두 약함. 주도주 수익은 '오래 들기' 에서 나오고 빠른 나가기는 그것을 자른다. 💹 은 지금 규칙 유지.
+[243](research/243-altair-short-frequency.md): 2020-06 ~ 2026-08 Altair 숏 148 건(1 년 23.7)이지만 75 달 중 35 달에 몰림, 90 일 넘게 숏 없던 때 5 번(최장 330 일). 10-29 에 숏 평가는 어려움 — 실제 10 건 쌓이면 본다.
+
 ## 2026-10-16 — 240 실적 갭 따라가기 `지지` · 239 H1 숏 지정가 `불명` · MF Paper TRI3 (Claude)
 
 [240](research/240-earnings-gap-drift-pead.md): S&P 500 504 종목, SEC 8-K 2.02 발표 시각 → 반응일 +5% · 거래량 2 배면 다음 날 시가 20 일 보유, SPY 대비 비용 뒤 +0.59% [+0.23, +0.94](3,946 건), 두 반쪽 + → 사전 규칙 `지지`. 대조와 평균 차이 작고 생존 편향 → Paper 후보, 실거래 근거 아님.
