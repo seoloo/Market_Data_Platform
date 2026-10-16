@@ -120,7 +120,7 @@ def update_nav(
         nav_before = base / units if base > 0 else float(st.get("nav_peak") or 1.0)
         units = max(0.0, units + total / nav_before)
     for _t, a, _i in new:
-        msgs.append(f"💵 선물 지갑 {'입금' if a > 0 else '출금'} {abs(a):,.2f} USDC — 손익 아님")
+        msgs.append(f"💵 선물 지갑 {'입금' if a > 0 else '출금'} {abs(a):,.2f} 달러 — 손익 아님")
     st["units"] = units
     st["flows_seen"] = [*seen, *(i for _t, _a, i in new)][-500:]
     if flows:
@@ -191,7 +191,7 @@ def tick(now_ms: int | None = None) -> list[str]:
             if bad:
                 _notify(f"{TITLE}\n⚠ 시작 안 함 — {bad}")
                 return [bad]
-            alert.append("🟢 실거래 시작 — 배율 5 · cross · USDC 선물 지갑만 장부")
+            alert.append("🟢 실거래 시작 — 배율 5 · cross · 다중 자산(선물 지갑 전체가 장부)")
         if not st.get("cross"):
             st["cross"] = core._ensure_cross(c)
         eq, _pos = core._equity(c, st)

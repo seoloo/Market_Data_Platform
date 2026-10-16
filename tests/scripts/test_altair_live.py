@@ -45,7 +45,7 @@ def test_deposits_are_units_not_profit() -> None:
     st: dict[str, Any] = {}
     nav, dd, msgs = m.update_nav(st, 2_000.0, [(1, 2_000.0, "a")])
     assert (nav, dd, st["units"]) == (1.0, 0.0, 2_000.0)  # 첫 입금은 시작 장부
-    assert msgs == ["💵 선물 지갑 입금 2,000.00 USDC — 손익 아님"]
+    assert msgs == ["💵 선물 지갑 입금 2,000.00 달러 — 손익 아님"]
     nav, dd, _ = m.update_nav(st, 2_200.0, [(1, 2_000.0, "a")])  # 같은 이체 다시 → 무시
     assert nav == pytest.approx(1.1) and dd == 0.0
     nav, dd, msgs = m.update_nav(st, 3_300.0, [(2, 1_100.0, "b")])  # +1,100 입금

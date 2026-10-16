@@ -6,7 +6,12 @@ from decimal import Decimal
 
 import pytest
 
-from auto_trading.execution.shadow_t2 import MUST_BE_OFF, book_slippage_bps, readiness_findings
+from auto_trading.execution.shadow_t2 import (
+    LIVE_ALLOWED,
+    MUST_BE_OFF,
+    book_slippage_bps,
+    readiness_findings,
+)
 
 ASKS = [(Decimal(101), Decimal(1)), (Decimal(102), Decimal(1)), (Decimal(104), Decimal(10))]
 MID = Decimal(100)
@@ -47,9 +52,12 @@ class TestReadiness:
     def test_ready_account_has_no_findings(self) -> None:
         assert findings() == []
 
-    def test_trading_permission_before_phase8_is_critical(self) -> None:
-        out = findings(restrictions={**READ_ONLY, "enableSpotAndMarginTrading": True})
-        assert out[0][0] == "CRITICAL" and "enableSpotAndMarginTrading" in out[0][1]
+    def test_live_trading_permissions_are_expected_but_withdrawal_is_critical(self) -> None:
+        """실거래 승인 뒤(Vega 10-15 · Altair 10-16): 현물 · 선물 거래 · 범용 이체는 정상."""
+        live = {**READ_ONLY, **dict.fromkeys(LIVE_ALLOWED, True)}
+        assert findings(restrictions=live) == []
+        out = findings(restrictions={**live, "enableWithdrawals": True})
+        assert out[0][0] == "CRITICAL" and "enableWithdrawals" in out[0][1]
 
     def test_missing_ip_restriction_is_critical(self) -> None:
         assert ("CRITICAL", "키에 IP 제한이 없음") in findings(

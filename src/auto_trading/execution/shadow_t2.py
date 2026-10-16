@@ -19,15 +19,21 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-__all__ = ["MUST_BE_OFF", "ShadowFinding", "book_slippage_bps", "readiness_findings"]
+__all__ = [
+    "LIVE_ALLOWED",
+    "MUST_BE_OFF",
+    "ShadowFinding",
+    "book_slippage_bps",
+    "readiness_findings",
+]
 
+LIVE_ALLOWED = ("enableSpotAndMarginTrading", "enableFutures", "permitsUniversalTransfer")
+"""실거래(Vega 2026-10-15 · Altair 2026-10-16 사용자 승인)에 필요한 권한 — 켜져 있어도 정상.
+예전(Phase 8 승인 전)엔 이것도 꺼져 있어야 했다."""
 MUST_BE_OFF = (
-    "enableSpotAndMarginTrading",
     "enableWithdrawals",
-    "enableFutures",
     "enableMargin",
     "enableInternalTransfer",
-    "permitsUniversalTransfer",
     "enableVanillaOptions",
     "enablePortfolioMarginTrading",
 )
@@ -107,9 +113,7 @@ def readiness_findings(
         risky = sorted(k for k in MUST_BE_OFF if restrictions.get(k))
         if risky:
             out.append(
-                ShadowFinding(
-                    "CRITICAL", f"Phase 8 승인 전인데 키에 읽기 외 권한이 켜져 있음: {risky}"
-                )
+                ShadowFinding("CRITICAL", f"실계좌 키에 쓰지 않는 위험 권한이 켜져 있음: {risky}")
             )
         if not restrictions.get("ipRestrict"):
             out.append(ShadowFinding("CRITICAL", "키에 IP 제한이 없음"))

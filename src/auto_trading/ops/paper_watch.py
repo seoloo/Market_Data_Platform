@@ -286,8 +286,9 @@ def check_shadow(report: Mapping[str, Any] | None, now_ms: int) -> tuple[list[st
     """T/v2 실거래 그림자 운영 보고서(최신 1개)로 한 줄 요약과 판정 (docs/research/51).
 
     그림자 운영은 주문을 보내지 않으므로 대부분 **WARN 까지만** 올린다.
-    다만 Phase 8 승인 전 실계좌 키에 읽기 외 권한이 켜졌거나 IP 제한이 없으면
-    보고서의 CRITICAL 을 그대로 올린다(보안 문제).
+    다만 실계좌 키에 쓰지 않는 위험 권한(출금 등)이 켜졌거나 IP 제한이 없으면
+    보고서의 CRITICAL 을 그대로 올린다(보안 문제). 현물 · 선물 거래 · 범용 이체는
+    실거래(2026-10-15 · 16 승인)에 필요해 정상으로 본다.
     """
     ledger = "그림자"
     if report is None:
