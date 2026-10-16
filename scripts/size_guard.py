@@ -31,10 +31,15 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from auto_trading.config.secrets import load_telegram_credentials, load_toss_credentials
+from auto_trading.config.secrets import (
+    load_telegram_credentials,
+    load_toss_credentials,
+    read_env_file,
+)
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.exchange.toss import TossReader, TossTokenCache, TossTrader
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
+from auto_trading.ops import kr_earnings
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.entry_events import EntryEvents, company_events, macro_events
 from auto_trading.ops.event_store import earnings_day
@@ -214,12 +219,21 @@ def event_risk(reader: TossReader, symbol: str, now_ms: int, *, force: bool = Fa
     kr = is_kr(symbol)
     try:
         days = _session_days(reader, kr, now_ms)
-        if kr:
+        if kr:  # 국내 — DART 공시로 실적 일정 (2026-10-16, ops/kr_earnings)
+            key = read_env_file(REPO / ".env").get("OPENDART_API_KEY", "")
+            if not key:
+                raise ValueError("OPENDART_API_KEY 없음")
+            info = kr_earnings.lookup(REPO, symbol, days[0], key)
+            evidence_kr = {
+                "kr_earnings": {
+                    "kind": info.kind,
+                    "day": str(info.day) if info.day else "",
+                    "last_release": str(info.last_release) if info.last_release else "",
+                },
+                "sessions": [str(d) for d in days],
+            }
             return _record_event_check(
-                symbol,
-                now_ms,
-                EntryEvents(("국내 실적 일정 원천 미확보 — 신규 매수 보류",), entry_day=days[0]),
-                {},
+                symbol, now_ms, kr_earnings.kr_company_events(info, days), evidence_kr
             )
         raw = yaml.safe_load((REPO / "config" / "event_calendar.yaml").read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
