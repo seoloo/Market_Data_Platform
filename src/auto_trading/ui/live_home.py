@@ -28,6 +28,8 @@ SHOW_UPBIT = False
 지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
 """바이낸스 Vega 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
 DENEB_TICKERS = ("TQQQ", "SCHD")
+DUST_KRW = 1_000.0
+"""이보다 작은 코인 잔고는 보유로 보이지 않는다 (매도 뒤 남는 먼지)."""
 _SKIP = frozenset({"M3", "QS_SWITCH"})
 """data/toss 안에서 적립 장부가 아닌 파일 (Deneb 은 따로, QS_SWITCH 는 Paper)."""
 _TTL_S = 60.0
@@ -493,6 +495,8 @@ def vega_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
         if n <= 0:
             continue
         usd = q.usd.get(VEGA_USD[coin])
+        if usd is not None and fx is not None and n * usd * fx < DUST_KRW:
+            continue  # 팔고 남은 먼지(2026-10-16 사용자: 보유 코인이 없는데 있다고 나옴)
         w = _f((sig.get(coin) or {}).get("weight"))
         holdings.append(
             Holding(
@@ -605,6 +609,7 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     activity: list[tuple[str, str]] = []
     trades: list[Trade] = []
     total_cost = 0.0
+    sold: list[str] = []
     for st in states:
         sym = str(st.get("symbol"))
         buys = [b for b in st.get("buys") or [] if isinstance(b, dict)]
@@ -661,6 +666,10 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
             )
         n = _f(st.get("last_qty"))
         if n <= 0:
+            # 다 팔린 장부 — 산 원가를 '넣은 돈' 에서 빼 가짜 손실이 안 보이게 (2026-10-16)
+            if buys:
+                total_cost -= cost
+                sold.append(sym)
             continue
         price = q.usd.get(sym)
         bought = sum(_f(b.get("qty")) for b in buys)
@@ -682,7 +691,10 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         total_cost,
         0.0,
         tuple(holdings),
-        ("입금 = 산 원가 (적립은 따로 입금 기록이 없다)",),
+        (
+            "입금 = 산 원가 (적립은 따로 입금 기록이 없다)",
+            *([f"다 판 종목 {', '.join(sold)} — 원가에서 뺌 (판 돈은 토스 현금)"] if sold else []),
+        ),
         (),
         tuple(activity),
         tuple(trades),
