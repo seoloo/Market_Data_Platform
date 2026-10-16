@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from auto_trading.config.secrets import BinanceCredentials
-from auto_trading.core.errors import ConfigError
+from auto_trading.core.errors import ConfigError, ExchangeError
 from auto_trading.core.types import Candle
 from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
 from auto_trading.exchange.spot import OrderStatus, SpotFilters, SpotOrderResult
@@ -404,3 +404,25 @@ def test_earn_client_needs_enable_flag_and_redeems_to_spot() -> None:
     assert c.earn_redeem("USDT") == "9"
     q = seen[-1].url.params
     assert seen[-1].method == "POST" and q["redeemAll"] == "true" and q["destAccount"] == "SPOT"
+
+
+def test_redeem_waits_until_earn_balance_catches_up(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """유동형 잔고 조회가 늦으면 기다리고, 끝내 안 맞으면 장부를 쓰지 않고 멈춘다."""
+    fake = FakeBinance(Decimal(10))
+    fake.earn = Decimal(500)
+    lag = {"n": 2}
+    real = fake.earn_balance
+
+    def slow(asset: str = "USDT") -> Decimal:
+        if fake.earn_log and lag["n"] > 0:
+            lag["n"] -= 1
+            return Decimal(500)  # 아직 옛 값
+        return real(asset)
+
+    monkeypatch.setattr(fake, "earn_balance", slow)
+    assert m._ensure_spot(fake, Decimal(100)) == ["💤 유동형에서 110.00 USDT 꺼냄 (살 돈)"]  # type: ignore[arg-type]
+    lag["n"] = 10**6
+    with pytest.raises(ExchangeError):
+        m._ensure_spot(fake, Decimal(400))  # type: ignore[arg-type]

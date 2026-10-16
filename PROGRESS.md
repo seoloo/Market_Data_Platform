@@ -1,5 +1,11 @@
 # 작업 현황
 
+## 2026-10-17 — 💤 Vega 남는 USDT 유동형 예치 (Claude)
+
+- 사용자 "1번" → 설계 승인 "그렇게 진행해". 조회: Vega 현물 852.33 USDT 대기, USDT 유동형 연 2.53% + 첫 500 USDT 보너스 4%, 키 현물 거래 · 범용 이체 켜짐 · 출금 꺼짐.
+- `BinanceSpotLive.earn_product · earn_balance · earn_subscribe · earn_redeem`(주문 허용일 때만). `vega_live`: 현금 = 현물 + 유동형(`_snapshot`), `_ensure_spot`(살 때 · Altair 분배 전 꺼냄, 현물 20 남김, 현물 · 유동형 잔고가 둘 다 맞을 때까지 최대 1 분, 아니면 멈춤), `_sweep`(실행 · 입금 분배 뒤 예치). 장부(expected)는 예치 전 합계.
+- 실계좌 1 USDT 넣기 → 꺼내기 시험 성공(07:05). 꺼낸 직후 유동형 잔고 조회가 몇 초 늦게 줄어드는 것을 보고 기다리기를 더함. 설정 `vega.earn` 켬 — 첫 예치는 오늘 09:05 Vega 실행 뒤.
+
 ## 2026-10-16 — 밤 연구 245 ~ 248 · 💹 손절 알림 손해 금액 (Claude)
 
 - 사용자 "걍 다해줘"(추천 넷). 246 `NONE` · 245 `NONE` · 247 `불명` · 248 `DATA_INSUFFICIENT` — 각 문서 · RESEARCH_HISTORY.

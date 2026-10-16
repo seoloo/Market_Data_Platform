@@ -154,11 +154,15 @@ def _ensure_spot(c: BinanceSpotLive, need: Decimal) -> list[str]:
     every = amount >= earn
     c.earn_redeem(CASH, None if every else amount)
     got = earn if every else amount
-    for _ in range(20):  # 유동형은 보통 바로 들어온다 — 10 초까지 기다린다
-        if _spot_cash(c) >= spot + got - Decimal("0.01"):
-            break
-        time.sleep(0.5)
-    return [f"💤 유동형에서 {_usd(got)} 꺼냄 (살 돈)"]
+    # 현물은 바로 늘지만 유동형 잔고 조회는 몇 초 늦다(2026-10-17 1 USDT 시험) — 둘 다 맞을 때까지
+    # 기다린다. 안 맞은 채 장부를 쓰면 같은 돈을 두 번 센다.
+    for _ in range(60):
+        if _spot_cash(c) >= spot + got - Decimal("0.01") and _earn(c) <= earn - got + Decimal(
+            "0.01"
+        ):
+            return [f"💤 유동형에서 {_usd(got)} 꺼냄 (살 돈)"]
+        time.sleep(1)
+    raise ExchangeError(f"유동형 {_usd(got)} 꺼냄이 1 분 안에 잔고에 안 잡힘 — 이번 실행 멈춤")
 
 
 def _sweep(c: BinanceSpotLive, *, halted: bool) -> list[str]:
@@ -174,10 +178,10 @@ def _sweep(c: BinanceSpotLive, *, halted: bool) -> list[str]:
         c.earn_subscribe(CASH, amount)
     except AutoTradingError as exc:
         return [f"⚠ 유동형 예치 실패 — 현물에 그대로 둠 ({exc})"]
-    for _ in range(20):  # 장부가 '돈이 사라졌다' 고 보지 않게 예치가 잡힐 때까지 기다린다
+    for _ in range(60):  # 장부가 '돈이 사라졌다' 고 보지 않게 예치가 잡힐 때까지 기다린다
         if _earn(c) >= before + amount - Decimal("0.01"):
             break
-        time.sleep(0.5)
+        time.sleep(1)
     return [f"💤 남는 {_usd(amount)} 유동형에 넣음 (현물에 {_usd(spot - amount)} 남김)"]
 
 
