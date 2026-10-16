@@ -456,6 +456,8 @@ def _size_guard(root: Path) -> None:
             done = sg.tick()
         if done:
             print(f"개별주: {len(done)} 건 알림")
+        if sg.monthly_review():
+            print("개별주 월간 복기 보냄")
     except SystemExit:
         print("개별주: 다른 실행 중 — 다음에")
     except Exception as exc:  # 개별주 문제로 봇을 멈추지 않는다

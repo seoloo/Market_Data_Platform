@@ -6,6 +6,7 @@
     python -m scripts.size_guard reserve NVDA      # 추천대로 예약 → 정규장 시작 직후 지정가 매수
     python -m scripts.size_guard tick              # 2 분마다: 예약 매수 · 손절 감시 (텔레그램 알림)
     python -m scripts.size_guard status
+    python -m scripts.size_guard review [YYYY-MM]  # 💹 월간 복기 (기본 이번 달)
     python -m scripts.size_guard attach 삼성전자    # 앱에서 산 종목에 손절만 (토스 평균 단가 −3%)
     python -m scripts.size_guard release <id>       # 손절 해제 (장부에서 빼고 주식은 그대로)
     python -m scripts.size_guard cancel <id>        # 아직 안 산 예약 취소
@@ -58,6 +59,9 @@ from auto_trading.ops.stop_guard import check_stop, register_app, status_lines, 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "size_guard"
 STATE = DATA / "state.json"
+JOURNAL = DATA / "journal.jsonl"
+"""추천 기록 (월간 복기용, ops/stock_journal)."""
+REVIEW = DATA / "review.json"
 LOCK = DATA / "lock"
 OUTBOX = REPO / "reports" / "size_guard" / "outbox.log"
 TOKEN = REPO / "data" / "toss_token.json"
@@ -340,9 +344,93 @@ def advise(query: str) -> Advice:
     symbol, name = resolve(query)
     reader = _reader()
     try:
-        return _advise(reader, symbol, name, _now_ms())
+        a = _advise(reader, symbol, name, _now_ms())
     finally:
         reader.close()
+    _journal(a)
+    return a
+
+
+def _journal(a: Advice) -> None:
+    """추천 한 번을 기록 (실패해도 추천은 그대로)."""
+    row = {
+        "at": _now_ms(),
+        "symbol": a.symbol,
+        "name": a.name,
+        "ok": a.ok,
+        "can_override": a.can_override,
+        "qty": a.qty,
+        "price": a.price,
+        "blocked": list(a.blocked),
+    }
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        with JOURNAL.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        print(f"추천 기록 실패: {exc}")
+
+
+def load_journal() -> list[dict[str, Any]]:
+    try:
+        lines = JOURNAL.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def review(month: str | None = None) -> str:
+    """그 달(기본 이번 달) 💹 복기 글."""
+    from auto_trading.ops.stock_journal import month_of, review_text
+
+    month = month or month_of(_now_ms())
+    tickets = load_tickets()
+    last: dict[str, float] = {}
+    held = sorted({t.symbol for t in tickets if t.status in ("holding", "selling")})
+    if held:
+        try:
+            reader = _reader()
+            try:
+                last = {s: float(v) for s, v in reader.prices(held).items()}
+            finally:
+                reader.close()
+        except Exception as exc:  # 시세 없이도 복기는 보낸다
+            print(f"복기 시세 건너뜀: {type(exc).__name__}")
+    return review_text(month, load_journal(), tickets, last)
+
+
+def monthly_review(now_ms: int | None = None, *, send: bool = True) -> str | None:
+    """매달 1 일 09:30 KST 뒤 한 번 — 지난달 복기 (추천 · 매수가 없던 달은 안 보냄)."""
+    from datetime import timedelta as _td
+
+    now_ms = now_ms or _now_ms()
+    k = datetime.fromtimestamp(now_ms / 1000, KST)
+    if k.day != 1 or (k.hour, k.minute) < (9, 30):
+        return None
+    prev = (k.replace(day=1) - _td(days=1)).strftime("%Y-%m")
+    try:
+        done = json.loads(REVIEW.read_text(encoding="utf-8")).get("sent")
+    except (OSError, ValueError):
+        done = None
+    if done == prev:
+        return None
+    from auto_trading.ops.stock_journal import month_of
+
+    active = any(month_of(int(r["at"])) == prev for r in load_journal()) or any(
+        month_of(int(t.created_ms)) == prev for t in load_tickets()
+    )
+    text = review(prev) if active else None
+    if text and send:
+        notify([text])
+    DATA.mkdir(parents=True, exist_ok=True)
+    REVIEW.write_text(json.dumps({"sent": prev}), encoding="utf-8")
+    return text
 
 
 def _advise(
@@ -631,6 +719,8 @@ def main(argv: list[str]) -> int:
                 print(line)
     elif cmd == "status":
         print(status())
+    elif cmd == "review":
+        print(review(rest[0] if rest else None))
     elif cmd == "attach" and rest:
         qty = float(rest[1]) if len(rest) > 1 else None
         print(attach(rest[0], qty))
