@@ -437,12 +437,19 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                                 pending = any(not o.closed for o in t.buys)
                                 if pending:
                                     risk = event_risk(reader, t.symbol, now, force=True)
-                                    if not risk.ok:
+                                    if not risk.ok and not t.override:
                                         block = " · ".join(risk.blocked)
                                 else:
                                     fresh = _advise(reader, t.symbol, t.name, now, force=True)
                                     rem = t.qty - int(sum(o.filled for o in t.buys))
-                                    if not fresh.ok:
+                                    if t.override:  # 사람이 정한 매수 — 넘을 수 없는 이유만
+                                        if fresh.hard:
+                                            block = " · ".join(fresh.hard)
+                                        elif rem > fresh.max_qty:
+                                            block = (
+                                                "다시 확인한 최대 수량보다 많음 — 새로 정해 주세요"
+                                            )
+                                    elif not fresh.ok:
                                         block = " · ".join(fresh.blocked)
                                     elif rem > fresh.qty:
                                         block = "다시 확인한 수량 상한 감소 — 새 추천 필요"
@@ -478,23 +485,42 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
     return out
 
 
-def reserve(query: str) -> str:
+def reserve(query: str, qty: int | None = None) -> str:
+    """추천대로(``qty`` 없음) 또는 사람이 정한 수량으로 예약.
+
+    ``qty`` 를 주면 규칙에 걸려도 예약한다('그래도 매수', 2026-10-16 사용자 승인) — 단 자동 전략
+    종목 · 돈 없음은 넘을 수 없고, 수량은 한 종목 25% · 현금 안(``max_qty``). 손절 −3% 는 그대로."""
     halt = halted_for(HALT, "stock")
     if halt:
         return f"⛔ 개별주 새 매수 정지 중 ({halt}) — 텔레그램 '정지풀기' 로 풀 수 있어요"
     a = advise(query)
     text = advice_text(a)
-    if not a.ok:
+    override = False
+    if qty is not None:
+        if not a.can_override:
+            return text
+        if not 1 <= qty <= a.max_qty:
+            return f"⚠️ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 25% · 현금)"
+        override = not a.ok
+        a.qty = qty
+    elif not a.ok:
         return text
     now = _now_ms()
     with _Lock():
         tickets = load_tickets()
         if any(t.active and t.symbol == a.symbol for t in tickets):
             return text + f"\n\n⚠️ {a.symbol} 는 이미 예약 · 감시 중이라 새로 예약하지 않았어요"
-        tickets.append(new_ticket(a, now, _tid(now)))
+        ticket = new_ticket(a, now, _tid(now))
+        ticket.override = override
+        if override:
+            ticket.note = "규칙 밖 매수: " + " · ".join(a.blocked)
+        tickets.append(ticket)
         save_tickets(tickets)
         msgs = tick(now)
     head = "⏳ 예약했어요 — 정규장 시작 직후(장중이면 바로) 지정가로 삽니다"
+    if qty is not None:
+        tag = " (규칙 밖 매수 — 기록에 따로 표시)" if override else ""
+        return "\n\n".join([f"⏳ {a.name} {qty}주 예약했어요{tag}", head, *msgs])
     return "\n\n".join([text, head, *msgs])
 
 

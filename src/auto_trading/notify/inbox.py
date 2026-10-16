@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -142,8 +143,8 @@ LIQ_DATA = ("liq:", "unh:")
 """정리 · 정지 풀기 버튼의 callback_data 머리."""
 STOCK_PREFIXES = ("개별주", "/개별주", "/stock", "비중", "/비중")
 """개별주 비중 추천 (2026-10-16) — '개별주 NVDA' 처럼 앞에 붙인다(종목만 보내면 Deneb 대화 몫)."""
-STOCK_DATA = ("stk:", "stkr:")
-"""개별주 [이대로 매수] · [손절 해제] 버튼의 callback_data 머리."""
+STOCK_DATA = ("stk:", "stkr:", "stq:", "sko:")
+"""개별주 버튼 머리 — 매수 · 손절 해제 · 수량 입력 · 수량 확인."""
 
 
 def _word(msg: InboxMessage) -> str:
@@ -178,17 +179,32 @@ def stock_ask_path() -> Path:
 
 def stock_ask(path: Path | None = None) -> tuple[int, int] | None:
     """(질문 메시지 번호, 물은 시각 유닉스 초). 없으면 None."""
+    d = stock_ask_info(path)
+    return (int(d["message_id"]), int(d["at"])) if d else None
+
+
+def stock_ask_info(path: Path | None = None) -> dict[str, Any] | None:
+    """질문 기록 전부 — ``kind`` 'symbol'(어떤 종목?) · 'qty'(몇 주?, ``symbol`` 함께)."""
     try:
         d = json.loads((path or stock_ask_path()).read_text(encoding="utf-8"))
-        return int(d["message_id"]), int(d["at"])
+        int(d["message_id"]), int(d["at"])
     except (OSError, ValueError, KeyError, TypeError):
         return None
+    return dict(d) if isinstance(d, dict) else None
 
 
-def set_stock_ask(message_id: int, at_s: int, path: Path | None = None) -> None:
+def set_stock_ask(
+    message_id: int,
+    at_s: int,
+    path: Path | None = None,
+    *,
+    kind: str = "symbol",
+    symbol: str = "",
+) -> None:
     p = path or stock_ask_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"message_id": message_id, "at": at_s}), encoding="utf-8")
+    d = {"message_id": message_id, "at": at_s, "kind": kind, "symbol": symbol}
+    p.write_text(json.dumps(d), encoding="utf-8")
 
 
 def clear_stock_ask(path: Path | None = None) -> None:
@@ -210,6 +226,9 @@ def is_stock_answer(msg: InboxMessage, path: Path | None = None) -> bool:
         return False
     if msg.reply_to:
         return msg.reply_to == mid
+    if (stock_ask_info(path) or {}).get("kind") == "qty":
+        # '몇 주?' 답은 숫자라 Deneb 금액과 헷갈린다 — 답장이거나 '5주' 처럼 '주' 를 붙였을 때만
+        return re.fullmatch(r"\d{1,6}\s*주", msg.text.strip()) is not None
     t = msg.text.strip()
     others = COMMANDS | HELP_WORDS | PAPER_WORDS | LIQ_WORDS | UNHALT_WORDS
     return (

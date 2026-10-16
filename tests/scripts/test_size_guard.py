@@ -91,3 +91,44 @@ def test_tick_without_active_tickets_does_not_call_toss(
     m.save_tickets([t])
     assert m.tick(send=False) == []
     assert m.load_tickets() == [t]
+
+
+def test_reserve_with_qty_overrides_soft_rules_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from auto_trading.ops.position_size import Advice
+
+    def advice(blocked: list[str], hard: list[str], max_qty: int) -> Advice:
+        return Advice(
+            symbol="005930",
+            name="삼성전자",
+            currency="KRW",
+            price=214_000.0,
+            base_krw=16_000_000.0,
+            weight=0.12,
+            limit=215_000.0,
+            qty=9,
+            amount_krw=1_935_000.0,
+            stop=208_500.0,
+            risk_krw=58_000.0,
+            blocked=blocked,
+            hard=hard,
+            max_qty=max_qty,
+        )
+
+    monkeypatch.setattr(m, "DATA", tmp_path)
+    monkeypatch.setattr(m, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(m, "LOCK", tmp_path / "lock")
+    monkeypatch.setattr(m, "halted_for", lambda *_: None)
+    monkeypatch.setattr(m, "tick", lambda now=None, **_: [])
+    soft = advice(["추세 아님"], [], 19)
+    monkeypatch.setattr(m, "advise", lambda q: soft)
+    assert "1 ~ 19주만" in m.reserve("삼성전자", qty=20)
+    assert m.load_tickets() == []
+    out = m.reserve("삼성전자", qty=5)
+    t = m.load_tickets()[0]
+    assert (t.qty, t.override) == (5, True) and "규칙 밖 매수" in t.note
+    assert "5주 예약했어요" in out and "규칙 밖" in out
+    assert "비추천" in m.reserve("삼성전자")  # 수량 없이(추천대로)는 규칙에 걸리면 안 삼
+    monkeypatch.setattr(m, "advise", lambda q: advice(["Deneb 종목"], ["Deneb 종목"], 0))
+    assert "예약했어요" not in m.reserve("TQQQ", qty=1)

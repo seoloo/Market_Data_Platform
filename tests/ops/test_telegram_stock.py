@@ -18,7 +18,7 @@ from scripts import telegram_bot as tb
 from tests.ops.test_telegram_liquidation import FakeBot
 
 
-def _advice(ok: bool = True) -> Advice:
+def _advice(ok: bool = True, max_qty: int = 0) -> Advice:
     return Advice(
         symbol="NVDA",
         name="엔비디아",
@@ -33,6 +33,8 @@ def _advice(ok: bool = True) -> Advice:
         risk_krw=70_000.0,
         lines=["✅ 추세 좋음"],
         blocked=[] if ok else ["추세 아님 — 50일선 아래 (-2.9%)"],
+        max_qty=max_qty,
+        fx=1_400.0,
     )
 
 
@@ -46,16 +48,19 @@ def ask_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.fixture
 def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
-    calls: dict[str, list[Any]] = {"reserve": [], "release": [], "advise": []}
+    calls: dict[str, list[Any]] = {"reserve": [], "release": [], "advise": [], "soft": []}
     monkeypatch.setattr(tb, "STOCK_STORE", Store(tmp_path / "tg"))
     monkeypatch.setattr(user_settings, "get", lambda root, key: True)
 
     def advise(q: str) -> Advice:
         calls["advise"].append(q)
-        return _advice(ok=q != "BAD")
+        if q == "SOFT":  # 이 뒤로는 같은 종목(NVDA)도 규칙에 걸린 것으로
+            calls["soft"].append(1)
+        soft = q == "SOFT" or bool(calls["soft"])
+        return _advice(ok=q != "BAD" and not soft, max_qty=19 if q != "BAD" else 0)
 
-    def reserve(q: str) -> str:
-        calls["reserve"].append(q)
+    def reserve(q: str, qty: int | None = None) -> str:
+        calls["reserve"].append(q if qty is None else (q, qty))
         return "⏳ 예약했어요"
 
     def release(tid: str, allowed: tuple[str, ...], status: str) -> str:
@@ -89,7 +94,8 @@ def test_buy_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> None:
     kind, (text, buttons) = bot.out[-1]
     assert kind == "buttons" and "매수 비중 추천" in text and not fake["reserve"]
     buy = buttons[0][0]
-    assert buy["text"] == "🛒 이대로 매수 (8주)" and buy["callback_data"].endswith(":NVDA")
+    assert buy["text"] == "🛒 8주 매수" and buy["callback_data"].endswith(":NVDA")
+    assert buttons[0][1]["text"] == "✏️ 수량 바꾸기"
     assert not tb.handle_stock(bot, _m(data=buy["callback_data"]))  # type: ignore[arg-type]
     assert fake["reserve"] == ["NVDA"] and bot.out[-1] == ("send", "⏳ 예약했어요")
     tb.handle_stock(bot, _m(data=buy["callback_data"]))  # type: ignore[arg-type]  # 두 번째
@@ -131,7 +137,7 @@ def test_bare_word_asks_which_stock_then_answer_gets_advice(
     assert is_stock(answer) and is_command(answer)  # Deneb 대화가 가져가지 않는다
     assert tb.handle_stock(bot, answer)  # type: ignore[arg-type]
     assert fake["advise"] == ["현대차"] and inbox.stock_ask() is None  # 한 번 쓰면 지움
-    assert "🛒 이대로 매수" in bot.out[-1][1][1][0][0]["text"]
+    assert "매수" in bot.out[-1][1][1][0][0]["text"]
 
 
 def test_answer_window_and_amounts_stay_with_deneb() -> None:
@@ -160,3 +166,36 @@ def test_bare_word_shows_status_and_release(
     rel = status_msg[1][0][0]["callback_data"]
     tb.handle_stock(bot, _m(data=rel))  # type: ignore[arg-type]
     assert fake["release"] == [("1016", "released")] and "손절 해제" in bot.out[-1][1]
+
+
+def test_override_asks_qty_then_confirms_then_reserves(fake: dict[str, list[Any]]) -> None:
+    bot = FakeBot()
+    assert tb.handle_stock(bot, _m("개별주 SOFT"))  # type: ignore[arg-type]
+    text, buttons = bot.out[-1][1]
+    assert "규칙상 지금은 비추천" in text
+    assert buttons[0][0]["text"] == "✏️ 그래도 매수 (수량 입력)"
+    assert tb.handle_stock(bot, _m(data=buttons[0][0]["callback_data"]))  # type: ignore[arg-type]
+    prompt = bot.out[-1][1][0]
+    assert "몇 주 살까요?" in prompt and "최대 19주" in prompt and "추천" not in prompt
+    info = inbox.stock_ask_info()
+    assert info is not None and info["kind"] == "qty" and info["symbol"] == "NVDA"
+    mid, at = info["message_id"], info["at"]
+    assert not is_stock_answer(InboxMessage(3, at + 10, "5"))  # 답장 아닌 숫자는 Deneb 몫
+    assert is_stock_answer(InboxMessage(3, at + 10, "5주"))
+    answer = InboxMessage(3, at + 10, "5", reply_to=mid)
+    assert is_stock(answer)
+    assert tb.handle_stock(bot, answer)  # type: ignore[arg-type]
+    card, rows = bot.out[-1][1]
+    assert "엔비디아 5주" in card and "규칙 밖 매수" in card
+    assert rows[0][0]["text"] == "✅ 5주 예약" and not fake["reserve"]
+    tb.handle_stock(bot, _m(data=rows[0][0]["callback_data"]))  # type: ignore[arg-type]
+    assert fake["reserve"] == [("NVDA", 5)]
+
+
+def test_qty_over_max_and_hard_block(fake: dict[str, list[Any]]) -> None:
+    bot = FakeBot()
+    inbox.set_stock_ask(70, 1_000, kind="qty", symbol="NVDA")
+    assert tb.handle_stock(bot, InboxMessage(4, 1_010, "20", reply_to=70)) is False  # type: ignore[arg-type]
+    assert "1 ~ 19주만" in bot.out[-1][1]
+    tb.handle_stock(bot, _m("개별주 BAD"))  # type: ignore[arg-type]
+    assert bot.out[-1][0] == "send"  # 넘을 수 없는 이유 — 버튼 없음

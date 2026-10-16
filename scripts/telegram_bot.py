@@ -44,6 +44,7 @@ from auto_trading.notify.inbox import (
     is_stock_answer,
     liquidation_symbol,
     set_stock_ask,
+    stock_ask_info,
 )
 from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import GROUPS
@@ -95,7 +96,9 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 💹 개별주 NVDA (또는 개별주 삼성전자 · /stock)
   얼마나 살지 추천: 현금(원화 + 달러)의 1% 까지만 잃게, 손절 −3% · 한 종목 최대 25%
   실적 3거래일 안 · 추세 아님 · 지수 200일선 아래(절반)면 안 사거나 줄여요
-  → [🛒 이대로 매수] 누르면 정규장 시작 직후 지정가로 사고, −3% 면 자동으로 팔아요
+  → [🛒 N주 매수] 누르면 정규장 시작 직후 지정가로 사고, −3% 면 자동으로 팔아요
+  → [✏️ 수량 바꾸기] · 규칙에 걸리면 [✏️ 그래도 매수] — 몇 주인지 답장 → [✅ 예약]
+     (한 종목 25% · 현금 안에서만, 손절 −3% 는 그대로)
   메뉴(/stock)나 '개별주' 만 보내면 "어떤 종목을 살까요?" 라고 물어요 → 종목 이름으로 답장
   (예약 · 손절 중인 종목이 있으면 현황 + [손절 해제] 버튼도)
 
@@ -290,9 +293,24 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
                 bot.send("🛡 손절 해제 — " + sg._set_status(arg, ("holding",), "released"))
             except SystemExit as exc:
                 bot.send(f"⚠ 해제 못 함 — {exc}")
+        elif kind == "stq":  # [수량 바꾸기] · [그래도 매수] → 몇 주?
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"✏️ {arg} 몇 주 살지 물어볼게요")
+            return _ask_qty(bot, arg)
+        elif kind == "sko":  # 수량 확인 → 예약
+            sym, _, n = arg.rpartition(":")
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"🛒 {sym} {n}주 다시 확인하고 예약해요…")
+            try:
+                bot.send(sg.reserve(sym, qty=int(n)))
+            except (SystemExit, ValueError) as exc:
+                bot.send(f"⚠ 예약 못 함 — {exc}")
         return False
-    if is_stock_answer(msg):  # '어떤 종목을 살까요?' 에 대한 답
+    ask = stock_ask_info() if is_stock_answer(msg) else None
+    if ask is not None:  # '어떤 종목?' · '몇 주?' 에 대한 답
         clear_stock_ask()
+        if ask.get("kind") == "qty":
+            return _confirm_qty(bot, str(ask.get("symbol") or ""), msg.text)
         query = msg.text.strip()
     else:
         query = _stock_query(msg.text)
@@ -327,15 +345,70 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
     from auto_trading.ops.position_size import advice_text
 
     text = advice_text(a)
-    if not a.ok:
+    if not a.ok and not a.can_override:
         bot.send(text)
         return False
-    nonce = STOCK_STORE.new_request(now, "stk")
-    rows = [
-        [{"text": f"🛒 이대로 매수 ({a.qty}주)", "callback_data": f"stk:{nonce}:{a.symbol}"}],
-        [{"text": "취소", "callback_data": f"stk:{nonce}:cancel"}],
-    ]
+    buy = STOCK_STORE.new_request(now, "stk")
+    qty = STOCK_STORE.new_request(now, "stq")
+    if a.ok:
+        rows = [
+            [
+                {"text": f"🛒 {a.qty}주 매수", "callback_data": f"stk:{buy}:{a.symbol}"},
+                {"text": "✏️ 수량 바꾸기", "callback_data": f"stq:{qty}:{a.symbol}"},
+            ],
+            [{"text": "취소", "callback_data": f"stk:{buy}:cancel"}],
+        ]
+    else:
+        rows = [
+            [{"text": "✏️ 그래도 매수 (수량 입력)", "callback_data": f"stq:{qty}:{a.symbol}"}],
+            [{"text": "취소", "callback_data": f"stk:{buy}:cancel"}],
+        ]
     bot.send_message(text + "\n\n누르면 다시 확인한 뒤 예약해요 (5 분 안, 한 번만)", buttons=rows)
+    return True
+
+
+def _ask_qty(bot: TelegramNotifier, symbol: str) -> bool:
+    """'몇 주 살까요?' — 답장 입력칸을 열고 질문 기록(kind=qty)을 남긴다."""
+    from auto_trading.ops.position_size import advice_text, qty_prompt_text
+    from scripts import size_guard as sg
+
+    try:
+        a = sg.advise(symbol)
+    except SystemExit as exc:
+        bot.send(f"⚠ {exc}")
+        return False
+    if not a.can_override:
+        bot.send(advice_text(a))
+        return False
+    mid = bot.send_message(qty_prompt_text(a), force_reply=True, placeholder="주 수 (예: 5)")
+    set_stock_ask(mid, int(time.time()), kind="qty", symbol=a.symbol)
+    return True
+
+
+def _confirm_qty(bot: TelegramNotifier, symbol: str, text: str) -> bool:
+    """'5' · '5주' 답 → 마지막 확인 카드 + [✅ N주 예약] [취소]."""
+    from auto_trading.ops.position_size import confirm_text
+    from scripts import size_guard as sg
+
+    digits = text.strip().removesuffix("주").strip()
+    if not digits.isdigit() or not symbol:
+        bot.send("⚠ 주 수는 숫자로 답해 주세요 (예: 5) — 다시 '개별주' 부터 해 주세요")
+        return False
+    n = int(digits)
+    try:
+        a = sg.advise(symbol)
+    except SystemExit as exc:
+        bot.send(f"⚠ {exc}")
+        return False
+    if not a.can_override or not 1 <= n <= a.max_qty:
+        bot.send(f"⚠ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 25% · 현금)")
+        return False
+    nonce = STOCK_STORE.new_request(int(time.time() * 1000), "sko")
+    rows = [
+        [{"text": f"✅ {n}주 예약", "callback_data": f"sko:{nonce}:{a.symbol}:{n}"}],
+        [{"text": "취소", "callback_data": f"sko:{nonce}:cancel"}],
+    ]
+    bot.send_message(confirm_text(a, n), buttons=rows)
     return True
 
 

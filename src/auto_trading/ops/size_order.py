@@ -137,6 +137,8 @@ class Ticket:
     stop: float = 0.0
     note: str = ""
     closed_ms: int = 0
+    override: bool = False
+    """사람이 규칙 밖에서 수량을 정해 산 것('그래도 매수') — 주문 직전엔 못 넘는 이유만 본다."""
 
     @property
     def kr(self) -> bool:

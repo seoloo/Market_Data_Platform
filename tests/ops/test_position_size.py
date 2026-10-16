@@ -79,7 +79,7 @@ def test_round_price_and_text() -> None:
     text = m.advice_text(m.recommend(_inp()))
     assert "추천: 25%" in text and "상한 25%" in text and "−3%" in text
     bad = m.advice_text(m.recommend(_inp(earnings_in_days=1)))
-    assert "⛔ 지금은 사지 않아요" in bad and "참고: 조건이 맞았다면 25%" in bad
+    assert "⚠️ 규칙상 지금은 비추천" in bad and "참고: 조건이 맞았다면 25%" in bad
     none = m.recommend(_inp(earnings_date="", earnings_in_days=8))
     assert "✅ 실적 발표 조회 범위 내 명단에 없음 (확정 공시 보증 아님)" in none.lines
     down = m.recommend(_inp(closes=list(reversed(_up()))))
@@ -99,3 +99,18 @@ def test_unknown_inputs_fail_closed_and_warning_is_not_sizing() -> None:
     assert a.ok and a.qty == m.recommend(_inp()).qty
     b = m.recommend(_inp(event_risk=EntryEvents(blocked=("CPI 보류",))))
     assert not b.ok and "CPI 보류" in b.blocked
+
+
+def test_max_qty_ignores_halving_but_keeps_cap_and_cash() -> None:
+    down = list(reversed(_up()))
+    a = m.recommend(_inp(index_closes=down))
+    assert a.ok and a.qty == 33 and a.max_qty == 67  # 추천은 절반, 사람이 정할 최대는 25% 상한
+    assert "추천 33주 · 최대 67주" in m.qty_prompt_text(a)
+    assert "추천(33주)보다 많아요" in m.confirm_text(a, 40)
+    assert "보다 많아요" not in m.confirm_text(a, 33)
+    hard = m.recommend(_inp(symbol="TQQQ", blocked_symbol="Deneb"))
+    assert not hard.can_override and hard.hard
+    soft = m.recommend(_inp(earnings_in_days=2, earnings_date="2026-10-20"))
+    assert not soft.ok and soft.can_override
+    text = m.confirm_text(soft, 5)
+    assert "5주" in text and "규칙 밖 매수" in text and "실적 발표가 코앞" in text

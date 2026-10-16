@@ -32,6 +32,8 @@ __all__ = [
     "advice_text",
     "base_krw",
     "buy_limit",
+    "confirm_text",
+    "qty_prompt_text",
     "recommend",
     "round_price",
     "stop_price",
@@ -166,10 +168,21 @@ class Advice:
     blocked: list[str] = field(default_factory=list)
     """사지 않는 이유 — 비어 있어야 매수 버튼."""
     entry_session: str = ""
+    max_qty: int = 0
+    """사람이 직접 정할 때의 최대 수량 — 한 종목 25% 상한 · 현금 (지수 절반 보정 전)."""
+    hard: list[str] = field(default_factory=list)
+    """'그래도 매수' 로도 넘을 수 없는 이유 (자동 전략 종목 · 돈 없음)."""
+    fx: float = 1.0
+    """원/달러 (국내 종목은 1)."""
 
     @property
     def ok(self) -> bool:
         return not self.blocked and self.qty > 0
+
+    @property
+    def can_override(self) -> bool:
+        """규칙에 걸려도 사람이 수량을 정해 살 수 있나 (2026-10-16 사용자 '그래도 매수')."""
+        return not self.hard and self.max_qty > 0
 
 
 def recommend(inp: Inputs) -> Advice:
@@ -184,8 +197,10 @@ def recommend(inp: Inputs) -> Advice:
         blocked.extend(inp.event_risk.blocked)
         lines.extend(inp.event_risk.lines)
     weight = min(RISK / STOP, CAP)
+    hard: list[str] = []
     if inp.blocked_symbol:
-        blocked.append(f"{inp.blocked_symbol} 가 자동으로 사고파는 종목 — 같은 계좌라 섞여요")
+        hard.append(f"{inp.blocked_symbol} 가 자동으로 사고파는 종목 — 같은 계좌라 섞여요")
+        blocked.append(hard[-1])
     idx_up = above_long(inp.index_closes)
     if idx_up is None:
         blocked.append(f"{inp.index_name or '지수'} 200일선 확인 못 함 — 신규 매수 보류")
@@ -229,6 +244,10 @@ def recommend(inp: Inputs) -> Advice:
         qty = can
     if qty <= 0:
         blocked.append("살 수 있는 수량이 0 주 (돈 · 상한)")
+    cap_qty = int(max(0.0, base * CAP - held_krw) / fx // limit) if limit > 0 else 0
+    max_qty = min(cap_qty, can)
+    if max_qty <= 0:
+        hard.append("살 수 있는 수량이 0 주 (현금 · 한 종목 25% 상한)")
     amount = qty * limit * fx
     if not kr and qty > 0:
         after = (inp.us_stock_krw + amount) / max(1.0, base + inp.us_stock_krw)
@@ -249,6 +268,9 @@ def recommend(inp: Inputs) -> Advice:
         risk_krw=qty * (limit - stop) * fx,
         lines=lines,
         blocked=blocked,
+        max_qty=max_qty,
+        hard=hard,
+        fx=fx,
         entry_session=(
             f"{'KR' if kr else 'US'}:{inp.event_risk.entry_day}"
             if inp.event_risk is not None and inp.event_risk.entry_day is not None
@@ -274,7 +296,8 @@ def advice_text(a: Advice) -> str:
             f"(지정가 {_px(a.limit, a.currency)} 까지)"
         )
     else:
-        top = "⛔ 지금은 사지 않아요\n" + "\n".join(f"• {b}" for b in a.blocked)
+        word = "⚠️ 규칙상 지금은 비추천" if a.can_override else "⛔ 지금은 사지 않아요"
+        top = word + "\n" + "\n".join(f"• {b}" for b in a.blocked)
         if a.qty > 0:
             top += f"\n(참고: 조건이 맞았다면 {a.weight:.0%} · {_won(a.amount_krw)} · {a.qty}주)"
     cap_note = f"(1% ÷ 3% = 33% 이지만 한 종목 상한 {CAP:.0%})" if RISK / STOP > CAP else ""
@@ -295,3 +318,33 @@ def advice_text(a: Advice) -> str:
         "갭·미체결·PC 꺼짐으로 −3%보다 더 잃을 수 있어요. 보류 후에는 새 추천·예약이 필요해요.",
     ]
     return "\n".join(body)
+
+
+def qty_prompt_text(a: Advice) -> str:
+    """'몇 주 살까요?' (순수) — 추천 수량과 사람이 정할 수 있는 최대."""
+    cash = "원화" if a.currency == "KRW" else "달러"
+    rec = f"추천 {a.qty}주 · " if a.ok else ""
+    return (
+        f"💹 {a.name} 몇 주 살까요?\n"
+        f"{rec}최대 {a.max_qty}주 (한 종목 {CAP:.0%} · {cash} 현금 기준)\n"
+        "숫자만 답장해 주세요 (예: 5)"
+    )
+
+
+def confirm_text(a: Advice, qty: int) -> str:
+    """수량을 정한 뒤 마지막 확인 (순수)."""
+    rate = 1.0 if a.currency == "KRW" else a.fx
+    amount = qty * a.limit * rate
+    risk = qty * (a.limit - a.stop) * rate
+    lines = [
+        f"💹 {a.name} {qty}주 · 약 {_won(amount)} (기준의 {amount / max(a.base_krw, 1):.1%})",
+        f"• 지정가 {_px(a.limit, a.currency)} 까지 · 정규장 시작 직후(장중이면 바로)",
+        f"• 손절: 산 값 −{STOP:.0%} 면 자동 매도 (약 {_won(risk)} 손실, 갭이면 더 클 수 있어요)",
+    ]
+    if not a.ok:
+        lines.append("⚠️ 규칙 밖 매수예요 — " + " · ".join(a.blocked))
+        if any("실적 발표" in b and "거래일 뒤" in b for b in a.blocked):
+            lines.append("🚨 실적 발표가 코앞이에요 — 발표 날 하루에 ±10% 넘게 움직이기도 해요")
+    elif qty > a.qty:
+        lines.append(f"ℹ️ 추천({a.qty}주)보다 많아요 — 틀리면 기준의 1% 보다 더 잃어요")
+    return "\n".join(lines)
