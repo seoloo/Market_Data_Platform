@@ -230,3 +230,24 @@ live SQLite DB 파일만 단순 복사하지 않는다. SQLite backup API 또는
 현재는 삭제·인덱스 제거·VACUUM·수집 범위 변경·스케줄러 추가를 모두 수행하지 않았다.
 
 장기 운영 전 디렉터리/DB 테이블·인덱스·WAL별 크기와 일별 증가량을 관찰하고 백업 복원 점검 주기를 확정해야 한다.
+
+## 오르빗 소유자 전용 웹 조회 (2026-10-16)
+
+- 주소 https://orbit-investment-seolh.workspace-655977.chatgpt.site / Sites project `appgprj_6ad219930e5c8191bbcc496e75c6850b`.
+  ChatGPT 공식 로그인 후 소유자 1명만 허용하며 외부 방문자는 없다. 익명 홈페이지·API 401 확인.
+  사용자는 이 Site를 만든 것과 같은 ChatGPT 계정으로 로그인한다. 별도 Supabase·Google OAuth 스택은 만들지 않았다.
+- 소스/수동 동기화 도구: `C:/Users/seolh/.codex/visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/orbit-web-site/`.
+  `README-ORBIT.md`의 두 수동 명령(기존 Python으로 `tools/orbit_export.py` → `tools/orbit_sync.py upload`)을 따른다.
+  PC 원본 장부는 읽기만 하며 키 없는 공개 시세 외에 거래소 인증·주문 API를 부르지 않는다. `.env`는 읽지 않는다.
+- `ORBIT_INGEST_SECRET`은 Sites 런타임 secret. 서비스 접근/쓰기 자격은 그 PC의 `local-data/service-credentials.dpapi`에
+  Windows CurrentUser DPAPI로 암호화하며 평문 파일·Git·브라우저·보고서에 넣지 않는다. 다른 PC/Windows 사용자에게 파일을 복사해도 그대로 쓸 수 없다.
+  토큰은 해당 Site HTTPS origin에만 전송하고 redirect는 따르지 않는다. 공유 대상 확대 전 별도 권한 감사를 한다.
+- D1 `orbit_snapshots`는 최신 허용 필드 JSON 1개를 보관한다. 시각 역전·같은 시각 다른 내용은 409, 동일 재전송은 멱등 허용한다.
+  실제 원본 장부·계좌번호·거래소 키·원본 주문 ID·자유 메모는 보관하지 않는다. 입력은 512KiB·strict schema, 응답 private/no-store다.
+- 최초 전송/서버 digest 재조회 성공. 화면 60초 폴링은 저장된 스냅샷만 읽는다. **PC 자동 업로드·예약은 미등록**이다.
+  전송 후 10분이 지나면 지연 표시, 시세 미확보는 추정 표시. PC가 꺼져도 사이트의 마지막 기록은 조회할 수 있지만 PC 매매를 대신 실행하지 않는다.
+- 기준 금액·평가 차액은 장부 모형이며 입출금 보정 수익률·실현손익이 아니다. Binance USDT≈USD/현재 환율 근사가 있다.
+  Altair는 선물 지갑 자금 장부만 연결됐으며 실제 포지션/미실현손익은 미연결이다. 보유 0/포지션 없음으로 인증하지 않는다.
+  그래프는 가격 확인·현재 장부 구성 일치 과거 기록만 쓴다(최초 기존 6개 제외/유효 0개). 과거 숫자 합성이나 소급 수익 계산 없음.
+- 배포 소스 `ce9bbee4dbe9bfb2a01e99a65679a1ec5b6785ae`. 초기 검증과 Windows 도구 경로 보정은 웹 소스 전용이며,
+  기존 exe·실거래·Paper·Telegram·예약·208 연구 폴더는 수정/재시작하지 않았다. 운영 Phase/전략 판정 불변.
