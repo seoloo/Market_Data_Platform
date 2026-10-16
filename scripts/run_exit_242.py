@@ -44,10 +44,12 @@ from scripts.run_lt_leaders import (
     FROM,
     SPLIT,
     SPY_SMA,
+    STOP_FROM_PEAK,
     TO,
     leaders,
     simulate,
     stats,
+    trend_off,
     trend_up,
 )
 from scripts.run_lt_leaders import build_panel as build_us
@@ -76,6 +78,9 @@ class Exit:
     """'진입 뒤 최고 종가 − k × ATR' 따라 올림. None 이면 없음."""
     ma: int | None
     """종가 < n 일선이면 다음 거래일 종가 매도. None 이면 없음."""
+    slow: bool = False
+    """113 의 느린 나가기 — 추세 꺾임(20 · 60 · 120 일 부호) 또는 고점 −35% 면 다음 거래일 종가 매도
+    (문서 246 이 더함, 242 의 네 규칙은 쓰지 않음)."""
 
 
 ARMS = (
@@ -243,6 +248,9 @@ def simulate_exit(mk: Market, arm: Exit, start_date: str = FROM) -> ExitRun:
                 m = sma(mk.close[sym], t, arm.ma)
                 if m is not None and c < m:
                     pending_sell.add(sym)
+            slow_off = trend_off(mk.close[sym], t) or c <= (1 - STOP_FROM_PEAK) * p.peak
+            if arm.slow and t > p.i0 and slow_off:
+                pending_sell.add(sym)
         if month_end_day(days, t) and mk.index_ok[t]:
             pending_buy = [
                 s
@@ -350,11 +358,13 @@ def kr_market() -> tuple[Market, list[float]]:
     return mk, simulate_kr(panel, index_ok).equity
 
 
-def evaluate(mk: Market, base_equity: Sequence[float]) -> dict[str, Any]:
+def evaluate(
+    mk: Market, base_equity: Sequence[float], arms: Sequence[Exit] = ARMS
+) -> dict[str, Any]:
     start = next(i for i, d in enumerate(mk.days) if d >= FROM)
     span = mk.days[start:]
     rows: dict[str, Any] = {"BASE": _row(span, base_equity)}
-    for arm in ARMS:
+    for arm in arms:
         r = simulate_exit(mk, arm)
         rows[arm.name] = {**_row(span, r.equity), "trade": trade_stats(mk, r)}
     return rows
