@@ -136,7 +136,8 @@ def test_live_equity_is_real_wallet_and_halt_blocks_long_increase(
 def test_multi_asset_mode_required_and_used_for_equity(monkeypatch: pytest.MonkeyPatch) -> None:
     class Setup:
         def __init__(self, multi: bool) -> None:
-            self.multi, self.lev = multi, []
+            self.multi = multi
+            self.lev: list[str] = []
 
         def dual_side_position(self) -> bool:
             return False

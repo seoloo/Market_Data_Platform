@@ -531,6 +531,7 @@ def run(root: Path = REPO) -> int:
     _namu_follow(root)
     _altair_demo(root)
     _paper_daily(root)
+    _safety_daily()
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
@@ -574,6 +575,18 @@ def _paper_daily(root: Path) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps({"sent": today}), encoding="utf-8")
     print("Paper 요약 보냄")
+
+
+def _safety_daily() -> None:
+    """매일 안전 점검 (09:20 KST 뒤 한 번, 이상 · 바뀐 것 있을 때만 알림). 실패해도 봇은 끝난다."""
+    try:
+        from scripts import safety_check
+
+        sent = safety_check.run()
+        if sent:
+            print("안전 점검 알림 보냄")
+    except Exception as exc:  # 점검 문제로 봇을 멈추지 않는다
+        print(f"안전 점검 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _namu_follow(root: Path) -> None:
