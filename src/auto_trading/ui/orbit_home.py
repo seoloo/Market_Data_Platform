@@ -611,6 +611,9 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
                 bcls,
             ),
         ]
+        halted = next((n for n in book.notes if n.startswith("⏸ 정지 중")), None)
+        if halted:  # 전부 정리 · 텔레그램 정지 — 다음 매수 날짜 대신 정지 이유 (2026-10-16)
+            return "".join(tiles), f"{halted} · 다시 사려면 '정지풀기'"
         now = datetime.fromtimestamp(now_ms / 1000, UTC) + _KST
         nxt = now.month % 12 + 1
         return "".join(tiles), f"다음 매수 {nxt}월 첫 거래일"
@@ -872,7 +875,7 @@ def render_live(
     warnings.extend(
         f"{b.title} · 매수 정지 기록을 확인하세요"
         for b in books
-        if any("낙폭 정지 중" in n for n in b.notes)
+        if any("낙폭 정지 중" in n or n.startswith("⏸ 정지 중") for n in b.notes)
     )
     warnings.extend(
         f"{b.title} · 장부가 오래됨 ({_kst(b.updated_ms)})" for b in books if _stale(b, now_ms)
