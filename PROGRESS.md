@@ -5,6 +5,13 @@
 
 옮긴 기록: 2026-09 이전 작업(2026-09-29 이하 날짜 절과 '이전 작업' 절)은 [docs/archive/PROGRESS_2026-09.md](docs/archive/PROGRESS_2026-09.md) 로 그대로 옮겼다(2026-10-15, 내용 수정 없음). 맨 아래 '다음 작업 · 단계 상태 · 미해결 · 검증 기록' 은 이 파일에 남아 있다.
 
+## 2026-10-16 — 예약 정리 · 실주문 경로 점검 · DART 실적 일정 확인 · 문서 (Claude)
+
+- 예약: 새 `AutoTrading_Vega` · `Deneb_Chat` · `Deneb_Retry` 등록, 옛 `Binance_Cruise` 끔. 옛 `Toss_M3_Chat` · `Toss_M3_Retry` · `Upbit_T2_Live` · `Upbit_T2_Weekly` 는 관리자 권한 필요(Access denied) → 새 Deneb 2 개는 겹치지 않게 꺼 둠. 사용자가 관리자 PowerShell 로 마무리.
+- 실주문 경로 점검(사용자 "7번은 반드시"): 토스 · 바이낸스 현물 · 선물 · 한투 · 나무 모의 · 개별주 · 정리는 스위치 · 상한 · 지정가 확인. 고친 것 ① 업비트 주문 스위치 없음 → `UPBIT_TRADING_ENABLED`(기본 꺼짐) ② Vega 의 Altair 자동 분배가 Altair 꺼진 채로도 돌 수 있었음 → `live.altair` 켜졌을 때만, USDT 이체 vs Altair USDC 장부 불일치 기록.
+- DART: '기업설명회(IR)개최(안내공시)' 본문에 '일시 2026-10-28 09:00 · 개최목적 2026년 3분기 경영실적 발표'(SK하이닉스) — 국내 실적 일정 자동화 가능. 삼성전자는 잠정실적을 예고 없이 발표하고 IR 안내는 같은 날이라 지난해 날짜로 추정이 필요. 현대차는 월별 판매도 '영업(잠정)실적' 이라 거를 것.
+- 사용법 다시 고정(메시지 267), CURRENT_SPEC '실거래 경로 현황' · OPERATIONS '실거래 스위치 · 예약 · 정리' · BRIEFING 갱신.
+
 ## 2026-10-16 — 사고: 시험이 실계좌 Vega 코인을 팖 · 재발 방지 (Claude)
 
 - 09:58 전체 시험 중 `tests/ops/test_liquidate_script.py::test_vega_sells_upbit_now_and_unhalt` 가 바이낸스 클라이언트(`_binance`)를 가짜로 바꾸지 않아 **실계좌 Vega 의 BTC 0.0003 · ETH 0.0073 · SOL 0.157 을 지정가 IOC 로 팔았다**(주문 번호 `liq-20261016T095815-*`, `.env` 주문 허용 켜짐). 10-15 Vega 를 바이낸스로 옮기며 정리에 바이낸스를 넣을 때 시험 고정물을 같이 고치지 않은 것(Claude). 손실은 수수료 · 가격 차 약 0.13 USDT. 사용자가 앱에서 '산 게 없다' 고 알려 발견.

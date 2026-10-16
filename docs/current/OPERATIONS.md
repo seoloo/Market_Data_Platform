@@ -5,6 +5,25 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 실거래 스위치 · 예약 · 정리 (2026-10-16)
+
+- **스위치(.env):** 토스 `TOSS_TRADING_ENABLED` · 바이낸스 현물 `BINANCE_LIVE_TRADING_ENABLED` ·
+  바이낸스 선물 `BINANCE_FUTURES_LIVE_TRADING_ENABLED` · 업비트 `UPBIT_TRADING_ENABLED`(기본 꺼짐) ·
+  한투 `KIS_TRADING_ENABLED`. 정확히 `true` 일 때만 주문. 환경 변수가 `.env` 보다 앞선다.
+- **설정(오르빗):** `live.altair`(Altair 실거래, 기본 꺼짐) · `stock.orders`(💹 개별주, 기본 켜짐) ·
+  `demo.altair`(Altair 데모).
+- **예약 이름(2026-10-15 이름 변경 뒤):** `AutoTrading_Vega`(매일 09:05) · `AutoTrading_Deneb_Chat` ·
+  `AutoTrading_Deneb_Retry` · `AutoTrading_Altair`(5 분마다, 꺼져 있으면 연결도 안 함).
+  2026-10-16: `AutoTrading_Vega` 등록 · 옛 `Binance_Cruise` 끔. 옛 `Toss_M3_Chat` · `Toss_M3_Retry` ·
+  `Upbit_T2_Live` · `Upbit_T2_Weekly` 는 관리자 권한으로 만들어져 일반 권한으로 못 꺼서, 새
+  `Deneb_Chat` · `Deneb_Retry` 는 겹치지 않게 꺼 둠 — 관리자 PowerShell 에서 옛 4 개 끄고 새 2 개 켜기.
+- **정지 · 정리:** 텔레그램 '정리'(범위 버튼) · '정리 NVDA'(한 종목) · '정지풀기'. 그룹: vega · deneb ·
+  acc · altair · stock. `python -m scripts.liquidate preview <범위|sym:종목>` 은 조회만.
+- **💹 개별주:** `/stock` → 종목 답장 → 추천 → [N주 매수] · [수량 바꾸기] · [그래도 매수] → 수량 답장 →
+  [예약]. 장부 `data/size_guard/state.json`, 봇이 2 분마다 tick. 명령 `python -m scripts.size_guard
+  advise|reserve|status|attach|release|cancel`.
+- **Altair 실거래:** `python -m scripts.altair_live plan|status|unhalt` — plan · status 는 조회만.
+
 ## 데이터·API·복구
 
 - Binance USD-M 시장 원자료는 출처·수집 시각·기간·심볼/TF·체크섬·적재 결과를 추적한다. 백필은 멱등/재개 가능, checksum 실패와 gap을 보고한다.
