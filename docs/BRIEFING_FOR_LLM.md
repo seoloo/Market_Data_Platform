@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 256 추세 밖 주도주 매수 `불리` · LT 동점 고정 (Claude)
+
+- [256](research/256-leader-dip-entry-preregistration.md) 주도주가 추세 밖으로 눌렸을 때 반등을 노리고 사기: 국장 샤프 −0.26 vs 추세 중 매수 0.26 → **불리**. 눌린 주도주는 반등보다 더 빠졌다.
+- LT 주도주 동점 순서 고정 — 113 백테스트가 해시 시드마다 흔들리던 것(샤프 0.871 ~ 0.895)을 0.888 하나로.
+
 ## 2026-10-17 — 253 할로윈 · 254 KOSPI200 편입 · 255 주말 주식 무기한 (Claude)
 
 - [253](research/253-halloween-effect-preregistration.md) 'Sell in May' 를 논문 뒤 2003 ~ 2025 로: S&P 500 겨울 − 여름 +1.6%(t 0.58), 나스닥 100 은 반대(−1.8%) → **불명**. 겨울만 보유는 나스닥 연수익 15.2 → 7.5%.
