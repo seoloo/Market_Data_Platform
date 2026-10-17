@@ -33,6 +33,10 @@ C 의 S&P 500 60% 를 C1 SPY(1 배) · C2 SSO(2 배) · C3 UPRO(3 배)로 바꾼
 주식 60 · 국채 20 · 금 20 에서 주식을 S1 SPY · S2 SSO · S3 UPRO · N1 QQQ · N2 QLD · N3 TQQQ 로.
 QLD 상장 전(2006-06)은 QQQ 일간 2 배 − 연 비용(겹치는 기간 맞춤). 나머지는 ``lev`` 와 같다.
 결과 ``reports/namu_core_compare/result_lev6.json``.
+
+``half`` (사용자 2026-10-17 "S&P 30 + 나스닥 30 + 국채 20 + 금 20 이거는", 실행 전 고정):
+H = SPY 30 · QQQ 30 · IEF 20 · GLD 20 을 S1 · N1 과 나란히. 조건은 위와 같다.
+결과 ``reports/namu_core_compare/result_half.json``.
 """
 
 from __future__ import annotations
@@ -248,6 +252,12 @@ def main(which: str = "base") -> int:
         pairs += [("N1", "QQQ"), ("N2", "QLD"), ("N3", "TQQQ")]
         rules = {tag: mix(sym) for tag, sym in pairs}
         rules["Deneb"] = deneb
+    if which == "half":
+        rules = {
+            "S1": mix("SPY"),
+            "H": lambda i: {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2},
+            "N1": mix("QQQ"),
+        }
     for wname, (a, b) in WINDOWS.items():
         i0 = next(k for k, d in enumerate(days) if d >= a)
         i1 = max(k for k, d in enumerate(days) if d <= b)
