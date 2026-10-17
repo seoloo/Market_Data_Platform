@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 257 주말 되돌림 1 차 · 258 💹 익절 (Claude)
+
+- [257](research/257-weekend-fade-holdout-check.md) 주말 되돌림 거스르기를 안 본 5 주로: +0.29% · 4 / 5 주 + 로 형식 통과지만 되돌림 상관이 사라짐(+0.09) → 그림자 기록 자격만.
+- [258](research/258-stock-take-profit-preregistration.md) 개별 주도주 익절: +20% 전부 · 절반 · 고점 −15% 모두 '익절 없이 추세 꺾임 · 고점 −35% 매도'(연 13.0% · 샤프 0.75)를 못 이김 → **KEEP_ARM**. 절반 익절은 수익 조금 손해 · 낙폭 · 이긴 비율 개선.
+
 ## 2026-10-17 — 256 추세 밖 주도주 매수 `불리` · LT 동점 고정 (Claude)
 
 - [256](research/256-leader-dip-entry-preregistration.md) 주도주가 추세 밖으로 눌렸을 때 반등을 노리고 사기: 국장 샤프 −0.26 vs 추세 중 매수 0.26 → **불리**. 눌린 주도주는 반등보다 더 빠졌다.
