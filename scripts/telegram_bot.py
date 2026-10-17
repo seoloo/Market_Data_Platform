@@ -276,10 +276,27 @@ def _stock_query(text: str) -> str:
     return t
 
 
+def _polaris(bot: TelegramNotifier, msg: InboxMessage) -> bool:
+    from scripts import polaris
+
+    if msg.callback_id:
+        with contextlib.suppress(NotifyError):
+            bot.answer_callback(msg.callback_id, "접수했어요")
+    parts = msg.data.split(":", 2)
+    if len(parts) != 3 or parts[2] not in ("buy", "skip"):
+        return False
+    reply = polaris.on_buy(parts[1]) if parts[2] == "buy" else polaris.on_skip(parts[1])
+    with contextlib.suppress(NotifyError):
+        bot.edit(msg.message_id, reply)
+    return False
+
+
 def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> bool:
     """'개별주 …' 글과 그 버튼. 버튼을 보냈으면 True (이 실행에서 답을 기다린다)."""
     from scripts import size_guard as sg
 
+    if msg.data.startswith("pol:"):  # 🧭 Polaris 회차 버튼 — 나무, 토스 개별주 설정과 별개
+        return _polaris(bot, msg)
     now = int(time.time() * 1000)
     if not user_settings.get(root, "stock.orders"):
         bot.send("💹 개별주 주문이 설정에서 꺼져 있어요 (오르빗 설정 '개별주 비중 주문')")

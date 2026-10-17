@@ -122,6 +122,7 @@ def summary_text(
     vega: Mapping[str, object] | None,
     altair: Mapping[str, object] | None,
     todo: Sequence[str],
+    polaris: Mapping[str, object] | None = None,
 ) -> str:
     """두 전략 칸 + 합계 + 할 일. 칸 자료가 없으면(꺼짐 · 조회 실패) 그 칸에 한 줄로 알린다."""
     lines = [f"🗓 [주간 요약 · {period}]", "━━━━━━━━━━━━"]
@@ -187,10 +188,24 @@ def summary_text(
         )
     else:
         lines.append("☄️ Altair — 꺼져 있거나 조회 실패")
+    if polaris is not None:  # 나무 — 원화, 바이낸스 합계와 섞지 않는다 (사용자 2026-10-17 '별개로')
+        value, paid = float(str(polaris["value_krw"])), float(str(polaris["cost_krw"]))
+        gain = value - paid
+        lines += [
+            "",
+            "🧭 Polaris  (나무 · 안정 적립 · 원화)",
+            f"💼 평가 {value:,.0f}원 · 산 돈 {paid:,.0f}원"
+            f" · {'+' if gain >= 0 else '−'}{abs(gain):,.0f}원"
+            f" ({_pct(value / paid - 1 if paid else 0)})",
+            "📦 보유 (평단은 수수료 포함, 직접 산 종목은 빼고)",
+        ]
+        plines: Sequence[str] = polaris["lines"]  # type: ignore[assignment]
+        lines += list(plines) or ["   └ 아직 없음"]
+        lines.append(f"🔄 회차 {polaris['done']}/{polaris['rounds']}")
     lines += ["", "━━━━━━━━━━━━"]
     if deposit:  # 사용자 2026-10-17: 잃은 · 번 금액도 함께
         lines += [
-            f"📊 합계 {total:,.2f} · 넣은 돈 {deposit:,.2f}",
+            f"📊 바이낸스 합계 {total:,.2f} · 넣은 돈 {deposit:,.2f}",
             f"   └ 손익 {_money(total - deposit)} ({_pct(total / deposit - 1)})"
             f" · 이번 주 {_money(week)}",
         ]

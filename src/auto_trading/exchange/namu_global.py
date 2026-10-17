@@ -14,7 +14,7 @@
 * 주문 결과를 모르면(네트워크 · 5xx) 다시 보내지 않고 :class:`OrderStateUnknownError`.
 * 주문 번호는 ``"YYYYMMDD:주문번호"`` — 체결 조회 API 가 주문 날짜를 요구해서 낸 날짜(한국)를
   붙인다.
-  그날 없으면 다음 날도 본다(미국 장은 한국 자정을 넘긴다).
+  그날 없으면 앞 · 다음 날도 본다(미국 장은 한국 자정을 넘기고, 나무의 주문 날짜 기준은 미확인).
 * 토큰 · 호출 간격 · 401/429 는 :class:`~auto_trading.exchange.namu.NamuSession`.
 """
 
@@ -64,6 +64,8 @@ class NamuQuote:
     regular_close: float
     session: str
     """``marketperiod_cls`` 그대로 (정규장 판단은 호출하는 쪽 시계로)."""
+    trade_date: str = ""
+    """시세의 미국 거래일 YYYYMMDD — 휴장일엔 앞 거래일로 남는다."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +257,7 @@ class NamuGlobal(NamuSession):
             bids=sorted(side("bid"), reverse=True),
             regular_close=_f(o.get("normal_trdprc")),
             session=str(o.get("marketperiod_cls") or ""),
+            trade_date=str(o.get("trade_date") or ""),
         )
 
     def asks(self, symbol: str) -> list[tuple[Decimal, Decimal]]:
@@ -344,7 +347,7 @@ class NamuGlobal(NamuSession):
         day, no = _split(order_id)
         row: dict[str, Any] | None = None
         kids: list[dict[str, Any]] = []
-        for d in (day, _next_day(day)):
+        for d in (day, _shift(day, -1), _shift(day, 1)):
             rows = self.orders(d)
             row = next((r for r in rows if _i(r.get("orr_no")) == no), row)
             kids += [r for r in rows if _i(r.get("org_orr_no")) == no and _i(r.get("orr_no")) != no]
@@ -386,7 +389,7 @@ class NamuGlobal(NamuSession):
             raise TradingDisabledError("NAMU_TRADING_ENABLED 가 true 가 아니다 — 취소하지 않는다")
         day, no = _split(order_id)
         if not symbol:
-            rows = self.orders(day) + self.orders(_next_day(day))
+            rows = [r for d in (day, _shift(day, -1), _shift(day, 1)) for r in self.orders(d)]
             hit = next((r for r in rows if _i(r.get("orr_no")) == no), None)
             if hit is None:
                 return NamuOrderResult(False, "-", "취소할 주문을 찾지 못함")
@@ -422,6 +425,6 @@ def _split(order_id: str) -> tuple[str, int]:
     return day, int(no)
 
 
-def _next_day(day: str) -> str:
+def _shift(day: str, n: int) -> str:
     d = datetime.strptime(day, "%Y%m%d").replace(tzinfo=KST)
-    return (d + timedelta(days=1)).strftime("%Y%m%d")
+    return (d + timedelta(days=n)).strftime("%Y%m%d")

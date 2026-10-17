@@ -143,6 +143,22 @@ FIELDS: tuple[Field, ...] = (
         "다음 4 시간봉부터",
     ),
     Field(
+        "polaris.on",
+        "🧭 Polaris 나무 안정 적립 (매달 버튼 누를 때만 주문)",
+        "bool",
+        True,
+        "다음 09:00 확인부터",
+    ),
+    Field(
+        "polaris.monthly_krw",
+        "🧭 Polaris 한 회차 금액 (원)",
+        "int",
+        1_000_000,
+        "다음 회차 버튼부터",
+        100_000,
+        3_000_000,
+    ),
+    Field(
         "namu.follow",
         "나무 모의 — 국장 수급 Paper 따라가기",
         "bool",

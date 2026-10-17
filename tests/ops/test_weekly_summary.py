@@ -76,3 +76,18 @@ def test_summary_text_blocks_and_todo() -> None:
     assert "노출" not in t and "청산" not in t
     bad = m.summary_text(period="x", vega=None, altair=None, todo=["Vega 조회 실패"])
     assert "Vega — 장부를 못 읽음" in bad and "⚠️ Vega 조회 실패" in bad
+
+
+def test_polaris_block_is_krw_and_separate_from_binance_total() -> None:
+    pol = {
+        "value_krw": 1_012_345.0,
+        "cost_krw": 1_000_000.0,
+        "lines": ["   └ SPYM 3주 · 평단 $89.75 → $95.00 · +2.2만 원 (+5.8%)"],
+        "done": 1,
+        "rounds": 4,
+    }
+    t = m.summary_text(period="x", vega=None, altair=None, todo=[], polaris=pol)
+    assert "🧭 Polaris  (나무 · 안정 적립 · 원화)" in t
+    assert "평가 1,012,345원 · 산 돈 1,000,000원 · +12,345원 (+1.2%)" in t
+    assert "직접 산 종목은 빼고" in t and "회차 1/4" in t and "SPYM 3주" in t
+    assert "바이낸스 합계" not in t  # 바이낸스 칸이 없으면 합계 줄도 없음

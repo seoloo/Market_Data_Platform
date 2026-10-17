@@ -10,6 +10,8 @@
   유동형 = Simple Earn 조회. 이번 주 · 시작부터는 단위 가치(nav) 기준이라 입금이 섞이지 않는다.
 * Altair: 선물 계정 조회(포지션 · 진입가 · 표시 가격 · 비상 스톱)
   + 장부(``data/altair_live/state.json``).
+* 🧭 Polaris(나무): 장부(``data/polaris/state.json``) 체결만 · 나무 시세 · 원화.
+  바이낸스 합계와 따로.
 * 설정 ``alerts.vega_weekly`` 가 꺼져 있으면 보내지 않는다.
 """
 
@@ -171,6 +173,31 @@ def altair_block(week_start: str) -> dict[str, Any] | None:
     }
 
 
+def polaris_block() -> dict[str, Any] | None:
+    """🧭 Polaris 장부(나무) — 장부 체결만, 지금 가격은 나무 시세."""
+    from scripts import polaris as pol
+
+    st = pol.load()
+    if not st.orders:
+        return None
+    from auto_trading.ops.polaris import ROUNDS, SYMBOLS, holdings_lines
+
+    nh = pol.client()
+    try:
+        q = pol.quotes(nh)
+    finally:
+        nh.close()
+    fx = q["SPYM"].fx
+    prices = {s: x.last for s, x in q.items()}
+    return {
+        "value_krw": sum(st.qty[s] * prices[s] for s in SYMBOLS) * fx,
+        "cost_krw": sum(st.cost_krw.values()),
+        "lines": holdings_lines(st, prices, fx),
+        "done": st.done_rounds,
+        "rounds": ROUNDS,
+    }
+
+
 def build(now: datetime | None = None) -> str:
     now = now or datetime.now(KST)
     end = now.date()
@@ -187,12 +214,20 @@ def build(now: datetime | None = None) -> str:
         a = altair_block(start.isoformat())
     except Exception as exc:
         todo.append(f"Altair 조회 실패 ({type(exc).__name__})")
+    p: dict[str, Any] | None = None
+    try:
+        p = polaris_block()
+    except Exception as exc:
+        todo.append(f"Polaris 조회 실패 ({type(exc).__name__})")
+    pst = _read(REPO / "data" / "polaris" / "state.json")
+    if pst.get("halted"):
+        todo.append(f"Polaris 멈춤 — {str(pst['halted'])[:80]}")
     vs = _read(VEGA)
     if vs.get("stopped"):
         todo.append("Vega 30% 멈춤 — 다시 시작할지 정해 주세요")
     if _read(ALTAIR).get("no_new"):
         todo.append("Altair 새 노출 멈춤 — 다시 시작할지 정해 주세요")
-    return summary_text(period=period, vega=v, altair=a, todo=todo)
+    return summary_text(period=period, vega=v, altair=a, todo=todo, polaris=p)
 
 
 def send(text: str) -> None:

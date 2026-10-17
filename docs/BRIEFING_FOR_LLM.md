@@ -6,6 +6,10 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 🧭 Polaris 나무증권 안정 적립 · 나무 해외 원화 주문 (Claude)
+
+나무증권 해외주식 원화 증거금 주문 클라이언트(지정가, 실전 스위치 기본 꺼짐). 새 전략 Polaris: SPYM 30 · QQQM 30 · IEF 20 · GLDM 20, 사기만(자동 매도 없음), 100 만 원 × 4 회차(2026-11 부터, 매달 버튼 확인). 토스와 완전 분리, 같은 계좌의 사용자 개별주는 계산 제외. 참고 계산 2005 ~ 2026: 연 11.2% · 낙폭 −33% (S&P 만 −55%, Deneb −81%).
+
 ## 2026-10-17 — 💹 월간 미장 주도주 추천 (Claude)
 
 - 매달 월말 종가로 S&P 500 + 나스닥 100 에서 113 방식 주도주 10 을 골라 텔레그램 카드(상위 3 매수 버튼). 시장이 200 일선 아래면 추천 없음. 매도 신호(추세 꺾임 · 고점 −35%)는 매일, 버튼으로 판단. 사용자 결정: 월 1 회 고정.
