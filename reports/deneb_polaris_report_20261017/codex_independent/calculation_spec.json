@@ -1,0 +1,32 @@
+{
+  "scope": "사용자 승인 독립 보고서 시안6쪽. 기존 Claude 시안은 수정/재사용하지 않고 사용자 첨부의 병렬 선그래프+비교표 구성을 참고한다.",
+  "sample_monthly_krw": 200000,
+  "final_monthly_range_krw": {"min":50000,"max":1000000,"step":50000},
+  "years": [5,10,15,20],
+  "historical": "Codex 기존 six_layouts/calculation_result.json의 동일 조건 원장만 재표시: 2012-01~2026-08 월20만원, 세전, 환율 고정, 소수 주, 편도0.15%. 기존 종가 회계이며 지정가 실제 체결 인증 아님. 적금3/4%만 사용",
+  "new_return_search": false,
+  "dividend_projection": {
+    "purpose": "확률 예측/성과 판정이 아닌 가정별 조건부 배당 산술. 고정100주나 SCHD단독 적립이 아니라 기존 Deneb T 연구 함수를 합성 가격 경로에 재사용한다",
+    "engine": "scripts.run_brake_184.simulate ref=T, park=cash, monthly=False, 초기자산0·매달납입·월비중조정·기존15/30%매도·추세off/on복귀. 신호와 임계값은 수정하지 않는다",
+    "years":20,
+    "dates": "2026년 합성 평일 준비구간, 2027~2046년 월 납입. 실제 거래소 휴장일/체결을 모사하지 않음",
+    "initial_schd_usd":35,
+    "initial_annual_dividend_yield":0.03,
+    "fx_krw_per_usd":1300,
+    "tax": "배당/양도세 전. 별도 세후 숫자를 만들지 않는다",
+    "trade_cost_each_side":0.0015,
+    "tqqq_path": "QQQ 일 수익률×3에서 연4%/252의 가정 비용을 차감한 합성 일 수익. 실제 ETF 비용이나 미래 TQQQ 수익 예측 아님",
+    "scenarios": [
+      {"name":"가격 정체","qqq_annual_price_growth":0.0,"schd_annual_price_growth":0.0,"schd_annual_dps_growth":0.0},
+      {"name":"완만한 성장","qqq_annual_price_growth":0.06,"schd_annual_price_growth":0.03,"schd_annual_dps_growth":0.03},
+      {"name":"성장 중 급락","qqq_annual_price_growth":0.06,"schd_annual_price_growth":0.03,"schd_annual_dps_growth":0.03,"shock_year":5,"shock_first_half":{"qqq":-0.35,"schd":-0.20},"recovery":"급락에 의한 가격 괴리를 6~7년차에 해소. 5년차 주당배당20%감소는 이후 회복시키지 않고 연3%성장만 유지"}
+    ],
+    "dividend_timing":"분기 마지막 합성 평일에 주당 연배당/4 지급·SCHD 즉시 재투자. 월초 비중조정과는 겹치지 않도록 검사",
+    "accounting":"SCHD 실제 가정가격과 배당 재투자 총수익가격을 함께 작성. 기존 엔진의 SCHD평가액을 실제가격으로 나누어 재투자 후 주수를 복원하고 배당일에는 배당 전 주수×주당배당을 집계한다. 배당을 총자산에 다시 더하지 않는다",
+    "optional_dividend_stages":"사용자 승인이 필요한 배당 단계별 목표비중 변경은 자동 승인하지 않으며 이 예시에는 포함하지 않는다",
+    "outputs":"가정별 연간SCHD배당·누적배당·연말SCHD주수/평가액·5/10/15/20년 배당과 월환산액. 월5~100만원20조건도 세전/소수주 선형 산술",
+    "limits":"임의 경제 가정이며 시장에서 추정한 기대수익/분위수/최악이 아니다. 금리·환율·세금·슬리피지·미체결·정수주·승인형배당단계가 실제와 다를 수 있다. 수익률 경로에 따른 불확실성 예시만 제시"
+  },
+  "polaris_management":"현행 ops/polaris.py를 읽어 월 신규자금은 부족분 매수, 연12월 승인형 목표비중 재조정, 별도 가격TP/손절 부재를 설명. 익절을 보장한다고 표현하지 않는다. 예시는 주식50/채권30/금20을 목표60/20/20으로 되돌리는 세전/비용전100만원 회계",
+  "boundary":"통계적우위·새PASS/OOS·Paper/Live 승인 판정 없음. 전략·위험·운영·주문·예약·208 자료 변경 없음. 기존 결과를 덮어쓰지 않음. 결과 후 가정 튜닝 없음"
+}
