@@ -73,3 +73,43 @@ def test_card_and_result_text() -> None:
     )
     assert "SPYM 3주 · 평균 $89.67" in out and "QQQM 1주 못 삼" in out
     assert "여기까지" in out and "평단 $89.75 → $95.00" in out
+
+
+BIDS = {s: a - 0.02 for s, a in ASKS.items()}
+
+
+def test_plan_rebalance_sells_overweight_and_buys_the_rest() -> None:
+    held = {"SPYM": 20.0, "QQQM": 6.0, "IEF": 4.0, "GLDM": 4.0}  # 주식 ≈ 87%
+    sells, buys = m.plan_rebalance(held, BIDS, ASKS)
+    assert set(sells) == {"SPYM", "QQQM"} and all(n >= 1 for n in sells.values())
+    assert set(buys) <= {"IEF", "GLDM"} and buys
+    proceeds = sum(n * m.sell_price(BIDS[s]) for s, n in sells.items())
+    assert sum(n * m.limit_price(ASKS[s]) for s, n in buys.items()) <= proceeds
+    balanced = m.plan_buys({}, ASKS, 3_000.0)
+    assert m.plan_rebalance({k: float(v) for k, v in balanced.items()}, BIDS, ASKS) == ({}, {})
+    assert m.plan_rebalance(held, {"SPYM": 1.0}, ASKS) == ({}, {})
+
+
+def test_apply_sell_books_avg_cost_gain_by_year() -> None:
+    st = m.PolarisState()
+    st.apply_fill("SPYM", 10, 900.0, 0.0, 1_400, "b")  # 평단 $90
+    gain = st.apply_sell("SPYM", 4, 400.0, 0.36, 1_400, "s", "2027")
+    assert gain == pytest.approx(400.0 - 0.36 - 360.0)
+    assert st.qty["SPYM"] == 6 and st.cost_usd["SPYM"] == pytest.approx(540.0)
+    assert st.realized_usd["2027"] == pytest.approx(gain)
+    assert st.realized_krw["2027"] == pytest.approx((400.0 - 0.36) * 1_400 - 360.0 * 1_400)
+    back = m.PolarisState.from_dict(st.to_dict())
+    assert back.realized_usd == st.realized_usd and back.orders[-1]["qty"] == -4
+    st.rebals.append(m.Rebal("2027", nonce="r1"))
+    back = m.PolarisState.from_dict(st.to_dict())
+    assert back.rebal_for("2027") is not None and back.rebal_for("2027").nonce == "r1"  # type: ignore[union-attr]
+
+
+def test_rebal_text_shows_ratios_sells_gain_and_tax_note() -> None:
+    st = m.PolarisState()
+    for s, q in {"SPYM": 20, "QQQM": 6, "IEF": 4, "GLDM": 4}.items():
+        st.apply_fill(s, q, q * ASKS[s] * 0.8, 0.0, 1_400, s)
+    sells, buys = m.plan_rebalance(st.qty, BIDS, ASKS)
+    text = m.rebal_text(st, "2027", sells, buys, BIDS, ASKS, 1_400)
+    assert "2027년 12월 비율 맞추기" in text and "→ 30%" in text and "팔 것" in text
+    assert "살 것" in text and "250만 원 공제" in text and "이익 약" in text

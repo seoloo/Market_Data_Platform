@@ -6,8 +6,12 @@
 계산에서 뺀다.
 
 * 비율 SPYM 30 · QQQM 30 · IEF 20 · GLDM 20 (참고 계산 ``run_namu_core_compare.py`` half · dca20).
-* **사기만 한다.** 매달 넣는 돈으로 목표 비율에 모자란 종목부터 정수 주로 산다(파는 맞추기 없음).
-  자동 매도 없음 — 파는 것은 사용자가 직접.
+* 회차: 매달 넣는 돈으로 목표 비율에 모자란 종목부터 정수 주로 산다(사기만).
+* **12 월 맞추기** (사용자 2026-10-17 "4개월 하지" · 12 월마다 확인 · 채권도 익절): 4 회차 뒤
+  매년 12 월 첫 평일에 버튼 — 누르면 목표보다 1 주 넘게 많은 종목을 팔고(익절) 그 돈(달러)으로
+  모자란 종목을 산다. 참고 계산 ``run_namu_core_compare.py rebal``: 사기만은 주식 82 ~ 90% 로
+  쏠림, 12 월 한 번 ≈ 5%p 기준.
+  그 밖의 자동 매도 · 손절 없음.
 * 매달 한 번(첫 거래일 무렵) 텔레그램 버튼을 눌러야 그 회차를 산다. 건너뛰면 회차를 쓰지 않는다.
 * 성적은 **Polaris 장부 체결만**으로 — 같은 계좌의 개별주 · 같은 종목 직접 매수는 섞지 않는다.
 """
@@ -25,10 +29,13 @@ __all__ = [
     "LIMIT_UP",
     "WEIGHTS",
     "PolarisState",
+    "Rebal",
     "Round",
     "budget_usd",
     "card_text",
     "plan_buys",
+    "plan_rebalance",
+    "rebal_text",
     "result_text",
 ]
 
@@ -63,6 +70,18 @@ class Round:
 
 
 @dataclass(slots=True)
+class Rebal:
+    """그해 12 월 맞추기."""
+
+    year: str
+    status: str = "offered"
+    """offered · approved · done · skipped · none(맞출 것 없음)."""
+    nonce: str = ""
+    tries: int = 0
+    note: str = ""
+
+
+@dataclass(slots=True)
 class PolarisState:
     rounds: list[Round] = field(default_factory=list)
     qty: dict[str, float] = field(default_factory=lambda: dict.fromkeys(SYMBOLS, 0.0))
@@ -78,6 +97,10 @@ class PolarisState:
     """첫 회차 전 1 주 시험 매수 — 첫 회차 돈에서 뺀다."""
     halted: str = ""
     """주문 결과를 모르는 등 — 비어 있지 않으면 새 주문 없음."""
+    rebals: list[Rebal] = field(default_factory=list)
+    realized_usd: dict[str, float] = field(default_factory=dict)
+    """해(YYYY) → 판 이익(달러, 평균 단가 · 수수료 뺌)."""
+    realized_krw: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -92,6 +115,9 @@ class PolarisState:
         st.sent = list(d.get("sent") or [])
         st.prepaid_krw = float(d.get("prepaid_krw") or 0)
         st.halted = str(d.get("halted") or "")
+        st.rebals = [Rebal(**x) for x in d.get("rebals") or []]
+        st.realized_usd = {k: float(v) for k, v in (d.get("realized_usd") or {}).items()}
+        st.realized_krw = {k: float(v) for k, v in (d.get("realized_krw") or {}).items()}
         return st
 
     @property
@@ -115,6 +141,45 @@ class PolarisState:
             {"id": order_id, "symbol": symbol, "qty": qty, "usd": usd, "fee": fee_usd, "fx": fx}
         )
 
+    def apply_sell(
+        self,
+        symbol: str,
+        qty: float,
+        usd: float,
+        fee_usd: float,
+        fx: float,
+        order_id: str,
+        year: str,
+    ) -> float:
+        """판 체결 — 평균 단가로 원가를 빼고 그해 실현 이익(달러)을 적는다. 이익을 돌려준다."""
+        held = self.qty.get(symbol, 0.0)
+        if qty <= 0 or held <= 0:
+            return 0.0
+        part = min(1.0, qty / held)
+        cost = self.cost_usd[symbol] * part
+        cost_krw = self.cost_krw[symbol] * part
+        gain = usd - fee_usd - cost
+        self.qty[symbol] = held - qty
+        self.cost_usd[symbol] -= cost
+        self.cost_krw[symbol] -= cost_krw
+        self.realized_usd[year] = self.realized_usd.get(year, 0.0) + gain
+        self.realized_krw[year] = self.realized_krw.get(year, 0.0) + (usd - fee_usd) * fx - cost_krw
+        self.orders.append(
+            {
+                "id": order_id,
+                "symbol": symbol,
+                "qty": -qty,
+                "usd": usd,
+                "fee": fee_usd,
+                "fx": fx,
+                "gain": gain,
+            }
+        )
+        return gain
+
+    def rebal_for(self, year: str) -> Rebal | None:
+        return next((x for x in self.rebals if x.year == year), None)
+
 
 def budget_usd(krw: float, fx: float) -> float:
     """원화 → 쓸 수 있는 달러 (환율 여유 · 수수료 뺌)."""
@@ -125,6 +190,37 @@ def budget_usd(krw: float, fx: float) -> float:
 
 def limit_price(ask: float) -> float:
     return math.ceil(ask * (1 + LIMIT_UP) * 100) / 100
+
+
+def sell_price(bid: float) -> float:
+    """파는 지정가 = 매수 1 호가 − 0.2% (센트 내림)."""
+    return math.floor(bid * (1 - LIMIT_UP) * 100) / 100
+
+
+def plan_rebalance(
+    qty: Mapping[str, float],
+    bids: Mapping[str, float],
+    asks: Mapping[str, float],
+    weights: Mapping[str, float] = WEIGHTS,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """12 월 맞추기 (팔 것, 살 것). 목표보다 1 주 넘게 많은 만큼 정수 주로 팔고,
+    판 돈(수수료 뺌)으로 :func:`plan_buys` 처럼 모자란 종목을 산다."""
+    if any(bids.get(s, 0) <= 0 or asks.get(s, 0) <= 0 for s in weights):
+        return {}, {}
+    mid = {s: (bids[s] + asks[s]) / 2 for s in weights}
+    total = sum(qty.get(s, 0.0) * mid[s] for s in weights)
+    if total <= 0:
+        return {}, {}
+    sells = {}
+    for s, w in weights.items():
+        extra = qty.get(s, 0.0) - total * w / mid[s]
+        if extra >= 1:
+            sells[s] = int(extra)
+    cash = sum(n * sell_price(bids[s]) for s, n in sells.items()) * (1 - FEE) / (1 + FEE)
+    after = {s: qty.get(s, 0.0) - sells.get(s, 0) for s in weights}
+    buys = plan_buys(after, asks, cash, weights) if cash > 0 else {}
+    buys = {s: n for s, n in buys.items() if s not in sells}
+    return sells, buys
 
 
 def plan_buys(
@@ -203,6 +299,44 @@ def card_text(
         "",
         "비율 SPYM 30 · QQQM 30 · IEF 20 · GLDM 20 · 사기만 함(자동 매도 없음)",
         "누르면 미국 정규장(밤 11:30 이후)에 삽니다. 건너뛰면 이번 달은 안 사요.",
+    ]
+    return "\n".join(lines)
+
+
+def rebal_text(
+    state: PolarisState,
+    year: str,
+    sells: Mapping[str, int],
+    buys: Mapping[str, int],
+    bids: Mapping[str, float],
+    asks: Mapping[str, float],
+    fx: float,
+) -> str:
+    """12 월 맞추기 카드 — 지금 비율 · 팔 것(예상 이익) · 살 것 · 올해 판 이익."""
+    mid = {s: (bids[s] + asks[s]) / 2 for s in SYMBOLS}
+    total = sum(state.qty.get(s, 0.0) * mid[s] for s in SYMBOLS)
+    lines = [f"🧭 [Polaris {year}년 12월 비율 맞추기]", "━━━━━━━━━━━━", "📊 지금 비율 → 목표"]
+    for s, w in WEIGHTS.items():
+        now = state.qty.get(s, 0.0) * mid[s] / total if total else 0.0
+        lines.append(f"   └ {s} {now:.0%} → {w:.0%}")
+    gain_krw = 0.0
+    if sells:
+        lines.append("💰 팔 것 (많아진 몫 익절)")
+        for s, n in sells.items():
+            q = state.qty.get(s, 0.0)
+            avg = state.cost_usd[s] / q if q else 0.0
+            g = (sell_price(bids[s]) - avg) * n * fx
+            gain_krw += g
+            lines.append(f"   └ {s} {n}주 (약 ${sell_price(bids[s]) * n:,.0f}, 이익 약 {_won(g)})")
+    if buys:
+        lines.append("🛒 살 것 (판 돈으로)")
+        lines += [f"   └ {s} {n}주 (약 ${limit_price(asks[s]) * n:,.0f})" for s, n in buys.items()]
+    done = state.realized_krw.get(year, 0.0)
+    lines += [
+        "",
+        f"🧾 Polaris 올해 판 이익 {_won(done)} + 이번 약 {_won(gain_krw)}",
+        "   해외주식 양도세는 사람 기준 1 년 250만 원 공제 — 토스 등 다른 매도 이익과 합쳐요",
+        "누르면 미국 정규장에 팔고 → 그 달러로 삽니다. 건너뛰면 올해는 그대로 둬요.",
     ]
     return "\n".join(lines)
 

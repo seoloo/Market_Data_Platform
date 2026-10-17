@@ -159,6 +159,27 @@ class NamuGlobal(NamuSession):
             self._account = found[0]  # 모의(03)는 여러 개여도 국내 모의와 같은 첫 계좌
         return self._account
 
+    def buyable_usd(self, symbol: str = "AAPL", price: float = 100.0) -> float:
+        """달러 증거금으로 살 수 있는 금액(달러) — 판 돈으로 다시 살 때."""
+        path = "/gbstock/inquiry/v1/buyableAmount"
+        data = self._post(
+            path,
+            {
+                "act_no": self.account(),
+                "pcs_dit": "1",
+                "fc_sec_trd_nat_cd": US,
+                "iem_cd": symbol.upper(),
+                "fc_orr_uit_pr": round(price, 2),
+                "wtm_cur_knd_cd": USD_MARGIN,
+                "oss_orr_knd_cd": GTS,
+                "ahi_nmn_pr_tp_cd": LIMIT,
+            },
+        )
+        out = data.get("Output_0")
+        if not isinstance(out, dict):
+            raise NamuError(path, _code(data), _msg(data))
+        return _f(out.get("orr_pbl_amt"))
+
     def buyable_krw(self, symbol: str = "AAPL", price: float = 100.0) -> float:
         """원화 증거금으로 미국 주식을 살 수 있는 금액(원). 모의투자는 원화 증거금이 없어 달러."""
         path = "/gbstock/inquiry/v1/buyableAmount"
@@ -307,8 +328,10 @@ class NamuGlobal(NamuSession):
         *,
         client_order_id: str = "",
         time_in_force: str = "DAY",
+        margin: str | None = None,
     ) -> NamuOrderResult:
-        """지정가 주문. ``client_order_id`` 는 나무에 없는 값이라 기록용으로만 받는다."""
+        """지정가 주문. ``client_order_id`` 는 나무에 없는 값이라 기록용으로만 받는다.
+        ``margin`` = 매수 증거금 통화(기본 :attr:`margin` — 실전 원화). 판 달러로 살 때 ``"1"``."""
         del client_order_id
         symbol = symbol.upper()
         self._check(symbol, side, qty, limit)
@@ -324,7 +347,9 @@ class NamuGlobal(NamuSession):
         }
         path = "/gbstock/order/v1/buy" if side == "BUY" else "/gbstock/order/v1/sell"
         if side == "BUY":
-            body["wtm_cur_knd_cd"] = self.margin
+            if margin not in (None, KRW_MARGIN, USD_MARGIN):
+                raise TradingDisabledError(f"증거금 통화 코드 오류: {margin}")
+            body["wtm_cur_knd_cd"] = margin or self.margin
         day = datetime.fromtimestamp(self.clock(), KST).strftime("%Y%m%d")
         try:
             data = self._post(path, body)

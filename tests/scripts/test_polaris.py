@@ -13,7 +13,7 @@ import pytest
 
 from auto_trading.core.errors import OrderStateUnknownError
 from auto_trading.exchange.namu_global import NamuOrderResult, NamuOrderStatus, NamuQuote
-from auto_trading.ops.polaris import PolarisState, Round
+from auto_trading.ops.polaris import PolarisState, Rebal, Round
 from scripts import polaris as p
 
 KST = ZoneInfo("Asia/Seoul")
@@ -34,6 +34,7 @@ class FakeNamu:
     day: str = "20261102"
     sent: list[tuple[str, int, Decimal]] = field(default_factory=list)
     canceled: list[str] = field(default_factory=list)
+    sides: list[tuple[str, str, Any]] = field(default_factory=list)
 
     def quote(self, s: str) -> NamuQuote:
         return _q(s, self.day)
@@ -41,9 +42,10 @@ class FakeNamu:
     def buyable_krw(self, symbol: str = "", price: float = 0.0) -> float:
         return self.avail
 
-    def order(self, s: str, side: str, n: int, limit: Decimal, **_: Any) -> NamuOrderResult:
+    def order(self, s: str, side: str, n: int, limit: Decimal, **kw: Any) -> NamuOrderResult:
         if self.unknown:
             raise OrderStateUnknownError("timeout")
+        self.sides.append((side, s, kw.get("margin")))
         self.sent.append((s, n, limit))
         return NamuOrderResult(True, f"20261103:{len(self.sent)}", "접수")
 
@@ -55,6 +57,12 @@ class FakeNamu:
         if oid in self.canceled:
             return NamuOrderStatus("CANCELED", Decimal(0), None, None, None)
         return NamuOrderStatus("PENDING", Decimal(0), None, None, None)
+
+    def sellable(self, symbol: str) -> int:
+        return 1_000
+
+    def buyable_usd(self, symbol: str = "", price: float = 0.0) -> float:
+        return 10_000.0
 
     def cancel(self, oid: str, symbol: str = "") -> NamuOrderResult:
         self.canceled.append(oid)
@@ -147,3 +155,62 @@ def test_skip_button(env: FakeNamu) -> None:
     p.save(PolarisState(rounds=[Round("2026-11", 1_000_000, nonce="n1")]))
     assert "건너뛰었어요" in p.on_skip("n1")
     assert p.load().rounds[0].status == "skipped" and "지난 버튼" in p.on_skip("n1")
+
+
+DEC_MORNING = datetime(2027, 12, 1, 9, 0, tzinfo=KST)
+DEC_NIGHT = datetime(2027, 12, 2, 0, 20, tzinfo=KST)  # 뉴욕 12-01 10:20
+
+
+def _heavy() -> PolarisState:
+    st = PolarisState(rounds=[Round(f"2027-0{k}", 1_000_000, status="done") for k in range(1, 5)])
+    for s, q in {"SPYM": 20, "QQQM": 6, "IEF": 4, "GLDM": 4}.items():
+        st.apply_fill(s, q, q * ASKS[s] * 0.8, 0.0, 1_400, s)
+    return st
+
+
+def test_rebal_waits_for_four_rounds_and_december(env: FakeNamu) -> None:
+    env.day = "20271201"
+    st = _heavy()
+    st.rounds = st.rounds[:3]
+    assert p.offer_rebal(st, DEC_MORNING) == ""  # 4 회차 전
+    st = _heavy()
+    assert p.offer_rebal(st, datetime(2027, 11, 1, 9, 0, tzinfo=KST)) == ""  # 12 월 아님
+    card = p.offer_rebal(st, DEC_MORNING)
+    assert "비율 맞추기" in card and p.offer_rebal(p.load(), DEC_MORNING) == ""
+
+
+def test_rebal_button_then_sell_then_buy_with_usd(
+    env: FakeNamu, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env.day = "20271201"
+    p.save(_heavy())
+    st = p.load()
+    p.offer_rebal(st, DEC_MORNING)
+    nonce = p.load().rebals[0].nonce
+    monkeypatch.setattr(p, "_now", lambda: DEC_MORNING)
+    assert "팔고 살게요" in p.on_buy(nonce)
+    st = p.load()
+    before = dict(st.qty)
+    msg = p.do_rebal(st, st.rebals[0], DEC_NIGHT)
+    assert "팜" in msg and "삼" in msg
+    sells = [x for x in env.sides if x[0] == "SELL"]
+    buys = [x for x in env.sides if x[0] == "BUY"]
+    assert {s for _, s, _ in sells} == {"SPYM", "QQQM"}
+    assert buys and all(m == "1" for _, _, m in buys)  # 판 달러로
+    st = p.load()
+    assert st.qty["SPYM"] < before["SPYM"] and st.qty["IEF"] + st.qty["GLDM"] > 8
+    assert st.realized_usd["2027"] > 0 and st.rebals[0].status == "done"
+
+
+def test_rebal_skip_and_nothing_to_do(env: FakeNamu) -> None:
+    env.day = "20271201"
+    st = _heavy()
+    st.rebals.append(Rebal("2027", nonce="r9"))
+    p.save(st)
+    assert "그대로" in p.on_skip("r9") and p.load().rebals[0].status == "skipped"
+    flat = PolarisState(rounds=[Round(f"2027-0{k}", 1, status="done") for k in range(1, 5)])
+    from auto_trading.ops.polaris import plan_buys
+
+    for s, q in plan_buys({}, ASKS, 3_000.0).items():
+        flat.apply_fill(s, q, q * ASKS[s], 0.0, 1_400, s)
+    assert "맞출 것 없어요" in p.offer_rebal(flat, DEC_MORNING)

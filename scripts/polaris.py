@@ -10,6 +10,10 @@
 * 회차 버튼: 그달(한국 날짜) 평일 09:00 에 한 번 — [🛒 매수] [이번 달 건너뛰기]. 그달 끝까지 유효.
 * 매수: 누른 회차를 미국 정규장(뉴욕 10:00 ~ 15:30, 시세 거래일 = 뉴욕 오늘)에서. 지정가(매도
   1 호가 + 0.2%) → 최대 3 분 기다림 → 안 찬 것 취소. 남으면 다음 확인 때 다시, 3 번이면 끝.
+* **12 월 맞추기**: 4 회차를 다 채운 뒤 매년 12 월 첫 평일 09:00 에 카드
+  [✅ 맞추기] [올해 건너뛰기]. 누르면 정규장에 목표보다 1 주 넘게 많은 종목을
+  지정가(매수 1 호가 − 0.2%)로 팔고, 판 달러(달러 증거금)로 모자란 종목을 산다.
+  안 차면 다음 확인 때 다시, 3 번이면 끝. 그해 12 월 안에만.
 * 원화 증거금으로 산다 — 나무 '원화로 살 수 있는 돈' 이 회차 돈보다 적으면 사지 않고 알린다
   (사용자가 직접 산 개별주 몫을 쓰지 않는다).
 * 주문 결과를 모르면(:class:`OrderStateUnknownError`) 장부에 멈춤을 적고 알린다 — 새 주문 없음.
@@ -38,7 +42,11 @@ from auto_trading.config.secrets import (  # noqa: E402
 )
 from auto_trading.core.errors import AutoTradingError, OrderStateUnknownError  # noqa: E402
 from auto_trading.exchange.namu import LIVE_URL, NamuTokenCache  # noqa: E402
-from auto_trading.exchange.namu_global import NamuGlobal, NamuQuote  # noqa: E402
+from auto_trading.exchange.namu_global import (  # noqa: E402
+    USD_MARGIN,
+    NamuGlobal,
+    NamuQuote,
+)
 from auto_trading.notify.channels import (  # noqa: E402
     NotifyError,
     OutboxNotifier,
@@ -51,13 +59,17 @@ from auto_trading.ops.polaris import (  # noqa: E402
     ROUNDS,
     SYMBOLS,
     PolarisState,
+    Rebal,
     Round,
     budget_usd,
     card_text,
     holdings_lines,
     limit_price,
     plan_buys,
+    plan_rebalance,
+    rebal_text,
     result_text,
+    sell_price,
 )
 
 KST = ZoneInfo("Asia/Seoul")
@@ -165,8 +177,19 @@ def _round_by_nonce(st: PolarisState, nonce: str) -> Round | None:
     return next((r for r in st.rounds if r.nonce == nonce), None)
 
 
+def _rebal_by_nonce(st: PolarisState, nonce: str) -> Rebal | None:
+    return next((x for x in st.rebals if x.nonce == nonce), None)
+
+
 def on_buy(nonce: str) -> str:
     st = load()
+    rb = _rebal_by_nonce(st, nonce)
+    if rb is not None:
+        if rb.status != "offered" or rb.year != _now().strftime("%Y") or _now().month != 12:
+            return "⌛ 지난 버튼이에요"
+        rb.status = "approved"
+        save(st)
+        return f"🧭 Polaris {rb.year}년 맞추기 — 오늘 밤 미국 정규장에 팔고 살게요"
     r = _round_by_nonce(st, nonce)
     if r is None or r.status != "offered":
         return "⌛ 지난 버튼이에요 (이미 누름 · 다른 달)"
@@ -181,6 +204,13 @@ def on_buy(nonce: str) -> str:
 
 def on_skip(nonce: str) -> str:
     st = load()
+    rb = _rebal_by_nonce(st, nonce)
+    if rb is not None:
+        if rb.status != "offered":
+            return "⌛ 지난 버튼이에요"
+        rb.status = "skipped"
+        save(st)
+        return f"🧭 Polaris {rb.year}년은 맞추지 않고 그대로 둬요"
     r = _round_by_nonce(st, nonce)
     if r is None or r.status != "offered":
         return "⌛ 지난 버튼이에요"
@@ -209,6 +239,159 @@ def _wait(nh: NamuGlobal, ids: dict[str, str]) -> dict[str, Any]:
             nh.cancel(oid, ids[oid])
     nh.sleep(5)
     return {oid: nh.order_status(oid) for oid in ids}
+
+
+def _send_orders(
+    nh: NamuGlobal,
+    st: PolarisState,
+    side: str,
+    plan: dict[str, int],
+    price: dict[str, float],
+    margin: str | None = None,
+) -> tuple[dict[str, str], str]:
+    """(주문 ID → 종목, 멈춤 글). 보내기 전에 장부에 적는다."""
+    ids: dict[str, str] = {}
+    for s, n in plan.items():
+        limit = Decimal(str(price[s]))
+        st.sent.append(
+            {"id": "", "symbol": s, "side": side, "qty": n, "limit": float(limit), "sent": 0}
+        )
+        save(st)
+        try:
+            if side == "BUY":
+                res = nh.order(s, side, n, limit, margin=margin)
+            else:
+                res = nh.order(s, side, n, limit)
+        except OrderStateUnknownError as exc:
+            st.halted = f"{s} 주문 결과 모름 — 나무 앱 확인 뒤 장부 정리 ({exc})"[:200]
+            save(st)
+            return ids, f"🛑 Polaris 멈춤: {st.halted}"
+        if not res.accepted:
+            st.sent[-1].update(sent=-1, note=f"{res.code} {res.message}"[:120])
+            save(st)
+            continue
+        st.sent[-1].update(id=res.code, sent=1)
+        ids[res.code] = s
+        save(st)
+    return ids, ""
+
+
+def _filled(stt: Any) -> tuple[float, float]:
+    filled = float(stt.filled_qty)
+    usd = float(stt.filled_amount or 0) or filled * float(stt.avg_price or 0)
+    return filled, usd
+
+
+def do_rebal(st: PolarisState, rb: Rebal, now: datetime) -> str:
+    """12 월 맞추기 한 번 — 팔고(익절) → 판 달러로 산다."""
+    nh = client()
+    try:
+        q = quotes(nh)
+        if not in_session(now, q["SPYM"]):
+            return ""
+        fx = q["SPYM"].fx
+        bids = {s: x.bid for s, x in q.items()}
+        asks = {s: x.ask for s, x in q.items()}
+        sells, _ = plan_rebalance(st.qty, bids, asks)
+        sells = {s: min(n, nh.sellable(s)) for s, n in sells.items()}
+        sells = {s: n for s, n in sells.items() if n > 0}
+        if not sells:
+            rb.status = "done"
+            save(st)
+            return ""
+        ids, halt = _send_orders(nh, st, "SELL", sells, {s: sell_price(bids[s]) for s in sells})
+        if halt:
+            return halt
+        sts = _wait(nh, ids)
+        year = now.strftime("%Y")
+        lines = [f"🧭 Polaris {year}년 맞추기", "━━━━━━━━━━━━"]
+        cash = 0.0
+        for oid, s in ids.items():
+            stt = sts[oid]
+            if stt.status not in ("FILLED", "CANCELED", "REJECTED"):
+                st.halted = f"{s} 매도 {oid} 상태 미확인({stt.status or '없음'}) — 나무 앱 확인"
+            n, usd = _filled(stt)
+            if n > 0:
+                fee = usd * FEE
+                gain = st.apply_sell(s, n, usd, fee, fx, oid, year)
+                cash += usd - fee
+                lines.append(
+                    f"💰 {s} {n:g}주 팜 · 평균 ${usd / n:,.2f} · 이익 약 {gain * fx:+,.0f}원"
+                )
+        save(st)
+        if st.halted:
+            return "\n".join([*lines, f"🛑 Polaris 멈춤: {st.halted}"])
+        budget = min(cash, nh.buyable_usd("SPYM", asks["SPYM"] or 100.0)) / (1 + FEE)
+        sold = set(ids.values())
+        buys = {s: n for s, n in plan_buys(st.qty, asks, budget).items() if s not in sold}
+        bought = 0.0
+        if buys:
+            bids_ids, halt = _send_orders(
+                nh, st, "BUY", buys, {s: limit_price(asks[s]) for s in buys}, USD_MARGIN
+            )
+            if halt:
+                return "\n".join([*lines, halt])
+            bsts = _wait(nh, bids_ids)
+            for oid, s in bids_ids.items():
+                n, usd = _filled(bsts[oid])
+                if n > 0:
+                    st.apply_fill(s, n, usd, usd * FEE, fx, oid)
+                    bought += usd * (1 + FEE)
+                    lines.append(f"🛒 {s} {n:g}주 삼 · 평균 ${usd / n:,.2f}")
+        rb.tries += 1
+        left, _ = plan_rebalance(st.qty, bids, asks)
+        if not left or rb.tries >= MAX_TRIES:
+            rb.status = "done"
+        save(st)
+        if cash - bought > 1:
+            lines.append(f"💵 남은 달러 약 ${cash - bought:,.2f} — 계좌에 그대로")
+        lines.append(f"🧾 Polaris {year}년 판 이익 약 {st.realized_krw.get(year, 0.0):,.0f}원")
+        prices = {s: x.last for s, x in q.items()}
+        lines += holdings_lines(st, prices, fx)
+        return "\n".join(lines)
+    finally:
+        nh.close()
+
+
+def offer_rebal(st: PolarisState, now: datetime) -> str:
+    """4 회차를 다 채운 뒤 매년 12 월 첫 평일 — 맞추기 카드 (맞출 것이 없으면 짧게 알림)."""
+    year = now.strftime("%Y")
+    if (
+        now.month != 12
+        or now.weekday() >= 5
+        or st.done_rounds < ROUNDS
+        or st.rebal_for(year) is not None
+        or sum(st.qty.values()) <= 0
+    ):
+        return ""
+    nh = client()
+    try:
+        q = quotes(nh)
+    finally:
+        nh.close()
+    bids = {s: x.bid or x.last for s, x in q.items()}
+    asks = {s: x.ask or x.last for s, x in q.items()}
+    sells, buys = plan_rebalance(st.qty, bids, asks)
+    if not sells:
+        st.rebals.append(Rebal(year, status="none"))
+        save(st)
+        text = f"🧭 Polaris {year}년 12월 — 비율이 목표와 1주 안쪽이라 올해는 맞출 것 없어요"
+        send(text)
+        return text
+    nonce = hashlib.sha256(f"polr:{year}:{time.time()}".encode()).hexdigest()[:10]
+    st.rebals.append(Rebal(year, nonce=nonce))
+    save(st)
+    text = rebal_text(st, year, sells, buys, bids, asks, q["SPYM"].fx)
+    send(
+        text,
+        [
+            [
+                {"text": "✅ 맞추기", "callback_data": f"pol:{nonce}:buy"},
+                {"text": "올해 건너뛰기", "callback_data": f"pol:{nonce}:skip"},
+            ]
+        ],
+    )
+    return text
 
 
 def buy_round(st: PolarisState, r: Round, now: datetime) -> str:
@@ -298,10 +481,20 @@ def daily() -> int:
     now = _now()
     out: list[str] = []
     try:
-        if now.hour >= 8:  # 아침 확인 — 회차 버튼
-            card = offer(st, now)
-            if card:
-                out.append(card)
+        if now.hour >= 8:  # 아침 확인 — 회차 버튼 · 12 월 맞추기 카드
+            for card in (offer(st, now), offer_rebal(st, now)):
+                if card:
+                    out.append(card)
+        rb = next((x for x in st.rebals if x.status == "approved"), None)
+        if rb is not None:
+            if now.month != 12 or rb.year != now.strftime("%Y"):
+                rb.status, rb.note = "done", "12 월이 지나 그만둠"
+                save(st)
+            else:
+                msg = do_rebal(st, rb, now)
+                if msg:
+                    send(msg)
+                    out.append(msg)
         r = next((x for x in st.rounds if x.status == "approved"), None)
         if r is not None:
             msg = buy_round(st, r, now)

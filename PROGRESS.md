@@ -1,5 +1,11 @@
 # 작업 현황
 
+## 2026-10-17 — 🧭 Polaris 4 회차 확정 · 12 월 맞추기 (Claude)
+
+- 사용자 "좋아 4개월 하지. 그렇게 반영해줘" — 회차 100 만 × 4 는 이미 기본값. 함께 정한 12 월 맞추기를 붙임:
+  `ops/polaris.py` `plan_rebalance` · `sell_price` · `apply_sell`(평균 단가 · 해마다 실현 이익) · `Rebal` · `rebal_text`, `scripts/polaris.py` `offer_rebal` · `do_rebal`(팔고 → 판 달러 `USD_MARGIN` 으로 삼), `NamuGlobal.order(margin=)` · `buyable_usd`.
+  4 회차를 다 채운 뒤 매년 12 월 첫 평일 카드 → 버튼 → 정규장. 첫 맞추기는 2027-12. 앞 답에서 '오르빗 설정에서 회차 수 변경' 이라 한 것은 틀림 — 회차 수는 코드 `ROUNDS`.
+
 ## 2026-10-17 — Polaris 4 달 × 100 만 vs 8 달 × 50 만 참고 계산 (Claude)
 
 - 사용자 "4개월 100만원씩이 좋을까 8개월 50만원씩이 좋을까". `run_namu_core_compare.py split`(조건 먼저 커밋), 시작 달 2005-01 ~ 2024-09 237 개.
