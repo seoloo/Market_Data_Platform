@@ -244,8 +244,8 @@ def main(which: str = "base") -> int:
             "Deneb": deneb,
         }
     if which == "lev6":
-        pairs = (("S1", "SPY"), ("S2", "SSO"), ("S3", "UPRO"))
-        pairs += (("N1", "QQQ"), ("N2", "QLD"), ("N3", "TQQQ"))
+        pairs = [("S1", "SPY"), ("S2", "SSO"), ("S3", "UPRO")]
+        pairs += [("N1", "QQQ"), ("N2", "QLD"), ("N3", "TQQQ")]
         rules = {tag: mix(sym) for tag, sym in pairs}
         rules["Deneb"] = deneb
     for wname, (a, b) in WINDOWS.items():
