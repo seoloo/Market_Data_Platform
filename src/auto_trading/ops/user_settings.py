@@ -115,6 +115,13 @@ FIELDS: tuple[Field, ...] = (
         "바로",
     ),
     Field(
+        "stock.pead",
+        "PEAD 실적 갭 10%+ 매수 알림 (💹 약 $100 · 손절 없이 20 거래일, 버튼 누를 때만)",
+        "bool",
+        True,
+        "다음 PEAD 실행(화 ~ 토 21:40)부터",
+    ),
+    Field(
         "vega.earn",
         "Vega 남는 USDT 를 바이낸스 유동형(Simple Earn)에 — 살 때 먼저 꺼냄",
         "bool",

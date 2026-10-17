@@ -6,6 +6,10 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 💹 PEAD 갭 10%+ 실거래 소액 (Claude)
+
+- 연구 240(지지) 의 갭 +10% 이상 신호만 알림 + 버튼으로 약 $100 실거래: 반응일 다음 정규장 시작 직후 매수, 손절 없이 20 거래일째 장 마감 무렵 매도(사용자 결정). 241 Paper(전체 신호)는 따로 계속.
+
 ## 2026-10-17 — 257 주말 되돌림 1 차 · 258 💹 익절 (Claude)
 
 - [257](research/257-weekend-fade-holdout-check.md) 주말 되돌림 거스르기를 안 본 5 주로: +0.29% · 4 / 5 주 + 로 형식 통과지만 되돌림 상관이 사라짐(+0.09) → 그림자 기록 자격만.

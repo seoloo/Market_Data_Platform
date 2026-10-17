@@ -199,3 +199,26 @@ def test_qty_over_max_and_hard_block(fake: dict[str, list[Any]]) -> None:
     assert "1 ~ 19주만" in bot.out[-1][1]
     tb.handle_stock(bot, _m("개별주 BAD"))  # type: ignore[arg-type]
     assert bot.out[-1][0] == "send"  # 넘을 수 없는 이유 — 버튼 없음
+
+
+def test_pead_button_routes_to_reserve_and_skip(
+    fake: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def buy(n: str) -> str:
+        calls.append(("buy", n))
+        return "⏳ PEAD 예약"
+
+    def skip(n: str) -> str:
+        calls.append(("skip", n))
+        return "ABC 건너뜀"
+
+    monkeypatch.setattr(sg, "reserve_pead", buy)
+    monkeypatch.setattr(sg, "skip_pead", skip)
+    assert is_stock(_m(data="stp:ab12:ABC"))
+    bot = FakeBot()
+    assert not tb.handle_stock(bot, _m(data="stp:ab12:ABC"))  # type: ignore[arg-type]
+    assert calls == [("buy", "ab12")] and bot.out[-1] == ("send", "⏳ PEAD 예약")
+    tb.handle_stock(bot, _m(data="stp:cd34:cancel"))  # type: ignore[arg-type]
+    assert calls[-1] == ("skip", "cd34") and not fake["reserve"]

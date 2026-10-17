@@ -292,6 +292,18 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
         if len(parts) != 3:
             return False
         kind, nonce, arg = parts
+        if kind == "stp":  # PEAD 알림 버튼 — 다음 정규장이 끝날 때까지 유효(알림 기록이 지킴)
+            if arg == "cancel":
+                with contextlib.suppress(NotifyError):
+                    bot.edit(msg.message_id, "건너뛰었어요 — " + sg.skip_pead(nonce))
+                return False
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"🛒 PEAD {arg} 다시 확인하고 예약해요…")
+            try:
+                bot.send(sg.reserve_pead(nonce))
+            except (SystemExit, ValueError) as exc:
+                bot.send(f"⚠ PEAD 예약 못 함 — {exc}")
+            return False
         if not STOCK_STORE.use_request(nonce, now, kind):
             bot.send("⌛ 지난 버튼이에요 (5 분 지남 · 이미 누름) — 다시 보내 주세요")
             return False

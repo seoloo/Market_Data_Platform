@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from auto_trading.ops import user_settings
 from auto_trading.ops.size_order import Ticket
 from scripts import size_guard as m
 
@@ -195,3 +196,66 @@ def test_reserve_on_held_symbol_is_add_on_and_pending_buy_blocks(
     assert "추가 매수" in out and "기존 10주와 합쳐" in out
     out2 = m.reserve("CRCL")  # 추가 매수가 아직 안 끝났으면 또 예약하지 않음
     assert "이미 매수 중" in out2 and len(m.load_tickets()) == 2
+
+
+def test_pead_qty() -> None:
+    assert m.pead_qty(30.0) == 3  # $90
+    assert m.pead_qty(120.0) == 1  # $100 넘지만 $150 까지는 1 주
+    assert m.pead_qty(400.0) == 0  # 알림만
+    assert m.pead_qty(0.0) == 0
+
+
+def _pead_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(m, "DATA", tmp_path)
+    monkeypatch.setattr(m, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(m, "LOCK", tmp_path / "lock")
+    monkeypatch.setattr(m, "PEAD_OFFERS", tmp_path / "pead_offers.json")
+    monkeypatch.setattr(m, "OUTBOX", tmp_path / "outbox.log")
+    monkeypatch.setattr(m, "halted_for", lambda *_: None)
+    monkeypatch.setattr(m, "tick", lambda now=None, **_: [])
+    monkeypatch.setattr(m, "_blocked", dict)
+    monkeypatch.setattr(m, "resolve", lambda q: (q, f"{q} Inc"))
+    monkeypatch.setattr(user_settings, "get", lambda root, key: True)
+
+
+def test_offer_pead_filters_gap_and_dedupes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _pead_env(tmp_path, monkeypatch)
+    sigs = [
+        {"sym": "ABC", "r_day": "2026-10-15", "gap": 0.12, "r_close": 30.0},
+        {"sym": "LOW", "r_day": "2026-10-15", "gap": 0.07, "r_close": 30.0},  # 10% 미만
+    ]
+    out = m.offer_pead(sigs, _ms("2026-10-16T21:40:00"), send=False)
+    assert len(out) == 1 and "ABC" in out[0] and "3주" in out[0]
+    assert m.offer_pead(sigs, _ms("2026-10-16T21:45:00"), send=False) == []  # 같은 신호 한 번만
+    monkeypatch.setattr(user_settings, "get", lambda root, key: key != "stock.pead")
+    sigs2 = [{"sym": "NEW", "r_day": "2026-10-15", "gap": 0.2, "r_close": 10.0}]
+    assert m.offer_pead(sigs2, send=False) == []  # 설정 끄면 안 보냄
+
+
+def test_reserve_pead_session_and_expiry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _pead_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(m, "_reader", lambda: _ClosingReader())
+    sigs = [{"sym": "ABC", "r_day": "2026-10-15", "gap": 0.12, "r_close": 30.0}]
+    m.offer_pead(sigs, _ms("2026-10-16T21:40:00"), send=False)
+    nonce = next(iter(m._load_offers()))
+    msg = m.reserve_pead(nonce, _ms("2026-10-16T21:50:00"))
+    assert "PEAD 예약" in msg and "2026-10-16" in msg
+    t = m.load_tickets()[0]
+    assert (t.kind, t.qty, t.session, t.ref_price) == ("pead", 3, "US:2026-10-16", 30.0)
+    assert "지난 버튼" in m.reserve_pead(nonce, _ms("2026-10-16T21:51:00"))  # 한 번만
+    # 반응일 다음 장이 끝난 뒤 누르면 사지 않음
+    m.offer_pead(
+        [{"sym": "LATE", "r_day": "2026-10-15", "gap": 0.15, "r_close": 20.0}],
+        _ms("2026-10-16T21:40:00"),
+        send=False,
+    )
+    late = next(k for k, o in m._load_offers().items() if o["sym"] == "LATE")
+    assert "이미 끝나" in m.reserve_pead(late, _ms("2026-10-17T06:00:00"))
+    assert len(m.load_tickets()) == 1
+
+
+class _ClosingReader(Reader):
+    def close(self) -> None:
+        pass

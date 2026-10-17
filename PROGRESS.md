@@ -1,5 +1,15 @@
 # 작업 현황
 
+## 2026-10-17 — 💹 PEAD 갭 10%+ 실거래 소액 연결 (Claude)
+
+- 사용자: 수익 후보 B(PEAD 갭 10% 이상만 작게) → "그렇게 진행해봐" · 손절 "20 보유 추천해준 것으로 변경" · $100 · 알림 + 버튼.
+- PEAD Paper(21:40)가 새 갭 +10% 신호를 찾으면 투자 봇 카드 + [🛒 N주 매수]. 누르면 반응일 다음 정규장 시작 직후 약 $100(1 주 $150 까지) 지정가,
+  **손절 없이** 20 번째 정규장 마감 무렵 지정가 매도. 그 장이 지나면 버튼 무효, 같은 종목이 💹 장부에 있으면 안 삼. 설정 `stock.pead`(기본 켬).
+- 코드: `ops/size_order.py`(`kind=pead` · `hold_days`, 추격 방지 없음 · 손절 0) · `ops/stop_guard.py`(`check_hold_exit`, PEAD 문구) ·
+  `scripts/size_guard.py`(`offer_pead` · `reserve_pead` · `skip_pead`, tick 에 보유 장 세기) · `telegram_bot`(`stp:` 버튼) · `pead_paper`(`r_close`, 신호 알림) · 설정.
+- 시험: PEAD 장부 3 · size_guard 3 · 텔레그램 1 추가. 전체 pytest · leakage · mypy · ruff · import 계층 통과.
+- 한계: 지정가 상한(`TossTrader` 최대가 = 반응일 종가 × 1.1)을 넘게 열리면 주문이 막힌다(드묾 — 알림으로 보임). PC 꺼짐 · 마감 창(3 분) 놓치면 다음 장에 판다.
+
 ## 2026-10-17 — 257 주말 되돌림 1 차 · 258 💹 익절 (Claude)
 
 - 사용자 "그렇게 진행해봐"(B 갭 10%+ 작게 + A 1 차 확인) · "개별주 익절 더 연구".

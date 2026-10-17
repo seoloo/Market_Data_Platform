@@ -10,11 +10,17 @@
     python -m scripts.size_guard attach 삼성전자    # 앱에서 산 종목에 손절만 (토스 평균 단가 −3%)
     python -m scripts.size_guard release <id>       # 손절 해제 (장부에서 빼고 주식은 그대로)
     python -m scripts.size_guard cancel <id>        # 아직 안 산 예약 취소
+    python -m scripts.size_guard pead-offers        # PEAD 알림 기록 (주문 없음)
 
 규칙: :mod:`auto_trading.ops.position_size` · :mod:`~auto_trading.ops.size_order` ·
 :mod:`~auto_trading.ops.stop_guard`. 주문은 ``TOSS_TRADING_ENABLED=true`` 일 때만, 예약 매수는
 ``data/HALT`` (전체 정지) 면 하지 않는다 — 손절 매도는 정지 중에도 한다(보호 매도).
 텔레그램 💹 개별주(scripts/telegram_bot.handle_stock)가 이 함수들을 부르고, 봇이 2 분마다 tick 한다.
+
+PEAD (2026-10-17 사용자 — 연구 240 · 241): PEAD Paper(21:40)가 새 실적 갭 +10% 이상 신호를 찾으면
+:func:`offer_pead` 가 [🛒 매수] 버튼 카드를 보낸다. 누르면 :func:`reserve_pead` 가
+반응일 다음 정규장 시작 직후 약 $100 어치를 예약한다(손절 없음, 20 거래일째 장 마감 무렵 자동 매도).
+그 장이 지나면 버튼은 무효.
 """
 
 from __future__ import annotations
@@ -40,7 +46,7 @@ from auto_trading.config.secrets import (
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.exchange.toss import TossReader, TossTokenCache, TossTrader
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
-from auto_trading.ops import kr_earnings
+from auto_trading.ops import kr_earnings, user_settings
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.entry_events import EntryEvents, company_events, macro_events
 from auto_trading.ops.event_store import earnings_day
@@ -54,8 +60,14 @@ from auto_trading.ops.position_size import (
     is_kr,
     recommend,
 )
-from auto_trading.ops.size_order import Ticket, merge_into, new_ticket, refresh, step_buy
-from auto_trading.ops.stop_guard import check_stop, register_app, status_lines, step_sell
+from auto_trading.ops.size_order import PEAD, Ticket, merge_into, new_ticket, refresh, step_buy
+from auto_trading.ops.stop_guard import (
+    check_hold_exit,
+    check_stop,
+    register_app,
+    status_lines,
+    step_sell,
+)
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "size_guard"
@@ -73,6 +85,13 @@ KST = ZoneInfo("Asia/Seoul")
 INDEX = {"US": ("SPY", "S&P500(SPY)"), "KR": ("069500", "KOSPI200(KODEX 200)")}
 LOCK_STALE_MS = 10 * 60_000
 TAG = "💹 [개별주 · 손절]"
+PEAD_OFFERS = DATA / "pead_offers.json"
+PEAD_USD = 100.0
+"""PEAD 한 번 매수 금액(사용자 2026-10-17 '$100')."""
+PEAD_MAX_PX = 150.0
+"""1 주가 $100 넘으면 $150 까지만 1 주 — 더 비싸면 알림만."""
+PEAD_MIN_GAP = 0.10
+"""240: 갭 10% 이상만 효과가 뚜렷했다(+1.48%, 5 ~ 10% 는 +0.16%)."""
 
 
 # ------------------------------------------------------------------ 장부
@@ -517,9 +536,11 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
         try:
             # 보호 매도는 일정 조회보다 먼저 실행한다. 발표 수집 실패가 매도를 막지 않는다.
             for t in held:
-                _key, _buy_live, sell_live = sess[t.kr]
+                key, buy_live, sell_live = sess[t.kr]
                 if t.status == "holding" and sell_live:
                     check_stop(t, last.get(t.symbol))
+                # PEAD: 지난 정규장을 세고 20 번째 장 마감 무렵(매수 창 닫힌 뒤 · 매도 창 안) 판다
+                check_hold_exit(t, key, sell_live=sell_live, closing=sell_live and not buy_live)
                 if t.status == "selling":
                     sellable = float(reader.sellable(t.symbol)) if sell_live else 0.0
                     out += step_sell(t, trader, now, live=sell_live, sellable=sellable, fx=fx)
@@ -543,12 +564,12 @@ def tick(now_ms: int | None = None, *, send: bool = True) -> list[str]:
                                 pending = any(not o.closed for o in t.buys)
                                 if pending:
                                     risk = event_risk(reader, t.symbol, now, force=True)
-                                    if not risk.ok and not t.override:
+                                    if not risk.ok and not (t.override or t.kind == PEAD):
                                         block = " · ".join(risk.blocked)
                                 else:
                                     fresh = _advise(reader, t.symbol, t.name, now, force=True)
                                     rem = t.qty - int(sum(o.filled for o in t.buys))
-                                    if t.override:  # 사람이 정한 매수 — 넘을 수 없는 이유만
+                                    if t.override or t.kind == PEAD:  # 넘을 수 없는 이유만
                                         if fresh.hard:
                                             block = " · ".join(fresh.hard)
                                         elif rem > fresh.max_qty:
@@ -648,6 +669,191 @@ def reserve(query: str, qty: int | None = None) -> str:
     return "\n\n".join([text, head, *msgs])
 
 
+# ------------------------------------------------------------------ PEAD
+
+
+def _load_offers() -> dict[str, dict[str, Any]]:
+    try:
+        d = json.loads(PEAD_OFFERS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _save_offers(offers: dict[str, dict[str, Any]]) -> None:
+    DATA.mkdir(parents=True, exist_ok=True)
+    tmp = PEAD_OFFERS.with_suffix(".tmp")
+    tmp.write_text(json.dumps(offers, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(PEAD_OFFERS)
+
+
+def pead_qty(price: float) -> int:
+    """약 $100 어치. 1 주가 $100 넘으면 $150 까지만 1 주, 더 비싸면 0 (알림만)."""
+    if price <= 0:
+        return 0
+    q = int(PEAD_USD // price)
+    if q >= 1:
+        return q
+    return 1 if price <= PEAD_MAX_PX else 0
+
+
+def pead_text(o: dict[str, Any]) -> str:
+    q, ref = int(o["qty"]), float(o["ref"])
+    lines = [
+        f"📈 PEAD 후보 — {o['sym']} 실적 발표 뒤 갭 +{float(o['gap']):.1%}"
+        f" (반응일 {o['r_day']}, 종가 ${ref:,.2f})",
+        "연구 240: 갭 10% 이상은 20 거래일 동안 SPY 보다 평균 +1.5%"
+        " (생존 편향 있음 · Paper 확인 중)",
+    ]
+    if q:
+        lines.append(
+            f"누르면 다음 정규장 시작 직후 {q}주(약 ${q * ref:,.0f}) 지정가 매수"
+            " · 손절 없이 20 거래일째 장 마감 무렵 자동 매도"
+        )
+    else:
+        lines.append(f"1 주가 ${PEAD_MAX_PX:,.0f} 넘어 $100 로는 못 사요 — 알림만")
+    lines.append("버튼은 다음 정규장이 끝나기 전까지만 유효")
+    return "\n".join(lines)
+
+
+def offer_pead(
+    sigs: list[dict[str, Any]], now_ms: int | None = None, *, send: bool = True
+) -> list[str]:
+    """새 갭 10%+ 신호마다 카드 + [🛒 N주 매수] [건너뛰기]. 같은 (종목, 반응일) 은 한 번만."""
+    if not user_settings.get(REPO, "stock.pead") or not user_settings.get(REPO, "stock.orders"):
+        return []
+    now = now_ms or _now_ms()
+    offers = _load_offers()
+    seen = {str(o.get("key")) for o in offers.values()}
+    out: list[str] = []
+    creds = load_telegram_credentials(REPO / ".env") if send else None
+    for sg in sorted(sigs, key=lambda x: -float(x["gap"])):
+        key = f"{sg['sym']}:{sg['r_day']}"
+        if float(sg["gap"]) < PEAD_MIN_GAP or key in seen or sg.get("r_close") is None:
+            continue
+        ref = float(sg["r_close"])
+        nonce = hashlib.sha256(f"{key}:{now}".encode()).hexdigest()[:10]
+        o: dict[str, Any] = {
+            "key": key,
+            "sym": str(sg["sym"]),
+            "r_day": str(sg["r_day"]),
+            "gap": float(sg["gap"]),
+            "ref": ref,
+            "qty": pead_qty(ref),
+            "at": now,
+            "used": False,
+        }
+        offers[nonce] = o
+        seen.add(key)
+        text = pead_text(o)
+        out.append(text)
+        rows = (
+            [
+                [
+                    {
+                        "text": f"🛒 {o['qty']}주 매수 (약 ${o['qty'] * ref:,.0f})",
+                        "callback_data": f"stp:{nonce}:{o['sym']}",
+                    }
+                ],
+                [{"text": "건너뛰기", "callback_data": f"stp:{nonce}:cancel"}],
+            ]
+            if o["qty"]
+            else None
+        )
+        if send:
+            OutboxNotifier(OUTBOX).send(text)
+        if creds is not None:
+            try:
+                TelegramNotifier(creds).send_message(text, buttons=rows)
+            except NotifyError as exc:
+                print(f"텔레그램 실패: {exc}")
+    _save_offers(offers)
+    return out
+
+
+def _pead_session(reader: Any, r_day: date, now_ms: int) -> str | None:
+    """반응일 다음 미국 정규장 이름. 그 장이 끝나기 5 분 전이 지났으면 None."""
+    d = r_day + timedelta(days=1)
+    for _ in range(10):
+        hours = reader.checked_regular_session(d.isoformat(), kr=False)
+        if hours is not None:
+            end = datetime.fromisoformat(hours[1])
+            if end.tzinfo is None:
+                raise ValueError("정규장 시각 오류")
+            if now_ms >= end.timestamp() * 1000 - 5 * 60_000:
+                return None
+            return f"US:{d.isoformat()}"
+        d += timedelta(days=1)
+    raise ValueError("다음 정규장 미확인")
+
+
+def skip_pead(nonce: str) -> str:
+    offers = _load_offers()
+    o = offers.get(nonce)
+    if o is None:
+        return "지난 알림이에요"
+    o["used"] = True
+    _save_offers(offers)
+    return f"{o['sym']} PEAD 건너뛰었어요"
+
+
+def reserve_pead(nonce: str, now_ms: int | None = None) -> str:
+    """PEAD 알림 버튼 → 반응일 다음 정규장 시작 직후 매수 예약 (손절 없음, 20 거래일 보유)."""
+    halt = halted_for(HALT, "stock")
+    if halt:
+        return f"⛔ 개별주 새 매수 정지 중 ({halt}) — 텔레그램 '정지풀기' 로 풀 수 있어요"
+    now = now_ms or _now_ms()
+    offers = _load_offers()
+    o = offers.get(nonce)
+    if o is None or o.get("used"):
+        return "⌛ 지난 버튼이에요 (이미 누름 · 건너뜀)"
+    sym, qty = str(o["sym"]), int(o["qty"])
+    if qty < 1:
+        return f"{sym} 는 1 주가 비싸 $100 로 못 사요"
+    blocked = _blocked()
+    if sym in blocked:
+        return f"{sym} 는 {blocked[sym]} 종목이라 PEAD 로 사지 않아요"
+    reader = _reader()
+    try:
+        key = _pead_session(reader, date.fromisoformat(str(o["r_day"])), now)
+    finally:
+        reader.close()
+    if key is None:
+        o["used"] = True
+        _save_offers(offers)
+        return f"⌛ {sym} 반응일 다음 정규장이 이미 끝나 사지 않았어요 (PEAD 는 그 장 시가 매수)"
+    try:
+        _sym, name = resolve(sym)
+    except SystemExit:
+        name = sym
+    with _Lock():
+        tickets = load_tickets()
+        if any(t.active and t.symbol == sym for t in tickets):
+            return f"⚠️ {sym} 는 이미 💹 장부에 있어 PEAD 로 따로 사지 않았어요"
+        t = Ticket(
+            _tid(now),
+            sym,
+            name,
+            "USD",
+            qty,
+            float(o["ref"]),
+            now,
+            session=key,
+            kind=PEAD,
+            note=f"PEAD 갭 +{float(o['gap']):.1%} (반응일 {o['r_day']})",
+        )
+        tickets.append(t)
+        save_tickets(tickets)
+        o["used"] = True
+        _save_offers(offers)
+        msgs = tick(now)
+    head = (
+        f"⏳ {name} {qty}주 PEAD 예약 — {key.split(':')[1]} 정규장 시작 직후 지정가 매수,"
+        " 손절 없이 20 거래일째 장 마감 무렵 매도"
+    )
+    return "\n\n".join([head, *msgs])
+
+
 def attach(query: str, qty: float | None = None) -> str:
     symbol, name = resolve(query)
     reader = _reader()
@@ -745,6 +951,8 @@ def main(argv: list[str]) -> int:
         print(_set_status(rest[0], ("holding",), "released"))
     elif cmd == "cancel" and rest:
         print(_set_status(rest[0], ("reserved",), "canceled"))
+    elif cmd == "pead-offers":
+        print(json.dumps(_load_offers(), ensure_ascii=False, indent=1))
     else:
         print(__doc__)
         return 2
