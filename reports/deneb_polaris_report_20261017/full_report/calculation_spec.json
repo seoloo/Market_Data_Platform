@@ -1,0 +1,15 @@
+{
+  "purpose": "승인된 Deneb Polaris 보고서52쪽의 설명용 회계와 재표본 분포. 전략 신규선정·우위 검정·OOS·채택판정·운영 변경 없음.",
+  "historical_period": ["2012-01-01", "2026-08-31"],
+  "monthly_sample_krw": 200000,
+  "monthly_grid_krw": {"min":50000,"max":1000000,"step":50000},
+  "horizons_years": [5,10,15,20],
+  "assumptions": {"fee_each_side":0.0015,"tax":0,"fx":"fixed","fractional_shares":true,"dividend":"adjusted-close total return, reinvested","execution":"existing previous-close signal / daily-close explanatory accounting, NOT market-order execution assumption or limit fill verification"},
+  "benchmarks": ["Deneb184T","Deneb184M0","TQQQ60_SCHD40_fixed","QQQ60_SCHD40_fixed","QLD60_SCHD40_fixed","QQQ100","QLD100","TQQQ100","SPY100","Polaris_YEAR","Polaris_BUY","Polaris_MONTH"],
+  "benchmark_scope": "고정된 기존 배분의 설명용 대조군. 파라미터 검색·최적값 선정 없음. 각 결과를 동일 기간과 비용으로 비교.",
+  "state_replay": {"seed":20261018,"paths":1000,"block_trading_days":252,"pool":"2012-01 through 2026-08 synchronized daily returns of QQQ TQQQ SCHD SPY IEF GLD","simulation_calendar":"2026 warmup, 2027-2046 weekdays, synthetic holidays excluded","logic":"join synchronized asset returns, recompute causal vol20 and 20/60/120 trend, replay unmodified existing184T and YEAR policy state from zero, same path for both","quantiles":"sample minimum, empirical10th,50th,90th interpolated percentiles at5/10/15/20 years","interpretation":"conditional resampling distribution, NOT estimated true future probabilities or independent OOS. pool misses dotcom and2008. minima are NOT loss bounds","sensitivity":"pool-history limitation explained with previously recorded long synthetic research, not retuning or extra fitted scenarios"},
+  "dividend_projection": "reuse pre-frozen5c68278 independent report three assumed paths, strategy holdings and no double count. show gross and simple85% receipt illustration, latter not after-tax reinvested path. optional approved cap changes excluded",
+  "savings": {"annual_rates":[0.03,0.04],"method":"12monthly beginning deposits simple interest, maturity rolled into same-rate deposit, pretax fixed scenario","five_percent":false},
+  "integrity": ["synthetic zero-return and fee cash-flow checks","Deneb existing endpoint reproduction","Polaris original function reuse and old endpoint reproduction","pure signal parity with183","source hashes unchanged","same1000 paths each strategy","240month contribution count","min<=p10<=p50<=p90","monthly grid linear scaling only pretax fractional constant-cost model"],
+  "deliverable": "52pages PPTX and PDF with complete amount tables, provenance and assumptions appendix, no actual personal balances, no Orbit or Obi"
+}
