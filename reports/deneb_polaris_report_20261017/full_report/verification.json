@@ -1,0 +1,17 @@
+{
+  "pages": 52,
+  "native_charts": 22,
+  "native_tables": 43,
+  "appendix_rows_verified": 160,
+  "pdf_korean_search": true,
+  "source_hashes_unchanged": true,
+  "historical_identity_and_amount_grid": true,
+  "layout_warnings": 0,
+  "visual_review": "52 slide PNGs individually reviewed, final PDF representative pages reviewed; not opened in native PowerPoint",
+  "production_tests": "not run, report-only outputs; no src/scripts/tests/config changes",
+  "scope": "explanatory retrospective and conditional resampling only, no PASS or OOS claim",
+  "sha256": {
+    "Deneb_Polaris_전략보고서_52쪽_v3.pptx": "802dd87c31783540a02ba8c94aeb053d7408196d8153efce5675905139a513ba",
+    "Deneb_Polaris_전략보고서_52쪽.pdf": "2664242828e429fddf9be465a9d12d65b861f1f3f39d0c6f92c332137b0ca119"
+  }
+}
