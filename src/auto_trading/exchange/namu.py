@@ -28,7 +28,15 @@ import httpx
 from auto_trading.config.secrets import NamuCredentials
 from auto_trading.core.errors import ExchangeError
 
-__all__ = ["LIVE_URL", "MOCK_URL", "NamuError", "NamuMock", "NamuOrder", "NamuTokenCache"]
+__all__ = [
+    "LIVE_URL",
+    "MOCK_URL",
+    "NamuError",
+    "NamuMock",
+    "NamuOrder",
+    "NamuSession",
+    "NamuTokenCache",
+]
 
 LIVE_URL = "https://api.nhplug.com:8443"
 """운영 — 토큰 발급만 여기서 한다."""
@@ -80,8 +88,8 @@ class NamuOrder:
 
 
 @dataclass(slots=True)
-class NamuMock:
-    """모의투자 국내주식 — 잔고 · 현재가 · 지정가 매수/매도 · 체결 조회 · 취소."""
+class NamuSession:
+    """토큰(파일 재사용) · 호출 간격 · 401/429 처리 — 국내 · 해외 클라이언트가 같이 쓴다."""
 
     credentials: NamuCredentials
     cache: NamuTokenCache
@@ -89,15 +97,7 @@ class NamuMock:
     client: httpx.Client = field(default_factory=lambda: httpx.Client(timeout=20.0))
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
-    _account: str | None = None
     _last: float = 0.0
-
-    def __post_init__(self) -> None:
-        if self.base_url != MOCK_URL:
-            raise ValueError("NamuMock 은 모의투자 주소에서만 쓴다")
-
-    def __repr__(self) -> str:
-        return f"NamuMock({self.base_url})"
 
     # ------------------------------------------------------------ 인증
 
@@ -148,6 +148,23 @@ class NamuMock:
         if r.status_code != 200:
             raise NamuError(path, str(r.status_code), _msg(data))
         return dict(data)
+
+    def close(self) -> None:
+        self.client.close()
+
+
+@dataclass(slots=True)
+class NamuMock(NamuSession):
+    """모의투자 국내주식 — 잔고 · 현재가 · 지정가 매수/매도 · 체결 조회 · 취소."""
+
+    _account: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.base_url != MOCK_URL:
+            raise ValueError("NamuMock 은 모의투자 주소에서만 쓴다")
+
+    def __repr__(self) -> str:
+        return f"NamuMock({self.base_url})"
 
     # ------------------------------------------------------------ 계좌 · 조회
 
@@ -263,9 +280,6 @@ class NamuMock:
         if not isinstance(out, dict) or not out.get("mkt_orr_no"):
             raise NamuError(path, _code(data), _msg(data))
         return int(out["mkt_orr_no"])
-
-    def close(self) -> None:
-        self.client.close()
 
 
 def _msg(data: Any) -> str:

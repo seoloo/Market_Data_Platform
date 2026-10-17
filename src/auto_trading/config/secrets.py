@@ -233,18 +233,26 @@ class NamuCredentials:
 
     app_key: str
     app_secret: str
+    trading_enabled: bool = False
+    """``NAMU_TRADING_ENABLED`` 가 정확히 ``true`` 일 때만 실전 주문 — 사용자가 직접 켠다."""
 
     def __repr__(self) -> str:
-        return "NamuCredentials(app_key=***, app_secret=***)"
+        return (
+            f"NamuCredentials(app_key=***, app_secret=***, trading_enabled={self.trading_enabled})"
+        )
 
 
 def load_namu_credentials(
     path: Path | str = ".env", environ: Mapping[str, str] | None = None
 ) -> NamuCredentials:
-    """``NAMU_APP_API_KEY`` · ``NAMU_APP_SECRET_API_KEY``."""
+    """``NAMU_APP_API_KEY`` · ``NAMU_APP_SECRET_API_KEY`` · ``NAMU_TRADING_ENABLED``(기본 꺼짐)."""
     merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
     names = ("NAMU_APP_API_KEY", "NAMU_APP_SECRET_API_KEY")
     missing = [n for n in names if not merged.get(n, "").strip()]
     if missing:
         raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
-    return NamuCredentials(merged[names[0]].strip(), merged[names[1]].strip())
+    return NamuCredentials(
+        merged[names[0]].strip(),
+        merged[names[1]].strip(),
+        trading_enabled=merged.get("NAMU_TRADING_ENABLED", "").strip().lower() == "true",
+    )
