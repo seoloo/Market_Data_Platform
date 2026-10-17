@@ -37,6 +37,15 @@ QLD 상장 전(2006-06)은 QQQ 일간 2 배 − 연 비용(겹치는 기간 맞�
 ``half`` (사용자 2026-10-17 "S&P 30 + 나스닥 30 + 국채 20 + 금 20 이거는", 실행 전 고정):
 H = SPY 30 · QQQ 30 · IEF 20 · GLD 20 을 S1 · N1 과 나란히. 조건은 위와 같다.
 결과 ``reports/namu_core_compare/result_half.json``.
+
+``dca20`` (사용자 2026-10-17 "polaris로 20년 동안 20만원씩 입금하면 얼마가 되는 지 … deneb랑 비교",
+실행 전 고정): Polaris = SPY 30 · QQQ 30 · IEF 20 · GLD 20 (SPYM · QQQM · GLDM 대신),
+Deneb 은 위와 같다.
+① 실제 최근 20 년: 2006-10 ~ 2026-09 매달 첫 거래일에 20 만 원(달러 자산, 환율 고정 가정).
+② 미래 범위: 2005-01 ~ 2026-09 월 수익(매달 다시 맞춤 · 수수료 포함)을 12 달 묶음으로 무작위
+   다시 뽑아 20 년 1 만 번(씨앗 20261017, 두 전략 같은 묶음) → 10 · 50 · 90 백분위와 Polaris 가
+   Deneb 보다 많은 비율, 중간에 넣은 돈보다 가장 많이 밑돈 정도. 세금 · 환율 · 환전 비용 없음.
+결과 ``reports/namu_core_compare/result_dca20.json``.
 """
 
 from __future__ import annotations
@@ -116,6 +125,82 @@ def vol20(qqq: Series, days: list[str], i: int) -> float | None:
 
 
 Rule = Callable[[int], dict[str, float]]
+
+
+def POLARIS(i: int) -> dict[str, float]:  # noqa: N802 - 전략 이름
+    return {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2}
+
+
+def dca20(px: Mapping[str, Series], days: list[str], rules: Mapping[str, Rule]) -> int:
+    """20 년 매달 20 만 원 — 실제 최근 20 년 + 12 달 묶음 다시 뽑기."""
+    import random
+
+    monthly_krw, years = 200_000, 20
+    out: dict[str, Any] = {"paid": monthly_krw * 12 * years}
+    i0 = next(k for k, d in enumerate(days) if d >= "2006-10-01")
+    i1 = max(k for k, d in enumerate(days) if d <= "2026-09-30")
+    real: dict[str, Any] = {}
+    for name, rule in rules.items():
+        vals, paid = simulate(px, days, rule, i0, i1, monthly=1.0)
+        real[name] = {
+            "final": vals[-1] * monthly_krw,
+            "worst_vs_paid": min(v / p - 1 for v, p in zip(vals, paid, strict=True)),
+        }
+    out["real_2006_2026"] = real
+    j0 = next(k for k, d in enumerate(days) if d >= "2005-01-01")
+    month_ret: dict[str, list[float]] = {}
+    for name, rule in rules.items():
+        vals, _ = simulate(px, days, rule, j0, i1, monthly=0.0)
+        ends = [
+            v
+            for k, v in enumerate(vals)
+            if k + j0 == i1 or days[k + j0][:7] != days[k + j0 + 1][:7]
+        ]
+        month_ret[name] = [b / a - 1 for a, b in itertools.pairwise([vals[0], *ends])]
+    n = min(len(r) for r in month_ret.values())
+    rng = random.Random(20261017)
+    finals: dict[str, list[float]] = {k: [] for k in rules}
+    worsts: dict[str, list[float]] = {k: [] for k in rules}
+    wins = 0
+    for _ in range(10_000):
+        starts = [rng.randrange(0, n - 12) for _ in range(years)]
+        path_final = {}
+        for name in rules:
+            r = month_ret[name]
+            v = put = 0.0
+            worst = 0.0
+            for s0 in starts:
+                for m in range(12):
+                    v = (v + 1) * (1 + r[s0 + m])
+                    put += 1
+                    worst = min(worst, v / put - 1)
+            finals[name].append(v * monthly_krw)
+            worsts[name].append(worst)
+            path_final[name] = v
+        wins += path_final["Polaris"] > path_final["Deneb"]
+
+    def pct(xs: list[float], q: float) -> float:
+        ys = sorted(xs)
+        return ys[int(q * (len(ys) - 1))]
+
+    out["bootstrap"] = {
+        name: {
+            "p10": pct(finals[name], 0.10),
+            "p50": pct(finals[name], 0.50),
+            "p90": pct(finals[name], 0.90),
+            "worst_vs_paid_p50": pct(worsts[name], 0.50),
+            "worst_vs_paid_p10": pct(worsts[name], 0.10),
+            "below_paid_at_end": sum(f < out["paid"] for f in finals[name]) / len(finals[name]),
+        }
+        for name in rules
+    }
+    out["bootstrap"]["polaris_beats_deneb"] = wins / 10_000
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "result_dca20.json").write_text(
+        json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8"
+    )
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+    return 0
 
 
 def mix(sym: str) -> Rule:
@@ -258,6 +343,8 @@ def main(which: str = "base") -> int:
             "H": lambda i: {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2},
             "N1": mix("QQQ"),
         }
+    if which == "dca20":
+        return dca20(px, days, {"Polaris": POLARIS, "Deneb": deneb})
     for wname, (a, b) in WINDOWS.items():
         i0 = next(k for k, d in enumerate(days) if d >= a)
         i1 = max(k for k, d in enumerate(days) if d <= b)
