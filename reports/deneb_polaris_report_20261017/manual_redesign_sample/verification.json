@@ -1,0 +1,30 @@
+{
+  "slide_count": 6,
+  "pdf_page_count": 6,
+  "editable_charts": 3,
+  "editable_tables": 6,
+  "monthly_krw": 100000,
+  "existing_ledger_sha256": "158385d23b0cc4987838658ef26c405f5696d61c15a68c2ae3e3c11c371c6aae",
+  "existing_ledger_unchanged": true,
+  "scaled_chart_values_checked": 246,
+  "all_table_cells_left_aligned": true,
+  "all_six_bar_amounts_labeled": true,
+  "nasdaq_2x_in_long_research_table": true,
+  "nasdaq_3x_in_final_asset_chart": true,
+  "pptx_pngs_individually_inspected": 6,
+  "pdf_pngs_individually_inspected": 6,
+  "reference_pages_visually_compared": [
+    9,
+    12,
+    15
+  ],
+  "layout_findings": 0,
+  "layout_warning": "Slide 3 native_table_overflow is a false footer heuristic caused by right-column chart captions. Left-column table ends at y=1034 with page number at y=1075. All five rows and both chart regions visually inspected without overlap.",
+  "scope": "Samples only. Original 52-page report preserved. No operational or research source changes.",
+  "powerpoint_app_opened": false,
+  "project_code_tests_rerun": false,
+  "files": {
+    "Deneb_Polaris_설명서형_시안6쪽.pptx": "df9990e630850ebecc662b70a8e30d360b1a4b7210a127c16b72c033a6e4d3c9",
+    "Deneb_Polaris_설명서형_시안6쪽.pdf": "4aff2a128fa76ec7b8a0522e4b89ac4c0223202c5b8b2807a25a1426dc4f1f7a"
+  }
+}
