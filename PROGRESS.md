@@ -1,5 +1,10 @@
 # 작업 현황
 
+## 2026-10-17 — 261 미장 주도주 크기 · 실적 `KEEP_BASE` (Claude)
+
+- 사용자: 맛코 주도주 방식 분석 → 미장 주도주 추천 방식 → "그렇게 해서 진행해줘". SEC companyfacts 493 종목(유통 시총 · 매출 · 영업이익) 받음.
+- [261](docs/research/261-us-leader-size-earnings-preregistration.md): 113 기본 15.2% · 샤프 0.83 > + 시총 7.7% · 0.51 > + 실적 5.3% · 0.39 → **KEEP_BASE**. 💹 월간 추천은 113 기본 고르기, 시총 · 실적은 카드 참고 정보로. 알림 시안 사용자 확인 대기.
+
 ## 2026-10-17 — 260 💹 그리드 손절 올리기 `KEEP_ARM` (Claude)
 
 - 사용자 "손해 보지 않도록 라인 잡아두고 … 그리드 방식처럼 손절라인도 평균단가 위로" → [260](docs/research/260-grid-stop-above-cost-preregistration.md):
