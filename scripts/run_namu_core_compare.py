@@ -46,6 +46,19 @@ Deneb 은 위와 같다.
    다시 뽑아 20 년 1 만 번(씨앗 20261017, 두 전략 같은 묶음) → 10 · 50 · 90 백분위와 Polaris 가
    Deneb 보다 많은 비율, 중간에 넣은 돈보다 가장 많이 밑돈 정도. 세금 · 환율 · 환전 비용 없음.
 결과 ``reports/namu_core_compare/result_dca20.json``.
+
+``rebal`` (사용자 2026-10-17 "세 가지 같은 조건으로 계산", 실행 전 고정):
+Polaris(SPY 30 · QQQ 30 · IEF 20 · GLD 20) 의 비율 맞추기 세 가지 + 참고 하나.
+BUY = 사기만(새 돈을 모자란 종목부터, 팔지 않음) · YEAR = BUY + 매년 12 월 첫 거래일에 목표로 다시
+맞춤(팔기 포함) · BAND = BUY + 매달 첫 거래일에 어느 종목이든 목표에서 5%p 넘게 벗어나면 목표로
+다시 맞춤 · 참고 MONTH = 매달 다시 맞춤(앞 계산들의 가정).
+돈 넣기 두 가지: ① 100 만 원 × 4 달 뒤 안 넣음(사용자 계획) · ② 매달 20 만 원 계속.
+기간: 2005-01 ~ 2026-09 · 2011-11 ~ 2026-09. 수수료 0.09%, 소수 주 허용, 환율 고정(달러 = 원 비율).
+양도세: 판 해의 실현 이익(평균 단가) − 250 만 원 × 22% 를 다음 해 첫 거래일에 평가액에서 뺀다
+(끝에 다 파는 세금은 넣지 않음 — 안 판 이익은 BUY 가 가장 큼).
+지표: 끝 평가액, 단위 가치 최대 낙폭 ·
+2008 · 2020 · 2022, 주식(SPY + QQQ) 비중 최고, 다시 맞춘 횟수, 낸 세금, 끝의 안 판 이익.
+결과 ``reports/namu_core_compare/result_rebal.json``.
 """
 
 from __future__ import annotations
@@ -203,6 +216,142 @@ def dca20(px: Mapping[str, Series], days: list[str], rules: Mapping[str, Rule]) 
     return 0
 
 
+TARGET = {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2}
+STOCKS = ("SPY", "QQQ")
+BAND = 0.05
+TAX_FREE, TAX_RATE = 2_500_000.0, 0.22
+
+
+def run_policy(
+    px: Mapping[str, Series], days: list[str], i0: int, i1: int, policy: str, deposit: Rule0
+) -> dict[str, Any]:
+    """원 단위(환율 고정). ``deposit(k)`` = k 번째 달에 넣는 원."""
+    q = dict.fromkeys(TARGET, 0.0)
+    basis = dict.fromkeys(TARGET, 0.0)
+    cash = units = paid = 0.0
+    realized: dict[str, float] = {}
+    tax_total = 0.0
+    navs: list[float] = []
+    vals: list[float] = []
+    max_stock, rebals, k = 0.0, 0, -1
+    for i in range(i0, i1 + 1):
+        d = days[i]
+        price = {s: px[s][d] for s in TARGET}
+        value = cash + sum(q[s] * price[s] for s in TARGET)
+        if i > i0 and d[:4] != days[i - 1][:4]:  # 해가 바뀜 → 지난해 세금
+            gain = realized.get(days[i - 1][:4], 0.0)
+            tax = max(0.0, gain - TAX_FREE) * TAX_RATE
+            if tax > 0 and value > 0:
+                scale = (value - tax) / value
+                q = {s: v * scale for s, v in q.items()}
+                basis = {s: v * scale for s, v in basis.items()}
+                cash *= scale
+                value -= tax
+                tax_total += tax
+        if i == i0 or d[:7] != days[i - 1][:7]:
+            k += 1
+            add = deposit(k)
+            nav = value / units if units else 1.0
+            units += add / nav
+            cash += add
+            paid += add
+            value += add
+            w = {s: q[s] * price[s] / value for s in TARGET} if value else dict(TARGET)
+            full = (
+                policy == "MONTH"
+                or (policy == "YEAR" and d[5:7] == "12" and days[i - 1][5:7] != "12")
+                or (policy == "BAND" and any(abs(w[s] - t) > BAND for s, t in TARGET.items()))
+            ) and sum(q.values()) > 0
+            if full:
+                rebals += 1
+                want = {s: value * t / price[s] for s, t in TARGET.items()}
+                turn = sum(abs(want[s] - q[s]) * price[s] for s in TARGET)
+                fee = turn * FEE
+                for s in TARGET:
+                    if want[s] < q[s]:
+                        sold = q[s] - want[s]
+                        avg = basis[s] / q[s] if q[s] else 0.0
+                        realized[d[:4]] = realized.get(d[:4], 0.0) + sold * (price[s] - avg)
+                        basis[s] -= sold * avg
+                    else:
+                        basis[s] += (want[s] - q[s]) * price[s]
+                scale = (value - fee) / value
+                q = {s: want[s] * scale for s in TARGET}
+                basis = {s: basis[s] for s in TARGET}
+                cash = 0.0
+                value -= fee
+            elif cash > 0:
+                spend = cash / (1 + FEE)
+                need = {s: max(0.0, value * t - q[s] * price[s]) for s, t in TARGET.items()}
+                tot = sum(need.values())
+                if tot >= spend:
+                    buy = {s: spend * need[s] / tot for s in TARGET}
+                else:
+                    buy = {s: need[s] + (spend - tot) * t for s, t in TARGET.items()}
+                for s in TARGET:
+                    q[s] += buy[s] / price[s]
+                    basis[s] += buy[s]
+                value -= cash - spend
+                cash = 0.0
+        stock = sum(q[s] * price[s] for s in STOCKS)
+        if value > 0 and sum(q.values()) > 0:
+            max_stock = max(max_stock, stock / value)
+        vals.append(value)
+        navs.append(value / units if units else 1.0)
+    st = stats(days[i0 : i1 + 1], navs)
+    return {
+        "final": vals[-1],
+        "paid": paid,
+        "mdd": st["mdd"],
+        "mdd_day": st["mdd_day"],
+        "y2008": st["y2008"],
+        "y2020": st["y2020"],
+        "y2022": st["y2022"],
+        "cagr_twr": st["cagr"],
+        "max_stock_weight": max_stock,
+        "end_stock_weight": sum(q[s] * px[s][days[i1]] for s in STOCKS) / vals[-1],
+        "rebalances": rebals,
+        "tax_paid": tax_total,
+        "unrealized_end": vals[-1] - sum(basis.values()),
+    }
+
+
+Rule0 = Callable[[int], float]
+
+
+def rebal(px: Mapping[str, Series], days: list[str]) -> int:
+    plans: dict[str, Rule0] = {
+        "plan_4x100": lambda k: 1_000_000.0 if k < 4 else 0.0,
+        "monthly_20": lambda k: 200_000.0,
+    }
+    out: dict[str, Any] = {}
+    for wname, (a, b) in WINDOWS.items():
+        i0 = next(k for k, d in enumerate(days) if d >= a)
+        i1 = max(k for k, d in enumerate(days) if d <= b)
+        for pname, dep in plans.items():
+            res = {
+                pol: run_policy(px, days, i0, i1, pol, dep)
+                for pol in ("BUY", "YEAR", "BAND", "MONTH")
+            }
+            out[f"{wname}/{pname}"] = res
+            print(f"== {wname} {pname}")
+            for pol, r in res.items():
+                y08 = "-" if r["y2008"] is None else f"{r['y2008']:+.1%}"
+                print(
+                    f"{pol:5} 끝 {r['final'] / 10_000:,.0f}만 (넣은 {r['paid'] / 10_000:,.0f}만)"
+                    f" 연 {r['cagr_twr']:+.1%} 낙폭 {r['mdd']:.1%}({r['mdd_day']})"
+                    f" 08 {y08} 20 {r['y2020']:+.1%} 22 {r['y2022']:+.1%}"
+                    f" 주식 최고 {r['max_stock_weight']:.0%} 끝 {r['end_stock_weight']:.0%}"
+                    f" 맞춤 {r['rebalances']}번 세금 {r['tax_paid'] / 10_000:,.0f}만"
+                    f" 안 판 이익 {r['unrealized_end'] / 10_000:,.0f}만"
+                )
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "result_rebal.json").write_text(
+        json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8"
+    )
+    return 0
+
+
 def mix(sym: str) -> Rule:
     """주식 ``sym`` 60 · 국채 20 · 금 20."""
     return lambda i: {sym: 0.6, "IEF": 0.2, "GLD": 0.2}
@@ -343,6 +492,8 @@ def main(which: str = "base") -> int:
             "H": lambda i: {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2},
             "N1": mix("QQQ"),
         }
+    if which == "rebal":
+        return rebal(px, days)
     if which == "dca20":
         return dca20(px, days, {"Polaris": POLARIS, "Deneb": deneb})
     for wname, (a, b) in WINDOWS.items():
