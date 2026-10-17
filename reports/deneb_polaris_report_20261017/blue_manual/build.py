@@ -154,6 +154,9 @@ def line(sl, x1, y1, x2, y2, color=RULE, pt=0.5, dash=None):
     ln.line.width = Pt(pt)
     if dash:
         ln.line.dash_style = dash
+    st = ln._element.find(qn("p:style"))  # 기본 테마 그림자 · 효과 빼기 (가는 선이 번져 보임)
+    if st is not None:
+        ln._element.remove(st)
     return ln
 
 
@@ -900,11 +903,12 @@ def page_savings(no: int) -> None:
     )
 
 
-page_deneb_structure(1)
-page_leverage(2)
-page_amounts(3)
-page_periods(4)
-page_polaris(5)
-page_savings(6)
-prs.save(OUT)
-print(OUT)
+if __name__ == "__main__":
+    page_deneb_structure(1)
+    page_leverage(2)
+    page_amounts(3)
+    page_periods(4)
+    page_polaris(5)
+    page_savings(6)
+    prs.save(OUT)
+    print(OUT)
