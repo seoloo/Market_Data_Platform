@@ -15,7 +15,7 @@
 ## 1. 자료
 
 - 바이낸스 공개 API `fapi/v1/klines` 30 분봉(상장일 ~ 2026-08-31), 거래소 정보에서 `underlyingType == EQUITY` · USDT 종목.
-  `data/research/weekend_perp_255/`(Git 밖). 해시: (받은 뒤 적음 — §5).
+  `data/research/weekend_perp_255/`(Git 밖). 182 종목, 해시 `0feb64dc2bab22dd56624ff47656054fe0b00dad04b5f594c5e2c96bd0a4774a`(코드 `EXPECTED_DATA`). 쓸 수 있는 관찰 1,411 개 · 주말 25 개(주말당 1 ~ 137 종목, 초기엔 TSLA 등 몇 개뿐) — 수익은 보지 않고 개수만 셈.
 - 한계: 지금 거래 중인 종목만(상장폐지 종목 없음), 30 분봉 시가 · 종가(호가 아님), 펀딩비는 비용 0.10% 에 포함한 것으로 본다.
 
 ## 2. 규칙

@@ -33,7 +33,7 @@ DATA = REPO / "data" / "research" / "weekend_perp_255"
 OUT = REPO / "reports" / "weekend_perp_255"
 API = "https://fapi.binance.com"
 ET = ZoneInfo("America/New_York")
-EXPECTED_DATA: str | None = None
+EXPECTED_DATA: str | None = "0feb64dc2bab22dd56624ff47656054fe0b00dad04b5f594c5e2c96bd0a4774a"
 """fetch 뒤 문서 255 §1 에 적고 여기 고정한다."""
 
 TO = "2026-08-31"
