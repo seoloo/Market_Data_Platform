@@ -6,6 +6,10 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 260 💹 본전 + 비용 잠금 · 그리드 손절 `KEEP_ARM` (Claude)
+
+- [260](research/260-grid-stop-above-cost-preregistration.md) 오르면 손절선을 평단 + 비용 위로 올리고 그리드로 계속 올리기: 손해로 끝나는 거래는 55 → 5 ~ 8% 로 줄지만 수익은 더 크게 줄었다(S&P 400 연 4.1 → 2.5 · −3.2%). 큰 승자를 작은 흔들림에 잘라서.
+
 ## 2026-10-17 — 259 💹 이익 보호 보강 `KEEP_ARM` (Claude)
 
 - [259](research/259-stock-profit-protect-preregistration.md) 오른 종목이 되돌아와 −3% 로 손절되는 것 막기: +10% 뒤 본전 · 20% 계단 · +20% 뒤 50 일선 모두 기준 미달. 미국에서 그런 경우는 8 번에 1 번이고, 보호는 큰 승자를 잘라 더 나빴다.

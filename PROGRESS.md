@@ -1,5 +1,10 @@
 # 작업 현황
 
+## 2026-10-17 — 260 💹 그리드 손절 올리기 `KEEP_ARM` (Claude)
+
+- 사용자 "손해 보지 않도록 라인 잡아두고 … 그리드 방식처럼 손절라인도 평균단가 위로" → [260](docs/research/260-grid-stop-above-cost-preregistration.md):
+  S&P 400 주 판정 · 국장 확인 · S&P 500 참고 모두 ARM 보다 나쁨(가장 덜 나쁜 LOCK5 도 S&P 500 연 13.0 → 10.4%). '손해로 끝' 은 55 → 8% 로 줄지만 큰 승자를 잘라 수익 감소, 갭엔 못 지킴.
+
 ## 2026-10-17 — 259 💹 이익 보호 보강 `KEEP_ARM` (Claude)
 
 - 사용자 "고점이 낮으면 그냥 손절한다는 의미잖아" → "다른 보완 혹은 보강책을 찾아줘" → [259](docs/research/259-stock-profit-protect-preregistration.md):
