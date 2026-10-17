@@ -1,5 +1,11 @@
 # 작업 현황
 
+## 2026-10-17 — 나무 C 의 S&P 500 1 · 2 · 3 배 참고 계산 (Claude)
+
+- 사용자 "C로 해서 sp500 1배 2배 3배 각각 비교해줘". `run_namu_core_compare.py lev`(조건 먼저 커밋), SSO · UPRO 야후 수정 종가(`data/research/namu_core_compare/`), 상장 전 SPY 2 · 3 배 − 연 3.19 · 4.99%.
+- 2005-01 ~ 2026-09: C1(SPY 60) 연 9.8% · 낙폭 −32% · 2008 −19% / C2(SSO 60) 13.4% · −62% · −44% / C3(UPRO 60) 16.7% · −79% · −62% / Deneb 24.4% · −81% · −63%.
+  2011-11 ~: C1 10.8% · −20% / C2 17.4% · −38% / C3 23.7% · −50% / Deneb 34.4% · −52%. C3 는 Deneb 와 낙폭이 비슷한데 수익이 낮음, C2 는 S&P 500 만(A −55%)보다 낙폭이 큼.
+
 ## 2026-10-17 — 나무 안정 계좌 A · B · C vs Deneb 참고 계산 (Claude)
 
 - 사용자 "A, B, C 그리고 deneb와 같이 비교해줘". `scripts/run_namu_core_compare.py`(조건을 먼저 커밋), 결과 `reports/namu_core_compare/result.json`. 판정 아님.
