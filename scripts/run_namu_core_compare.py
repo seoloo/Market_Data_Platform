@@ -31,6 +31,7 @@ import statistics
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "research"
@@ -205,11 +206,11 @@ def main() -> int:
         "C": lambda i: {"SPY": 0.6, "IEF": 0.2, "GLD": 0.2},
         "Deneb": deneb,
     }
-    out: dict[str, object] = {"tqqq_synthetic_drag": drag}
+    out: dict[str, Any] = {"tqqq_synthetic_drag": drag}
     for wname, (a, b) in WINDOWS.items():
         i0 = next(k for k, d in enumerate(days) if d >= a)
         i1 = max(k for k, d in enumerate(days) if d <= b)
-        res: dict[str, object] = {"from": days[i0], "to": days[i1]}
+        res: dict[str, Any] = {"from": days[i0], "to": days[i1]}
         for name, rule in rules.items():
             vals, _ = simulate(px, days, rule, i0, i1, monthly=0.0)
             dv, dp = simulate(px, days, rule, i0, i1, monthly=1.0)
@@ -222,7 +223,6 @@ def main() -> int:
     print(f"TQQQ 합성 연 비용 {drag:.2%}")
     for wname in WINDOWS:
         res = out[wname]
-        assert isinstance(res, dict)
         print(f"\n== {wname} {res['from']} ~ {res['to']}")
         for name in rules:
             lump, dca = res[name]["lump"], res[name]["dca"]
