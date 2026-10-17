@@ -1,0 +1,49 @@
+{
+  "purpose": "사용자 요청 보고서 6쪽 시안의 설명용 회계 비교. 새로운 전략 후보·우위 검정·독립 OOS·운영 parity 인증이 아니다.",
+  "frozen_before_calculation": true,
+  "period": ["2012-01-01", "2026-08-31"],
+  "models": {
+    "Deneb": "기존 scripts.run_brake_184.simulate ref=T, park=cash, monthly=False, monthly_krw=200000. 신호·방어·복귀·위험 비율 변경 없음",
+    "Deneb_no_brake": "같은 기존 함수 ref=None. 3쪽에서 하락 방어의 차이만 설명",
+    "Polaris": "기존 scripts.run_namu_core_compare.run_policy policy=YEAR, 매달 200000 지속 납입. SPY30/QQQ30/IEF20/GLD20 대리 ETF, 매년 12월 비중 조정"
+  },
+  "comparison_assumptions": {
+    "monthly_krw": 200000,
+    "trading_cost_each_side": 0.0015,
+    "tax": "모든 비교 세전. 기존 함수의 과세 계수를 이번 별도 보고서 프로세스 안에서만 0으로 설정",
+    "fx": "고정, 환전 비용 제외",
+    "shares": "소수 주 허용",
+    "execution": "기존 종가 기반 연구 회계. 지정가 체결·미체결·호가를 새로 검증하지 않는다. 실제 실행 보장 아님",
+    "dividends": "기존 수정 종가의 재투자 총수익에 포함. 현금 배당을 별도로 더하지 않음",
+    "source_files": "기존 코드·시장 원본·기존 결과를 수정하거나 덮어쓰지 않음"
+  },
+  "savings": {
+    "annual_rates": [0.03, 0.04, 0.05],
+    "formula": "월초 납입 12개월 단리 적금, 매년 만기금은 같은 금리 예금으로 이월. 연말 B_next=B*(1+r)+12*M+6.5*M*r. 부분 연도는 경과 개월의 발생 이자 포함",
+    "tax": "세전 가정, 실제 미래 상품 금리·보장 수익 아님"
+  },
+  "scenario_arithmetic": {
+    "source": "위 기존 고정 연구 모형의 세전·비용 후 월 단위 가치 수익률. 전략 규칙을 재학습/최적화하지 않음",
+    "horizon_years": [5, 10, 15, 20],
+    "monthly_amounts_krw": [100000,200000,300000,400000,500000,600000,700000,800000,900000,1000000],
+    "paths": 10000,
+    "seed": 20261017,
+    "block_months": 12,
+    "paired": true,
+    "replacement": true,
+    "endpoint_formula": "V_next=(V+monthly)*(1+sampled_month_return)",
+    "display": ["모의 최저(최악)", "10백분위", "50백분위", "90백분위"],
+    "quantile": "정렬된 경로 값의 floor(q*(N-1))",
+    "minimum_definition": "10000개 모의 경로 중 최저 최종자산. 가능한 모든 미래의 최악/손실 상한이 아님",
+    "limitations": "약 15년의 노출된 자료 재사용. 현행 실계좌 미래 예측·확률 보장 아님. 수익률 블록 접합 뒤 전략의 방어 상태·연간 배분을 다시 실행하지 않는 단순 경로 재표본. 세금/환율/정수 주/체결 제외. 최종 보고서의 정식 전망에는 추가 검증 필요",
+    "no_rerun_tuning": true
+  },
+  "dividend_example": {
+    "source": "https://www.schwabassetmanagement.com/products/schd",
+    "year": 2025,
+    "constant_shares": 100,
+    "scope": "공식 지급 내역으로 계산한 100주 고정 보유의 세전 달러 예시. Deneb 실계좌·월 적립 장부의 실제 배당이 아님",
+    "future_report": "배당락일 보유 주수·주식분할·지급일 환율·원천징수·재투자 주수로 연간 수령액과 재투자 효과를 분리. 수정 종가와 배당의 이중 계상 금지"
+  },
+  "gate_boundary": "기존 고정 연구 모형의 보고서용 회계 및 시나리오 산술만. 80% 검정력 게이트를 낮추거나 통계적 우위·채택·새 OOS를 판정하지 않는다. live/paper/주문/예약/208 불변"
+}
