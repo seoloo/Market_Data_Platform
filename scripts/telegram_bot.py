@@ -292,6 +292,37 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
         if len(parts) != 3:
             return False
         kind, nonce, arg = parts
+        if kind in (
+            "rcb",
+            "rcm",
+            "rcs",
+            "rsl",
+            "rsk",
+        ):  # 월간 추천 · 매도 신호 — 5 일 유효(추천 기록이 지킴)
+            from scripts import stock_reco as sr
+
+            word = {
+                "rcb": "🛒 예약 확인 중…",
+                "rcm": "📋 보내는 중…",
+                "rcs": "건너뜀",
+                "rsl": "🧹 매도 예약 중…",
+                "rsk": "계속 보유",
+            }
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"{word[kind]} ({arg})" if arg != "x" else word[kind])
+            try:
+                reply = {
+                    "rcb": lambda: sr.on_buy(nonce, arg),
+                    "rcm": lambda: sr.on_more(nonce),
+                    "rcs": lambda: sr.on_skip(nonce),
+                    "rsl": lambda: sr.on_sell(nonce, arg),
+                    "rsk": lambda: sr.on_keep(nonce),
+                }[kind]()
+            except (SystemExit, ValueError) as exc:
+                reply = f"⚠ 처리 못 함 — {exc}"
+            if reply:
+                bot.send(reply)
+            return False
         if kind == "stp":  # PEAD 알림 버튼 — 다음 정규장이 끝날 때까지 유효(알림 기록이 지킴)
             if arg == "cancel":
                 with contextlib.suppress(NotifyError):

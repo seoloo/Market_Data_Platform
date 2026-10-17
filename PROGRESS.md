@@ -1,5 +1,13 @@
 # 작업 현황
 
+## 2026-10-17 — 💹 월간 미장 주도주 추천 · 매도 신호 (Claude)
+
+- 사용자: 맛코 방식 → 미장 주도주 추천 "그렇게 해서 진행해줘" · 시안 확인 · "한 달에 한번만 … 월말에 추천" · 주간 요청 땐 단점 다시 말하기(메모리).
+- `ops/stock_reco.py`(113 고르기 · 월말 판정 · 매도 신호 ARM · 카드 글) · `scripts/stock_reco.py`(일봉 갱신 · 매도 신호 · 월말 추천 · 버튼 처리) ·
+  텔레그램 `rcb/rcm/rcs/rsl/rsk` 버튼 · `stop_guard` 매도 신호 문구 · 설정 `stock.reco`(기본 켬) · 예약 `AutoTrading_Stock_Reco` 07:30.
+- 나스닥 100 중 S&P 500 일봉에 없는 15 종목(ASML · MSTR · ALNY · MELI · NBIS · SHOP · CCEP · PDD · RKLB · ARM · TRI · FER · ALAB · CRWV · SPCX) 일봉 받음(2024 ~, SPCX 는 2026-06 상장).
+- 첫 월간 카드: 10-30(금) 종가 → 10-31(토) 07:30. 매도 신호는 매일(지금 💹 보유 없음).
+
 ## 2026-10-17 — 261 미장 주도주 크기 · 실적 `KEEP_BASE` (Claude)
 
 - 사용자: 맛코 주도주 방식 분석 → 미장 주도주 추천 방식 → "그렇게 해서 진행해줘". SEC companyfacts 493 종목(유통 시총 · 매출 · 영업이익) 받음.

@@ -26,6 +26,7 @@
   advise|reserve|status|attach|release|cancel`.
   이미 보유한 종목은 **추가 매수**(`add_to`) — 체결되면 기존 장부에 합치고 손절선을 합친 평균 단가 −3% 로 다시 잡는다(2026-10-16).
 - **💹 PEAD (2026-10-17 사용자 '$100 · 알림 + 버튼 · 20 거래일'):** PEAD Paper(화 ~ 토 21:40)가 새 실적 갭 +10% 이상 신호를 찾으면 투자 봇에 카드 + [🛒 N주 매수] [건너뛰기]. 누르면 반응일 다음 정규장 시작 직후 약 $100 지정가 매수(장부 `kind=pead`), **손절 없이** 20 번째 정규장 마감 무렵(5 ~ 2 분 전) 지정가로 판다. 알림 기록 `data/size_guard/pead_offers.json`, 설정 `stock.pead`(끄면 알림 없음). `python -m scripts.size_guard pead-offers` 는 조회만. 241 Paper 판정(닫힌 거래 100 건)은 그대로 따로 본다.
+- **💹 월간 미장 주도주 추천 (2026-10-17 사용자 '한 달에 한번만 … 월말에'):** 예약 `AutoTrading_Stock_Reco` 매일 07:30 KST — 일봉 갱신(LT Paper 일봉 + 나스닥 100 추가 15 `data/stock_reco/bars`, 한투 조회 전용) → 💹 보유 종목 매도 신호(추세 꺾임 · 고점 −35%, 산 뒤 추세 확인된 것만, 같은 이유 한 번) → 마지막 종가가 그달 마지막 거래일이면 추천 카드(상위 3 [🛒] + [📋 4 ~ 10위] [건너뛰기], 버튼 5 일 유효). 고르기는 연구 113 기본(261 KEEP_BASE), 시총 · 실적은 참고 줄. 설정 `stock.reco`. 상태 `data/stock_reco/state.json` · 버튼 `offers.json`. `python -m scripts.stock_reco preview` 는 글만(안 보냄). **주간으로 바꾸자는 요청엔 단점(손절 누적 · 꼭대기 매수 · 근거 없음)을 먼저 말한다**(사용자 2026-10-17).
 - **Altair 실거래:** `python -m scripts.altair_live plan|status|unhalt` — plan · status 는 조회만.
 
 ## 데이터·API·복구

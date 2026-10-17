@@ -222,3 +222,36 @@ def test_pead_button_routes_to_reserve_and_skip(
     assert calls == [("buy", "ab12")] and bot.out[-1] == ("send", "⏳ PEAD 예약")
     tb.handle_stock(bot, _m(data="stp:cd34:cancel"))  # type: ignore[arg-type]
     assert calls[-1] == ("skip", "cd34") and not fake["reserve"]
+
+
+def test_reco_buttons_route_to_stock_reco(
+    fake: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import stock_reco as sr
+
+    calls: list[tuple[str, ...]] = []
+
+    def rec(name: str, reply: str) -> Any:
+        def f(*a: str) -> str:
+            calls.append((name, *a))
+            return reply
+
+        return f
+
+    monkeypatch.setattr(sr, "on_buy", rec("buy", "⏳ 예약했어요"))
+    monkeypatch.setattr(sr, "on_more", rec("more", ""))
+    monkeypatch.setattr(sr, "on_skip", rec("skip", "건너뜀"))
+    monkeypatch.setattr(sr, "on_sell", rec("sell", "🧹 팔아요"))
+    monkeypatch.setattr(sr, "on_keep", rec("keep", "계속"))
+    bot = FakeBot()
+    for data in ("rcb:n1:MRNA", "rcm:n2:x", "rcs:n3:x", "rsl:n4:T1", "rsk:n5:T1"):
+        assert is_stock(_m(data=data))
+        tb.handle_stock(bot, _m(data=data))  # type: ignore[arg-type]
+    assert calls == [
+        ("buy", "n1", "MRNA"),
+        ("more", "n2"),
+        ("skip", "n3"),
+        ("sell", "n4", "T1"),
+        ("keep", "n5"),
+    ]
+    assert ("send", "🧹 팔아요") in bot.out and not fake["reserve"]

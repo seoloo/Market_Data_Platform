@@ -145,8 +145,9 @@ LIQ_DATA = ("liq:", "unh:")
 """정리 · 정지 풀기 버튼의 callback_data 머리."""
 STOCK_PREFIXES = ("개별주", "/개별주", "/stock", "비중", "/비중")
 """개별주 비중 추천 (2026-10-16) — '개별주 NVDA' 처럼 앞에 붙인다(종목만 보내면 Deneb 대화 몫)."""
-STOCK_DATA = ("stk:", "stkr:", "stq:", "sko:", "stp:")
-"""개별주 버튼 머리 — 매수 · 손절 해제 · 수량 입력 · 수량 확인 · PEAD 알림 매수."""
+STOCK_DATA = ("stk:", "stkr:", "stq:", "sko:", "stp:", "rcb:", "rcm:", "rcs:", "rsl:", "rsk:")
+"""개별주 버튼 머리 — 매수 · 손절 해제 · 수량 입력 · 수량 확인 · PEAD 알림 매수 ·
+월간 추천(매수 · 더 보기 · 건너뛰기) · 매도 신호(매도 · 계속 보유)."""
 
 
 def _word(msg: InboxMessage) -> str:

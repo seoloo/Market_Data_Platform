@@ -149,6 +149,15 @@ def step_sell(
         t.note = f"매도 거절 {res.code} {res.message[:60]} — 다음 확인 때 다시"
         return [f"⚠️ {t.name} {t.note}"] if first else []
     t.sells.append(Order(res.code, cid, "SELL", qty, limit, now_ms))
+    if first and t.note.startswith("매도 신호"):  # 월간 추천의 매도 신호 버튼 (stock_reco)
+        est = (limit - t.avg) * rem
+        return [
+            f"🧹 {t.name} {t.note} — {qty}주 지정가 {_px(limit, t.kr)} 매도 주문\n"
+            + _loss_line(est, limit / t.avg - 1, t.kr, fx, done=False).replace(
+                "예상 손해 약", "예상 손익"
+            )
+            + f" ({rem}주, 평균 {_px(t.avg, t.kr)} 기준, 수수료 전)"
+        ]
     if first and t.kind == PEAD:
         est = (limit - t.avg) * rem
         return [
@@ -174,7 +183,13 @@ def _done(t: Ticket, now_ms: int, fx: float) -> list[str]:
     avg = t.sold_amount / sold if sold > 0 else 0.0
     pnl = t.sold_amount - t.avg * sold
     pct = pnl / (t.avg * sold) if sold > 0 and t.avg > 0 else 0.0
-    head = f"📅 {t.name} PEAD 매도 끝" if t.kind == PEAD else f"🛑 {t.name} 손절 매도 끝"
+    head = (
+        f"📅 {t.name} PEAD 매도 끝"
+        if t.kind == PEAD
+        else f"🧹 {t.name} 매도 신호 매도 끝"
+        if t.note.startswith("매도 신호")
+        else f"🛑 {t.name} 손절 매도 끝"
+    )
     return [
         f"{head} · {sold:g}주 · 평균 {_px(avg, t.kr)} "
         f"({avg / t.avg - 1:+.1%})\n" + _loss_line(pnl, pct, t.kr, fx, done=True)

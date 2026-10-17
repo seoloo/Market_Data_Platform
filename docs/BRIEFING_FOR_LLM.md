@@ -6,6 +6,10 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 💹 월간 미장 주도주 추천 (Claude)
+
+- 매달 월말 종가로 S&P 500 + 나스닥 100 에서 113 방식 주도주 10 을 골라 텔레그램 카드(상위 3 매수 버튼). 시장이 200 일선 아래면 추천 없음. 매도 신호(추세 꺾임 · 고점 −35%)는 매일, 버튼으로 판단. 사용자 결정: 월 1 회 고정.
+
 ## 2026-10-17 — 261 미장 주도주 크기 · 실적 조건 `KEEP_BASE` (Claude)
 
 - [261](research/261-us-leader-size-earnings-preregistration.md) 주도주 고르기에 '시총 $500억 이상' · '매출 · 영업이익 증가' 를 더하면 연 15.2% → 7.7% · 5.3% 로 나빠짐(크기 비교는 생존 편향 주의). 미장 주도주 추천은 113 기본 고르기로.
