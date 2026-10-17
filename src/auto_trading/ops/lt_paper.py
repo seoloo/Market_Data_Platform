@@ -75,7 +75,7 @@ def spy_ok(spy: Closes, t: int) -> bool:
 def leaders(
     closes: Mapping[str, Closes], sectors: Mapping[str, str], t: int
 ) -> tuple[list[tuple[str, float]], list[str]]:
-    """(주도주 상위 10 [(종목, 점수)], 주도 섹터 상위 3)."""
+    """(주도주 상위 10 [(종목, 점수)], 주도 섹터 상위 3). 동점은 종목 · 섹터 이름으로 정한다."""
     rets: dict[int, dict[str, float]] = {}
     for k in LOOKS:
         rets[k] = {s: r for s, xs in closes.items() if (r := _ret(xs, t, k)) is not None}
@@ -84,7 +84,7 @@ def leaders(
         return [], []
     score: dict[str, float] = defaultdict(float)
     for k in LOOKS:
-        ordered = sorted(common, key=lambda s: rets[k][s])
+        ordered = sorted(common, key=lambda s: (rets[k][s], s))
         n = len(ordered)
         for i, s in enumerate(ordered):
             score[s] += i / (n - 1) / len(LOOKS)
@@ -97,10 +97,10 @@ def leaders(
         m = len(ys) // 2
         return ys[m] if len(ys) % 2 else (ys[m - 1] + ys[m]) / 2
 
-    top = sorted(by_sector, key=lambda x: median(by_sector[x]), reverse=True)[:TOP_SECTORS]
+    top = sorted(by_sector, key=lambda x: (median(by_sector[x]), x), reverse=True)[:TOP_SECTORS]
     pool = sorted(
         (s for s in common if sectors.get(s, "Unknown") in top),
-        key=lambda s: score[s],
+        key=lambda s: (score[s], s),
         reverse=True,
     )
     return [(s, round(score[s], 4)) for s in pool[:TOP_STOCKS]], top

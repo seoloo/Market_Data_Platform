@@ -93,7 +93,10 @@ def trend_off(xs: Sequence[float | None], t: int) -> bool:
 
 
 def leaders(panel: Panel, t: int) -> list[tuple[str, float]]:
-    """그날 주도 섹터 상위 3 개 안의 주도 점수 상위 10 종목 (점수 높은 순)."""
+    """그날 주도 섹터 상위 3 개 안의 주도 점수 상위 10 종목 (점수 높은 순).
+
+    동점은 종목 · 섹터 이름으로 정한다(141 ``leaders_pit`` 과 같음) — 예전엔 집합 순서라
+    파이썬 해시 시드마다 순위가 달라졌다(2026-10-17 고침, 판정들은 그대로)."""
     rets: dict[int, dict[str, float]] = {}
     for k in LOOKS:
         rets[k] = {s: r for s, xs in panel.close.items() if (r := _ret(xs, t, k)) is not None}
@@ -102,18 +105,18 @@ def leaders(panel: Panel, t: int) -> list[tuple[str, float]]:
         return []
     score: dict[str, float] = defaultdict(float)
     for k in LOOKS:
-        ordered = sorted(common, key=lambda s: rets[k][s])
+        ordered = sorted(common, key=lambda s: (rets[k][s], s))
         n = len(ordered)
         for i, s in enumerate(ordered):
             score[s] += i / (n - 1) / len(LOOKS)
     by_sector: dict[str, list[float]] = defaultdict(list)
     for s in common:
         by_sector[panel.sector[s]].append(score[s])
-    top = sorted(by_sector, key=lambda x: statistics.median(by_sector[x]), reverse=True)[
+    top = sorted(by_sector, key=lambda x: (statistics.median(by_sector[x]), x), reverse=True)[
         :TOP_SECTORS
     ]
     pool = sorted(
-        (s for s in common if panel.sector[s] in top), key=lambda s: score[s], reverse=True
+        (s for s in common if panel.sector[s] in top), key=lambda s: (score[s], s), reverse=True
     )
     return [(s, score[s]) for s in pool[:TOP_STOCKS]]
 

@@ -57,3 +57,14 @@ def test_bought_after_month_end_and_stopped_after_crash() -> None:
     star = [tr for tr in run.trades if tr["symbol"] == "STAR"]
     assert star, "STAR 를 샀다가 팔아야 한다"
     assert star[0]["reason"] == "stop_35"
+
+
+def test_leaders_tie_order_is_fixed() -> None:
+    """모두 같은 수익(동점)이면 종목 이름 순으로 정해진다 — 해시 시드와 무관."""
+    days = _days(200)
+    close: dict[str, list[float | None]] = {
+        f"S{k:02d}": [100.0 * 1.001**t for t in range(200)] for k in range(60)
+    }
+    sector = {s: ("Tech", "Energy", "Utilities")[int(s[1:]) % 3] for s in close}
+    got = [s for s, _ in leaders(Panel(days, close, sector), 199)]
+    assert got == [f"S{k:02d}" for k in range(59, 49, -1)]

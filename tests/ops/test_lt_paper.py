@@ -61,3 +61,20 @@ def test_state_round_trip_json() -> None:
         step(state, panel.days, panel.close, spy, panel.sector, t)
     again = PaperState.from_json(json.loads(json.dumps(state.to_json())))
     assert again == state
+
+
+def test_leaders_tie_order_is_fixed() -> None:
+    """동점이면 종목 · 섹터 이름 순 — 연구 판(run_lt_leaders)과 같은 결과."""
+    from scripts.run_lt_leaders import leaders as research_leaders
+
+    from auto_trading.ops.lt_paper import leaders
+
+    days = _days(200)
+    close: dict[str, list[float | None]] = {
+        f"S{k:02d}": [100.0 * 1.001**t for t in range(200)] for k in range(60)
+    }
+    sector = {s: ("Tech", "Energy", "Utilities", "Health")[int(s[1:]) % 4] for s in close}
+    lead, top = leaders(close, sector, 199)
+    assert top == ["Health", "Utilities", "Energy"]  # 이름 순 점수 → 끝 번호 많은 섹터가 위
+    assert [s for s, _ in lead] == [s for s, _ in research_leaders(Panel(days, close, sector), 199)]
+    assert lead[0][0] == "S59" and "S56" not in dict(lead)  # S56 은 Tech(빠진 섹터)
