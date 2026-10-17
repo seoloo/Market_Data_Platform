@@ -125,11 +125,11 @@ def summary_text(
 ) -> str:
     """두 전략 칸 + 합계 + 할 일. 칸 자료가 없으면(꺼짐 · 조회 실패) 그 칸에 한 줄로 알린다."""
     lines = [f"🗓 [주간 요약 · {period}]", "━━━━━━━━━━━━"]
-    total = deposit = 0.0
+    total = deposit = week = 0.0
     if vega is not None:
         eq, dep = float(str(vega["equity"])), float(str(vega["deposits"]))
         wk = float(str(vega["week"]))
-        total, deposit = total + eq, deposit + dep
+        total, deposit, week = total + eq, deposit + dep, week + wk
         lines += [
             "🌌 Vega  (바이낸스 현물 · 코인 추세)",
             f"💼 평가 {eq:,.2f} USDT · 넣은 돈 {dep:,.2f}",
@@ -159,7 +159,7 @@ def summary_text(
     if altair is not None:
         eq, start = float(str(altair["equity"])), float(str(altair["start"]))
         wk = float(str(altair["week"]))
-        total, deposit = total + eq, deposit + start
+        total, deposit, week = total + eq, deposit + start, week + wk
         lines += [
             "☄️ Altair  (바이낸스 선물 · 롱 4배 + 숏)",
             f"💼 장부 {eq:,.2f} USDC · 시작 {start:,.2f}",
@@ -188,7 +188,11 @@ def summary_text(
     else:
         lines.append("☄️ Altair — 꺼져 있거나 조회 실패")
     lines += ["", "━━━━━━━━━━━━"]
-    if deposit:
-        lines.append(f"📊 합계 {total:,.2f} · 넣은 돈 {deposit:,.2f} · {_pct(total / deposit - 1)}")
+    if deposit:  # 사용자 2026-10-17: 잃은 · 번 금액도 함께
+        lines += [
+            f"📊 합계 {total:,.2f} · 넣은 돈 {deposit:,.2f}",
+            f"   └ 손익 {_money(total - deposit)} ({_pct(total / deposit - 1)})"
+            f" · 이번 주 {_money(week)}",
+        ]
     lines.append("✅ 할 일 없음" if not todo else "\n".join(f"⚠️ {x}" for x in todo))
     return "\n".join(lines)

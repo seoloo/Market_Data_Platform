@@ -72,6 +72,7 @@ def test_summary_text_blocks_and_todo() -> None:
     assert "평단 $81,684 → $81,584" in t and "−$0.12" in t and "ETH ❌" in t
     assert "BTC 롱 0.004 · 진입 $82,197 → $81,445" in t and "숏 없음" in t
     assert "합계 1,696.51 · 넣은 돈 1,704.48" in t and "✅ 할 일 없음" in t
+    assert "손익 −7.97 (−0.5%) · 이번 주 −8.35" in t
     assert "노출" not in t and "청산" not in t
     bad = m.summary_text(period="x", vega=None, altair=None, todo=["Vega 조회 실패"])
     assert "Vega — 장부를 못 읽음" in bad and "⚠️ Vega 조회 실패" in bad
