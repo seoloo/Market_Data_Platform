@@ -564,21 +564,52 @@ def vega_binance_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
-def altair_book(state: Mapping[str, Any], q: Quotes) -> Book:
+ALTAIR_LIVE = Path("data") / "altair_live" / "state.json"
+"""Altair 실거래 실행기 장부 (``scripts/altair_live.py``, 2026-10-17 시작). 화면은 읽기만."""
+ALTAIR_EXPOSURE = 4.0
+"""롱 목표 × 4 = 명목 비중 (``scripts.altair_demo.EXPOSURE``)."""
+
+
+def altair_book(state: Mapping[str, Any], q: Quotes, live: Mapping[str, Any] | None = None) -> Book:
     """Altair (옛 AG4S2) — 바이낸스 USDⓈ-M 선물 지갑.
 
-    사용자 2026-10-15 "오르빗에 실거래에 altair 추가". Vega 실행기가 날마다 남기는
-    ``altair`` 기록(선물 지갑 USDT · 자동 이체)만 읽는다. 화면은 계좌를 조회하지 않는다.
-    실거래 실행기 전이라 지금은 선물 지갑의 USDT 가 대기 중인 모습이다."""
+    사용자 2026-10-15 "오르빗에 실거래에 altair 추가". 입금 = Vega 실행기가 남긴 현물 → 선물
+    이체(``altair.transfers``). 평가액은 실거래 실행기 장부(``live``)의 마지막 기록
+    — 선물 지갑 전체 증거금 잔고(USDT + USDC, 미실현 포함) — 를 쓴다
+    (2026-10-18 사용자 "현황에 altair 반영 안 되어 있다"). 실행기 기록이 없으면 Vega 가 확인한
+    선물 지갑 USDT. 화면은 계좌를 조회하지 않는다."""
     fx = q.fx or 0.0
     fal = state.get("altair") or {}
     rows = [t for t in fal.get("transfers") or [] if isinstance(t, list) and len(t) >= 2]
-    usdt = _f(fal.get("futures_usdt"))
-    notes = (
-        "실거래 실행기 준비 중 — 선물 지갑에서 대기",
-        "바이낸스 돈의 50% 를 선물로 (선물 몫 500 USDT 부터 자동 이체)",
-        f"선물 지갑 {usdt:,.2f} USDT · 마지막 확인 {fal.get('checked', '—')}",
-    )
+    hist = [h for h in (live or {}).get("history") or [] if isinstance(h, list) and len(h) >= 3]
+    summary: list[str] = []
+    if hist:
+        at_ms, usd, nav = int(hist[-1][0]), _f(hist[-1][1]), _f(hist[-1][2])
+        at = (datetime.fromtimestamp(at_ms / 1000, UTC) + _KST).strftime("%m/%d %H:%M")
+        peak = _f((live or {}).get("nav_peak"), nav) or nav
+        w = (live or {}).get("long_w") or {}
+        longs = " · ".join(f"{c} {ALTAIR_EXPOSURE * _f(v):.0%}" for c, v in w.items() if _f(v) > 0)
+        shorts = " · ".join(str(c) for c in ((live or {}).get("shorts") or {}))
+        pos = f"롱 {longs or '없음'} · 숏 {shorts or '없음'}"
+        summary = [
+            f"장부 {usd:,.2f} USDT (미실현 포함) · {at} 기준",
+            f"{pos} (장부 대비 명목)",
+        ]
+        notes = [
+            "실거래 중 — 4 시간마다 실행기가 기록",
+            f"선물 지갑 전체 {usd:,.2f} USDT (USDT + USDC, 미실현 포함) · {at} 기준",
+            pos + " — 롱은 T/v2 목표 × 4",
+            f"단위 가치 {nav:.3f} · 고점 대비 {nav / peak - 1:+.1%} (30% 면 새 노출 정지)",
+        ]
+        if (live or {}).get("dd_halt"):
+            notes.append(f"⛔ {live['dd_halt']} — 해제는 사람이")  # type: ignore[index]
+    else:
+        usd = _f(fal.get("futures_usdt"))
+        notes = [
+            "실거래 실행기 준비 중 — 선물 지갑에서 대기",
+            f"선물 지갑 {usd:,.2f} USDT · 마지막 확인 {fal.get('checked', '—')}",
+        ]
+    notes.append("바이낸스 돈의 50% 를 선물로 (선물 몫 500 USDT 부터 자동 이체)")
     trades = tuple(
         Trade(
             str(t[0]),
@@ -595,12 +626,13 @@ def altair_book(state: Mapping[str, Any], q: Quotes) -> Book:
         "Altair",
         "바이낸스 선물 · BTC · ETH",
         sum(_f(t[1]) for t in rows) * fx,
-        usdt * fx,
+        usd * fx,
         (),
-        notes,
+        tuple(notes),
         (),
         tuple((str(t[0]), f"☄️ 현물 → 선물 {_f(t[1]):,.2f} USDT") for t in rows),
         trades,
+        info={"summary": summary} if summary else {},
     )
 
 
@@ -760,7 +792,9 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
             replace(vega_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_VEGA))
         )
         if binance.get("altair"):
-            out.append(replace(altair_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_VEGA)))
+            live = _read(root / ALTAIR_LIVE)
+            src = root / (ALTAIR_LIVE if live and live.get("history") else BINANCE_VEGA)
+            out.append(replace(altair_book(binance, q, live), updated_ms=_mtime_ms(src)))
     acc = _toss_states(root)
     if acc:
         files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
@@ -897,7 +931,9 @@ def summary_text(books: list[Book], q: Quotes, now_ms: int) -> str:
             else:
                 pct = f"{h.value_krw / h.cost_krw - 1:+.1%}" if h.cost_krw > 0 else "—"
                 lines.append(sub(f"{trend}{h.name} {qty}{h.value_krw:,.0f}원 · {pct}"))
-        if b.cash_krw:
+        if b.info.get("summary"):  # Altair — 선물 지갑 평가액은 현금이 아니다
+            lines += [sub(x) for x in b.info["summary"]]
+        elif b.cash_krw:
             lines.append(sub(f"현금 {b.cash_krw:,.0f}원"))
         lines += [sub(f"⏳ {p}") for p in b.pending]
     fx = f"원/달러 {q.fx:,.1f}" if q.fx else "환율 없음"
