@@ -19,6 +19,14 @@
 
 자료: ``data/research/div_mix_180`` (SPY · QQQ · IEF · GLD · SCHD · DVY) · ``lev_div_181`` (TQQQ),
 수정 종가. 결과 ``reports/namu_core_compare/result.json``.
+
+``lev`` (사용자 2026-10-17 "C로 해서 sp500 1배 2배 3배 각각 비교해줘", 실행 전 고정):
+C 의 S&P 500 60% 를 C1 SPY(1 배) · C2 SSO(2 배) · C3 UPRO(3 배)로 바꾼다. 국채 20 · 금 20 · 매달
+다시 맞추기 · 수수료 · 기간 · 지표는 위와 같다.
+상장 전(SSO 2006-06 · UPRO 2009-06)은 SPY 일간 2 · 3 배
+− 연 비용(겹치는 기간 총수익이 같아지게 맞춤)으로 잇는다. 참고로 Deneb 줄을 같이 둔다.
+자료 ``data/research/namu_core_compare`` (SSO · UPRO, 야후 수정 종가 2026-10-17 받음).
+결과 ``reports/namu_core_compare/result_lev.json``.
 """
 
 from __future__ import annotations
@@ -56,15 +64,15 @@ def rets(s: Series, days: list[str]) -> dict[str, float]:
     return out
 
 
-def fit_drag(qqq_r: Mapping[str, float], real: Series, days: list[str]) -> float:
-    """3 배 합성의 연 비용 — 겹치는 기간 총수익이 진짜 TQQQ 와 같아지게(이분법)."""
+def fit_drag(qqq_r: Mapping[str, float], real: Series, days: list[str], mult: float = 3.0) -> float:
+    """``mult`` 배 합성의 연 비용 — 겹치는 기간 총수익이 진짜 ETF 와 같아지게(이분법)."""
     span = [d for d in days if d in real]
     target = real[span[-1]] / real[span[0]]
 
     def total(drag: float) -> float:
         v = 1.0
         for d in span[1:]:
-            v *= 1 + 3 * qqq_r[d] - drag / 252
+            v *= 1 + mult * qqq_r[d] - drag / 252
         return v
 
     lo, hi = -0.2, 0.5
@@ -179,7 +187,7 @@ def dca_stats(vals: list[float], paid: list[float]) -> dict[str, float]:
     }
 
 
-def main() -> int:
+def main(which: str = "base") -> int:
     raw = {
         s: load(DATA / "div_mix_180" / f"{s}.csv")
         for s in ("SPY", "QQQ", "IEF", "GLD", "SCHD", "DVY")
@@ -207,6 +215,19 @@ def main() -> int:
         "Deneb": deneb,
     }
     out: dict[str, Any] = {"tqqq_synthetic_drag": drag}
+    if which == "lev":
+        spy_r = rets(raw["SPY"], days)
+        for sym, mult in (("SSO", 2.0), ("UPRO", 3.0)):
+            real = load(DATA / "namu_core_compare" / f"{sym}.csv")
+            d = fit_drag(spy_r, real, days, mult)
+            px[sym] = chain(real, {k: mult * r - d / 252 for k, r in spy_r.items()}, days)
+            out[f"{sym.lower()}_synthetic_drag"] = d
+        rules = {
+            "C1": lambda i: {"SPY": 0.6, "IEF": 0.2, "GLD": 0.2},
+            "C2": lambda i: {"SSO": 0.6, "IEF": 0.2, "GLD": 0.2},
+            "C3": lambda i: {"UPRO": 0.6, "IEF": 0.2, "GLD": 0.2},
+            "Deneb": deneb,
+        }
     for wname, (a, b) in WINDOWS.items():
         i0 = next(k for k, d in enumerate(days) if d >= a)
         i1 = max(k for k, d in enumerate(days) if d <= b)
@@ -217,10 +238,10 @@ def main() -> int:
             res[name] = {"lump": stats(days[i0 : i1 + 1], vals), "dca": dca_stats(dv, dp)}
         out[wname] = res
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "result.json").write_text(
+    (OUT / ("result_lev.json" if which == "lev" else "result.json")).write_text(
         json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"TQQQ 합성 연 비용 {drag:.2%}")
+    print({k: f"{v:.2%}" for k, v in out.items() if k.endswith("_drag")})
     for wname in WINDOWS:
         res = out[wname]
         print(f"\n== {wname} {res['from']} ~ {res['to']}")
@@ -240,4 +261,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1] if len(sys.argv) > 1 else "base"))
