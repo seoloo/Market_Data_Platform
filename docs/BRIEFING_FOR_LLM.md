@@ -6,6 +6,12 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-17 — 253 할로윈 · 254 KOSPI200 편입 · 255 주말 주식 무기한 (Claude)
+
+- [253](research/253-halloween-effect-preregistration.md) 'Sell in May' 를 논문 뒤 2003 ~ 2025 로: S&P 500 겨울 − 여름 +1.6%(t 0.58), 나스닥 100 은 반대(−1.8%) → **불명**. 겨울만 보유는 나스닥 연수익 15.2 → 7.5%.
+- [254](research/254-kospi200-inclusion-data-audit.md) KOSPI200 편입 효과: 편입 이력 자료 없음 → 보류.
+- [255](research/255-weekend-stock-perp-preregistration.md) 바이낸스 주식 무기한의 주말 움직임 방향으로 월 미국 시가까지: 주말 평균 −0.47%, 25 중 20 주말 − → **불리**. 주말 움직임은 월요일에 되돌아간다(상관 −0.41).
+
 ## 2026-10-17 — 251 순유동성 · 252 하락장 상대 강도 (Claude)
 
 - [251](research/251-net-liquidity-preregistration.md) 순유동성(연준 자산 − TGA − 역레포)이 4 주 늘어난 뒤 4 주 수익이 더 큼: QQQ +0.77%p · BTC +4.63%p, 두 반쪽 같은 방향이지만 p 0.09 · 0.06 → **불명**. '줄면 빠진다' 가 아니라 '덜 오른다' — 빠지는 필터는 QQQ 샤프를 깎음. 운영에 안 넣음.
