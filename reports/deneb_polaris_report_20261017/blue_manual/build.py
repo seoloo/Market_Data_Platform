@@ -534,7 +534,7 @@ def page_leverage(no: int) -> None:
     cats = [p[1] for p in P2]
     keys = [p[2] for p in P2]
     yc = 8.55
-    chart_head(sl, X1, yc, 13.0, "최종 평가액 · 월 10만 원", "2026년 8월 31일, 원금 1,760만 원 · 단위 만 원 · 세전")
+    chart_head(sl, X1, yc, 13.0, "14년 8개월 적립 후 최종 평가액 · 월 10만 원", "2012년 1월 ~ 2026년 8월 31일 · 176회 · 원금 1,760만 원 · 단위 만 원 · 세전")
     ch = add_chart(sl, XL_CHART_TYPE.COLUMN_CLUSTERED, X1, yc + 1.25, 13.0, 5.1, cats,
                    [("최종 평가액", [run(n)["final"] / 1e4 for n in names])], name="최종 평가액")
     _gap(ch.plots[0], 45)
@@ -561,7 +561,7 @@ def page_leverage(no: int) -> None:
     fin(ch2)
 
     yt = 15.15
-    hdr = ["월 10만 원"] + [n if "SCHD" in n else n.replace("\n", " ") for n in cats]
+    hdr = ["월 10만 원 · 14년 8개월"] + [n if "SCHD" in n else n.replace("\n", " ") for n in cats]
     rows = [hdr,
             ["최종 평가액"] + [eok(run(n)["final"], "") for n in names],
             ["투자이익"] + [eok(run(n)["profit"], "") for n in names],
@@ -573,7 +573,7 @@ def page_leverage(no: int) -> None:
     fills = {(i, 9): PANEL for i in range(6)}
     table(sl, X1, yt, [w0] + [wd] * 9, rows, size=8.5, row_h=0.6, bold_first_col=True, fills=fills)
     text(sl, X1, 19.3, FULL, 0.5,
-         "투자이익 = 최종 평가액 − 원금 1,760만 원. 회복 기간 = 최대 낙폭이 시작된 고점에서 그 고점을 다시 넘은 날까지. 금액 단위 원(억 · 만 표기).",
+         "모든 값은 2012년 1월부터 2026년 8월까지 14년 8개월 동안 매달 10만 원을 넣은 결과. 투자이익 = 최종 평가액 − 원금 1,760만 원. 회복 기간 = 최대 낙폭이 시작된 고점에서 그 고점을 다시 넘은 날까지. 금액 단위 원(억 · 만 표기).",
          size=7.5, color=MUTED, after=0)
     sl.notes_slide.notes_text_frame.text = (
         "자료: QQQ · SCHD · SPY data/research/div_mix_180, TQQQ · QLD data/research/lev_div_181 (실제 ETF 수정 종가). "
@@ -588,14 +588,14 @@ def page_amounts(no: int) -> None:
     sl = new_slide()
     frame(sl, 3, no)
     title(sl, X1, 2.75, CW, "다섯 납입액의 결과")
-    quote(sl, X1, 4.3, CW, 2.2, "같은 기간 · 같은 날 · 같은 비용입니다. 금액만 다릅니다.")
+    quote(sl, X1, 4.3, CW, 2.2, "14년 8개월 · 같은 날 · 같은 비용입니다. 금액만 다릅니다.")
     d, q, p = (run(k)["cagr"] for k in ("Deneb", "QQQ 단독 적립", "Polaris"))
     text(sl, X1, 6.85, CW, 2.5,
          f"이 계산은 세금 전 · 소수 주 허용 · 비율 비용이어서 연복리와 낙폭은 금액과 상관없이 같습니다 "
          f"(Deneb 연 {pct(d)}, QQQ 단독 적립 {pct(q)}, Polaris {pct(p)}). 그래서 아래 금액만 다섯 줄로 나눠 봅니다.",
          size=9.5, after=0)
 
-    chart_head(sl, X2, 2.75, SPAN2, "QQQ 단독 적립과 비교한 최종 평가액 차이",
+    chart_head(sl, X2, 2.75, SPAN2, "14년 8개월 적립 후 최종 평가액 차이 — QQQ 단독 적립과 비교",
                "같은 돈으로 QQQ만 샀을 때보다 더 남았으면 오른쪽, 덜 남았으면 왼쪽 · 2026-08-31 · 단위 만 원 · 세전")
     cats = [AM_LABEL[a] for a in AM][::-1]
     dn = [(run("Deneb", a)["final"] - run("QQQ 단독 적립", a)["final"]) / 1e4 for a in AM][::-1]
@@ -619,7 +619,7 @@ def page_amounts(no: int) -> None:
     fin(ch)
 
     yt = 10.15
-    chart_head(sl, X1, yt, FULL, "납입액별 최종 평가액과 투자이익",
+    chart_head(sl, X1, yt, FULL, "14년 8개월 적립 후 납입액별 최종 평가액과 투자이익",
                "2012-01 ~ 2026-08 매달 첫 거래일 납입 176회 · 단위 만 원 · 세전 · 투자이익 = 최종 평가액 − 원금")
     hdr1 = ["", "원금", "Deneb", None, "QQQ 단독 적립", None, "Polaris", None, "QQQ 단독 적립과 차이", None]
     hdr2 = ["월 납입액", "", "최종 평가액", "투자이익", "최종 평가액", "투자이익", "최종 평가액", "투자이익", "Deneb", "Polaris"]
@@ -670,13 +670,14 @@ def page_periods(no: int) -> None:
     keys = [("Deneb", "Deneb"), ("QQQ 단독 적립", "QQQ 단독"), ("Polaris", "Polaris")]
     marks = ["2015-12", "2019-12", "2021-12", "2022-12", "2026-08"]
     allm = sorted(m["Deneb"])
-    rows = [["달말", "원금", "Deneb", "QQQ 단독", "Polaris"]]
+    rows = [["달말", "적립 기간", "원금", "Deneb", "QQQ 단독", "Polaris"]]
     for mk in marks:
         k = allm.index(mk) + 1
-        rows.append([mk.replace("-", "년 ") + "월", man(k * 1e5)] + [man(m[n][mk]) for n, _ in keys])
-    chart_head(sl, X1, 11.2, CW, "구간 끝 평가액 · 월 10만 원", "단위 만 원 · 세전")
-    table(sl, X1, 12.45, [2.05, 1.45, 1.65, 1.65, 1.55], rows, size=9, row_h=0.58, bold_first_col=True)
-    text(sl, X1, 16.25, CW, 3.0,
+        span = f"{k // 12}년" + (f" {k % 12}개월" if k % 12 else "")
+        rows.append([mk.replace("-", "."), span, man(k * 1e5)] + [man(m[n][mk]) for n, _ in keys])
+    chart_head(sl, X1, 11.2, CW, "구간 끝 평가액 · 월 10만 원", "2012년 1월 첫 납입부터 센 적립 기간 · 단위 만 원 · 세전")
+    table(sl, X1, 12.45, [1.4, 1.85, 1.05, 1.4, 1.45, 1.2], rows, size=8.5, row_h=0.58, bold_first_col=True)
+    text(sl, X1, 16.5, CW, 3.0,
          f"2022년 한 해 동안 Deneb는 {man(m['Deneb']['2021-12'])}만 원에서 {man(m['Deneb']['2022-12'])}만 원으로, "
          f"QQQ 단독 적립은 {man(m['QQQ 단독 적립']['2021-12'])}만 원에서 {man(m['QQQ 단독 적립']['2022-12'])}만 원으로 줄었습니다. "
          "그사이 넣은 120만 원이 포함된 금액입니다.",
@@ -803,8 +804,8 @@ def page_polaris(no: int) -> None:
 
     # 오른쪽 아래 오른쪽: QQQ 비교 + 예시
     line(sl, X3, yb, X3 + CW, yb, RULE_D, 0.6)
-    text(sl, X3, yb + 0.18, CW, 0.5, "QQQ 단독 적립과 비교 · 월 10만 원", size=9.5, bold=True, spacing=1.0, after=0)
-    text(sl, X3, yb + 0.68, CW, 0.5, "2012-01 ~ 2026-08 · 원금 1,760만 원 · 세전", size=8, color=MUTED, spacing=1.0, after=0)
+    text(sl, X3, yb + 0.18, CW, 0.5, "14년 8개월 적립 후 · 월 10만 원", size=9.5, bold=True, spacing=1.0, after=0)
+    text(sl, X3, yb + 0.68, CW, 0.5, "QQQ 단독 적립과 비교 · 2012-01 ~ 2026-08 · 원금 1,760만 원 · 세전", size=8, color=MUTED, spacing=1.0, after=0)
     po, qq, sp = run("Polaris"), run("QQQ 단독 적립"), run("S&P500 단독 적립(SPY)")
     table(sl, X3, yb + 1.35, [2.35, 2.0, 2.0, 2.0], [
         ["", "Polaris", "QQQ 단독", "S&P500 단독"],
@@ -843,7 +844,7 @@ def page_savings(no: int) -> None:
     mdd = [0.0, 0.0] + [run(k)["mdd"] for _, k, _ in names[2:]]
     cats = [n for n, _, _ in names][::-1]
     keys = [k for _, _, k in names][::-1]
-    chart_head(sl, X2, 2.75, CW, "넣은 원금 대비 최종 금액", "2026-08-31 · 몇 배가 됐나 · 금액과 무관 · 세전")
+    chart_head(sl, X2, 2.75, CW, "14년 8개월 적립 후 원금 대비 최종 금액", "2012-01 ~ 2026-08-31 · 몇 배가 됐나 · 금액과 무관 · 세전")
     ch = add_chart(sl, XL_CHART_TYPE.BAR_CLUSTERED, X2, 3.95, CW, 5.4, cats, [("배수", mult[::-1])], name="원금 대비 배수")
     _gap(ch.plots[0], 45)
     color_points(ch.plots[0].series[0], keys)
@@ -864,7 +865,7 @@ def page_savings(no: int) -> None:
     fin(ch2)
 
     yt = 10.05
-    chart_head(sl, X1, yt, FULL, "납입액별 최종 금액 — Deneb · Polaris · QQQ 단독 적립 · 적금 3% · 적금 4%",
+    chart_head(sl, X1, yt, FULL, "14년 8개월 적립 후 납입액별 최종 금액 — Deneb · Polaris · QQQ 단독 적립 · 적금 3% · 적금 4%",
                "2012-01 ~ 2026-08 매달 납입 176회 · 단위 만 원 · 모두 세전")
     hdr1 = ["", "원금", "최종 금액", None, None, None, None, "적금 4%보다 더 남은 금액", None, None]
     hdr2 = ["월 납입액", "", "적금 3%", "적금 4%", "Polaris", "QQQ 단독", "Deneb", "Polaris", "QQQ 단독", "Deneb"]
