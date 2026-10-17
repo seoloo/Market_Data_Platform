@@ -59,6 +59,15 @@ BUY = 사기만(새 돈을 모자란 종목부터, 팔지 않음) · YEAR = BUY 
 지표: 끝 평가액, 단위 가치 최대 낙폭 ·
 2008 · 2020 · 2022, 주식(SPY + QQQ) 비중 최고, 다시 맞춘 횟수, 낸 세금, 끝의 안 판 이익.
 결과 ``reports/namu_core_compare/result_rebal.json``.
+
+``split`` (사용자 2026-10-17 "4개월 100만원씩이 좋을까 8개월 50만원씩이 좋을까", 실행 전 고정):
+Polaris 단위 가치(매달 다시 맞춤, 앞과 같음)에 400 만 원을 4 달 × 100 만 vs 8 달 × 50 만
+(매달 첫 거래일).
+아직 안 넣은 돈은 이자 0. 시작 달을 2005-01 부터 24 달 뒤 자료가 있는 마지막 달까지 하나씩 옮겨 가며
+12 · 24 달 뒤 평가액, 그 24 달 동안 '평가액 − 넣은 돈' 최저(원), 4 달 쪽이 더 많은 비율 ·
+평균 차이 ·
+하위 10% · 가장 나빴던 시작 달.
+결과 ``reports/namu_core_compare/result_split.json``.
 """
 
 from __future__ import annotations
@@ -352,6 +361,61 @@ def rebal(px: Mapping[str, Series], days: list[str]) -> int:
     return 0
 
 
+def split(px: Mapping[str, Series], days: list[str]) -> int:
+    i0 = next(k for k, d in enumerate(days) if d >= "2005-01-01")
+    i1 = max(k for k, d in enumerate(days) if d <= "2026-09-30")
+    vals, _ = simulate(px, days, POLARIS, i0, i1, monthly=0.0)
+    span = days[i0 : i1 + 1]
+    firsts = [k for k in range(len(span)) if k == 0 or span[k][:7] != span[k - 1][:7]]
+    plans = {"4x100": [1_000_000.0] * 4, "8x50": [500_000.0] * 8}
+    rows: list[dict[str, Any]] = []
+    for m in range(len(firsts) - 24):
+        row: dict[str, Any] = {"start": span[firsts[m]][:7]}
+        for name, deps in plans.items():
+            units = paid = 0.0
+            worst = 0.0
+            v12 = v24 = 0.0
+            for j in range(firsts[m], firsts[m + 24] + 1):
+                if j in firsts[m : m + len(deps)]:
+                    add = deps[firsts.index(j) - m]
+                    units += add / vals[j]
+                    paid += add
+                value = units * vals[j] + (4_000_000.0 - paid)  # 안 넣은 돈은 현금
+                worst = min(worst, value - 4_000_000.0)
+                if j == firsts[m + 12]:
+                    v12 = value
+                if j == firsts[m + 24]:
+                    v24 = value
+            row[name] = {"v12": v12, "v24": v24, "worst": worst}
+        rows.append(row)
+
+    def pct(xs: list[float], q: float) -> float:
+        ys = sorted(xs)
+        return ys[int(q * (len(ys) - 1))]
+
+    out: dict[str, Any] = {"starts": len(rows), "from": rows[0]["start"], "to": rows[-1]["start"]}
+    for h in ("v12", "v24", "worst"):
+        a = [r["4x100"][h] for r in rows]
+        b = [r["8x50"][h] for r in rows]
+        out[h] = {
+            "4x100_mean": sum(a) / len(a),
+            "8x50_mean": sum(b) / len(b),
+            "4x100_p10": pct(a, 0.10),
+            "8x50_p10": pct(b, 0.10),
+            "4x100_min": min(a),
+            "8x50_min": min(b),
+            "4x100_better": sum(x > y for x, y in zip(a, b, strict=True)) / len(a),
+        }
+    worst_start = min(rows, key=lambda r: r["4x100"]["worst"])
+    out["worst_start"] = worst_start
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "result_split.json").write_text(
+        json.dumps({"summary": out, "rows": rows}, indent=1, ensure_ascii=False), encoding="utf-8"
+    )
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+    return 0
+
+
 def mix(sym: str) -> Rule:
     """주식 ``sym`` 60 · 국채 20 · 금 20."""
     return lambda i: {sym: 0.6, "IEF": 0.2, "GLD": 0.2}
@@ -492,6 +556,8 @@ def main(which: str = "base") -> int:
             "H": lambda i: {"SPY": 0.3, "QQQ": 0.3, "IEF": 0.2, "GLD": 0.2},
             "N1": mix("QQQ"),
         }
+    if which == "split":
+        return split(px, days)
     if which == "rebal":
         return rebal(px, days)
     if which == "dca20":
