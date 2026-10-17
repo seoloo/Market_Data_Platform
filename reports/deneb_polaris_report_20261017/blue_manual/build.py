@@ -47,7 +47,7 @@ C = {
     "QQQ60": "F2B27A",
     "QLD60": "9FCBEF",
     "TQQQ60": "BBA3DB",
-    "VOL": "5F7FC0",
+    "VOL": "C8506A",
     "Polaris": "1E9A84",
     "IEF": "3D9BE0",
     "GLD": "C9A227",
