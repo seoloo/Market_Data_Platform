@@ -324,6 +324,9 @@ def text(rep: Mapping[str, Any]) -> str:
 
 
 def main(argv: list[str]) -> int:
+    reconf = getattr(sys.stdout, "reconfigure", None)
+    if reconf is not None:  # cp949 콘솔에서도 '—' 등을 찍을 수 있게
+        reconf(encoding="utf-8", errors="replace")
     cmd = argv[1] if len(argv) > 1 else ""
     if cmd == "run":
         print(text(run()))
