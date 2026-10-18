@@ -1,0 +1,31 @@
+{
+  "panel_sha256": "c96d5989eb1fd27adc3ac8c44d4d3661f598c86f4498aaa689368992669799aa",
+  "rows": 139,
+  "first_decision": "2015-01-30",
+  "last_decision": "2026-07-31",
+  "source_sha256": {
+    "NASDAQ100_filtered_prefix": "a10498186ed399b5b4f3fa32d3a75b495e997bef969c20f43a732b35394ade21",
+    "data/research/deneb_macro_281/INDPRO/snapshots_000.zip": "aba970f33f4a3b378227768fadc3f3f6568857582ad19b0b5dd7a6d71a0885f1",
+    "data/research/deneb_macro_281/INDPRO/snapshots_001.zip": "2170c324b3d71a7fff56d022c9cb70223503fdc893f19a82d8723fb7a91ea9d8",
+    "data/research/deneb_macro_281/INDPRO/snapshots_002.zip": "34ab891a24de7a681f75216cd0a133ebb09c3ec3c2c3eedea85bf79982dffc7c",
+    "data/research/deneb_macro_281/INDPRO/snapshots_003.zip": "0fb645ae4c6fdbe17f560c4264e3b8f09ecef7051be97205fde0c79092e7b6eb",
+    "data/research/deneb_macro_281/PCEPILFE/snapshots_000.zip": "7923ff3c097cbbe62732a09441957988130fc920550f5248b58d9cd153428dcd",
+    "data/research/deneb_macro_281/PCEPILFE/snapshots_001.zip": "8dd9f46f77726ce5f6549ffee16d56ed2055e46136361ba438de3ef41c04445c",
+    "data/research/deneb_macro_281/PCEPILFE/snapshots_002.zip": "874a17733802f6ec5fc0806ae6a8df5e781201c815a855bd515dd29a0f3a2ca0"
+  },
+  "macro_missing_histogram": {
+    "0": 128,
+    "1": 5,
+    "2": 5,
+    "3": 1,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0
+  },
+  "model_fits": 0,
+  "candidate_pnl_calculations": 0
+}
