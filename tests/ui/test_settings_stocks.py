@@ -70,7 +70,11 @@ def test_add_errors(tmp_path: Path) -> None:
     _, err = us.validate(
         _form(v, **{"new.mkt": "KR", "new.query": "KODEX 200", "new.daily": "100"}), v, UNIVERSE
     )
-    assert "₩1,000 ~ ₩30,000" in err["new.daily"]
+    assert "₩500 ~ ₩30,000" in err["new.daily"]
+    _, err = us.validate(  # 2026-10-18 사용자: 국내 하루 최소 500 원
+        _form(v, **{"new.mkt": "KR", "new.query": "KODEX 200", "new.daily": "500"}), v, UNIVERSE
+    )
+    assert "new.daily" not in err
     _, err = us.validate(_form(v, **{"new.mkt": "KR", "new.query": "삼성전자"}), v, [])
     assert "목록을 아직" in err["new.query"]
 

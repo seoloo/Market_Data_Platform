@@ -243,7 +243,7 @@ def _xfields(meta: Sequence[Mapping[str, Any]]) -> list[Field]:
                 "int" if kr else "float",
                 float(x.get("daily0") or (5_000 if kr else 1.0)),
                 "내일 적립분부터",
-                1_000 if kr else 0.5,
+                500 if kr else 0.5,
                 30_000 if kr else 20,
             ),
             Field(f"{k}.on", f"{name} 적립", "bool", True, "내일 적립분부터"),

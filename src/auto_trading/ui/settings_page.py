@@ -435,7 +435,7 @@ def render_settings(
         + (f'<p class="set-err" style="flex-basis:100%">{escape(q_err)}</p>' if q_err else "")
         + (f'<p class="set-err" style="flex-basis:100%">{escape(d_err)}</p>' if d_err else "")
         + '<p class="set-help" style="flex-basis:100%">[+ 추가]를 누르면 토스 종목 목록에서 찾아 '
-        "확인 화면에 이름 · 코드를 보여 드려요. 미국 하루 $0.5 ~ $20 · 국내 ₩1,000 ~ ₩30,000, "
+        "확인 화면에 이름 · 코드를 보여 드려요. 미국 하루 $0.5 ~ $20 · 국내 ₩500 ~ ₩30,000, "
         f"합쳐서 최대 {MAX_ITEMS} 종목.</p></div>"
     )
     toss = (
