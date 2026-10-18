@@ -286,10 +286,23 @@ def acc_ask(path: Path | None = None) -> tuple[int, int] | None:
         return None
 
 
-def set_acc_ask(message_id: int, at_s: int, path: Path | None = None) -> None:
+def set_acc_ask(
+    message_id: int, at_s: int, path: Path | None = None, *, kind: str = "add", key: str = ""
+) -> None:
+    """``kind`` 'add'(추가할 종목?) · 'amt'(``key`` 종목의 새 하루 금액?)."""
     p = path or acc_ask_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"message_id": message_id, "at": at_s}), encoding="utf-8")
+    d = {"message_id": message_id, "at": at_s, "kind": kind, "key": key}
+    p.write_text(json.dumps(d), encoding="utf-8")
+
+
+def acc_ask_info(path: Path | None = None) -> dict[str, Any]:
+    """질문 기록 전부 (없으면 빈 dict) — kind · key."""
+    try:
+        d = json.loads((path or acc_ask_path()).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return dict(d) if isinstance(d, dict) else {}
 
 
 def clear_acc_ask(path: Path | None = None) -> None:

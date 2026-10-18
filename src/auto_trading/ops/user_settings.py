@@ -41,6 +41,7 @@ __all__ = [
     "load",
     "read_log",
     "remove_item",
+    "set_daily",
     "show",
     "validate",
 ]
@@ -461,6 +462,23 @@ def add_item(
     form = {"new.mkt": "KR" if mkt == "KR" else "US", "new.daily": daily}
     _add(form, query, new, meta, universe, errors)
     return new, errors
+
+
+def set_daily(
+    current: Mapping[str, Any], key: str, amount: str
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """적립 종목(``key`` = acc.BTQ · x.KR.005930 …)의 하루 금액 → (새 값, 오류).
+
+    설정 화면의 그 종목 금액 칸과 같은 검사(미국 $0.5 ~ 20 · 국내 ₩500 ~ 30,000)."""
+    name = f"{key}.usd" if key.startswith("acc.") else f"{key}.daily"
+    field = next((f for f in fields(current.get("_extras") or []) if f.key == name), None)
+    if field is None or current.get(f"{key}.removed"):
+        return dict(current), {"amount": f"적립 목록에 없는 종목: {key}"}
+    try:
+        value = _parse(field, amount)
+    except ValueError as exc:
+        return dict(current), {"amount": str(exc)}
+    return {**current, name: value}, {}
 
 
 def remove_item(current: Mapping[str, Any], key: str) -> dict[str, Any]:

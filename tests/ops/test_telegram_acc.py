@@ -89,7 +89,9 @@ def test_menu_lists_items_with_add_and_remove(root: Path) -> None:
     assert tb.handle_acc(bot, _text("적립"), root)  # type: ignore[arg-type]
     data = _buttons(bot)
     assert data[0].endswith(":add")
-    assert {d.split(":", 2)[2] for d in data[1:-1]} == {"rm=acc.BTQ", "rm=acc.WQTM", "rm=acc.QS"}
+    assert {d.split(":", 2)[2] for d in data[1:-1]} == {
+        f"{op}=acc.{s}" for op in ("amt", "rm") for s in ("BTQ", "WQTM", "QS")
+    }
     assert "BTQ" in bot.out[-1][1][0]
 
 
@@ -172,3 +174,39 @@ def test_stop_acc_removes_symbol(root: Path, monkeypatch: pytest.MonkeyPatch) ->
     line = liq._stop_acc("QS", "텔레그램")
     assert "멈춤" in line and user_settings.load(root)["acc.QS.removed"] is True
     assert "목록에 없음" in liq._stop_acc("QS", "텔레그램")
+
+
+def test_amount_change_flow(root: Path) -> None:
+    bot = FakeBot()
+    tb.handle_acc(bot, _text("적립"), root)  # type: ignore[arg-type]
+    amt = next(d for d in _buttons(bot) if d.endswith(":amt=acc.BTQ"))
+    assert tb.handle_acc(bot, _press(amt), root)  # type: ignore[arg-type]
+    assert bot.out[-1][1][2].get("force_reply") and "$0.5 ~ $20" in bot.out[-1][1][0]
+    assert not tb.handle_acc(bot, _text("25", reply_to=7), root)  # type: ignore[arg-type]
+    assert "$0.5 ~ $20" in bot.out[-1][1]  # 범위 밖 — 저장 안 함
+    tb.handle_acc(bot, _text("적립"), root)  # type: ignore[arg-type]
+    amt = next(d for d in _buttons(bot) if d.endswith(":amt=acc.BTQ"))
+    tb.handle_acc(bot, _press(amt), root)  # type: ignore[arg-type]
+    assert tb.handle_acc(bot, _text("$3", reply_to=7), root)  # type: ignore[arg-type]
+    assert "$1 → $3" in bot.out[-1][1][0]
+    ok = _buttons(bot)[0]
+    assert user_settings.load(root)["acc.BTQ.usd"] == 1.0  # 확인 전엔 그대로
+    tb.handle_acc(bot, _press(ok), root)  # type: ignore[arg-type]
+    assert user_settings.load(root)["acc.BTQ.usd"] == 3.0
+    assert "$1 → $3" in bot.out[-1][1]
+
+
+def test_one_line_amount_for_kr_item(root: Path) -> None:
+    v = user_settings.load(root)
+    uni = [type("L", (), {"symbol": "005930", "name": "삼성전자", "market": "KOSPI",
+                          "kind": "STOCK", "country": "KR"})()]  # fmt: skip
+    new, err = user_settings.add_item(v, "005930", "KR", "1000", uni)
+    assert not err
+    user_settings.apply(root, user_settings.diff(v, new), __import__("datetime").datetime.now(
+        __import__("datetime").UTC), new=new)  # fmt: skip
+    bot = FakeBot()
+    assert tb.handle_acc(bot, _text("적립 금액 005930 500"), root)  # type: ignore[arg-type]
+    tb.handle_acc(bot, _press(_buttons(bot)[0]), root)  # type: ignore[arg-type]
+    assert user_settings.load(root)["x.KR.005930.daily"] == 500
+    assert not tb.handle_acc(bot, _text("적립 금액 005930 400"), root)  # type: ignore[arg-type]
+    assert "₩500 ~ ₩30,000" in bot.out[-1][1]

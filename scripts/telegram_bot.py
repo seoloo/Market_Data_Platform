@@ -39,6 +39,7 @@ from auto_trading.notify.inbox import (
     InboxMessage,
     InboxQueue,
     TelegramInbox,
+    acc_ask_info,
     clear_acc_ask,
     clear_stock_ask,
     is_acc,
@@ -115,9 +116,10 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
   정리 NVDA (또는 정리 삼성전자) — 그 종목 하나만 (Deneb · 적립 몫 빼고 전부)
 
 💰 적립 (또는 /acc)
-  자동 적립 종목 보기 · [➕ 종목 추가] · [➖ 빼기] — 바꾸면 내일 적립분부터, 보유는 그대로
+  자동 적립 종목 보기 · [➕ 종목 추가] · [✏️ 금액] · [➖ 빼기] — 내일 적립분부터, 보유는 그대로
   추가는 답장으로 '기호 금액' (예: PLTR 3 · 삼성전자 10000) → [✅ 추가]
-  한 줄로도: 적립 추가 PLTR 3 · 적립 빼기 BTQ
+  [✏️ 금액] 누르면 새 하루 금액을 답장 → [✅ 바꾸기] (미국 $0.5 ~ 20 · 국내 ₩500 ~ 30,000)
+  한 줄로도: 적립 추가 PLTR 3 · 적립 금액 BTQ 3 · 적립 빼기 BTQ
 
 💹 개별주 NVDA (또는 개별주 삼성전자 · /stock)
   얼마나 살지 추천: 현금(원화 + 달러)의 0.3% 까지만 잃게, 손절 −3% · 한 종목 최대 10%
@@ -359,7 +361,10 @@ def _acc_menu(bot: TelegramNotifier, root: Path) -> bool:
     )
     rows = [[{"text": "➕ 종목 추가", "callback_data": f"acc:{nonce}:add"}]]
     rows += [
-        [{"text": f"➖ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:rm={x['key']}"}]
+        [
+            {"text": f"✏️ {x['sym']} 금액", "callback_data": f"acc:{nonce}:amt={x['key']}"},
+            {"text": f"➖ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:rm={x['key']}"},
+        ]
         for x in items
     ]
     rows.append([{"text": "닫기", "callback_data": f"acc:{nonce}:cancel"}])
@@ -412,6 +417,48 @@ def _acc_confirm_rm(bot: TelegramNotifier, root: Path, key: str) -> bool:
     return True
 
 
+def _acc_ask_amount(bot: TelegramNotifier, root: Path, key: str) -> bool:
+    x = {i["key"]: i for i in user_settings.acc_items(user_settings.load(root))}.get(key)
+    if x is None:
+        bot.send("⚠ 이미 목록에 없는 종목이에요")
+        return False
+    rng = "₩500 ~ ₩30,000" if x["mkt"] == "KR" else "$0.5 ~ $20"
+    mid = bot.send_message(
+        f"✏️ {x['name']}({x['sym']}) 지금 하루 {_acc_unit(x)} — 새 하루 금액을 답장해 주세요"
+        f" ({rng})",
+        force_reply=True,
+        placeholder="예: 3" if x["mkt"] == "US" else "예: 2000",
+    )
+    set_acc_ask(mid, int(time.time()), kind="amt", key=key)
+    return True
+
+
+def _acc_confirm_amount(bot: TelegramNotifier, root: Path, key: str, text: str) -> bool:
+    amount = text.strip().replace(",", "").replace("$", "").replace("원", "").replace("₩", "")
+    current = user_settings.load(root)
+    new, errors = user_settings.set_daily(current, key, amount)
+    if errors:
+        bot.send("⚠ " + " · ".join(errors.values()) + " — 다시 '적립' 부터 해 주세요")
+        return False
+    changes = user_settings.diff(current, new)
+    if not changes:
+        bot.send("지금 금액과 같아요 — 바꾸지 않았어요")
+        return False
+    c = changes[0]
+    nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
+    _acc_pending(nonce, {"action": "amt", "key": key, "daily": amount})
+    rows = [
+        [{"text": "✅ 바꾸기", "callback_data": f"acc:{nonce}:ok"}],
+        [{"text": "취소", "callback_data": f"acc:{nonce}:cancel"}],
+    ]
+    bot.send_message(
+        f"✏️ {c.label} {user_settings.show(c.key, c.before)} → "
+        f"{user_settings.show(c.key, c.after)} — 내일 적립분부터. 맞으면 [✅ 바꾸기]",
+        buttons=rows,
+    )
+    return True
+
+
 def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> None:
     from datetime import UTC, datetime
 
@@ -424,6 +471,11 @@ def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> No
         except ValueError as exc:
             bot.send(f"⚠ {exc}")
             return
+    elif payload.get("action") == "amt":
+        new, errors = user_settings.set_daily(current, str(payload["key"]), str(payload["daily"]))
+        if errors:
+            bot.send("⚠ " + " · ".join(errors.values()))
+            return
     else:
         universe = read_universe(root / "data" / "toss" / "universe.json")
         new, errors = user_settings.add_item(
@@ -434,7 +486,14 @@ def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> No
             return
     changes = user_settings.diff(current, new)
     user_settings.apply(root, changes, datetime.now(UTC), by="텔레그램", new=new)
-    bot.send("✅ " + " · ".join(c.label for c in changes) + " — 내일 적립분부터")
+
+    def line(c: user_settings.Change) -> str:
+        if c.key.endswith((".usd", ".daily")):
+            before, after = user_settings.show(c.key, c.before), user_settings.show(c.key, c.after)
+            return f"{c.label} {before} → {after}"
+        return c.label
+
+    bot.send("✅ " + " · ".join(line(c) for c in changes) + " — 내일 적립분부터")
 
 
 def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> bool:
@@ -466,6 +525,8 @@ def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> b
             return True
         if arg.startswith("rm="):
             return _acc_confirm_rm(bot, root, arg[3:])
+        if arg.startswith("amt="):
+            return _acc_ask_amount(bot, root, arg[4:])
         if arg == "ok":
             payload = _acc_pending().get(nonce)
             if payload is None:
@@ -474,11 +535,25 @@ def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> b
             _acc_apply(bot, root, payload)
         return False
     if is_acc_answer(msg):
+        ask = acc_ask_info()
         clear_acc_ask()
+        if ask.get("kind") == "amt":
+            return _acc_confirm_amount(bot, root, str(ask.get("key")), msg.text)
         return _acc_confirm_add(bot, root, msg.text)
     parts = msg.text.strip().split(maxsplit=2)
     if len(parts) >= 3 and parts[1] in ("추가", "더하기"):
         return _acc_confirm_add(bot, root, parts[2])
+    if len(parts) >= 3 and parts[1] in ("금액", "변경", "바꾸기"):
+        bits = parts[2].split()
+        hit = [
+            x
+            for x in user_settings.acc_items(user_settings.load(root))
+            if bits and x["sym"] == bits[0].upper()
+        ]
+        if len(bits) != 2 or not hit:
+            bot.send("⚠ '적립 금액 BTQ 3' 처럼 목록에 있는 종목과 새 하루 금액을 적어 주세요")
+            return False
+        return _acc_confirm_amount(bot, root, hit[0]["key"], bits[1])
     if len(parts) >= 3 and parts[1] in ("빼기", "삭제", "제거"):
         sym = parts[2].strip().upper()
         hit = [x for x in user_settings.acc_items(user_settings.load(root)) if x["sym"] == sym]
