@@ -607,6 +607,7 @@ def run(root: Path = REPO) -> int:
     _event_alert(root)
     _namu_follow(root)
     _altair_demo(root)
+    _shadow_272()
     _paper_daily(root)
     _safety_daily()
     _deposit_watch(root)
@@ -724,6 +725,18 @@ def _altair_demo(root: Path) -> None:
             print(f"Altair 데모: {len(done)} 줄")
     except Exception as exc:  # 데모 문제로 봇을 멈추지 않는다
         print(f"Altair 데모 건너뜀: {type(exc).__name__}: {exc}")
+
+
+def _shadow_272() -> None:
+    """H1 숏 · Altair 펀딩비 끄기 그림자 기록(문서 272) — 4 시간마다 다시 계산, 주문 · 알림 없음."""
+    try:
+        from scripts import shadow_272
+
+        out = shadow_272.run()
+        if out:
+            print(f"그림자 272: H1 {out['h1_filled']} 건 · 펀딩 {out['funding_days']} 일")
+    except Exception as exc:  # 그림자 기록 문제로 봇을 멈추지 않는다
+        print(f"그림자 272 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _event_alert(root: Path) -> None:
