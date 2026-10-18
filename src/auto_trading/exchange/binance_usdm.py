@@ -210,6 +210,11 @@ class BinanceUsdmReadOnly:
     def mark_price(self, symbol: str) -> Decimal:
         return _dec(self._request("/fapi/v1/premiumIndex", {"symbol": symbol})["markPrice"])
 
+    def book_ticker(self, symbol: str) -> tuple[Decimal, Decimal]:
+        """(최우선 매수 호가, 최우선 매도 호가) — 메이커(post-only) 주문 가격용."""
+        d = self._request("/fapi/v1/ticker/bookTicker", {"symbol": symbol})
+        return _dec(d["bidPrice"]), _dec(d["askPrice"])
+
     def get_order(self, symbol: str, client_order_id: str) -> FuturesOrderResult | None:
         try:
             data = self._request(

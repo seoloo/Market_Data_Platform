@@ -60,3 +60,16 @@ python -m scripts.run_altair_maker_269     # 커밋 뒤 한 번 → reports/alta
 
 - **하루 롱 맞추기를 호가에 걸어 두는(post-only) 주문으로 바꾸면 비용 대부분이 사라진다.** Altair 는 매일 4 배 비중을 맞추느라 거래가 많아(비용의 81% 가 이 체결) 효과가 크다.
 - 권장: 실거래 `rebalance_long` 을 '메이커 먼저(최우선 호가, post-only) → 30 분 안 못 걸리면 지금처럼 IOC'. 손절 · 숏 · 정리 · 레버리지 줄이기는 그대로 IOC / 비상 STOP_MARKET. 실거래 코드 변경은 사용자 결정 뒤.
+
+## 7. 사용자 결정 · 반영 (2026-10-18)
+
+- 사용자: (메이커 설명 뒤) **"음.. 그렇게 변경해줘."**
+- 반영(실거래 Altair 만, 데모는 IOC 그대로):
+  - `scripts/altair_demo.py` `rebalance_long(maker=True)` — 하루 롱 조정을 최우선 호가(사기 = 매수 1 호가, 팔기 = 매도 1 호가)에 **post-only(GTX)** 로 건다. 팔기는 reduce-only. 바로 체결될 자리라 거래소가 만료 · 거절하면 그 자리에서 지금까지처럼 지정가 IOC.
+  - `maker_check` — 실행기가 5 분마다: 다 체결이면 기록 · 알림(수수료 0), **30 분** 지나면 남은 양을 취소하고 IOC, 전체 · 그룹 정지면 취소만, 낙폭 정지(새 노출 금지) 중이면 사기 주문은 취소만. 포지션이 바뀐 코인은 비상 스톱(−20%)을 다시 건다.
+  - `scripts/altair_live.py` — 걸어 둔 주문이 있으면 할 차례가 아니어도 확인. `status` 에 `maker_pending`.
+  - 거래소 어댑터: `book_ticker`(최우선 호가) · `place_limit_order(reduce_only=)`.
+  - `scripts/liquidate.py` — 전부 정리 때 Altair 종목에 걸린 주문을 먼저 취소하고 기록을 지운다(정리 뒤 체결돼 다시 사는 일 방지).
+  - 숏 · 숏 정리 · 손절 · 레버리지 줄이기 · 정리는 그대로 지정가 IOC / 비상 STOP_MARKET.
+- 시험: `tests/scripts/test_altair_maker.py` 9 개(걸기 · 체결 · 30 분 뒤 IOC · 정지 취소 · 낙폭 정지 · 바로 체결 자리 IOC · 거절 IOC · 데모 IOC · 정리 기록).
+

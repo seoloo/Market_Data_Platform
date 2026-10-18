@@ -43,6 +43,7 @@ from auto_trading.core.errors import AutoTradingError, OrderRejectedError, Order
 from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
 from auto_trading.exchange.binance_usdm_public import BinanceUsdmPublic
 from auto_trading.exchange.binance_usdm_testnet import BinanceUsdmTestnet
+from auto_trading.exchange.spot import OrderStatus
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
 from auto_trading.ops.ag_short_paper import DAY, H4, Bar, short_signals
 from auto_trading.strategy.spot_trend import spot_trend_targets
@@ -61,6 +62,10 @@ SIGNAL = {"BTC": "BTCUSDT", "ETH": "ETHUSDT"}
 TRADE = {"BTC": "BTCUSDC", "ETH": "ETHUSDC"}
 """데모 주문 종목 (USDC 지갑)."""
 LIMIT_PAD = 0.003
+MAKER_WAIT = 30 * 60_000
+"""하루 롱 맞추기 메이커(post-only) 주문을 기다리는 시간 — 지나면 남은 양을 IOC 로.
+
+문서 269, 사용자 2026-10-18 "그렇게 변경해줘"."""
 LONG_STOP = 0.20
 SHORT_STOP = 0.03
 HOLD_MS = 48 * 3_600_000
@@ -296,6 +301,134 @@ def _order(
     return r.executed_qty, r.avg_price, f"🛒 {coin} {word} {r.executed_qty:g} @ {r.avg_price:,.2f}"
 
 
+def _maker_place(
+    c: BinanceUsdmTestnet,
+    st: dict[str, Any],
+    coin: str,
+    side: str,
+    qty: Decimal,
+    now_ms: int,
+    *,
+    reduce: bool,
+) -> str:
+    """최우선 호가(사기면 매수 1 호가, 팔기면 매도 1 호가)에 post-only 로 건다.
+
+    바로 체결될 가격이라 거래소가 만료시키거나 거절하면 그 자리에서 IOC 로 (지금까지와 같음)."""
+    sym = TRADE[coin]
+    bid, ask = c.book_ticker(sym)
+    price = bid if side == "BUY" else ask
+    ident = _id("mk", coin, now_ms)
+    word = {"BUY": "매수", "SELL": "매도"}[side]
+    rec = {
+        "id": ident,
+        "side": side,
+        "qty": str(qty),
+        "price": str(price),
+        "placed_ms": now_ms,
+        "reduce": reduce,
+    }
+    try:
+        r = c.place_limit_order(sym, side, qty, price, ident, reduce_only=reduce)
+    except OrderStateUnknownError as exc:
+        st.setdefault("maker", {})[coin] = rec  # 다음 확인 때 조회
+        return f"⚠ {coin} 메이커 주문 결과 모름 — 다음 확인 때 조회 ({exc})"
+    except OrderRejectedError as exc:
+        _q, _p, line = _order(c, coin, side, qty, _id("lg", coin, now_ms), reduce=reduce)
+        return f"{line} (메이커 거절 → 바로 IOC: {exc})"
+    if r.status in (OrderStatus.EXPIRED, OrderStatus.REJECTED) and r.executed_qty <= 0:
+        _q, _p, line = _order(c, coin, side, qty, _id("lg", coin, now_ms), reduce=reduce)
+        return f"{line} (호가가 바로 체결될 자리라 메이커 대신 IOC)"
+    if r.status is OrderStatus.FILLED:
+        return f"🛒 {coin} {word} {r.executed_qty:g} @ {r.avg_price:,.2f} (메이커 · 수수료 0)"
+    st.setdefault("maker", {})[coin] = rec
+    return (
+        f"📌 {coin} {word} {qty:g} 호가에 걸어 둠 @ {price:,.2f} (메이커 · 30 분 안 안 걸리면 IOC)"
+    )
+
+
+def maker_check(
+    c: BinanceUsdmTestnet,
+    st: dict[str, Any],
+    now_ms: int,
+    *,
+    halted: str | None,
+    alert: list[str],
+) -> list[str]:
+    """걸어 둔 메이커 주문 확인 (실거래 5 분마다).
+
+    다 체결 → 기록. 30 분 지남 · 전체(그룹) 정지 · (사기 주문이고) 새 노출 정지면 남은 양을
+    취소하고, 정지가 아니면 남은 양을 IOC 로. 포지션이 바뀐 코인은 비상 스톱을 다시 건다."""
+    pend: dict[str, Any] = st.get("maker") or {}
+    lines: list[str] = []
+    changed: set[str] = set()
+    for coin, o in list(pend.items()):
+        sym = TRADE[coin]
+        word = {"BUY": "매수", "SELL": "매도"}[o["side"]]
+        try:
+            r = c.get_order(sym, o["id"])
+        except AutoTradingError as exc:
+            lines.append(f"⚠ {coin} 메이커 주문 조회 실패 — 다음 확인 때 ({exc})")
+            continue
+        if r is None:
+            pend.pop(coin)
+            alert.append(f"⚠ {coin} 메이커 주문을 거래소에서 못 찾음 — 기록만 지움")
+            continue
+        if r.status is OrderStatus.FILLED:
+            pend.pop(coin)
+            alert.append(
+                f"🛒 {coin} {word} {r.executed_qty:g} @ {r.avg_price:,.2f} (메이커 · 수수료 0)"
+            )
+            changed.add(coin)
+            continue
+        stop_buy = o["side"] == "BUY" and bool(st.get("no_new"))
+        ended = r.status in (OrderStatus.CANCELED, OrderStatus.EXPIRED, OrderStatus.REJECTED)
+        late = now_ms - int(o["placed_ms"]) >= MAKER_WAIT
+        if not (halted or stop_buy or ended or late):
+            continue
+        if not ended:
+            try:
+                c.cancel_order(sym, o["id"])
+            except OrderRejectedError:
+                pass  # 그 사이 끝남 — 아래에서 다시 조회
+            except AutoTradingError as exc:
+                lines.append(f"⚠ {coin} 메이커 주문 취소 실패 — 다음 확인 때 ({exc})")
+                continue
+            r = c.get_order(sym, o["id"]) or r
+        pend.pop(coin)
+        filled = r.executed_qty
+        if filled > 0:
+            alert.append(f"🛒 {coin} {word} {filled:g} @ {r.avg_price:,.2f} (메이커 · 일부)")
+            changed.add(coin)
+        rest = Decimal(o["qty"]) - filled
+        if rest <= 0:
+            continue
+        if halted or stop_buy:
+            why = halted or st.get("no_new")
+            alert.append(f"⏸ {coin} 메이커 주문 남은 {rest:g} 취소 — {why}")
+            continue
+        f = c.filters(sym)
+        if rest * c.mark_price(sym) < f.min_notional:
+            lines.append(f"⏸ {coin} 남은 {rest:g} — 최소 주문 금액 아래라 끝냄")
+            continue
+        q, _p, line = _order(c, coin, o["side"], rest, _id("lx", coin, now_ms), reduce=o["reduce"])
+        alert.append(f"{line} (30 분 안 메이커로 안 걸린 양)")
+        if q > 0:
+            changed.add(coin)
+    if changed:
+        acct = c.account()
+        for coin in sorted(changed):
+            held_pos = acct.positions.get(TRADE[coin])
+            if held_pos is not None and held_pos.quantity > 0:
+                lines.append(
+                    _replace_stop(c, st, coin, "SELL", held_pos.entry_price * Decimal("0.8"))
+                )
+            elif held_pos is None or held_pos.quantity == 0:
+                _clear_stop(c, st, coin)
+    if not pend:
+        st.pop("maker", None)
+    return lines
+
+
 def _replace_stop(
     c: BinanceUsdmTestnet, st: dict[str, Any], coin: str, side: str, trigger: Decimal
 ) -> str:
@@ -376,8 +509,12 @@ def rebalance_long(
     *,
     dry: bool = False,
     alert: list[str] | None = None,
+    maker: bool = False,
 ) -> list[str]:
-    """하루 한 번 — 롱 목표(× 4)로 맞추고, 롱 목표가 생긴 코인의 숏은 먼저 정리."""
+    """하루 한 번 — 롱 목표(× 4)로 맞추고, 롱 목표가 생긴 코인의 숏은 먼저 정리.
+
+    ``maker`` (실거래, 문서 269): 롱 조정은 최우선 호가에 post-only 로 걸어 두고
+    :func:`maker_check` 가 30 분 안 체결을 확인 · 못 걸린 양은 IOC. 숏 정리는 그대로 IOC."""
     lines: list[str] = []
     alert = alert if alert is not None else []
     w, info = long_targets(now_ms)
@@ -425,6 +562,15 @@ def rebalance_long(
             f" (지금 {cur:,.0f})"
         )
         if dry:
+            continue
+        if maker:
+            if coin in (st.get("maker") or {}):
+                lines.append(f"⏳ {coin} 앞 메이커 주문 확인 중 — 이번 조정은 건너뜀")
+                continue
+            line = _maker_place(c, st, coin, side, qty, now_ms, reduce=side == "SELL")
+            lines.append(line)
+            if line.startswith(("⚠", "❌", "🛒")):
+                alert.append(line)
             continue
         q, p, line = _order(c, coin, side, qty, _id("lg", coin, now_ms), reduce=side == "SELL")
         lines.append(line)

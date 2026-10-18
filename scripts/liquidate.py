@@ -136,6 +136,9 @@ def _altair_forget(coin: str) -> None:
         return
     st.get("shorts", {}).pop(coin, None)
     st.get("stops", {}).pop(coin, None)
+    st.get("maker", {}).pop(coin, None)  # 걸어 둔 메이커 주문 기록 (문서 269)
+    if st.get("maker") == {}:
+        st.pop("maker")
     tmp = ALTAIR_STATE.with_suffix(".tmp")
     tmp.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(ALTAIR_STATE)
@@ -486,6 +489,10 @@ def _step_futures(job: Job, futs: list[Item]) -> list[str]:
         for it in futs:
             sym = ALTAIR_SYMBOLS[it.symbol]
             try:
+                # 걸어 둔 메이커 주문(문서 269)이 정리 뒤 체결돼 다시 사지 않게 먼저 취소
+                for o in f.open_orders(sym):
+                    f.cancel_order(sym, o.client_order_id)
+                    log.append(f"{it.symbol} 걸어 둔 주문 취소 ({o.side} {o.orig_qty:g})")
                 flt = f.filters(sym)
                 log += run_futures_item(
                     it,

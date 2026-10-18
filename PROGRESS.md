@@ -2327,4 +2327,4 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - **271 나스닥 적립 2 차**: 고수익성 대형 30% `REJECT` · 비트코인 5 · 10% `HISTORICAL_SUPPORT(사후 선택)` — 5 년 창 99% 에서 나스닥만보다 많음(한 번 적립 1.31 · 1.68 배), 낙폭 +2 ~ 5%p. 비트코인 220 배 상승기라 앞으로의 근거 아님.
 - **272 그림자 기록 시작**(2026-10-19 ~): H1 숏 · Altair 펀딩비 끄기, 텔레그램 봇이 4 시간마다 공개 시세로 다시 계산(주문 · 알림 없음), `python -m scripts.shadow_272 status`.
 - 증거금 이자(BFUSD 등): 선물 다중 자산 모드에서 BFUSD · LDUSDT 가 증거금으로 쓰임 확인(공개 exchangeInfo). 이율 연 3 ~ 4.5% 안팎(제3자 자료) · 지금 Altair 약 840 USDC 라 연 약 30 달러 — 실거래 반영은 사용자 결정 대기.
-
+- **Altair 메이커 반영(사용자 결정)**: 하루 롱 맞추기를 최우선 호가 post-only → 30 분 뒤 남은 양 IOC(`altair_demo.maker_check`), 정리 때 걸린 주문 취소. 시험 9 개.

@@ -205,27 +205,32 @@ class BinanceUsdmTestnet(BinanceUsdmReadOnly):
         return self._stop(self._send("POST", "/fapi/v1/algoOrder", params))
 
     def place_limit_order(
-        self, symbol: str, side: str, quantity: Decimal, price: Decimal, client_order_id: str
+        self,
+        symbol: str,
+        side: str,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+        *,
+        reduce_only: bool = False,
     ) -> FuturesOrderResult:
-        """post-only 지정가(GTX) 진입. 바로 체결될 가격이면 거래소가 만료시킨다.
+        """post-only 지정가(GTX). 바로 체결될 가격이면 거래소가 만료시킨다.
 
-        Elliott 데모(docs/research/56)의 되돌림 예약 진입에서 쓴다.
+        Elliott 데모(docs/research/56)의 되돌림 예약 진입 · Altair 하루 롱 맞추기 메이커(문서 269).
         """
-        data = self._send(
-            "POST",
-            "/fapi/v1/order",
-            {
-                "symbol": symbol,
-                "side": side,
-                "type": "LIMIT",
-                "timeInForce": "GTX",
-                "quantity": _qty(quantity),
-                "price": _qty(price),
-                "newClientOrderId": client_order_id,
-                "newOrderRespType": "RESULT",
-            },
-        )
-        return self._order(data)
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "type": "LIMIT",
+            "timeInForce": "GTX",
+            "quantity": _qty(quantity),
+            "price": _qty(price),
+            "newClientOrderId": client_order_id,
+            "newOrderRespType": "RESULT",
+        }
+        if reduce_only:
+            params["reduceOnly"] = "true"
+        return self._order(self._send("POST", "/fapi/v1/order", params))
 
     def place_take_profit_market(
         self, symbol: str, side: str, trigger_price: Decimal, client_order_id: str

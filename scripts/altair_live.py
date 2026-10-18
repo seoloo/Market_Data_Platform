@@ -210,7 +210,7 @@ def tick(now_ms: int | None = None) -> list[str]:
     day, bar = now_ms // DAY, now_ms // H4
     due_long = st.get("long_day") != day and now_ms % DAY >= 5 * MINUTE
     due_short = st.get("short_bar") != bar and now_ms % H4 >= 3 * MINUTE
-    if not (due_long or due_short):
+    if not (due_long or due_short or st.get("maker")):
         return []
     lines: list[str] = []
     alert: list[str] = []
@@ -246,9 +246,12 @@ def tick(now_ms: int | None = None) -> list[str]:
             return lines
         st["alloc"] = float(st.get("alloc") or eq)
         st.setdefault("peak", eq)  # 데모 기본값(가상 2,000)이 숏 규칙의 고점으로 쓰이지 않게
-        st["no_new"] = stop_reason(st, halted_for(HALT, "altair"))
+        halt = halted_for(HALT, "altair")
+        st["no_new"] = stop_reason(st, halt)
+        if st.get("maker"):  # 걸어 둔 메이커 주문 확인 (문서 269)
+            lines += core.maker_check(c, st, now_ms, halted=halt, alert=alert)
         if due_long:
-            lines += core.rebalance_long(c, st, now_ms, alert=alert)
+            lines += core.rebalance_long(c, st, now_ms, alert=alert, maker=True)
             st["long_day"] = day
         if due_short:
             lines += core.check_shorts(c, st, now_ms, alert=alert, skipped=skipped)
@@ -325,6 +328,7 @@ def status() -> dict[str, Any]:
         "margin": "CROSSED" if st.get("cross") else "아직 설정 전",
         "long_w": st.get("long_w"),
         "shorts": st.get("shorts"),
+        "maker_pending": st.get("maker"),
         "short_trades": len(st.get("short_trades") or []),
         "own_halted": st.get("own_halted"),
     }
