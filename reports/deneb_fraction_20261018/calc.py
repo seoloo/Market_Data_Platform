@@ -88,7 +88,7 @@ def check_fast(trials: int = 3000) -> int:
     return bad
 
 
-def run(days, L, D, vol, trend, monthly_usd, integer: bool, start: str):
+def run(days, L, D, vol, trend, monthly_usd, integer: bool, start: str, KL=None, KD=None):
     """Deneb (ref T · 현금 보관 · 세전). L · D = 그날 가격(분할 반영된 명목가). 달말 기록을 돌려줌."""
     q = {"TQQQ": 0.0, "SCHD": 0.0}
     cash = res = 0.0
@@ -99,10 +99,16 @@ def run(days, L, D, vol, trend, monthly_usd, integer: bool, start: str):
     i0 = next(i for i, d in enumerate(days) if d >= start and i > 0)
     for i in range(i0, len(days)):
         d, prev = days[i], days[i - 1]
+        kl, kd = (KL[i], KD[i]) if KL else (1, 1)
+        if kl != 1:  # 분할: 주수 × k, 고점 ÷ k
+            q["TQQQ"] *= kl
+            l_max /= kl
+        if kd != 1:
+            q["SCHD"] *= kd
         new_month = d[:7] != prev[:7]
         # 1) 브레이크 (T: TQQQ 자체 고점)
         if started and q["TQQQ"] > (1 - 1e-12 if integer else 0) and stage < 2:
-            dd = 1 - L[i - 1] / l_max if l_max > 0 else 0.0
+            dd = 1 - L[i - 1] / kl / l_max if l_max > 0 else 0.0
             sell = 0.0
             if dd >= STAGE2:
                 sell, stage = (math.floor(q["TQQQ"]) if integer else q["TQQQ"]), 2
@@ -178,17 +184,20 @@ def run(days, L, D, vol, trend, monthly_usd, integer: bool, start: str):
     return rec
 
 
-def nominal(path: list[float], sym: str) -> list[float]:
-    """수익률 경로(시작 100) → 시작 실제가 · 분할 규칙 반영 명목가."""
+def nominal(path: list[float], sym: str) -> tuple[list[float], list[int]]:
+    """수익률 경로(시작 100) → 시작 실제가 · 분할 규칙 반영 명목가와 그날 분할 배수(없으면 1).
+
+    분할한 날 장부 주수를 × k 해야 평가액이 그대로다(엔진의 KL · KD)."""
     lim, k = SPLIT[sym]
-    out, f = [], START[sym] / path[0]
+    out, ks, f = [], [], START[sym] / path[0]
     for x in path:
-        p = x * f
+        p, kk = x * f, 1
         if p >= lim:
             f /= k
-            p = x * f
+            p, kk = x * f, k
         out.append(p)
-    return out
+        ks.append(kk)
+    return out, ks
 
 
 def validate(px, common) -> float:
@@ -234,12 +243,12 @@ def main() -> None:
         pa = np.vstack([np.ones(6) * 100, 100 * np.cumprod(1 + rr, axis=0)])
         qqq = dict(zip(sd, pa[:, 0].tolist(), strict=True))
         vv, tt = c1.signals(sd, qqq)
-        L = nominal(pa[:, 1].tolist(), "TQQQ")
-        D = nominal(pa[:, 2].tolist(), "SCHD")
+        L, KL = nominal(pa[:, 1].tolist(), "TQQQ")
+        D, KD = nominal(pa[:, 2].tolist(), "SCHD")
         for a in AMOUNTS:
             usd = a / FX
-            fr = run(sd, L, D, vv, tt, usd, False, "2027-01-01")
-            it = run(sd, L, D, vv, tt, usd, True, "2027-01-01")
+            fr = run(sd, L, D, vv, tt, usd, False, "2027-01-01", KL, KD)
+            it = run(sd, L, D, vv, tt, usd, True, "2027-01-01", KL, KD)
             fm, im = {r[0]: r for r in fr}, {r[0]: r for r in it}
             r_ = res[str(a)]
             for y, e in ends.items():

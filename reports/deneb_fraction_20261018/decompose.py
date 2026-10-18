@@ -22,7 +22,7 @@ FEE, STAGE1, STAGE2 = fc.FEE, fc.STAGE1, fc.STAGE2
 MODES = ("frac", "int_ideal", "int_live")
 
 
-def run(days, L, D, vol, trend, usd, mode, start):
+def run(days, L, D, vol, trend, usd, mode, start, KL=None, KD=None):
     integer = mode != "frac"
     q = {"TQQQ": 0.0, "SCHD": 0.0}
     cash = res = 0.0
@@ -31,9 +31,15 @@ def run(days, L, D, vol, trend, usd, mode, start):
     i0 = next(i for i, d in enumerate(days) if d >= start and i > 0)
     for i in range(i0, len(days)):
         d, prev = days[i], days[i - 1]
+        kl, kd = (KL[i], KD[i]) if KL else (1, 1)
+        if kl != 1:  # 분할: 주수 × k, 고점 ÷ k
+            q["TQQQ"] *= kl
+            l_max /= kl
+        if kd != 1:
+            q["SCHD"] *= kd
         new_month = d[:7] != prev[:7]
         if started and q["TQQQ"] > (1 - 1e-12 if integer else 0) and stage < 2:
-            dd = 1 - L[i - 1] / l_max if l_max > 0 else 0.0
+            dd = 1 - L[i - 1] / kl / l_max if l_max > 0 else 0.0
             sell = 0.0
             if dd >= STAGE2:
                 sell, stage = (math.floor(q["TQQQ"]) if integer else q["TQQQ"]), 2
@@ -143,13 +149,13 @@ def main() -> None:
         rr = np.concatenate([rets[a:a + 252] for a in starts], axis=0)[: len(sd) - 1]
         pa = np.vstack([np.ones(6) * 100, 100 * np.cumprod(1 + rr, axis=0)])
         vv, tt = c1.signals(sd, dict(zip(sd, pa[:, 0].tolist(), strict=True)))
-        L, D = fc.nominal(pa[:, 1].tolist(), "TQQQ"), fc.nominal(pa[:, 2].tolist(), "SCHD")
+        (L, KL), (D, KD) = fc.nominal(pa[:, 1].tolist(), "TQQQ"), fc.nominal(pa[:, 2].tolist(), "SCHD")
         for a in fc.AMOUNTS:
             usd = a / fc.FX
-            recs = {m: run(sd, L, D, vv, tt, usd, m, "2027-01-01") for m in MODES}
+            recs = {m: run(sd, L, D, vv, tt, usd, m, "2027-01-01", KL, KD) for m in MODES}
             if not checked:
-                ref_f = fc.run(sd, L, D, vv, tt, usd, False, "2027-01-01")
-                ref_i = fc.run(sd, L, D, vv, tt, usd, True, "2027-01-01")
+                ref_f = fc.run(sd, L, D, vv, tt, usd, False, "2027-01-01", KL, KD)
+                ref_i = fc.run(sd, L, D, vv, tt, usd, True, "2027-01-01", KL, KD)
                 assert abs(ref_f[-1][1] / recs["frac"][-1][1] - 1) < 1e-12
                 assert abs(ref_i[-1][1] / recs["int_live"][-1][1] - 1) < 1e-12
                 checked = True
