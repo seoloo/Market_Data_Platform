@@ -21,6 +21,9 @@ b, c, c1 = fc.b, fc.c, fc.c1
 FEE, STAGE1, STAGE2 = fc.FEE, fc.STAGE1, fc.STAGE2
 BUF = 1.03
 MODES = ("A", "B", "C", "D", "E", "F")
+SLIP = 0.0005
+if len(__import__("sys").argv) > 1 and __import__("sys").argv[1] == "v3":
+    MODES = ("A", "D", "D2", "E", "D_s", "D2_s")
 AMOUNTS = [100_000, 300_000, 1_000_000]
 SYMS = ("TQQQ", "SCHD")
 
@@ -42,18 +45,20 @@ def buy_integer_daily(q, cash, px, share):
             return cash
 
 
-def buy_frac_daily(q, cash, px, share):
+def buy_frac_daily(q, cash, px, share, fee=FEE):
     val = cash + sum(q[s] * px[s] for s in SYMS)
     need = {s: max((share if s == "TQQQ" else 1 - share) * val - q[s] * px[s], 0.0) for s in SYMS}
     tot = sum(need.values())
     for s in SYMS:
         part = cash * (need[s] / tot if tot > 0 else (0.0 if s == "TQQQ" else 1.0))
-        q[s] += part * (1 - FEE) / px[s]
+        q[s] += part * (1 - fee) / px[s]
     return 0.0
 
 
 def run(days, L, D, vol, trend, usd, mode, start, ndays, KL=None, KD=None):
     integer = mode in ("A", "B", "C")
+    fee = FEE + SLIP if mode.endswith("_s") else FEE
+    mode = mode[:-2] if mode.endswith("_s") else mode
     q = {"TQQQ": 0.0, "SCHD": 0.0}
     cash = pend = res = 0.0
     stage, off_seen, ep, l_max, started, base = 0, False, False, 0.0, False, 0.0
@@ -73,7 +78,7 @@ def run(days, L, D, vol, trend, usd, mode, start, ndays, KL=None, KD=None):
         pend = 0.0
         val0 = q["TQQQ"] * L[i] + q["SCHD"] * D[i] + cash + res
         dep = 0.0
-        if mode in ("C", "D", "F"):
+        if mode in ("C", "D", "F"):  # D2 는 매달 한 번 (아래 elif)
             dep = usd / ndays[d[:7]]
         elif new_month:
             dep = usd
@@ -90,7 +95,7 @@ def run(days, L, D, vol, trend, usd, mode, start, ndays, KL=None, KD=None):
                 sell, stage = (max(1, math.floor(q["TQQQ"] / 2)) if integer else q["TQQQ"] / 2), 1
             if sell > 0:
                 sell = min(sell, q["TQQQ"])
-                res += sell * L[i] * (1 - FEE)
+                res += sell * L[i] * (1 - fee)
                 q["TQQQ"] -= sell
                 if not ep:
                     ep, off_seen = True, False
@@ -104,7 +109,7 @@ def run(days, L, D, vol, trend, usd, mode, start, ndays, KL=None, KD=None):
                     q["TQQQ"] += n
                     cash += res - n * L[i] * (1 + FEE)
                 else:
-                    q["TQQQ"] += res * (1 - FEE) / L[i]
+                    q["TQQQ"] += res * (1 - fee) / L[i]
                 res, ep, stage, l_max = 0.0, False, 0, L[i]
         if new_month:
             v = vol.get(prev)
@@ -140,16 +145,17 @@ def run(days, L, D, vol, trend, usd, mode, start, ndays, KL=None, KD=None):
                         pend += n * px[s] * (1 - FEE)
                         q[s] -= n
             cash = buy_integer_daily(q, cash, px, share)
-        elif mode == "D":
+        elif mode in ("D", "D2"):
             if new_month:
                 val = cash + sum(q[s] * px[s] for s in SYMS)
                 for s in SYMS:
                     over = q[s] * px[s] - (share if s == "TQQQ" else 1 - share) * val
                     if over > 0:
                         n = over / px[s]
-                        pend += n * px[s] * (1 - FEE)
+                        pend += n * px[s] * (1 - fee)
                         q[s] -= n
-            cash = buy_frac_daily(q, cash, px, share)
+            if cash > 0:
+                cash = buy_frac_daily(q, cash, px, share, fee)
         elif mode == "E" and new_month:  # simulate 회계
             cash -= dep
             act_l, act_d = q["TQQQ"] * L[i], q["SCHD"] * D[i]
@@ -247,7 +253,7 @@ def main() -> None:
                 "mdd_p50": float(np.median(A_[m]["mdd"])),
             }
         res["summary"][str(a)] = row
-    (W / "modes_result.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    (W / ("modes3_result.json" if "D2" in MODES else "modes_result.json")).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     for a in AMOUNTS:
         for m in MODES:
             r = res["summary"][str(a)][m]
