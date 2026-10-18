@@ -1,0 +1,14 @@
+title = "ORBIT — 기본 검사와 연구 기록 ID 오탐 구분"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "2026-10-18 사용자 승인: 공개 관찰 ID 한 개와 두 보고서의 일치만 예외."
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^hypothesis-leverage-20261018$''']
+paths = ['''^reports/deneb_watch_282/(hypothesis_leverage|latest)\.json$''']
