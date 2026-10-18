@@ -90,9 +90,9 @@ def simulate_hold(
             budget = min(cash, (cash + value(t)) / slots)
             for sym, w in zip(syms, ws, strict=True):
                 c = close[sym][t]
-                if c is None or w <= 0:
-                    continue
                 amt = budget * w
+                if c is None or amt <= 0:  # 현금이 다 들어가 있으면 그달 몫은 0
+                    continue
                 lots.append((t + hold, sym, amt * (1 - fee) / c, amt))
                 cash -= amt
             pending = None

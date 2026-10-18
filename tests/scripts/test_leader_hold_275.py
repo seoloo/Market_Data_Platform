@@ -75,3 +75,11 @@ def test_judge() -> None:
     assert h.judge({"U1": _res(0.7, 0.8, 0.5), "U2": _res(0.6, 0.8, 0.5)}, "A_EQ")["status"] == (
         "불리"
     )
+
+
+def test_zero_budget_month_buys_nothing() -> None:
+    days = _days(12)
+    close: dict[str, list[float | None]] = {"A": [10.0] * 12}
+    # slots=1: 첫 달에 현금을 다 씀 → 둘째 달 예산 0 이어도 0 으로 나누지 않는다
+    r = h.simulate_hold(days, close, {2: ["A"], 5: ["A"]}, "2016-01-01", fee=0.0, hold=6, slots=1)
+    assert len(r.trades) == 1 and r.equity[-1] == pytest.approx(1.0)
