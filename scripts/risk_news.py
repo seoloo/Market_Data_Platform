@@ -70,7 +70,11 @@ CRYPTO = (
     Asset("BTC", "Bitcoin", "Bitcoin", group="Vega"),
     Asset("ETH", "Ethereum", "Ethereum", group="Vega"),
     Asset("SOL", "Solana", "Solana crypto", group="Vega"),
-    Asset("Upbit", "Upbit, the Korean crypto exchange", "Upbit exchange", group="Vega 거래소"),
+    # Vega 는 2026-10-15 업비트 → 바이낸스로 옮겼다(Altair 도 바이낸스).
+    # 업비트 기사는 보지 않는다 (사용자 2026-10-19).
+    Asset(
+        "Binance", "Binance, the crypto exchange", "Binance exchange", group="Vega · Altair 거래소"
+    ),
 )
 
 
