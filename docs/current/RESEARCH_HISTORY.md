@@ -1790,3 +1790,25 @@ H1/H2를 전부 “단일 심볼 표본 부족 때문”으로 뭉뚱그리지 �
 ID/version · 요약(무엇을 연구했나 — 결과, 한 줄) · Hypothesis · ACCEPTED/REJECTED/INCONCLUSIVE · TRAIN/VALIDATION/OOS 각각의 결과 · Net expectancy/PF/MDD/실제 trade count · 선별 n 별도 · Failure reason · Learned · Do not retry · 사전등록/코드/config/data/result 참조.
 자료 누락/검정 중단을 전략 REJECTED로 변환하지 않는다. 관찰에서 얻은 개선 아이디어는 별도 가설로 등록한다.
 후보 비교와 승인 절차는 [BACKTEST_AND_TESTING](BACKTEST_AND_TESTING.md)을 따른다.
+
+## 2026-10-18 — TCN-CHART (독립 후향 탐색, 실제학습 완료)
+
+- 상태: **NO_DEMONSTRATED_PRACTICAL_ADVANTAGE / 정식채택 미검증**.
+  사용자가 이번 학습의 검정력 선행조건 예외를 허용했다. DMN/203(학습전중단),204(주식ML기각),
+  229(Laya 판독)의 과거 판정은 바꾸지 않는다. [사전등록](../research/TCN_CHART_20261018_PREREG.md),
+  [결과](../research/TCN_CHART_20261018_RESULTS.md), [검증](../research/TCN_CHART_20261018_VALIDATION.md).
+- 가설: BTC/ETH4h96봉의 시간변화가 같은입력LR·고정추세규칙보다24h 비용후행동/계좌를 개선하는가.
+  설계25b51b8→구현34a943e→학습전잔량/결측교정e1bf580→학습1회. 후보/문턱/seed 재튜닝0.
+- 실제TCN8,067파라미터·12epoch,TRAIN2020-07~2023/검증2024/확인2025~2026-08.
+  TCN 순손익TRAIN−22.41(4건)/검증0(0건)/확인0(0건), 확인7,284신호 모두FLAT.
+  분류정확도74.98%=항상FLAT,MacroF1.286/LR.314,롱/숏recall0. 점수log-loss만0.6768로 개선.
+- 확인1만USDT/진입10%/1배: RULE−445.84·225건·MDD5.84%,LR+18.84·64건·2.88%.
+  LR 비용2배−3.38/추가5분−323.47,롱+98.29·숏−79.45,최고5거래제외−543.51.
+- 교훈: 확률점수 개선과 수익을 구별한다. FLAT5,431개 중3,467개가 양쪽진입불가여서
+  체결모형과불균형정답의 영향이 크다. 미래 실행실패로 표본을 빼지 않고 계좌모든기회 보존,
+  잔량은정지후에도funding/보호stop/MTM을 추적했다. 청산지연과호가부재 한계가 있다.
+- 제한: 2자산·겹치는창·기존노출역사·mark대리·단일시간분할/seed·운영gate parity미확인.
+  학습환경/가중치/전처리/예측/결과/감사 reports/tcn_chart_20261018 보존.
+  결과SHA25629fabb6c...ad51a7b,21계좌 독립회계검산·CPU재생 정상.
+- 현고정후보는후속채택근거없음으로종료. 같은자료에class weight/확률문턱/feature/model크기 변경으로
+  되살리지 않는다. 주식학습·이미지모델·Shadow/Paper/Live는미실행,기존운영/208/봉인자료불변.

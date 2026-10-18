@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "reports/tcn_chart_20261018"
+DOC_ASSETS = ROOT / "docs/research/assets/tcn_chart_20261018"
 
 
 def main() -> None:
@@ -34,6 +35,7 @@ def main() -> None:
         }
     )
     result = json.loads((OUT / "result.json").read_text(encoding="utf-8"))
+    DOC_ASSETS.mkdir(parents=True, exist_ok=True)
     names = ("RULE", "LR", "TCN")
     colors = {"RULE": "#2764A5", "LR": "#CC741C", "TCN": "#176B55"}
     labels = {"RULE": "고정 지표 규칙", "LR": "로지스틱", "TCN": "TCN"}
@@ -103,6 +105,7 @@ def main() -> None:
     axes[1, 1].legend(frameon=False, fontsize=9)
     fig.suptitle("BTC·ETH 96봉 TCN · 2025-01~2026-08 후향 확인", fontsize=19)
     fig.savefig(OUT / "comparison.png", dpi=180)
+    fig.savefig(DOC_ASSETS / "comparison.png", dpi=180)
     plt.close(fig)
     history = result["training"]["history"]
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), layout="constrained")
@@ -138,6 +141,7 @@ def main() -> None:
     )
     axes[1].legend(frameon=False)
     fig.savefig(OUT / "training_calibration.png", dpi=180)
+    fig.savefig(DOC_ASSETS / "training_calibration.png", dpi=180)
     plt.close(fig)
 
 
