@@ -2399,3 +2399,10 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 
 - 사용자 "s&p500말고 나스닥으로 했을 때는 어떠니?" → [278](docs/research/278-us-leader-nasdaq-preregistration.md): S&P 500 중 나스닥 상장 157 종목만(진짜 나스닥100 아님).
 - **`차이 불명`**: 나스닥만 고르기 N1 샤프 1.433 · 낙폭 39% / N2 1.026 · 37% vs S&P 판 1.354 · 42% / 0.958 · 38% (문턱 +0.10 미달). QQQ 0.940 · 35% 보다는 높음. S&P 모델도 원래 나스닥 기술주를 주로 골라 목록이 거의 겹침. Paper 277 불변.
+
+## 2026-10-18 — ✨ Sirius 실거래 준비 (토스 소수점 미장 주도주, ₩100 만) (Claude)
+
+- 사용자 "토스로 실거래 할 수 있도록 준비 부탁해. 다음달부터 … 100만원의 1/6" → [279](docs/research/279-sirius-live-registration.md). 한투 Open API 는 소수점 주문 없음(공식 예제 확인), 토스 명세 v1.2.24 `orderAmount`(US MARKET) · 소수점 6 자리 매도.
+- 토스 어댑터 `amount_buy` · `fractional_sell`(허용 종목 · 금액 상한 · 주문 스위치), 순수 계산 `ops/sirius_live.py`(결정 시점 · 126 거래일 · 평가액 ÷ 6 · 같은 종목 넘기기 · 장부), 실행기 `scripts/sirius_live.py`(연구 venv), 설정 `live.sirius`(기본 꺼짐), 정지 그룹 `sirius`, 현황 ✨ 장부, 예약 `AutoTrading_Sirius` 평일 23:45 · 화 ~ 토 02:00 KST.
+- 장부 시작 ₩1,000,000 = $745.55(환율 1,341.3) → 첫 달 약 $124(종목당 $12.4). 11-02 전 토스 달러 약 $750 필요. 첫 결정 10-30 종가 → 11-02 정규장.
+- 안 된 것: 전부 정리는 Sirius 새 주문만 멈춤(소수점 보유 매도 경로 없음).
