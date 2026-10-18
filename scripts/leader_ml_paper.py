@@ -38,11 +38,16 @@ SECTORS = REPO / "data" / "research" / "stocks" / "sectors.json"
 START = "2026-10-01"
 """이 날 이후의 월말부터 결정 (첫 결정 = 2026-10 월말)."""
 KRW_PER_USD = 1400.0
-BOOKS: dict[str, tuple[str, int, float]] = {
-    "GBM10": ("GBM", 10, 80_000_000 / KRW_PER_USD),
-    "GBM5": ("GBM", 5, 50_000_000 / KRW_PER_USD),
-    "BASE10": ("BASE", 10, 80_000_000 / KRW_PER_USD),
+BOOKS: dict[str, tuple[str, int, float, bool]] = {
+    "GBM10": ("GBM", 10, 80_000_000 / KRW_PER_USD, False),
+    "GBM5": ("GBM", 5, 50_000_000 / KRW_PER_USD, False),
+    "BASE10": ("BASE", 10, 80_000_000 / KRW_PER_USD, False),
+    # 소수점 장부 (사용자 2026-10-18 "gbm10와 gbm5를 소수점으로 매수하는 것도 한번 확인") —
+    # 토스 소수점은 금액 시장가만 · 정규장(마감 1 시간 전까지) → 체결일 시가로 사고 판다.
+    "GBM10F": ("GBM", 10, 10_000_000 / KRW_PER_USD, True),
+    "GBM5F": ("GBM", 5, 10_000_000 / KRW_PER_USD, True),
 }
+"""장부 → (고르기, 종목 수, 가상 자본 $, 소수점)."""
 SPY_CAPITAL = 80_000_000 / KRW_PER_USD
 FEE = 0.0025
 HOLD = 126
@@ -61,10 +66,25 @@ def new_state(start: str = START) -> dict[str, Any]:
         "decisions": {},
         "books": {
             name: {"cash": cap, "lots": [], "closed": [], "skipped": [], "equity": {}}
-            for name, (_src, _n, cap) in BOOKS.items()
+            for name, (_src, _n, cap, _f) in BOOKS.items()
         },
         "spy": {"cash": SPY_CAPITAL, "qty": 0, "equity": {}},
     }
+
+
+def ensure_books(state: dict[str, Any]) -> None:
+    """나중에 더한 장부를 기존 상태에 넣는다(첫 결정 전에만 — 결정 뒤면 다른 시작이 됨)."""
+    for name, (_src, _n, cap, _f) in BOOKS.items():
+        if name not in state["books"]:
+            if state["decisions"]:
+                raise SystemExit(f"{name}: 결정이 시작된 뒤에는 장부를 더하지 않는다 — 새 등록으로")
+            state["books"][name] = {
+                "cash": cap,
+                "lots": [],
+                "closed": [],
+                "skipped": [],
+                "equity": {},
+            }
 
 
 def _px(xs: Sequence[float | None], i: int) -> float | None:
@@ -79,15 +99,20 @@ def _value(book: Mapping[str, Any], close: Mapping[str, Sequence[float | None]],
 
 
 def buy(book: dict[str, Any], syms: Sequence[str], prices: Mapping[str, float | None], day: str,
-        equity: float) -> None:  # fmt: skip
-    """한 묶음: min(현금, 평가액 ÷ 6) 을 종목마다 같게, 1 주 단위 내림(수수료 포함)."""
+        equity: float, fractional: bool = False) -> None:  # fmt: skip
+    """한 묶음: min(현금, 평가액 ÷ 6) 을 종목마다 같게. 1 주 단위 내림(수수료 포함) 또는 소수점."""
     if not syms:
         return
     budget = min(book["cash"], equity / SLOTS)
     target = budget / len(syms)
     for s in syms:
         p = prices.get(s)
-        qty = math.floor(target / (p * (1 + FEE))) if p else 0
+        if not p:
+            qty: float = 0
+        elif fractional:
+            qty = round(target / (p * (1 + FEE)), 6)
+        else:
+            qty = math.floor(target / (p * (1 + FEE)))
         if qty <= 0:
             book["skipped"].append({"sym": s, "day": day, "price": p})
             continue
@@ -101,10 +126,13 @@ def process(
     close: Mapping[str, Sequence[float | None]],
     spy: Sequence[float],
     decide: Callable[[int], Picks],
+    opens: Mapping[str, Sequence[float | None]] | None = None,
 ) -> list[str]:
     """처리 안 한 거래일을 차례로.
 
-    팔기(126 거래일) → 새 달 첫날이면 직전 월말 결정 · 사기 → 평가."""
+    팔기(126 거래일) → 새 달 첫날이면 직전 월말 결정 · 사기 → 평가.
+    1 주 단위 장부는 그날 종가, 소수점 장부는 그날 시가(``opens`` 없으면 종가)."""
+    op = opens if opens is not None else close
     idx = {d: i for i, d in enumerate(days)}
     last = state["last_day"]
     first = (
@@ -113,11 +141,12 @@ def process(
     log: list[str] = []
     for i in range(first, len(days)):
         d = days[i]
-        for book in state["books"].values():
+        for name, book in state["books"].items():
+            src_px = op if BOOKS[name][3] else close
             keep = []
             for lot in book["lots"]:
                 if i - idx[lot["buy_day"]] >= HOLD:
-                    px = _px(close[lot["sym"]], i) or 0.0
+                    px = _px(src_px[lot["sym"]], i) or _px(close[lot["sym"]], i) or 0.0
                     book["cash"] += lot["qty"] * px * (1 - FEE)
                     cost = lot["qty"] * lot["buy_px"] * (1 + FEE)
                     book["closed"].append(
@@ -131,12 +160,13 @@ def process(
         if prev and prev >= state["start"] and prev[:7] != d[:7] and prev not in state["decisions"]:
             picks = decide(i - 1)
             state["decisions"][prev] = {"fill_day": d, **picks}
-            prices = {
-                s: close[s][i] for k in ("GBM", "BASE") for s in picks.get(k, []) if s in close
-            }
+            names = [s for k in ("GBM", "BASE") for s in picks.get(k, []) if s in close]
+            at_close = {s: close[s][i] for s in names}
+            at_open = {s: op[s][i] for s in names}
             for name, book in state["books"].items():
-                src, n, _cap = BOOKS[name]
-                buy(book, picks.get(src, [])[:n], prices, d, _value(book, close, i))
+                src, n, _cap, frac = BOOKS[name]
+                prices = at_open if frac else at_close
+                buy(book, picks.get(src, [])[:n], prices, d, _value(book, close, i), frac)
             sp = state["spy"]
             if sp["qty"] == 0 and spy[i] > 0:
                 q = math.floor(sp["cash"] / (spy[i] * (1 + FEE)))
@@ -187,9 +217,10 @@ def summary(state: Mapping[str, Any], close: Mapping[str, Sequence[float | None]
 # ------------------------------------------------------------------ 자료 · 모델 (예약 실행)
 
 
-def load_panel() -> tuple[
-    list[str], dict[str, list[float | None]], dict[str, list[float | None]], list[float]
-]:
+Series = dict[str, list[float | None]]
+
+
+def load_panel() -> tuple[list[str], Series, Series, list[float], Series]:
     from scripts.run_sb_breakout import load
 
     spy_s = load(BARS / "SPY.csv")
@@ -197,15 +228,18 @@ def load_panel() -> tuple[
     spy = list(spy_s.close)
     close: dict[str, list[float | None]] = {}
     dvol: dict[str, list[float | None]] = {}
+    opens: dict[str, list[float | None]] = {}
     for p in sorted(BARS.glob("*.csv")):
         if p.stem == "SPY":
             continue
         s = load(p)
         c = dict(zip(s.dates, s.close, strict=True))
         v = {d: x * y for d, x, y in zip(s.dates, s.close, s.volume, strict=True)}
+        o = dict(zip(s.dates, s.open, strict=True))
         close[p.stem] = [c.get(d) for d in days]
+        opens[p.stem] = [o.get(d) for d in days]
         dvol[p.stem] = [v.get(d) for d in days]
-    return days, close, dvol, spy
+    return days, close, dvol, spy, opens
 
 
 def refresh_sec(symbols: Sequence[str], month: str) -> dict[str, Any]:
@@ -288,9 +322,10 @@ def make_decider(
 
 
 def run() -> dict[str, Any]:
-    days, close, dvol, spy = load_panel()
+    days, close, dvol, spy, opens = load_panel()
     state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else new_state()
-    log = process(state, days, close, spy, make_decider(days, close, dvol))
+    ensure_books(state)
+    log = process(state, days, close, spy, make_decider(days, close, dvol), opens)
     ROOT.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
     rep = summary(state, close, days)

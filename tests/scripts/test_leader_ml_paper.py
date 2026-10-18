@@ -65,3 +65,32 @@ def test_summary_reports_books() -> None:
     rep = lp.summary(st, close, days)
     assert set(lp.BOOKS) <= set(rep) and "SPY" in rep
     assert "GBM10" in lp.text(rep)
+
+
+def test_fractional_book_buys_exact_amount_at_open() -> None:
+    book: dict[str, Any] = {"cash": 6000.0, "lots": [], "closed": [], "skipped": [], "equity": {}}
+    lp.buy(book, ["A", "B"], {"A": 100.0, "B": 600.0}, "d", equity=6000.0, fractional=True)
+    assert [x["sym"] for x in book["lots"]] == ["A", "B"] and book["skipped"] == []
+    assert book["lots"][1]["qty"] == pytest.approx(500 / (600 * 1.0025), abs=1e-6)
+    assert book["cash"] == pytest.approx(5000.0, abs=1e-3)
+
+    days = _days()
+    close: dict[str, list[float | None]] = {"A": [100.0] * len(days)}
+    opens: dict[str, list[float | None]] = {"A": [90.0] * len(days)}
+    st = lp.new_state("2026-10-01")
+    lp.process(st, days, close, [400.0] * len(days), lambda t: {"GBM": ["A"], "BASE": []}, opens)
+    assert st["books"]["GBM10F"]["closed"][0]["sell_day"]
+    lot_px = {n: b["closed"][0]["ret"] for n, b in st["books"].items() if b["closed"]}
+    # 소수점은 시가(90)에 사고 시가(90)에 팖 → 수수료만큼 손해, 1 주 단위는 종가(100)
+    assert lot_px["GBM10F"] == pytest.approx(0.9975 / 1.0025 - 1)
+
+
+def test_new_books_added_only_before_first_decision() -> None:
+    st = lp.new_state()
+    del st["books"]["GBM5F"]
+    lp.ensure_books(st)
+    assert "GBM5F" in st["books"]
+    del st["books"]["GBM5F"]
+    st["decisions"]["2026-10-30"] = {}
+    with pytest.raises(SystemExit):
+        lp.ensure_books(st)
