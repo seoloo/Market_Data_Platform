@@ -2382,3 +2382,10 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자: 원래 판 8,000 만 원은 부담 → 소액 · 1 주 단위 지정가 판 재검증. [276](docs/research/276-us-leader-small-account-preregistration.md) 사전 고정 `11ea2fb` → 1 회.
 - **`시범 후보 R5x6`**(상위 5 · 매달 · 6 달 보유): U2 연 +30.1% · 샤프 0.965 · 낙폭 40%(U1 +54% · 1.277 · 58%), 113 같은 판 0.707. 1 주 단위 필요 약 **5,000 만 원**. R5x3(3,000 만) · R3x3(2,000 만)은 U2 에서 SPY 보유보다 샤프 낮아 탈락. 종목을 줄일수록 낙폭이 커짐.
 - 원래 R10x6 은 사용자 요청으로 따로 Paper(문서 277)로 남긴다.
+
+## 2026-10-18 — 277 미장 주도주 GBM Paper 등록 (10 × 6 원래 판 + 5 × 6) (Claude)
+
+- 사용자 "10종목 6묶음 전략은 반드시 남겨 놓고 따로 paper 진행해줘". [277](docs/research/277-us-leader-gbm-paper-registration.md) 등록 · `scripts/leader_ml_paper.py`.
+- 매달 마지막 거래일 자료로 274 GBM 재학습 → 상위 10(GBM10, 가상 ₩8,000 만) · 상위 5(GBM5 = 276 R5x6, ₩5,000 만) · 113(BASE10) · SPY 장부. 다음 거래일 종가 1 주 단위 가상 체결, 126 거래일 뒤 매도, 손절 없음, 편도 0.25%. 실적은 결정 달마다 SEC 새로 받음(`data/leader_ml_paper/sec`).
+- 예약 `AutoTrading_Leader_ML_Paper` 화 ~ 토 21:50 KST(연구 venv pythonw), 첫 결정 2026-10-30 종가 → 11-02 체결. 주문 · 텔레그램 없음, 보기 `build/tcn-venv/Scripts/python.exe -m scripts.leader_ml_paper status`. 결정 경로를 9/30 자료로 한 번 점검(학습 59,116 행, 4 분 42 초, 상태 저장 안 함).
+- 판정: 12 묶음 끝난 뒤(2028-05 쯤) GBM10 이 BASE10 · SPY 보다 누적 수익 높고 낙폭 ≤ 40% 면 `지지` → 실거래 여부 질문.
