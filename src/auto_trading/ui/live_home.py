@@ -636,6 +636,73 @@ def altair_book(state: Mapping[str, Any], q: Quotes, live: Mapping[str, Any] | N
     )
 
 
+SIRIUS = Path("data") / "sirius" / "state.json"
+
+
+def sirius_book(state: Mapping[str, Any], q: Quotes) -> Book:
+    """✨ Sirius — 토스 소수점 미장 주도주 (문서 279). 장부 = 이 전략 몫만(묶음별 lot)."""
+    deposits = [d for d in state.get("deposits") or [] if isinstance(d, list) and len(d) >= 4]
+    dep_krw = sum(_f(d[1]) for d in deposits)
+    dep_usd = sum(_f(d[2]) for d in deposits)
+    avg_fx = dep_krw / dep_usd if dep_usd > 0 else None
+    fx = q.fx or avg_fx or 0.0
+    agg: dict[str, list[float]] = {}
+    for lot in state.get("lots") or []:
+        a = agg.setdefault(str(lot.get("sym")), [0.0, 0.0])
+        a[0] += _f(lot.get("qty"))
+        a[1] += _f(lot.get("cost_usd"))
+    holdings = []
+    for sym, (n, cost) in sorted(agg.items()):
+        price = q.usd.get(sym)
+        holdings.append(
+            Holding(
+                sym,
+                round(n, 6),
+                cost * (avg_fx or fx),
+                None if price is None or not fx else n * price * fx,
+                avg_usd=cost / n if n > 0 else None,
+            )
+        )
+    decisions = state.get("decisions") or {}
+    notes = [f"남은 달러 ${_f(state.get('cash_usd')):,.2f}"]
+    if decisions:
+        k = max(decisions)
+        d = decisions[k]
+        notes.append(f"{k} 결정: {', '.join(d.get('picks') or [])}")
+    else:
+        notes.append("첫 결정 대기 — 매달 마지막 거래일 종가 기준, 다음 거래일 정규장에서 매수")
+    pending = [
+        f"{o.get('sym')} {'매수' if o.get('side') == 'BUY' else '매도'} 체결 확인 대기"
+        for o in state.get("orders") or []
+        if o.get("status") in ("SENT", "UNKNOWN")
+    ]
+    trades = tuple(
+        Trade(
+            str(d[0]),
+            "deposit",
+            "KRW",
+            amount=_f(d[1]),
+            status="입금 기록",
+            note=f"${_f(d[2]):,.2f} · {_f(d[3]):,.1f}원/$",
+            ref=f"sirius:deposit:{d[0]}:{i}",
+            fx=_f(d[3]) or None,
+        )
+        for i, d in enumerate(deposits)
+    )
+    return Book(
+        "sirius",
+        "Sirius",
+        "토스 · 미장 주도주 소수점",
+        dep_krw,
+        _f(state.get("cash_usd")) * fx,
+        tuple(holdings),
+        tuple(notes),
+        tuple(pending),
+        tuple((str(d[0]), f"💵 입금 {_f(d[1]):,.0f} 원") for d in deposits),
+        trades,
+    )
+
+
 def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     holdings = []
     activity: list[tuple[str, str]] = []
@@ -757,6 +824,9 @@ def needed(root: Path) -> tuple[set[str], set[str]]:
     }
     if (root / BINANCE_VEGA).exists():
         tickers |= set(VEGA_USD.values())
+    sirius = _read(root / SIRIUS)
+    if sirius:
+        tickers |= {str(lot.get("sym")) for lot in sirius.get("lots") or []}
     return set(VEGA_COINS), tickers
 
 
@@ -795,6 +865,12 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
             live = _read(root / ALTAIR_LIVE)
             src = root / (ALTAIR_LIVE if live and live.get("history") else BINANCE_VEGA)
             out.append(replace(altair_book(binance, q, live), updated_ms=_mtime_ms(src)))
+    sirius = _read(root / SIRIUS)
+    if sirius:
+        book = sirius_book(sirius, q)
+        if (root / "data" / "HALT_sirius").exists():
+            book = replace(book, notes=("⏸ 정지 중 — 새 주문 안 함", *book.notes))
+        out.append(replace(book, updated_ms=_mtime_ms(root / SIRIUS)))
     acc = _toss_states(root)
     if acc:
         files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
@@ -839,7 +915,7 @@ def _pl(value: float, base: float) -> str:
 
 def _priced(b: Book, q: Quotes) -> bool:
     """표시 품질만 판단한다. 달러 현금의 환율 대체도 확정 평가로 표시하지 않는다."""
-    return b.priced and (b.key not in {"deneb", "accumulate"} or q.fx is not None)
+    return b.priced and (b.key not in {"deneb", "accumulate", "sirius"} or q.fx is not None)
 
 
 def render_live(
@@ -891,7 +967,7 @@ def live_page(data: DashboardData) -> str:
 # ---------------------------------------------------------------- 텔레그램 '현황' 답
 
 
-_ICON = {"deneb": "🌟", "vega": "🌌", "altair": "☄️", "accumulate": "💰"}
+_ICON = {"deneb": "🌟", "vega": "🌌", "altair": "☄️", "sirius": "✨", "accumulate": "💰"}
 
 
 def _pl_text(value: float, base: float) -> str:

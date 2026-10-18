@@ -57,7 +57,7 @@ def _plan(groups: tuple[str, ...], **over: object) -> tuple[list[Item], list[str
 
 
 def test_scopes() -> None:
-    assert groups_of("all") == ("vega", "deneb", "acc", "altair", "stock")
+    assert groups_of("all") == ("vega", "deneb", "acc", "altair", "stock", "sirius")
     assert groups_of("sym:NVDA") == ()  # 한 종목 정리는 그룹을 멈추지 않는다
     assert groups_of("altair") == ("altair",)
     assert groups_of("deneb") == ("deneb",)

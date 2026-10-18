@@ -32,6 +32,7 @@ GROUPS: dict[str, str] = {
     "acc": "자동 적립",
     "altair": "Altair",
     "stock": "개별주",
+    "sirius": "Sirius",
 }
 """그룹 키 → 보이는 이름."""
 LEGACY: dict[str, str] = {"vega": "cruise", "deneb": "glide"}

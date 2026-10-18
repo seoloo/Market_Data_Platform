@@ -143,6 +143,14 @@ FIELDS: tuple[Field, ...] = (
         "다음 4 시간봉부터",
     ),
     Field(
+        "live.sirius",
+        "✨ Sirius 실거래 (토스 소수점 · 미장 주도주 10 종목 6 달 보유)"
+        " — .env 토스 주문 허용도 켜야 주문",
+        "bool",
+        False,
+        "다음 Sirius 실행(미국 정규장 23:45 · 02:00 KST)부터",
+    ),
+    Field(
         "polaris.on",
         "🧭 Polaris 나무 안정 적립 (매달 버튼 누를 때만 주문)",
         "bool",
