@@ -20,7 +20,7 @@ import math
 import statistics
 import sys
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -173,18 +173,41 @@ def build_rows(universe: str) -> tuple[list[dict[str, Any]], Any]:
         ser = load(STOCKS / f"{sym}.csv")
         m = {d: c * v for d, c, v in zip(ser.dates, ser.close, ser.volume, strict=True)}
         dvol[sym] = [m.get(d) for d in days]
-    fund = Fundamentals()
-    pdates, psets = pit_members()
+    members = None
+    if universe == "U2":
+        pdates, psets = pit_members()
+
+        def members(day: str) -> set[str]:
+            return member_at(pdates, psets, day)
+
+    return rows_from(days, mk.close, dvol, sector, Fundamentals(), members), mk
+
+
+def rows_from(
+    days: Sequence[str],
+    close: Mapping[str, Sequence[float | None]],
+    dvol: Mapping[str, Sequence[float | None]],
+    sector: Mapping[str, str],
+    fund: Fundamentals,
+    members: Callable[[str], set[str]] | None = None,
+    only: Iterable[int] | None = None,
+) -> list[dict[str, Any]]:
+    """월말 행 만들기(274 · 그림자 기록 공용).
+
+    ``members`` 가 있으면 그날 명단만, ``only`` 는 그 날짜 칸만(월말 아니어도)."""
+    want = None if only is None else set(only)
     rows: list[dict[str, Any]] = []
     for t in range(len(days)):
-        if days[t] < FIRST or not month_end_day(days, t):
+        if want is not None and t not in want:
+            continue
+        if days[t] < FIRST or (want is None and not month_end_day(days, t)):
             continue
         day = days[t]
-        pool = [s for s in mk.close if mk.close[s][t] is not None]
-        if universe == "U2":
-            members = member_at(pdates, psets, day)
-            pool = [s for s in pool if s in members]
-        raw = {s: f for s in pool if (f := price_features(mk.close[s], dvol[s], t)) is not None}
+        pool = [s for s in close if close[s][t] is not None]
+        if members is not None:
+            today = members(day)
+            pool = [s for s in pool if s in today]
+        raw = {s: f for s in pool if (f := price_features(close[s], dvol[s], t)) is not None}
         if len(raw) < 30:
             continue
         score = dict.fromkeys(raw, 0.0)
@@ -208,7 +231,7 @@ def build_rows(universe: str) -> tuple[list[dict[str, Any]], Any]:
         cols["op_yoy"] = {s: oo.get(s, 0.5) for s in raw}
         cols["fund_missing"] = {s: float(s not in rr or s not in oo) for s in raw}
         fwd = {
-            s: (_ret(mk.close[s], t, t + HORIZON) if t + HORIZON < len(days) else None) for s in raw
+            s: (_ret(close[s], t, t + HORIZON) if t + HORIZON < len(days) else None) for s in raw
         }
         labels = top_labels(fwd)
         for s in sorted(raw):
@@ -222,16 +245,25 @@ def build_rows(universe: str) -> tuple[list[dict[str, Any]], Any]:
                     "fwd": fwd[s],
                 }
             )
-    return rows, mk
+    return rows
 
 
 # ------------------------------------------------------------------ 학습 · 고르기
 
 
+def gbm_model() -> Any:
+    """문서 274 §5 GBM (판정 · 그림자 기록 공용)."""
+    from sklearn.ensemble import HistGradientBoostingClassifier  # type: ignore[import-not-found]
+
+    return HistGradientBoostingClassifier(
+        max_iter=200, learning_rate=0.05, max_depth=3, min_samples_leaf=50,
+        l2_regularization=1.0, early_stopping=False, random_state=SEED,
+    )  # fmt: skip
+
+
 def walk_forward(rows: Sequence[dict[str, Any]], days: Sequence[str]) -> dict[str, list[float]]:
     """시험 해마다 다시 학습한 GBM · LR 확률 (행 순서, 시험 전 행은 NaN)."""
     import numpy as np  # type: ignore[import-not-found]
-    from sklearn.ensemble import HistGradientBoostingClassifier  # type: ignore[import-not-found]
     from sklearn.linear_model import LogisticRegression  # type: ignore[import-not-found]
 
     x = np.asarray([r["x"] for r in rows], dtype=float)
@@ -242,10 +274,7 @@ def walk_forward(rows: Sequence[dict[str, Any]], days: Sequence[str]) -> dict[st
         te = np.asarray([r["day"][:4] == str(year) for r in rows])
         if not te.any():
             continue
-        gbm = HistGradientBoostingClassifier(
-            max_iter=200, learning_rate=0.05, max_depth=3, min_samples_leaf=50,
-            l2_regularization=1.0, early_stopping=False, random_state=SEED,
-        )  # fmt: skip
+        gbm = gbm_model()
         gbm.fit(x[tr], y[tr])
         out["GBM"][te] = gbm.predict_proba(x[te])[:, 1]
         lr = LogisticRegression(C=1.0, max_iter=2000)
