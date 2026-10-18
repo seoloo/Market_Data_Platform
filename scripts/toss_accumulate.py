@@ -100,6 +100,7 @@ from auto_trading.ops.deneb_live import (
     deposited,
     dividend_lines,
     due,
+    fill,
     holdings_lines,
     lev_share,
     limit_price,
@@ -180,8 +181,13 @@ DENEB_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
 DENEB_BRAKE = True
 """T 브레이크 (문서 183 ~ 188, 사용자 2026-10-09 '처음부터'): TQQQ 고점 −15% 절반 · −30% 전부,
 판 돈은 달러 보관, QQQ 추세가 꺼졌다 켜지면 되산다. 매일 21:00 실행에서만 판단한다."""
+DENEB_FILL = True
+"""다음 날 채우기 (사용자 2026-10-18 "b로 변경 부탁해", reports/deneb_fraction_20261018):
+그달 계획 다음 거래일부터 매일 21:00, 남은 전략 현금으로 목표보다 가장 모자란 종목을
+1 주씩 장 마감 지정가로 산다(사기만)."""
 BRAKE_KINDS = frozenset({"brake", "rebuy"})
 KIND_WORDS = {
+    "fill": "채우기 매수",
     "brake": "브레이크 매도",
     "rebuy": "재매수",
     "harvest_sell": "공제 실현 매도",
@@ -618,10 +624,8 @@ def _deneb_brake(
     return alerts, report
 
 
-def _deneb_plan(
-    day: Day, deneb: DenebState, events: list[tuple[str, str, float]] | None = None
-) -> tuple[dict[str, int], float | None, float, list[str]]:
-    """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
+def _deneb_share(day: Day, deneb: DenebState) -> tuple[float | None, float]:
+    """(σ20, 이번 달 TQQQ 몫) — 지난달 말까지 변동성 × 배당 단계 상한 × 브레이크 단계."""
     closes = [(d, float(px)) for d, px in day.reader.daily_closes("QQQ", 60)]
     vol, share = lev_share(closes, day.today)
     share *= min(deneb.lev_cap, LEV_MAX) / LEV_MAX  # 배당 단계로 낮아진 TQQQ 상한
@@ -630,6 +634,26 @@ def _deneb_plan(
             o.kind == "rebuy" and o.date == day.today and o.status == "SENT" for o in deneb.orders
         )
         share *= 1.0 if rebuying else STAGE_SHARE[int(deneb.brake.get("stage", 0))]
+    return vol, share
+
+
+def _deneb_today(day: Day, deneb: DenebState) -> tuple[dict[str, float], float]:
+    """(보유, 전략 현금) — 오늘 이미 접수된 주문(아직 체결 전)은 산 것 · 판 것으로 본다."""
+    qty, cash = dict(deneb.qty), deneb.cash_usd
+    for o in deneb.orders:
+        if o.status == "SENT" and o.date == day.today:
+            sign = 1 if o.side == "BUY" else -1
+            qty[o.symbol] = qty.get(o.symbol, 0.0) + sign * o.qty
+            if o.kind not in BRAKE_KINDS:  # 브레이크 · 재매수 돈은 보관금이다
+                cash -= sign * o.qty * o.limit * (1 + day.fee)
+    return qty, cash
+
+
+def _deneb_plan(
+    day: Day, deneb: DenebState, events: list[tuple[str, str, float]] | None = None
+) -> tuple[dict[str, int], float | None, float, list[str]]:
+    """이번 달 납입 · 배당 반영 뒤 (사고팔 주수, σ20, TQQQ 몫, 메모). ``m3`` 를 고친다."""
+    vol, share = _deneb_share(day, deneb)
     events = _dividend_events() if events is None else events
     notes = credit_dividends(deneb, events, day.today, _since)
     krw = deneb.amounts.get(day.today[:7], _deneb_monthly())
@@ -640,15 +664,35 @@ def _deneb_plan(
     elif krw <= 0:
         notes.append("이번 달 납입 0원(텔레그램 답) — 이월 현금 · 배당만으로")
     last = {s: day.prices[s] for s in DENEB_SYMBOLS}
-    # 오늘 이미 접수된 주문(아직 체결 전)은 산 것 · 판 것으로 보고 다시 사지 않는다
-    qty, cash = dict(deneb.qty), deneb.cash_usd
-    for o in deneb.orders:
-        if o.status == "SENT" and o.date == day.today:
-            sign = 1 if o.side == "BUY" else -1
-            qty[o.symbol] = qty.get(o.symbol, 0.0) + sign * o.qty
-            if o.kind not in BRAKE_KINDS:  # 브레이크 · 재매수 돈은 보관금이다
-                cash -= sign * o.qty * o.limit * (1 + day.fee)
+    qty, cash = _deneb_today(day, deneb)
     return choose(qty, cash, last, share, day.fee), vol, share, notes
+
+
+def _deneb_fill(
+    day: Day, trader: TossTrader, deneb: DenebState, *, enabled: bool, halted: str | None
+) -> list[str]:
+    """다음 날 채우기 (21:00 실행만). 이번 달 계획이 끝난 뒤 · 계획 날이 아닐 때 · 지난 주문이 다
+    정리됐을 때 · 하루 한 번. 남은 전략 현금으로 1 주씩 장 마감 지정가 매수. 알림은 ❌ · ⚠ 만."""
+    if not DENEB_FILL or not enabled or halted or due(deneb, day.today):
+        return []
+    if any(o.date == day.today and (not o.kind or o.kind == "fill") for o in deneb.orders):
+        return []  # 계획 날(그달 첫 주문) · 오늘 이미 채움
+    if any(o.status == "SENT" and o.date < day.today for o in deneb.orders):
+        return []  # 지난 주문이 아직 정리 전 — 현금이 확정되지 않음
+    _, share = _deneb_share(day, deneb)
+    qty, cash = _deneb_today(day, deneb)
+    last = {s: day.prices[s] for s in DENEB_SYMBOLS}
+    plan = fill(qty, cash, last, share, day.fee, {LEV: MAX_TQQQ_QTY, **DENEB_MAX_QTY})
+    lines: list[str] = []
+    for sym, n in sorted(plan.items()):
+        limit = limit_price(day.prices[sym], "BUY")
+        order, line = _deneb_send(day, trader, deneb, "BUY", n, limit, "fill", sym)
+        if order.status == "REJECTED" and order.code in DENEB_RETRY:
+            order.booked = True
+            line = f"↻ Deneb {sym} 채우기 매수 거절 {order.code} — 내일 다시"
+        lines.append(line.replace("🛑", "🛒"))
+        _save_deneb(deneb)
+    return lines
 
 
 def _usdt_krw() -> float | None:
@@ -853,8 +897,9 @@ def _deneb_run(
             {"lines": [*quiet, *report, *more], "brake": deneb.brake, "proposals": deneb.proposals},
         )
     if not due(deneb, day.today):
+        filled = _deneb_fill(day, trader, deneb, enabled=enabled, halted=halted) if brake else []
         _save_deneb(deneb)
-        return [*(f"🌟 Deneb · {x}" for x in notes), *alerts]
+        return [*(f"🌟 Deneb · {x}" for x in [*notes, *filled]), *alerts]
     plan, vol, share, more = _deneb_plan(day, deneb)
     notes += more
     if not any(str(x[0]) == day.today[:7] for x in deneb.months):

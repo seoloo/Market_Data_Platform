@@ -6,6 +6,10 @@
   + 판 돈. 1 주 단위 장 마감 지정가로만 사고판다(소수점 = 시장가뿐이라 쓰지 않는다).
 * 수량은 목표 금액과의 차이(제곱합)가 가장 작은 정수 조합. 사는 돈은 지정가 × (1 + 수수료) 로
   잡아 지금 전략 현금을 넘지 않게 한다. 파는 것은 목표보다 1 주 값 넘게 많을 때만(세금 · 회전 줄임).
+* **다음 날 채우기** (사용자 2026-10-18 "b로 변경", 참고 계산 ``reports/deneb_fraction_20261018``):
+  그달 계획 다음 거래일부터 매일, 남은 전략 현금(지난 계획에서 남은 돈 · 판 돈 ·
+  미체결로 돌아온 돈)으로 목표보다 가장 모자란 종목을 1 주씩 산다(:func:`fill`, 사기만).
+  놀고 있는 현금 평균 3 ~ 4% → 1% 아래, 모의 20 년 +18%(같은 낙폭).
 * 체결은 주문 상세(체결 수량 · 금액 · 수수료)로만 장부에 넣는다.
   사용자가 따로 가진 같은 종목과 섞지 않는다.
 """
@@ -346,6 +350,42 @@ def choose(
         if best is None or key < (round(best[0], 6), sum(abs(n) for n in best[1].values())):
             best = (err, d)
     return {s: n for s, n in (best[1] if best else {}).items() if n != 0}
+
+
+def fill(
+    qty: Mapping[str, float],
+    cash: float,
+    last: Mapping[str, float],
+    share: float,
+    fee: float,
+    max_qty: Mapping[str, int] | None = None,
+) -> dict[str, int]:
+    """다음 날 채우기 — 종목 → 살 주수 (사기만, 순수).
+
+    살 돈을 지정가(+3%) × (1 + 수수료) 로 잡아 남은 현금으로 1 주씩, 그때마다 목표(평가액 × 몫)보다
+    가장 모자란 종목부터 — 그 종목 1 주 값이 안 되면 살 수 있는 다음 종목(참고 계산과 같은 규칙).
+    목표가 0 인 종목은 사지 않는다. ``max_qty`` (종목마다 한 번 주문 상한)에 닿으면 그날은 멈춘다.
+    1 주도 못 사면 빈 dict."""
+    q = {s: qty.get(s, 0.0) for s in SYMBOLS}
+    left = cash
+    out: dict[str, int] = {}
+    cost = {s: limit_price(last[s], "BUY") * (1 + fee) for s in SYMBOLS}
+    while True:
+        val = left + sum(q[s] * last[s] for s in SYMBOLS)
+        target = {LEV: share * val, DIV: (1 - share) * val}
+        for s in sorted(SYMBOLS, key=lambda x: -(target[x] - q[x] * last[x])):
+            if target[s] <= 0:  # 목표 0 (브레이크 2 단계의 TQQQ 등)은 사지 않는다
+                continue
+            if max_qty and out.get(s, 0) >= max_qty.get(s, 10**9):
+                return out  # 가장 모자란 종목이 한 번 상한 — 나머지는 다음 날
+            if left + 1e-9 < cost[s]:
+                continue
+            q[s] += 1
+            left -= cost[s]
+            out[s] = out.get(s, 0) + 1
+            break
+        else:
+            return out
 
 
 def apply_fill(state: DenebState, order: DenebOrder) -> None:

@@ -339,10 +339,94 @@ def test_deneb_first_month_buys_whole_shares_then_settles(
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 21, 0, tzinfo=UTC))
     n_sent = len(fake.sent)
     assert mod.run(telegram=False) == 0
-    assert not any(o[4].startswith("M3") for o in fake.sent[n_sent:])
+    # 같은 달 계획은 다시 하지 않고 남은 $42.02 로 채운다 (B, 2026-10-18): 가장 모자란 TQQQ 는
+    # 1 주 값($83.58)이 안 돼 다음으로 살 수 있는 SCHD 1 주
+    m3 = [o for o in fake.sent[n_sent:] if o[4].startswith("M3")]
+    assert [(o[0], o[1], o[2]) for o in m3] == [("SCHD", "BUY", 1)]
     state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
     assert state["qty"] == {"TQQQ": 1.0, "SCHD": 3.0}
     assert abs(state["cash_usd"] - (300_000 / 1350 - 179 - 0.2)) < 1e-6
+    assert state["orders"][-1]["kind"] == "fill" and state["orders"][-1]["status"] == "SENT"
+    # 같은 날 다시 돌아도 또 채우지 않는다
+    n2 = len(fake.sent)
+    assert mod.run(telegram=False) == 0
+    assert not [o for o in fake.sent[n2:] if o[4].startswith("M3")]
+
+
+def _deneb_first_month(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Any, FakeToss]:
+    fake = FakeToss(usd="500")
+    mod = _mod(monkeypatch, tmp_path, fake)
+    monkeypatch.setattr(mod, "DENEB_ENABLED", True)
+    monkeypatch.setattr(mod, "DENEB_START", "2026-10-06")
+    _seed(mod)
+    assert mod.run(telegram=False) == 0  # 10-06 계획: TQQQ 1 · SCHD 3
+    return mod, fake
+
+
+def _fill_all(fake: FakeToss, tmp_path: Path) -> None:
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
+    for o in state["orders"]:
+        if o["order_id"]:
+            fake.statuses[o["order_id"]] = TossOrderStatus(
+                "FILLED",
+                Decimal(o["qty"]),
+                Decimal(o["limit"]),
+                Decimal(o["qty"]) * Decimal(o["limit"]),
+                Decimal(0),
+            )
+    for k in range(1, len(fake.sent) + 1):
+        fake.statuses.setdefault(
+            f"OID-{k}", TossOrderStatus("FILLED", Decimal(1), Decimal(1), Decimal(1), Decimal(0))
+        )
+
+
+def _m3(xs: list[tuple[str, str, int, Decimal, str]]) -> list[tuple[str, str, int, Decimal, str]]:
+    return [o for o in xs if o[4].startswith("M3")]
+
+
+def test_deneb_fill_waits_for_settlement_and_halt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    mod, fake = _deneb_first_month(monkeypatch, tmp_path)
+    # 10-07: 지난 주문이 아직 체결 대기 → 현금 확정 전이라 채우지 않음
+    for k in range(1, len(fake.sent) + 1):
+        fake.statuses[f"OID-{k}"] = TossOrderStatus("PENDING", Decimal(0), None, None, None)
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 21, 0, tzinfo=UTC))
+    n = len(fake.sent)
+    assert mod.run(telegram=False) == 0
+    assert not _m3(fake.sent[n:])
+    # 10-08: 체결됐지만 Deneb 정지 → 채우지 않음
+    fake.statuses.clear()
+    _fill_all(fake, tmp_path)
+    monkeypatch.setattr(
+        mod, "halted_for", lambda _h, group: "HALT_deneb" if group == "deneb" else None
+    )
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 8, 21, 0, tzinfo=UTC))
+    n = len(fake.sent)
+    assert mod.run(telegram=False) == 0
+    assert not _m3(fake.sent[n:])
+
+
+def test_deneb_fill_rejected_for_dollars_is_quiet_and_retries_next_day(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sent: list[str] = []
+    mod, fake = _deneb_first_month(monkeypatch, tmp_path)
+    monkeypatch.setattr(mod, "_notify", lambda text, telegram: sent.append(text))
+    _fill_all(fake, tmp_path)
+    fake.outcome = "insufficient-buying-power"
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 7, 21, 0, tzinfo=UTC))
+    assert mod.run(telegram=True) == 0
+    state = json.loads((tmp_path / "data" / "DENEB.json").read_text(encoding="utf-8"))
+    last = state["orders"][-1]
+    assert last["kind"] == "fill" and last["status"] == "REJECTED"
+    assert not any("❌ Deneb" in m for m in sent)  # 달러 부족 채우기는 알리지 않음(↻)
+    fake.outcome = "ok"
+    _fill_all(fake, tmp_path)
+    monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 10, 8, 21, 0, tzinfo=UTC))
+    n = len(fake.sent)
+    assert mod.run(telegram=False) == 0
+    assert [(o[0], o[1]) for o in fake.sent[n:] if o[4].startswith("M3")] == [("SCHD", "BUY")]
 
 
 def test_deneb_insufficient_usd_retries_next_day(

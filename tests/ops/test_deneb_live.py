@@ -9,7 +9,9 @@ from auto_trading.ops.deneb_live import (
     choose,
     credit_dividends,
     deposit,
+    fill,
     lev_share,
+    limit_price,
 )
 
 
@@ -100,3 +102,30 @@ def test_holdings_dividends_and_reason_lines() -> None:
     assert "6주 × 직전 주당 $0.2600" in lines
     assert "최대 60%" in share_reason(0.15, 0.6)
     assert "= 44% 로 줄임" in share_reason(0.27, 0.6 * 0.20 / 0.27)
+
+
+# ------------------------------------------------------------------ 다음 날 채우기 (B, 2026-10-18)
+
+
+def test_fill_buys_most_short_symbol_one_share_at_a_time() -> None:
+    last = {"TQQQ": 80.0, "SCHD": 30.0}
+    # TQQQ 10 주(800) · SCHD 0, 현금 300, 몫 60% → 평가액 1100 · 목표 TQQQ 660 → SCHD 가 모자람
+    plan = fill({"TQQQ": 10.0, "SCHD": 0.0}, 300.0, last, 0.6, 0.001)
+    cost = limit_price(30.0, "BUY") * 1.001
+    assert plan == {"SCHD": int(300.0 // cost)}  # 9 주 — 남은 현금이 1 주 값보다 적을 때까지
+
+
+def test_fill_skips_unaffordable_short_symbol_and_never_sells() -> None:
+    last = {"TQQQ": 80.0, "SCHD": 33.0}
+    # 가장 모자란 TQQQ 1 주(+3% · 비용 82.5)는 못 사고 SCHD 1 주는 살 수 있다
+    assert fill({"TQQQ": 1.0, "SCHD": 3.0}, 42.0, last, 0.6, 0.001) == {"SCHD": 1}
+    assert fill({"TQQQ": 1.0, "SCHD": 3.0}, 20.0, last, 0.6, 0.001) == {}
+    plan = fill({"TQQQ": 50.0, "SCHD": 0.0}, 100.0, last, 0.1, 0.001)
+    assert all(n > 0 for n in plan.values())  # 넘쳐도 팔지 않는다
+
+
+def test_fill_stage_two_buys_only_schd_and_respects_max_qty() -> None:
+    last = {"TQQQ": 80.0, "SCHD": 30.0}
+    assert set(fill({"TQQQ": 0.0, "SCHD": 0.0}, 1000.0, last, 0.0, 0.001)) == {"SCHD"}
+    capped = fill({"TQQQ": 0.0, "SCHD": 0.0}, 5000.0, last, 0.0, 0.001, {"TQQQ": 60, "SCHD": 40})
+    assert capped == {"SCHD": 40}
