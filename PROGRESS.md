@@ -2410,3 +2410,8 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 ## 2026-10-18 — Sirius 실거래 보류, Paper 만 (Claude)
 
 - 사용자 "sirius는 실거래는 아직 하지 않도록 하고 paper만" → 예약 `AutoTrading_Sirius` Disabled · 설정 `live.sirius` 꺼짐 그대로. 장부 · 정리 기능은 남겨 둠(다시 켜면 바로). Paper 277(GBM10 · GBM5 · GBM10F · GBM5F · BASE10 · SPY) 계속, 첫 결정 10-30.
+
+## 2026-10-18 — 🌟 Deneb 그림자 기록 시작 (Claude)
+
+- 사용자 "1번만 해줘"(Deneb 보강 후보 중 그림자 기록). [280](docs/research/280-deneb-shadow-registration.md): 실거래 Deneb 과 같은 순수 함수(lev_share · choose · T 브레이크 · 되사기 · 배당)로 정지와 상관없이 매일 규칙대로 기록, 주문 · 알림 없음. 실거래 시작 2026-10-09 · 같은 첫 납입부터.
+- 첫 실행이 10-09 실거래 체결을 그대로 재현(TQQQ 1 주 $81.28 · SCHD 3 주 $99.12, σ20 14.8% → 60%). 10-16 평가 $213.81(−4.2%). 예약 `AutoTrading_Deneb_Shadow` 화 ~ 토 09:35 KST. 실거래 Deneb 정지는 그대로.
