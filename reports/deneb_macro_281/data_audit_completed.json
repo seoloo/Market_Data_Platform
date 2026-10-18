@@ -1,0 +1,233 @@
+{
+  "research": 281,
+  "stage": "G0_DATA_AUDIT",
+  "as_of_ms": 1792317196068,
+  "cutoff": "2026-08-31",
+  "model_fits": 0,
+  "candidate_pnl_calculations": 0,
+  "series": {
+    "T10Y3M": {
+      "series": "T10Y3M",
+      "frequency": "daily",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=T10Y3M",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1982-01-04",
+        "2026-08-31"
+      ],
+      "first_vintage": "2014-01-27",
+      "last_vintage": "2026-08-31",
+      "vintage_count": 3110,
+      "raw_sha256": {
+        "initial_000.zip": "ae8952d871fa53c2f5ac07aa5ab0d5793253224d3809957bdc6736b994963c63",
+        "initial_001.zip": "9c16842c1b37c16237c01ec22661b70784443c73165cf3ae6185cf97b31e8368",
+        "initial_002.zip": "c1c5cb02c26d32868cd428b4899b3342bb643cf67e6623a78f8c419f85982aca",
+        "initial_003.zip": "1b11ebe01d126591418647b8678bb0ae01164d64892140f467d4ade4196e2950",
+        "initial_004.zip": "9e055aeb4021e9a2f70a6a9b7f40af6dfd75c46edcc1dc1676189ca05266b197",
+        "initial_005.zip": "37e4eb0901e6fd1929e56992b9d5634405033c62b709d2703df0ef3cb1b57caa",
+        "initial_006.zip": "edd4f6cb080cdfcb5965e8364524bb119011a2f865b4111c7767ee6aeec3d867",
+        "initial_007.zip": "64a5060ca57dc455df201a172f2a8956808d69a870a6db12c153bdeee661c30d"
+      },
+      "raw_path": "data/research/deneb_macro_281/T10Y3M",
+      "original_rows": 3151,
+      "timely_rows": 3151,
+      "first_observation": "2014-01-27",
+      "first_timely_observation": "2014-01-27",
+      "first_timely_release": "2014-01-28",
+      "last_timely_release": "2026-08-31",
+      "archive_backfill_rows": 0,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 0,
+      "release_lag_max_days": 6,
+      "lag_limit_days": 7
+    },
+    "BAA10Y": {
+      "series": "BAA10Y",
+      "frequency": "daily",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=BAA10Y",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1986-01-02",
+        "2026-08-31"
+      ],
+      "first_vintage": "2014-01-27",
+      "last_vintage": "2026-08-31",
+      "vintage_count": 2952,
+      "raw_sha256": {
+        "initial_000.zip": "760f743db71f93b569ebb95dbd5dbb59505ae86e6eb56146d14bcd6ef786f651",
+        "initial_001.zip": "7e958d3f79d906651a9f4781b41c0b9d137124aacd3180d25b09c0e5e8fb16fa",
+        "initial_002.zip": "1f4c001e61d06ffb47e133eef1ca87196270095ae12ac854b51bcb67f0061ea8",
+        "initial_003.zip": "c249fcc322b102e980ae2863e2bccf9c7406e1de003af82f8be0865c77445a01",
+        "initial_004.zip": "269ef2e3c40c6613d40b2f5a2627a58523ded154d5d9bb408ccc1e47526e8df3",
+        "initial_005.zip": "325260ffa99c2f8bdb3aa4d4f6f7fa18dbadf3595b84be3a70b9ad0eab794bd9",
+        "initial_006.zip": "91540dbc438d2957fc027a733672eb816de969450a661e4d8427f227a7a40c40",
+        "initial_007.zip": "39d8fd4cd2875b38cd613820bb73a0fb2c8a578eeb940a4c07cf5679d6987837"
+      },
+      "raw_path": "data/research/deneb_macro_281/BAA10Y",
+      "original_rows": 3144,
+      "timely_rows": 3038,
+      "first_observation": "2014-01-27",
+      "first_timely_observation": "2014-01-27",
+      "first_timely_release": "2014-01-28",
+      "last_timely_release": "2026-08-31",
+      "archive_backfill_rows": 106,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 1.0,
+      "release_lag_max_days": 166,
+      "lag_limit_days": 7
+    },
+    "UNRATE": {
+      "series": "UNRATE",
+      "frequency": "monthly",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=UNRATE",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1960-01-01",
+        "2026-08-31"
+      ],
+      "first_vintage": "1960-03-15",
+      "last_vintage": "2026-08-07",
+      "vintage_count": 798,
+      "raw_sha256": {
+        "initial_000.zip": "3ac6920467fe55c3cff4eb308be17befe35f22452e39d0974ac9a7bd21701eb8",
+        "initial_001.zip": "f740a5799f955bd19868fcc8226cb2ac88d3f9dbddf624f6b8d84b03b36bf64d"
+      },
+      "raw_path": "data/research/deneb_macro_281/UNRATE",
+      "original_rows": 796,
+      "timely_rows": 795,
+      "first_observation": "1960-03-01",
+      "first_timely_observation": "1960-03-01",
+      "first_timely_release": "1960-04-12",
+      "last_timely_release": "2026-08-07",
+      "archive_backfill_rows": 1,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 34.0,
+      "release_lag_max_days": 80,
+      "lag_limit_days": 62
+    },
+    "ICSA": {
+      "series": "ICSA",
+      "frequency": "weekly",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=ICSA",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1967-01-07",
+        "2026-08-31"
+      ],
+      "first_vintage": "2009-05-28",
+      "last_vintage": "2026-08-27",
+      "vintage_count": 895,
+      "raw_sha256": {
+        "initial_000.zip": "2805d1bd4e888d8bcb8148ed0d74a8453c4daddd2e45a25ba2bea8e6c569e8e1",
+        "initial_001.zip": "7ec7effec8c54bce9cad5626611114728496b18a86d36b9b21bb290b7cd9d813",
+        "initial_002.zip": "58a8f5dac529e0c0f5814c4e945342ddebe5e9bd368e17dd2ec9117554ada22b"
+      },
+      "raw_path": "data/research/deneb_macro_281/ICSA",
+      "original_rows": 900,
+      "timely_rows": 894,
+      "first_observation": "2009-05-30",
+      "first_timely_observation": "2009-05-30",
+      "first_timely_release": "2009-06-04",
+      "last_timely_release": "2026-08-27",
+      "archive_backfill_rows": 6,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 5.0,
+      "release_lag_max_days": 54,
+      "lag_limit_days": 14
+    },
+    "INDPRO": {
+      "series": "INDPRO",
+      "frequency": "monthly",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=INDPRO",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1960-01-01",
+        "2026-08-31"
+      ],
+      "first_vintage": "1927-01-26",
+      "last_vintage": "2026-08-18",
+      "vintage_count": 1222,
+      "raw_sha256": {
+        "initial_000.zip": "716580863284c414e37127cb9006d36a5324eca52217fa34f3b1eae8745426f2",
+        "initial_001.zip": "d8ec5db4e0d0dc5ff32553f347878c4c0ba08c879ff7189bee6c24d7377f5e5e",
+        "initial_002.zip": "c499d3d327edc63dd5f67b5c47186f0027f023ed4ab53bb894039e2d6541cca0",
+        "initial_003.zip": "9e776589286740f7798befe120a216fc2246a9b529ab5cddfb6e35ef9dc8bdd7"
+      },
+      "raw_path": "data/research/deneb_macro_281/INDPRO",
+      "original_rows": 799,
+      "timely_rows": 797,
+      "first_observation": "1960-01-01",
+      "first_timely_observation": "1960-01-01",
+      "first_timely_release": "1960-02-16",
+      "last_timely_release": "2026-08-18",
+      "archive_backfill_rows": 2,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 45,
+      "release_lag_max_days": 93,
+      "lag_limit_days": 62
+    },
+    "PCEPILFE": {
+      "series": "PCEPILFE",
+      "frequency": "monthly",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=PCEPILFE",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1960-01-01",
+        "2026-08-01"
+      ],
+      "first_vintage": "2000-08-01",
+      "last_vintage": "2026-08-26",
+      "vintage_count": 315,
+      "raw_sha256": {
+        "initial_000.zip": "730d078396d86fc6df260c351e071b6d3df85002e42ba483d5f053793a473391"
+      },
+      "raw_path": "data/research/deneb_macro_281/PCEPILFE",
+      "original_rows": 313,
+      "timely_rows": 292,
+      "first_observation": "2000-07-01",
+      "first_timely_observation": "2000-07-01",
+      "first_timely_release": "2000-08-28",
+      "last_timely_release": "2026-08-26",
+      "archive_backfill_rows": 21,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 59,
+      "release_lag_max_days": 113,
+      "lag_limit_days": 62
+    },
+    "FEDFUNDS": {
+      "series": "FEDFUNDS",
+      "frequency": "monthly",
+      "source_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=FEDFUNDS",
+      "format": "initial_release_only",
+      "cutoff": "2026-08-31",
+      "requested_observation_range": [
+        "1960-01-01",
+        "2026-08-31"
+      ],
+      "first_vintage": "1996-12-03",
+      "last_vintage": "2026-08-03",
+      "vintage_count": 363,
+      "raw_sha256": {
+        "initial_000.zip": "fe14093f8a0f03a62a4dc8e4c9f1239ce5d354d9d0966110f63149318f2ed894"
+      },
+      "raw_path": "data/research/deneb_macro_281/FEDFUNDS",
+      "original_rows": 356,
+      "timely_rows": 356,
+      "first_observation": "1996-12-01",
+      "first_timely_observation": "1996-12-01",
+      "first_timely_release": "1997-01-07",
+      "last_timely_release": "2026-08-03",
+      "archive_backfill_rows": 0,
+      "negative_lag_rows": 0,
+      "release_lag_median_days": 33.0,
+      "release_lag_max_days": 44,
+      "lag_limit_days": 62
+    }
+  }
+}

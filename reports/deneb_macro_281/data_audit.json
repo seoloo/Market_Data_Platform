@@ -1,0 +1,45 @@
+{
+  "research": 281,
+  "stage": "G0_DATA_AUDIT",
+  "as_of_ms": 1792316758767,
+  "cutoff": "2026-08-31",
+  "model_fits": 0,
+  "candidate_pnl_calculations": 0,
+  "series": {
+    "T10Y3M": {
+      "series": "T10Y3M",
+      "status": "UNAVAILABLE",
+      "error": "<urlopen error The write operation timed out>"
+    },
+    "BAA10Y": {
+      "series": "BAA10Y",
+      "status": "UNAVAILABLE",
+      "error": "<urlopen error The write operation timed out>"
+    },
+    "UNRATE": {
+      "series": "UNRATE",
+      "status": "UNAVAILABLE",
+      "error": "The read operation timed out"
+    },
+    "ICSA": {
+      "series": "ICSA",
+      "status": "UNAVAILABLE",
+      "error": "The read operation timed out"
+    },
+    "INDPRO": {
+      "series": "INDPRO",
+      "status": "UNAVAILABLE",
+      "error": "The read operation timed out"
+    },
+    "PCEPILFE": {
+      "series": "PCEPILFE",
+      "status": "UNAVAILABLE",
+      "error": "The read operation timed out"
+    },
+    "FEDFUNDS": {
+      "series": "FEDFUNDS",
+      "status": "UNAVAILABLE",
+      "error": "The read operation timed out"
+    }
+  }
+}

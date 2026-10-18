@@ -1,0 +1,185 @@
+{
+  "research": 281,
+  "status": "G0_NOT_READY_ADOPTION_UNVERIFIED",
+  "model_fits": 0,
+  "candidate_pnl_calculations": 0,
+  "common_first_timely_release": "2014-01-28",
+  "conservative_feature_start": "2015-01-01",
+  "common_coverage_is_only_upper_bound": true,
+  "label_eligible_month_counts_upper_bound": {
+    "train": 18,
+    "validation": 30,
+    "historical_confirmation": 74
+  },
+  "label_distribution_not_model_performance": {
+    "train": {
+      "eligible_months_upper_bound": 18,
+      "positive_months": 2,
+      "negative_months": 16,
+      "overlapping_positive_window_groups": 1
+    },
+    "validation": {
+      "eligible_months_upper_bound": 30,
+      "positive_months": 6,
+      "negative_months": 24,
+      "overlapping_positive_window_groups": 1
+    },
+    "historical_confirmation": {
+      "eligible_months_upper_bound": 74,
+      "positive_months": 15,
+      "negative_months": 59,
+      "overlapping_positive_window_groups": 3
+    }
+  },
+  "last_label_eligible_month": "2026-02",
+  "baseline_variance_only_period": [
+    "2012-01-03",
+    "2016-06-30"
+  ],
+  "target_annual_increment_pct_points": 3.0,
+  "simulations_per_assumption": 300,
+  "seed": 281,
+  "all_conservative_proxy_checks_passed": false,
+  "formal_power_gate": "NOT_ESTABLISHED",
+  "scenarios": {
+    "occupancy_0.1_duration_63": {
+      "monthly_sd_median_pct": 0.7937876425549812,
+      "half_year_sd_median_pct": 1.9480735137087586,
+      "monthly": {
+        "train": {
+          "sd_pct": 1.6272097981146163,
+          "samples": 18,
+          "months_per_sample": 1,
+          "required_samples": 343,
+          "achieved_power": 0.08880146127793742,
+          "annual_mde_pct_points": 13.07840353628434,
+          "decidable_proxy_only": false
+        },
+        "validation": {
+          "sd_pct": 1.6272097981146163,
+          "samples": 30,
+          "months_per_sample": 1,
+          "required_samples": 343,
+          "achieved_power": 0.12333119743212495,
+          "annual_mde_pct_points": 10.130487818201885,
+          "decidable_proxy_only": false
+        },
+        "historical_confirmation": {
+          "sd_pct": 1.6272097981146163,
+          "samples": 74,
+          "months_per_sample": 1,
+          "required_samples": 343,
+          "achieved_power": 0.2487709061893295,
+          "annual_mde_pct_points": 6.450228890807845,
+          "decidable_proxy_only": false
+        }
+      },
+      "nonoverlapping_half_year": {
+        "train": {
+          "sd_pct": 4.348171330187864,
+          "samples": 3,
+          "months_per_sample": 6,
+          "required_samples": 68,
+          "achieved_power": 0.08038449965004757,
+          "annual_mde_pct_points": 14.267313551174187,
+          "decidable_proxy_only": false
+        },
+        "validation": {
+          "sd_pct": 4.348171330187864,
+          "samples": 5,
+          "months_per_sample": 6,
+          "required_samples": 68,
+          "achieved_power": 0.10960756923631298,
+          "annual_mde_pct_points": 11.051413555763407,
+          "decidable_proxy_only": false
+        },
+        "historical_confirmation": {
+          "sd_pct": 4.348171330187864,
+          "samples": 12,
+          "months_per_sample": 6,
+          "required_samples": 68,
+          "achieved_power": 0.21041565832815734,
+          "annual_mde_pct_points": 7.133656775587093,
+          "decidable_proxy_only": false
+        }
+      }
+    },
+    "occupancy_0.2_duration_126": {
+      "monthly_sd_median_pct": 1.1798619875510337,
+      "half_year_sd_median_pct": 2.9335779365428367,
+      "monthly": {
+        "train": {
+          "sd_pct": 2.1862701112778833,
+          "samples": 18,
+          "months_per_sample": 1,
+          "required_samples": 618,
+          "achieved_power": 0.0649046892770051,
+          "annual_mde_pct_points": 17.57174937598023,
+          "decidable_proxy_only": false
+        },
+        "validation": {
+          "sd_pct": 2.1862701112778833,
+          "samples": 30,
+          "months_per_sample": 1,
+          "required_samples": 618,
+          "achieved_power": 0.0847706448715051,
+          "annual_mde_pct_points": 13.611018539380398,
+          "decidable_proxy_only": false
+        },
+        "historical_confirmation": {
+          "sd_pct": 2.1862701112778833,
+          "samples": 74,
+          "months_per_sample": 1,
+          "required_samples": 618,
+          "achieved_power": 0.15473754852942823,
+          "annual_mde_pct_points": 8.66633340778408,
+          "decidable_proxy_only": false
+        }
+      },
+      "nonoverlapping_half_year": {
+        "train": {
+          "sd_pct": 5.328706053977665,
+          "samples": 3,
+          "months_per_sample": 6,
+          "required_samples": 102,
+          "achieved_power": 0.06521127589148512,
+          "annual_mde_pct_points": 17.48466523531738,
+          "decidable_proxy_only": false
+        },
+        "validation": {
+          "sd_pct": 5.328706053977665,
+          "samples": 5,
+          "months_per_sample": 6,
+          "required_samples": 102,
+          "achieved_power": 0.08525611564712188,
+          "annual_mde_pct_points": 13.543563454079196,
+          "decidable_proxy_only": false
+        },
+        "historical_confirmation": {
+          "sd_pct": 5.328706053977665,
+          "samples": 12,
+          "months_per_sample": 6,
+          "required_samples": 102,
+          "achieved_power": 0.1527109944828463,
+          "annual_mde_pct_points": 8.74233261765869,
+          "decidable_proxy_only": false
+        }
+      }
+    }
+  },
+  "filtered_source_sha256": {
+    "data/research/lev_div_181/TQQQ.csv": "52c10aea3ca55a91c92de0ef2f64296eaf7e3748bf3a992e9b430132c3f6b813",
+    "data/research/div_mix_180/SCHD.csv": "16a27c7a79870a0f2d7e16cd637689a6c983f86cf1b4a6fbad602f3ebdfb0977",
+    "data/research/div_mix_180/QQQ.csv": "c9529b4c0756490effe1d324379ec037fbdebc22848547d8ac986a5a59462ca0",
+    "NASDAQ100_filtered_prefix": "a10498186ed399b5b4f3fa32d3a75b495e997bef969c20f43a732b35394ade21"
+  },
+  "source_audit_sha256": "10061e421083ecef5702704719c52c1c4d81cfb21dbf40a97a90a858709098e6",
+  "limitations": [
+    "Actual TQQQ-only overlay variance unknown; whole-baseline attenuation is a proxy",
+    "126-trading-day labels overlap; six-month blocks remain dependent across crises",
+    "First timely release does not prove a complete point-in-time feature panel",
+    "INDPRO/PCEPILFE index rebasing requires same-vintage history, not stitched levels",
+    "Baseline 184 is not full live accounting parity or tax-inclusive differential PnL",
+    "Past research exposure means historical confirmation is not independent OOS"
+  ]
+}
