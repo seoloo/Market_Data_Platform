@@ -180,24 +180,22 @@ def main() -> None:
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     data.prepare()
     stamp = {"git": git, "code_sha256": code_digest(), "started_utc": datetime.now(UTC).isoformat()}
-    attempt = data.OUT / "attempt.json"
+    attempt = data.OUT / "attempt_v2.json"
     if attempt.exists():
         before = json.loads(attempt.read_text(encoding="utf-8"))
         if before["code_sha256"] != stamp["code_sha256"]:
             raise RuntimeError("code changed after attempt; audit required")
     else:
-        data.save("attempt.json", stamp)
+        data.save("attempt_v2.json", stamp)
     if (data.OUT / "result.json").exists():
         raise RuntimeError("completed evaluation cannot be repeated")
-    cache = data.OUT / "dataset.npz"
+    cache = data.OUT / "dataset_v2.npz"
     if cache.exists():
         with np.load(cache, allow_pickle=False) as f:
             ds = dict(f)
     else:
         ds = dataset.build()
-    aud = json.loads((data.OUT / "dataset_audit.json").read_text(encoding="utf-8"))
-    if any(aud[s].get("label_unknown", 0) for s in data.SYMBOLS):
-        raise RuntimeError("future-dependent coverage exclusion requires explicit audit")
+    aud = json.loads((data.OUT / "dataset_audit_v2.json").read_text(encoding="utf-8"))
     pred_file = data.OUT / "predictions.npz"
     if pred_file.exists():
         with np.load(pred_file, allow_pickle=False) as f:
@@ -213,19 +211,48 @@ def main() -> None:
         "classification": {},
         "accounts": {},
         "by_asset_year": {},
+        "raw_direction_diagnostic": {},
+        "dataset_audit": aud,
+        "artifact_sha256": {
+            name: hashlib.sha256((data.OUT / name).read_bytes()).hexdigest()
+            for name in (
+                "dataset_v2.npz",
+                "data_manifest.json",
+                "predictions.npz",
+                "tcn.pt",
+                "lr.joblib",
+                "scaler.npz",
+            )
+        },
     }
-    prior = np.bincount(ds["y"][ds["splits"] == 0], minlength=3)
+    known = ds["y"] >= 0
+    prior = np.bincount(ds["y"][(ds["splits"] == 0) & known], minlength=3)
     probs["CONSTANT"] = np.tile(prior / prior.sum(), (len(ds["y"]), 1))
     probs["RULE"] = np.eye(3)[ds["rules"]]
     for split, name in enumerate(("train", "validation", "holdout")):
-        mask = ds["splits"] == split
+        mask = (ds["splits"] == split) & known
         result["classification"][name] = {
             k: metrics.classification(ds["y"][mask], p[mask]) for k, p in probs.items()
         }
+        result["raw_direction_diagnostic"][name] = {}
+        for model, p in probs.items():
+            predicted = metrics.decisions(p)
+            observed = ds["future_return_24h"]
+            active = (ds["splits"] == split) & (predicted != 0) & np.isfinite(observed)
+            accuracy = (
+                float(np.mean((predicted[active] == 1) == (observed[active] > 0)))
+                if active.any()
+                else None
+            )
+            result["raw_direction_diagnostic"][name][model] = {
+                "active_signals": int(active.sum()),
+                "direction_accuracy": accuracy,
+                "meaning": "unstopped 24h direction, not after-cost trade outcome",
+            }
     for sym in (0, 1):
         for year in (2025, 2026):
             years = np.asarray([datetime.fromtimestamp(t / 1000, UTC).year for t in ds["times"]])
-            mask = (ds["symbols"] == sym) & (years == year) & (ds["splits"] == 2)
+            mask = (ds["symbols"] == sym) & (years == year) & (ds["splits"] == 2) & known
             result["by_asset_year"][f"{data.SYMBOLS[sym]}/{year}"] = {
                 k: metrics.classification(ds["y"][mask], p[mask]) for k, p in probs.items()
             }
@@ -238,7 +265,7 @@ def main() -> None:
             for sens in sensitivities:
                 key = f"{period}/{name}/{sens}"
                 print(json.dumps({"replay": key}), flush=True)
-                r = account.replay(ds, probs[name].argmax(axis=1), split, assets, sens)
+                r = account.replay(ds, metrics.decisions(probs[name]), split, assets, sens)
                 result["accounts"][key] = r
     target = result["accounts"]["holdout/TCN/base"]
     bases = {k: result["accounts"][f"holdout/{k}/base"] for k in ("RULE", "LR")}

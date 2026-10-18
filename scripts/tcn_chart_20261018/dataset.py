@@ -12,6 +12,7 @@ def build() -> dict[str, Any]:
     import numpy as np
 
     xs, ys, times, symbols, splits, rules, ranks = [], [], [], [], [], [], []
+    forward_returns: list[float] = []
     audit: dict[str, Any] = {}
     for symbol in data.SYMBOLS:
         d = data.load(symbol)
@@ -38,14 +39,18 @@ def build() -> dict[str, Any]:
                 returns.append(float(e.net / (e.entry * e.qty)) if e.status == "CLOSED" else None)
             if not valid:
                 counts["label_unknown"] += 1
-                continue
             xs.append(window)
-            ys.append(features.classify(*returns))
+            # Keep the feature row for every prediction/account path. Only the supervised
+            # target is missing; future execution eligibility must not filter the account.
+            ys.append(features.classify(*returns) if valid else -1)
             times.append(t)
             symbols.append(data.SYMBOLS.index(symbol))
             splits.append(sp)
             rules.append(features.rule(f[i]))
             ranks.append(float(np.mean(h4[i - 19 : i + 1, 4] * h4[i - 19 : i + 1, 5])))
+            forward_returns.append(
+                float(h4[i + 6, 4] / h4[i, 4] - 1) if i + 6 < len(h4) else float("nan")
+            )
         audit[symbol] = dict(counts)
         print({"dataset_asset": symbol, "counts": dict(counts)}, flush=True)
     result = {
@@ -56,13 +61,20 @@ def build() -> dict[str, Any]:
         "splits": np.asarray(splits),
         "rules": np.asarray(rules),
         "ranks": np.asarray(ranks),
+        "future_return_24h": np.asarray(forward_returns),
     }
     order = np.lexsort((result["symbols"], -result["ranks"], result["times"]))
     result = {k: v[order] for k, v in result.items()}
-    np.savez_compressed(data.OUT / "dataset.npz", **result)
+    np.savez_compressed(data.OUT / "dataset_v2.npz", **result)
     audit["split_labels"] = {
-        str(s): np.bincount(result["y"][result["splits"] == s], minlength=3).tolist()
+        str(s): np.bincount(
+            result["y"][(result["splits"] == s) & (result["y"] >= 0)], minlength=3
+        ).tolist()
         for s in (0, 1, 2)
     }
-    data.save("dataset_audit.json", audit)
+    audit["unknown_by_split"] = {
+        str(s): int(np.count_nonzero((result["splits"] == s) & (result["y"] < 0)))
+        for s in (0, 1, 2)
+    }
+    data.save("dataset_audit_v2.json", audit)
     return result

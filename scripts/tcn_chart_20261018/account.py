@@ -69,6 +69,17 @@ def replay(
         if e.qty == 0:
             veto[e.status] += 1
             continue
+        if e.status == "UNRESOLVED":
+            halted = True
+            execution.carry_unresolved(
+                e,
+                d["minutes"],
+                d["funding"],
+                side,
+                hi,
+                cost=opts.get("cost", 1),
+                worst_mark=opts.get("worst_mark", False),
+            )
         pnl, notionals = execution.equity_path(e, d["minutes"], side)
         begin_ms = int(d["minutes"][e.start, 0])
         end_ms = int(d["minutes"][e.end, 0])
@@ -91,9 +102,16 @@ def replay(
             left, right = max(start, day_start), min(end + 1, day_start + 1440)
             if left < right and eq[left:right].min() <= day_equity * 0.98:
                 blocked_days.add(day_id)
-        if e.status == "UNRESOLVED":
+        reserve = Decimal(0)
+        unrealized = Decimal(0)
+        if e.status == "UNRESOLVED_MTM":
             halted = True
-            cash = Decimal(str(path[-1]))
+            last_px = Decimal(str(d["minutes"][e.end, 4]))
+            unrealized = e.remaining * side * (last_px - e.entry)
+            reserve = e.remaining * last_px * Decimal("0.0005") * cost
+            cash += e.net + unrealized - reserve
+            path[-1] = float(cash)
+            eq[end] = float(cash)
         else:
             if abs(pnl[-1] - float(e.net)) > 1e-7:
                 raise ValueError("cash/MTM reconciliation")
@@ -109,9 +127,13 @@ def replay(
                 "side": "LONG" if side == 1 else "SHORT",
                 "entry_ms": begin_ms,
                 "exit_ms": end_ms,
-                "net": float(e.net),
-                "gross": float(e.gross),
-                "fee": float(e.fees),
+                "net": float(e.net + unrealized - reserve),
+                "gross": float(e.gross + unrealized),
+                "gross_realized": float(e.gross),
+                "terminal_unrealized": float(unrealized),
+                "fee": float(e.fees + reserve),
+                "fee_actual": float(e.fees),
+                "fee_reserve": float(reserve),
                 "funding": float(e.funding),
                 "turnover": float(e.turnover),
                 "price_impact": float(e.price_impact),
@@ -123,6 +145,7 @@ def replay(
                 "delay_min": e.exit_delay,
                 "status": e.status,
                 "remaining_qty": str(e.remaining),
+                "was_unresolved": e.was_unresolved,
             }
         )
     eq[cursor:] = float(cash)
@@ -164,7 +187,8 @@ def replay(
         else 0,
         "partial_entries": sum(t["partial"] for t in trades),
         "delayed_exits": sum(t["delay_min"] > 0 for t in trades),
-        "unresolved": sum(t["status"] != "CLOSED" for t in trades),
+        "unresolved": sum(t["was_unresolved"] for t in trades),
+        "terminal_open": sum(t["status"] == "UNRESOLVED_MTM" for t in trades),
         "halted": halted,
         "veto": dict(veto),
         "monthly": monthly,

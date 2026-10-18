@@ -48,6 +48,7 @@ class Episode:
     stopped: bool = False
     pieces: int = 0
     exit_delay: int = 0
+    was_unresolved: bool = False
     flows: list[tuple[int, Decimal, Decimal]] = field(default_factory=list)
 
     @property
@@ -161,7 +162,68 @@ def simulate(
             return e
     accrue(int(a[max_ix, 0]))
     e.end, e.status, e.exit_delay = max_ix, "UNRESOLVED", 60
+    e.was_unresolved = True
     return e
+
+
+def carry_unresolved(
+    e: Episode,
+    a: Any,
+    funds: Any,
+    side: int,
+    end_ms: int,
+    *,
+    cost: int = 1,
+    worst_mark: bool = False,
+) -> None:
+    """No new entry or ordinary retry. Value retained inventory and existing emergency stop.
+
+    This does not turn an expired execution into a successful 24h trade. The account stays
+    halted and the original failure flag remains even if its emergency stop eventually fills.
+    """
+    import numpy as np
+
+    if e.status != "UNRESOLVED" or e.remaining <= 0:
+        raise ValueError("only unresolved inventory can be carried")
+    first_ms = int(a[0, 0])
+    start = e.end + 1
+    terminal = min(len(a) - 1, (end_ms - first_ms) // 60000 - 1)
+    if terminal < start:
+        raise ValueError("unresolved valuation boundary")
+    stop = e.entry * (1 - D(side) * D("0.03"))
+    path = a[start : terminal + 1]
+    hits = np.flatnonzero(path[:, 3] <= float(stop) if side == 1 else path[:, 2] >= float(stop))
+    stop_ix = start + int(hits[0]) if len(hits) else None
+    finish = terminal if stop_ix is None else stop_ix
+    funding_end = int(a[finish, 0]) + 59999
+    keep = funds[(funds[:, 0] > a[e.end, 0]) & (funds[:, 0] <= funding_end)]
+    for f in keep:
+        at = int((f[0] - first_ms) // 60000)
+        rate = D(str(f[1]))
+        mark = D(str(f[4] if side * float(rate) > 0 else f[3])) if worst_mark else D(str(f[2]))
+        flow = -D(side) * e.remaining * rate * mark
+        if at == stop_ix and flow > 0:
+            flow = ZERO
+        e.funding += flow
+        e.flows.append((at, flow, e.remaining))
+    if stop_ix is not None:
+        opening = D(str(a[stop_ix, 1]))
+        reference = min(opening, stop) if side == 1 else max(opening, stop)
+        price = reference * (1 - D(side) * D("0.00245") * cost)
+        gross = e.remaining * D(side) * (price - e.entry)
+        fee = e.remaining * price * D("0.0005") * cost
+        e.price_impact += e.remaining * abs(price - reference)
+        e.turnover += e.remaining * price
+        e.gross += gross
+        e.fees += fee
+        e.remaining = ZERO
+        e.flows.append((stop_ix, gross - fee, ZERO))
+        e.stopped = True
+        e.pieces += 1
+        e.status = "LATE_EMERGENCY_CLOSED"
+    else:
+        e.status = "UNRESOLVED_MTM"
+    e.end = finish
 
 
 def equity_path(e: Episode, a: Any, side: int) -> tuple[Any, Any]:

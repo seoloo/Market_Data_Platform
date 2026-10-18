@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import unittest
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
-from scripts.tcn_chart_20261018 import account, execution, models
+from scripts.tcn_chart_20261018 import account, data, dataset, execution, metrics, models
 
 
 class ResearchTests(unittest.TestCase):
@@ -104,6 +106,72 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(r["veto"]["POSITION_OR_60MIN"], 2)
         self.assertAlmostEqual(r["net"], r["gross"] - r["fee"] + r["funding"], places=8)
         self.assertLessEqual(r["trades"][0]["entry_notional"], 1000)
+
+    def test_unresolved_inventory_not_deleted(self) -> None:
+        import numpy as np
+
+        a, f = self.fixture()
+        a = np.concatenate([a, a[:1400].copy()])
+        a[:, 0] = np.arange(len(a)) * 60000
+        a[1440:, 5] = 0
+        e = execution.simulate(a, f, 0, 1, "ETHUSDT")
+        self.assertEqual(e.status, "UNRESOLVED")
+        qty = e.remaining
+        execution.carry_unresolved(e, a, f, 1, 2 * 86400000)
+        self.assertEqual(e.status, "UNRESOLVED_MTM")
+        self.assertEqual(e.remaining, qty)
+        self.assertTrue(e.was_unresolved)
+        a[1700, 3] = 90
+        e = execution.simulate(a, f, 0, 1, "ETHUSDT")
+        execution.carry_unresolved(e, a, f, 1, 2 * 86400000)
+        self.assertEqual(e.status, "LATE_EMERGENCY_CLOSED")
+        self.assertEqual(e.end, 1700)
+        pnl, _ = execution.equity_path(e, a, 1)
+        self.assertAlmostEqual(pnl[-1], float(e.net), places=8)
+
+    def test_unknown_labels_keep_prediction_rows(self) -> None:
+        import numpy as np
+
+        bars = np.tile([1735689600000, 100, 101, 99, 100, 1000], (100, 1)).astype(float)
+        bars[:, 0] += np.arange(100) * 14400000
+        fake = {"minutes": bars, "h4": bars, "funding": bars}
+        with (
+            TemporaryDirectory() as folder,
+            patch.object(data, "OUT", Path(folder)),
+            patch.object(data, "load", return_value=fake),
+            patch.object(dataset.features, "calculate", return_value=[[0] * 10] * 100),
+            patch.object(
+                execution, "simulate", return_value=execution.Episode(status="UNRESOLVED")
+            ),
+        ):
+            ds = dataset.build()
+        self.assertEqual(len(ds["x"]), 10)
+        self.assertTrue(np.all(ds["y"] == -1))
+
+    def test_account_terminal_inventory_and_reserve(self) -> None:
+        import numpy as np
+
+        a, f = self.fixture()
+        a = np.concatenate([a, a[:1400].copy()])
+        a[:, 0] = np.arange(len(a)) * 60000
+        a[1440:, 5] = 0
+        a[1700:, 1:5] = [120, 121, 119, 120]
+        ds = {"times": np.asarray([0]), "splits": np.asarray([0]), "symbols": np.asarray([0])}
+        assets = {"BTCUSDT": {"minutes": a, "funding": f}}
+        with patch.object(account, "BOUNDS", ((0, 86400000 * 2),)):
+            r = account.replay(ds, np.asarray([1]), 0, assets)
+        self.assertEqual(r["unresolved"], 1)
+        self.assertEqual(r["terminal_open"], 1)
+        self.assertGreater(r["trades"][0]["fee_reserve"], 0)
+        self.assertGreater(Decimal(r["trades"][0]["remaining_qty"]), 0)
+        self.assertAlmostEqual(r["final"], r["daily_equity"][-1], places=8)
+        self.assertAlmostEqual(r["net"], r["gross"] - r["fee"] + r["funding"], places=8)
+
+    def test_probability_tie_is_flat(self) -> None:
+        import numpy as np
+
+        out = metrics.decisions(np.asarray([[0.1, 0.45, 0.45], [0.1, 0.2, 0.7]]))
+        np.testing.assert_array_equal(out, [0, 2])
 
 
 if __name__ == "__main__":

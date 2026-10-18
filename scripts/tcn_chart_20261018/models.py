@@ -75,8 +75,8 @@ def train(x: Any, y: Any, split: Any, out: Path) -> tuple[dict[str, Any], dict[s
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if device == "cuda":
         torch.cuda.set_per_process_memory_fraction(0.65)
-    tr, va = split == 0, split == 1
-    mean, sd = scaler(x[tr])
+    tr, va = (split == 0) & (y >= 0), (split == 1) & (y >= 0)
+    mean, sd = scaler(x[split == 0])
     z = normalize(x, mean, sd)
     np.savez(out / "scaler.npz", mean=mean, sd=sd)
     lr = LogisticRegression(C=0.1, max_iter=1000)

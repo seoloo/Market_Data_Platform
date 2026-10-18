@@ -5,11 +5,19 @@ from __future__ import annotations
 from typing import Any
 
 
+def decisions(p: Any) -> Any:
+    import numpy as np
+
+    out = np.argmax(p, axis=1)
+    tied = np.sum(p == np.max(p, axis=1, keepdims=True), axis=1) > 1
+    return np.where(tied, 0, out)
+
+
 def classification(y: Any, p: Any) -> dict[str, Any]:
     import numpy as np
     from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, log_loss
 
-    pred = p.argmax(axis=1)
+    pred = decisions(p)
     conf = p.max(axis=1)
     bins = []
     for k in range(10):
