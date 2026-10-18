@@ -426,3 +426,56 @@ def test_redeem_waits_until_earn_balance_catches_up(
     lag["n"] = 10**6
     with pytest.raises(ExchangeError):
         m._ensure_spot(fake, Decimal(400))  # type: ignore[arg-type]
+
+
+def _stopped_state(off_seen: bool) -> dict[str, Any]:
+    return {
+        "units": "1000",
+        "peak": "2",  # 단위 가치 1 → 고점 대비 50% 낙폭
+        "stopped": True,
+        "stopped_since": "2026-01-01",
+        "stop_reminded": [],
+        "halt_off_seen": off_seen,
+        "history": [],
+        "orders": [],
+        "deposits": [["2026-01-01", "1000"]],
+        "expected": {"USDT": "1000", "BTC": "0", "ETH": "0", "SOL": "0"},
+    }
+
+
+def test_trend_ready_marks_off_then_releases_on() -> None:
+    """문서 266 · 사용자 2026-10-18 'vega도 altair와 같은 방식' — BTC 목표 0 → 다시 > 0 이면 풂."""
+    st: dict[str, Any] = {"stopped": True}
+    assert m.trend_ready(st, Decimal("0.1")) is False  # 꺼짐을 아직 못 봄
+    assert m.trend_ready(st, Decimal(0)) is False and st["halt_off_seen"] is True
+    assert m.trend_ready(st, None) is False  # 판단 불가는 그대로
+    assert m.trend_ready(st, Decimal("0.05")) is True
+    assert m.trend_ready({"stopped": False, "halt_off_seen": True}, Decimal("0.1")) is False
+
+
+def test_stopped_vega_releases_itself_when_trend_back_and_buys(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m.DATA.mkdir(parents=True)
+    m._save(_stopped_state(off_seen=True))
+    fake = FakeBinance(Decimal(1000))  # 오르는 일봉 → BTC 목표 > 0
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert st["stopped"] is False and "halt_off_seen" not in st and "stopped_since" not in st
+    assert Decimal(st["peak"]) == Decimal(st["last_nav"])  # 고점 = 지금
+    assert any(side == "BUY" for _s, side, _q, _p in fake.sent)
+    outbox = (env / "reports" / "vega" / "outbox.log").read_text(encoding="utf-8")
+    assert "스스로 풀림" in outbox
+
+
+def test_stopped_vega_stays_stopped_until_trend_was_off(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m.DATA.mkdir(parents=True)
+    m._save(_stopped_state(off_seen=False))
+    fake = FakeBinance(Decimal(1000))
+    monkeypatch.setattr(m, "_client", lambda **_: fake)
+    assert m.run_cmd() == 0
+    st = json.loads(m.STATE.read_text(encoding="utf-8"))
+    assert st["stopped"] is True and fake.sent == []

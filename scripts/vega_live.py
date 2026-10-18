@@ -3,7 +3,7 @@
     python -m scripts.vega_live plan     # 계획만 — 주문 · 기록 · 알림 없음 (첫날 확인)
     python -m scripts.vega_live run      # 실행 (예약 매일 09:05 KST, 일봉 마감 5 분 뒤)
     python -m scripts.vega_live status
-    python -m scripts.vega_live release-dd "사유"   # 계좌 낙폭 30% 정지 해제 (자동 해제 없음)
+    python -m scripts.vega_live release-dd "사유"   # 계좌 낙폭 30% 정지를 손으로 해제
 
 * 사용자 (2026-10-15): "vega는 그냥 바이낸스로 옮기면 돼" — 업비트 Vega
   (:mod:`scripts.vega_upbit`)와 **같은 규칙**(:mod:`auto_trading.ops.t2_upbit`: T/v2 그대로 ·
@@ -14,6 +14,9 @@
   이 전략 돈으로 본다(따로 들고 있을 코인은 Funding 지갑에 둔다). 그 밖의 코인은 건드리지 않는다.
 * 입출금은 단위 가치(NAV)로 걸러 낸다 — 아무 때나 USDT 를 넣으면 다음 실행이 입금으로 알아챈다.
 * 긴급 정지 ``data/HALT`` · ``data/HALT_vega`` 면 주문하지 않는다.
+* 계좌 낙폭 30% 정지는 **BTC 목표 비중이 0(추세 꺼짐)이 된 뒤 다시 0 보다 커지면(추세 다시 켜짐)
+  스스로 풀고 고점을 그날 단위 가치로** 다시 잡는다 — Altair 와 같은 방식(사용자 2026-10-18
+  "vega도 altair와 같은 방식으로", 문서 266 · 199). 손으로는 ``release-dd``.
 * 상태 ``data/vega/state.json`` · 보고 ``reports/vega/<날짜>.json`` · 알림 텔레그램.
 """
 
@@ -194,6 +197,18 @@ def kst_day(decision_day: str) -> str:
     return (date.fromisoformat(decision_day) + timedelta(days=1)).isoformat()
 
 
+def trend_ready(st: dict[str, Any], btc_w: Decimal | None) -> bool:
+    """낙폭 정지 중 — 오늘 BTC 목표가 0 이면 꺼짐을 적고, 꺼짐을 본 뒤 0 보다 크면 True(풀 때)."""
+    if not st.get("stopped"):
+        return False
+    if btc_w is None:
+        return False
+    if btc_w <= 0:
+        st["halt_off_seen"] = True
+        return False
+    return bool(st.get("halt_off_seen"))
+
+
 def _plan_today(
     c: BinanceSpotLive, st: dict[str, Any], now_ms: int
 ) -> tuple[dict[str, Any], dict[str, SpotFilters]]:
@@ -209,9 +224,12 @@ def _plan_today(
         holdings=hold,
         prices=prices,
     )
-    stopped = bool(st.get("stopped")) or (Decimal(st["units"]) > 0 and ns.dd >= DD_STOP)
     daily = {k: c.closed_daily(SYMBOLS[k], dms) for k in COINS}
     w = targets(daily, dms)
+    released = trend_ready(st, w.get("BTC"))
+    stopped = not released and (
+        bool(st.get("stopped")) or (Decimal(st["units"]) > 0 and ns.dd >= DD_STOP)
+    )
     filters = {k: c.filters(SYMBOLS[k]) for k in COINS}
     eq = equity(cash, hold, prices)
     intents = plan(
@@ -231,6 +249,7 @@ def _plan_today(
         "equity": eq,
         "nav": ns,
         "stopped": stopped,
+        "released": released,
         "weights": w,
         "signals": signals(daily, dms),
         "intents": intents,
@@ -506,18 +525,39 @@ def run_cmd() -> int:
             deposits.append([p["day"], str(ns.flow)])
             word = "입금" if ns.flow > 0 else "출금"
             lines.append(f"💰 {word} 감지 {ns.flow:+,.2f} USDT → 총 입금에 반영")
+        if p["released"]:
+            lines.append(
+                "▶ 계좌 낙폭 정지 스스로 풀림 — BTC 추세가 꺼졌다 다시 켜짐,"
+                " 고점을 지금 단위 가치로"
+            )
+            st.setdefault("releases", []).append(
+                [datetime.now(UTC).isoformat(timespec="seconds"), "BTC 추세 다시 켜짐 (자동)"]
+            )
+            for k in ("stopped_since", "stop_reminded", "halt_off_seen"):
+                st.pop(k, None)
         if p["stopped"] and not st.get("stopped"):
-            lines.append(f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤 (해제는 사람이)")
+            lines.append(
+                f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤"
+                " (BTC 추세가 꺼졌다 다시 켜지면 스스로 풀림)"
+            )
             st["stopped_since"], st["stop_reminded"] = p["day"], []
+            btc = p["weights"].get("BTC")
+            st["halt_off_seen"] = btc is not None and btc <= 0
         st.update(
-            units=str(ns.units), peak=str(ns.peak), stopped=p["stopped"], last_nav=str(ns.nav)
+            units=str(ns.units),
+            peak=str(ns.nav if p["released"] else ns.peak),
+            stopped=p["stopped"],
+            last_nav=str(ns.nav),
         )
         if p["stopped"]:
             since = st.setdefault("stopped_since", p["day"])
             due = stop_reminder(since, p["day"], st.setdefault("stop_reminded", []))
             if due:
                 st["stop_reminded"].append(due)
-                lines.append(f"🔔 매수 정지 {due} 일째 — 풀려면 release-dd (문서 199)")
+                lines.append(
+                    f"🔔 매수 정지 {due} 일째 — BTC 추세가 다시 켜지면 스스로 풀림"
+                    " (손으로: release-dd)"
+                )
         intents = [] if halted else p["intents"]
         if halted:
             lines.append(f"⏸ 긴급 정지 중 — 주문 안 함 ({halted})")
@@ -623,6 +663,7 @@ def release_cmd(reason: str) -> int:
     st.setdefault("releases", []).append([datetime.now(UTC).isoformat(timespec="seconds"), reason])
     st.pop("stopped_since", None)
     st.pop("stop_reminded", None)
+    st.pop("halt_off_seen", None)
     _save(st)
     _notify(f"{TAG}\n{RULE}\n✅ 계좌 낙폭 정지 해제 — {reason}")
     return 0
