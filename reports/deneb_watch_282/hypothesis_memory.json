@@ -1,0 +1,10 @@
+{
+  "key": "hypothesis-memory-20261018",
+  "kind": "hypothesis",
+  "factor_id": "memory_competition",
+  "event_key": "memory-competition",
+  "summary": "조건부 경로: 신규 메모리 제품 → 실제 공급·고객 채택 증가 → 가격/기존 생산자 이익 압박 → 관련 지수 영향. 현재 근거는 제품 목록의 DDR5 표기뿐이다. 생산량·수율·고객 채택·가격 영향은 미확인이고, 메모리 구매자에는 비용 감소 효과가 있을 수 있다. 시장 전체 악재로 확정하지 않는다.",
+  "stance": "mixed",
+  "related_keys": ["282.1:cxmt:memory_competition:66d20c6ae18f3d2599ec1d8c211cf91fbcf4bcf32750c2f7472fa9b59d5da95c"],
+  "details": {"research_role": "CONDITIONAL_TRANSMISSION_NOT_SIGNAL"}
+}

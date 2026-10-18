@@ -1,0 +1,13 @@
+{
+  "key": "hypothesis-leverage-20261018",
+  "kind": "hypothesis",
+  "factor_id": "margin_debt",
+  "event_key": "investor-leverage",
+  "summary": "조건부 경로: 차입 확대 → 담보 가치 하락 → 추가 증거금·강제 매도. 현재 FINRA 차입잔액과 고객 free credit은 같은 월별 원천의 두 수치다. 시장 규모 분모와 증가 추세·차입 주체 분포 없이 빚투 비율이나 강제 매도 위험의 크기를 확정하지 않는다. 두 수치를 독립 악재 두 표로 세지 않는다.",
+  "stance": "unclassified",
+  "related_keys": [
+    "282.1:finra:margin_debt:eaa9db186ab7ead2d92d785b8a584ee558ce74fab841d92633dc0e6960dcb488",
+    "282.1:finra:margin_cash:eaa9db186ab7ead2d92d785b8a584ee558ce74fab841d92633dc0e6960dcb488"
+  ],
+  "details": {"research_role": "FRAGILITY_WITH_DENOMINATOR_MISSING"}
+}

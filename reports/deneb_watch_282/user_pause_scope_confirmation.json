@@ -1,0 +1,18 @@
+{
+  "key": "user-pause-scope-confirmed-20261018",
+  "kind": "decision",
+  "event_key": "deneb-user-pause-202610",
+  "summary": "사용자가 추가 확인: '그냥 다 매도 했어 매도 하고 정지했지'. Deneb 기존 보유분을 전부 매도한 뒤 정지한 행동으로 기록한다. 신규 매수만 중단한 경우와 구분하며, 매도일·체결가·수수료는 아직 확인하지 않았다.",
+  "source_url": "user:conversation:2026-10-18:scope-confirmation",
+  "action": "sell_existing",
+  "claimed_action_ms": null,
+  "reentry_plan": "",
+  "related_keys": ["user-pause-reported-20261018"],
+  "details": {
+    "timing_origin": "retrospective_user_report",
+    "scope": "DENEB_HOLDINGS_ALL",
+    "execution_confirmation": "USER_CONFIRMED_SOLD_ALL_NOT_BROKER_RECONCILED",
+    "historical_prediction_status": "NOT_PROSPECTIVELY_RECORDED",
+    "new_order_authority": "NONE"
+  }
+}

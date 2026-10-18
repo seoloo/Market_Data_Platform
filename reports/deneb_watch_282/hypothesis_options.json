@@ -1,0 +1,14 @@
+{
+  "key": "hypothesis-options-20261018",
+  "kind": "hypothesis",
+  "factor_id": "vol_term",
+  "event_key": "option-market-stress",
+  "summary": "확산 관찰: VIX·VVIX·9일/30일 비율이 보여 주는 옵션 보험 가격은 서로 연관된다. 이 세 항목을 독립 경고 세 표로 더하지 않는다. VIX 수준 또는 단기 비율만으로 이후 하락·바닥을 확정하지 않으며, 나스닥 VXN은 아직 미확보다. 기존 124를 문턱만 바꿔 재시험하지 않는다.",
+  "stance": "unclassified",
+  "related_keys": [
+    "282.1:vix:vix:a9742d4deab98f7644bda10df92db0b6afbca17ccc8b64139c52ad2ca0963d42",
+    "282.2:vvix:vvix:03feb6fd03631eb31048adfe7aa25aa3d3f7639cd197045a0f1f43edfcc3896b",
+    "282.1:term:cbf4ac7f5af8f4f0c0f9c32a4018ebd3898a1a25f9b84faf768cf87647e46770"
+  ],
+  "details": {"research_role": "CORRELATED_OBSERVATIONS_NOT_VOTES"}
+}

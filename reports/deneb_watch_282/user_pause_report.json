@@ -1,0 +1,18 @@
+{
+  "key": "user-pause-reported-20261018",
+  "kind": "decision",
+  "event_key": "deneb-user-pause-202610",
+  "summary": "사용자는 거품과 기업·산업·빚투·변동성 등 여러 위험을 우려해 Deneb를 잠시 중단했다고 2026-10-18 대화에서 설명했다. 중지 판단의 정확한 과거 시각과 신규 매수만 중단했는지 보유분도 매도했는지는 이 진술만으로 확정하지 않는다.",
+  "source_url": "user:conversation:2026-10-18",
+  "action": "pause_unspecified",
+  "claimed_action_ms": null,
+  "reentry_plan": "",
+  "details": {
+    "timing_origin": "retrospective_user_report",
+    "user_reported_entry_tqqq_usd": "81.29",
+    "user_reported_later_tqqq_usd": "68.21",
+    "price_comparison_status": "USER_REPORTED_NOT_ACCOUNT_PNL",
+    "historical_prediction_status": "NOT_PROSPECTIVELY_RECORDED",
+    "execution_confirmation": "NOT_VERIFIED"
+  }
+}

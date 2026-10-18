@@ -1,0 +1,182 @@
+{
+  "schema_version": "282.validation.1",
+  "date_kst": "2026-10-18",
+  "phase": "Phase 0 자료 감사·정보 도구 기능 검증",
+  "mode": "INFORMATION_ONLY",
+  "contract_commit": "f787ef5",
+  "status": {
+    "information_tool": "FUNCTIONALLY_VERIFIED",
+    "profitability": "NOT_EVALUATED",
+    "adoption": "UNVERIFIED",
+    "new_money_g0": "DATA_INSUFFICIENT",
+    "new_performance_calculations": 0,
+    "paper_live_authorized": false,
+    "auto_refresh_registered": false
+  },
+  "user_pause": {
+    "action": "sell_existing",
+    "scope": "DENEB_HOLDINGS_ALL",
+    "source": "USER_CONFIRMATION",
+    "timing": "RETROSPECTIVE_TIME_UNKNOWN",
+    "broker_fill_reconciled": false,
+    "reentry_plan_registered": false,
+    "comparison": "PENDING_MATCHED_LEDGER",
+    "avoided_loss": null,
+    "missed_upside": null,
+    "incremental_pnl": null
+  },
+  "journal": {
+    "records": 27,
+    "kinds": {
+      "fact": 15,
+      "failure": 6,
+      "baseline": 1,
+      "decision": 2,
+      "hypothesis": 3
+    },
+    "unique_raw_sha256_verified": 10,
+    "head_sha256": "f1b84834f4adb82d265b2e72c9d19969fccb4279fd2c0a6046d7e0ba57692107",
+    "hash_chain_limit": "Current database mutation detection, not external notarization or tail-truncation protection",
+    "git_policy": "Database and full source bodies remain Git-ignored; summary and manual inputs only are committed"
+  },
+  "coverage": {
+    "OBSERVED": 6,
+    "MISSING": 25,
+    "STALE": 0,
+    "SOURCE_FAILED": 3,
+    "UNDATED_CONTEXT": 1,
+    "CONTEXT_ONLY": 1,
+    "PARTIAL": 0
+  },
+  "tests": {
+    "full_pytest": {
+      "command": ".venv/Scripts/python.exe -m pytest",
+      "passed": 4409,
+      "skipped": 10,
+      "seconds": 241.84,
+      "note": "Existing optional-dependency tests skipped; no new test skipped"
+    },
+    "leakage": {
+      "command": "PYTHONPATH=src;.;.venv/Lib/site-packages build/tcn-venv/Scripts/python.exe -m pytest -m leakage -v",
+      "passed": 160,
+      "deselected": 4259,
+      "skipped": 0,
+      "seconds": 23.04
+    },
+    "new_tests": {
+      "command": ".venv/Scripts/python.exe -m pytest tests/research/test_deneb_watch.py -q",
+      "passed": 51,
+      "skipped": 0
+    },
+    "new_mypy": {
+      "command": "MYPYPATH=src;. .venv/Scripts/python.exe -m mypy --explicit-package-bases --follow-imports=silent --strict src/auto_trading/research/deneb_watch scripts/deneb_risk_watch.py tests/research/test_deneb_watch.py",
+      "checked_files": 8,
+      "status": "PASSED"
+    },
+    "new_ruff": {
+      "checked_files": 8,
+      "status": "PASSED"
+    },
+    "new_format": {
+      "checked_files": 8,
+      "status": "PASSED"
+    },
+    "global_mypy": {
+      "command": "MYPYPATH=src;. .venv/Scripts/python.exe -m mypy --explicit-package-bases src tests",
+      "checked_files": 760,
+      "errors": 7,
+      "error_files": 6,
+      "status": "EXISTING_OUT_OF_SCOPE_ERRORS",
+      "paths": [
+        "scripts/wallet_grid_data_20261013.py",
+        "scripts/run_ag_short_leverage_20261013.py",
+        "tests/scripts/test_v_exec_267.py",
+        "scripts/run_alt_short_230.py",
+        "tests/scripts/test_shadow_272.py",
+        "tests/scripts/test_altair_live.py"
+      ]
+    },
+    "global_ruff": {
+      "errors": 16,
+      "status": "EXISTING_OUT_OF_SCOPE_ERRORS",
+      "paths": [
+        "scripts/run_deneb1x_262.py",
+        "scripts/run_qqq_combo_263.py",
+        "scripts/run_split_264.py"
+      ]
+    },
+    "global_format": {
+      "unformatted_files": 3,
+      "formatted_files": 1194,
+      "status": "EXISTING_OUT_OF_SCOPE_ERRORS"
+    },
+    "lint_imports": {
+      "kept": 5,
+      "broken": 0
+    }
+  },
+  "secret_scan": {
+    "user_approval": "2026-10-18 해당 공개 ID·두 파일에 한정한 예외 승인",
+    "default_rules_retained": true,
+    "false_positive_public_id": "hypothesis-leverage-20261018",
+    "allow_scope": "Exact extracted value AND either reports/deneb_watch_282/hypothesis_leverage.json or latest.json; generic-api-key rule only",
+    "hook_disabled": false,
+    "staged_scan": "PASSED",
+    "synthetic_general_key_detected": true,
+    "same_public_id_outside_allowed_paths_detected": true,
+    "initial_TESTONLY_fixture": "Ignored by existing default scanner test/example handling; replaced by an unmarked synthetic fixture, which was detected."
+  },
+  "source_failures_preserved": [
+    "CoreWeave HTTP 403: two factors not filled",
+    "VVIX distinct column header: first failure preserved; same saved bytes reparsed under parser 282.2",
+    "FRED combined CSV HTTP 404 preserved; separate official HTML sources recorded independently",
+    "IORB HTML future observation rejected; no SOFR-IORB derived",
+    "High-yield history/reuse rights pending; not collected"
+  ],
+  "protected_files": {
+    "data/HALT_deneb": {
+      "before": "10fd4c42b1549db42d9c3cdeb8d7dc944f83982e0db0867d51f82fd67566abec",
+      "after": "10fd4c42b1549db42d9c3cdeb8d7dc944f83982e0db0867d51f82fd67566abec",
+      "unchanged": true
+    },
+    "reports/deneb_shadow/latest.json": {
+      "before": "44cbaa893a286f87a9d67980e7126f3c175fb43044c2e95f97e0beeb7676e2f8",
+      "after": "44cbaa893a286f87a9d67980e7126f3c175fb43044c2e95f97e0beeb7676e2f8",
+      "unchanged": true
+    },
+    "scripts/deneb_shadow.py": {
+      "before": "dbfd9158b0ba25a5b59c94e534088fd552ba418410778cabf39e4243d3cdd70e",
+      "after": "dbfd9158b0ba25a5b59c94e534088fd552ba418410778cabf39e4243d3cdd70e",
+      "unchanged": true
+    },
+    "data/toss/DENEB.json": {
+      "before": "d52a4ee9d764294b5e5e9657c5eec72ee1aaee4e92afa0718cf1f79a07f7f22c",
+      "after": "d52a4ee9d764294b5e5e9657c5eec72ee1aaee4e92afa0718cf1f79a07f7f22c",
+      "unchanged": true
+    },
+    "data/deneb_shadow/state.json": {
+      "before": "7c9d9de2a74c09f9dd5c0818f2a512b5bf1b5960f42f503b164c4242672640b6",
+      "after": "7c9d9de2a74c09f9dd5c0818f2a512b5bf1b5960f42f503b164c4242672640b6",
+      "unchanged": true
+    },
+    "src/auto_trading/ops/deneb_live.py": {
+      "before": "52d148ad7ffcb6858ef9ffead252f917a315c5227dcabafce781be836665e5be",
+      "after": "52d148ad7ffcb6858ef9ffead252f917a315c5227dcabafce781be836665e5be",
+      "unchanged": true
+    }
+  },
+  "artifact_hash_scope": "UTF-8 bytes with CRLF normalized to LF, matching Git text normalization. Raw-source provenance hashes remain original bytes.",
+  "artifact_and_code_sha256": {
+    "scripts/deneb_risk_watch.py": "eb371f95492d7456c7c8c20c97990890d8331ab878ac5e5754b781e5effe5552",
+    "src/auto_trading/research/deneb_watch/catalog.py": "bdfb7c1d1a02134a7ffa1a3780ce690399114dd9da855987c09f38755d411641",
+    "src/auto_trading/research/deneb_watch/domain.py": "e6fc4928e275a53a8bc275fbdbd4d4d19d05205144e2d8d9c83dec5df99a7fb9",
+    "src/auto_trading/research/deneb_watch/__init__.py": "adf911e66164a3da2acaf51f6165d1efd2f83c05cebc25a8df34c11f420ebdf5",
+    "reports/deneb_watch_282/latest.md": "dd27b219d37f325d63f650944f2530ec6c5e37f8a1cf9725b8da89961805e13e",
+    "reports/deneb_watch_282/latest.json": "4a0c728779dbee30e29fcb686a024c41c74d3d7a6000a25c49c4f7d72170a051",
+    "src/auto_trading/research/deneb_watch/report.py": "5f70cce9c34d109a213bd2990a7cdfa1af2c1bd494e18b06e70fe9b0b96d8e5f",
+    "docs/research/282-deneb-risk-watch-contract.md": "2c927615269692d380f06c2540d009845e34d3ed10ca075bfc17172b88956f92",
+    "tests/research/test_deneb_watch.py": "e1b81128985b6480c464eff1598f95375b78890bd59718240d053da5c9aba699",
+    "src/auto_trading/research/deneb_watch/journal.py": "0f4d019f64e920959203428782c72c03381fb281963aedf28a588b27f7bf2c66",
+    "src/auto_trading/research/deneb_watch/sources.py": "0b4bc5df73413625d7ffe7fb3e85e3015631b3d7c8890c361e09e919a4fb8918"
+  }
+}
