@@ -44,6 +44,7 @@ __all__ = [
     "Item",
     "Job",
     "Store",
+    "acc_symbol_of",
     "build_items",
     "choose_price",
     "floor_price",
@@ -95,14 +96,26 @@ def symbol_of(scope: str) -> str | None:
     return scope[len(SYMBOL_SCOPE) :].upper() if scope.startswith(SYMBOL_SCOPE) else None
 
 
+ACC_SCOPE = "acc:"
+"""자동 적립 한 종목 정리 범위 머리 (``acc:BTQ``) — 2026-10-18 사용자 '각 종목을 선택해서 정리'."""
+
+
+def acc_symbol_of(scope: str) -> str | None:
+    """자동 적립 한 종목 범위면 그 종목(그 종목의 적립 몫만 판다), 아니면 None."""
+    return scope[len(ACC_SCOPE) :].upper() if scope.startswith(ACC_SCOPE) else None
+
+
 def scope_label(scope: str) -> str:
     sym = symbol_of(scope)
+    acc = acc_symbol_of(scope)
+    if acc:
+        return f"자동 적립 {acc}"
     return f"{sym} 한 종목" if sym else SCOPES.get(scope, scope)
 
 
 def groups_of(scope: str) -> tuple[str, ...]:
     """범위 → 정지할 그룹. 한 종목 정리는 그룹을 멈추지 않는다(빈 값)."""
-    if symbol_of(scope):
+    if symbol_of(scope) or acc_symbol_of(scope):
         return ()
     scope = _OLD_GROUPS.get(scope, scope)
     if scope == "all":
@@ -365,6 +378,7 @@ def build_items(
     altair_positions: Mapping[str, Decimal] | None = None,
     stock_qty: Mapping[str, Decimal] | None = None,
     only_symbol: str | None = None,
+    only_acc: str | None = None,
 ) -> tuple[list[Item], list[str]]:
     """그룹 → 팔 것 · 못 파는 것 (먼지 · 소수점 · 묶인 수량 · 수동 보유).
 
@@ -409,8 +423,12 @@ def build_items(
     toss_groups = {"deneb", "acc", "stock"} & set(groups)
     if only_symbol and only_symbol not in toss_holdings:
         notes.append(f"{only_symbol} — 토스에 보유 없음")
+    if only_acc and only_acc not in toss_holdings:
+        notes.append(f"{only_acc} — 토스에 보유 없음")
     for sym in sorted(toss_holdings):
         if only_symbol and sym != only_symbol:
+            continue
+        if only_acc and sym != only_acc:
             continue
         held = toss_holdings[sym]
         g_ledger = min(deneb_qty.get(sym, ZERO), held)
@@ -420,7 +438,17 @@ def build_items(
         parts: list[str] = []
         want = ZERO
         deneb_part = ZERO
-        if only_symbol:
+        if only_acc:  # 자동 적립 한 종목 — 적립 몫만, 나머지는 남김
+            want = a_ledger
+            parts = ["acc"] if a_ledger > 0 else []
+            kept = [
+                f"{name} 몫 {_n(q)}"
+                for name, q in (("Deneb", g_ledger), ("개별주", s_ledger), ("수동 보유", rest))
+                if q > 0
+            ]
+            if kept:
+                notes.append(f"{sym} 의 {' · '.join(kept)} 는 적립 몫이 아니라 남김")
+        elif only_symbol:
             want = s_ledger + rest
             parts = (["stock"] if s_ledger > 0 else []) + (["manual"] if rest > 0 else [])
             kept = [

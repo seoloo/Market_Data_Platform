@@ -267,10 +267,61 @@ def is_stock(msg: InboxMessage) -> bool:
     )
 
 
+ACC_PREFIXES = ("적립", "/적립", "자동적립", "/자동적립", "/acc")
+"""자동 적립 종목 추가 · 빼기 (2026-10-18 사용자 '텔레그램에 자동적립 추가 및 삭제하는 메뉴')."""
+ACC_DATA = ("acc:",)
+ACC_ASK_TTL_S = 600
+
+
+def acc_ask_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "data" / "telegram" / "acc_ask.json"
+
+
+def acc_ask(path: Path | None = None) -> tuple[int, int] | None:
+    """'추가할 종목?' 질문 (메시지 번호, 물은 시각 초). 없으면 None."""
+    try:
+        d = json.loads((path or acc_ask_path()).read_text(encoding="utf-8"))
+        return int(d["message_id"]), int(d["at"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def set_acc_ask(message_id: int, at_s: int, path: Path | None = None) -> None:
+    p = path or acc_ask_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"message_id": message_id, "at": at_s}), encoding="utf-8")
+
+
+def clear_acc_ask(path: Path | None = None) -> None:
+    (path or acc_ask_path()).unlink(missing_ok=True)
+
+
+def is_acc_answer(msg: InboxMessage, path: Path | None = None) -> bool:
+    """'추가할 종목과 하루 금액?' 질문에 **답장**한 글 (10 분 안). 답장이 아니면 Deneb 금액과
+    헷갈리므로 받지 않는다."""
+    if msg.data or not msg.reply_to:
+        return False
+    ask = acc_ask(path)
+    return (
+        ask is not None and msg.reply_to == ask[0] and ask[1] <= msg.date <= ask[1] + ACC_ASK_TTL_S
+    )
+
+
+def is_acc(msg: InboxMessage) -> bool:
+    """'적립' 글 · 그 버튼 · 추가 질문의 답장."""
+    if msg.data:
+        return msg.data.startswith(ACC_DATA)
+    if is_acc_answer(msg):
+        return True
+    first = (msg.text.strip().split() or [""])[0].lower()
+    return first in ACC_PREFIXES
+
+
 def is_command(msg: InboxMessage) -> bool:
-    """봇(scripts/telegram_bot.py) 몫 — 현황 · 전부 정리 · 개별주 류. 나머지는 Deneb 대화 몫."""
+    """봇(scripts/telegram_bot.py) 몫 — 현황 · 정리 · 개별주 · 적립 류. 나머지는 Deneb 대화 몫."""
     return (
         is_liquidation(msg)
+        or is_acc(msg)
         or is_stock(msg)
         or (not msg.data and _word(msg) in COMMANDS | HELP_WORDS | PAPER_WORDS | DEPOSIT_WORDS)
     )

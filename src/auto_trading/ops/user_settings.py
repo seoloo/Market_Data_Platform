@@ -30,7 +30,9 @@ __all__ = [
     "Change",
     "Field",
     "acc_history",
+    "acc_items",
     "active_count",
+    "add_item",
     "apply",
     "diff",
     "extras",
@@ -38,6 +40,7 @@ __all__ = [
     "get",
     "load",
     "read_log",
+    "remove_item",
     "show",
     "validate",
 ]
@@ -420,6 +423,52 @@ def _add(
     meta.append(x)
     k = _xkey(x)
     new.update({f"{k}.daily": daily, f"{k}.on": True, f"{k}.removed": False, f"{k}.added": True})
+
+
+def acc_items(values: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """지금 적립 목록(뺀 것 빼고) — 텔레그램 '적립' 메뉴 · 정리 (2026-10-18).
+
+    {key: 설정 키 머리, sym, name, mkt: US · KR, daily: 하루 금액(달러 · 원), on}."""
+    out: list[dict[str, Any]] = []
+    for s in ACC_SYMBOLS:
+        if values.get(f"acc.{s}.removed"):
+            continue
+        out.append(
+            {"key": f"acc.{s}", "sym": s, "name": s, "mkt": "US",
+             "daily": float(values.get(f"acc.{s}.usd", _ACC_DEFAULT[s])),
+             "on": bool(values.get(f"acc.{s}.on", True))}
+        )  # fmt: skip
+    for x in values.get("_extras") or []:
+        k = _xkey(x)
+        if x.get("removed") or values.get(f"{k}.removed"):
+            continue
+        out.append(
+            {"key": k, "sym": str(x["sym"]), "name": str(x.get("name") or x["sym"]),
+             "mkt": str(x["mkt"]), "daily": float(values.get(f"{k}.daily", x.get("daily0") or 0)),
+             "on": bool(values.get(f"{k}.on", True))}
+        )  # fmt: skip
+    return out
+
+
+def add_item(
+    current: Mapping[str, Any], query: str, mkt: str, daily: str, universe: Sequence[Any]
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """설정 화면 '추가' 와 같은 검사로 한 종목 추가 → (새 값, 오류). ``daily`` 빈 값이면 기본."""
+    new = dict(current)
+    meta = [dict(x) for x in current.get("_extras") or []]
+    new["_extras"] = meta
+    errors: dict[str, str] = {}
+    form = {"new.mkt": "KR" if mkt == "KR" else "US", "new.daily": daily}
+    _add(form, query, new, meta, universe, errors)
+    return new, errors
+
+
+def remove_item(current: Mapping[str, Any], key: str) -> dict[str, Any]:
+    """설정 화면 '삭제' 와 같음 — ``{key}.removed`` 를 켠다(내일 적립분부터, 보유는 그대로)."""
+    flag = f"{key}.removed"
+    if flag not in current or current[flag]:
+        raise ValueError(f"적립 목록에 없는 종목: {key}")
+    return {**current, flag: True}
 
 
 @dataclass(frozen=True, slots=True)

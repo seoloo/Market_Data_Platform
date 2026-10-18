@@ -25,6 +25,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
@@ -38,12 +39,16 @@ from auto_trading.notify.inbox import (
     InboxMessage,
     InboxQueue,
     TelegramInbox,
+    clear_acc_ask,
     clear_stock_ask,
+    is_acc,
+    is_acc_answer,
     is_command,
     is_liquidation,
     is_stock,
     is_stock_answer,
     liquidation_symbol,
+    set_acc_ask,
     set_stock_ask,
     stock_ask_info,
 )
@@ -103,9 +108,16 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
-  [전부 정리] [Vega 만] [Deneb 만] [자동 적립만] [개별주만] [Altair 만] [취소]
+  [전부 정리] [Vega 만] [Deneb 만] [자동 적립 (종목 고르기)] [개별주만]
+  [Altair 만] [Sirius 만] [취소]
+  자동 적립은 종목을 골라 그 종목 적립 몫만 팔고, 그 종목 적립도 멈춰요
   버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
   정리 NVDA (또는 정리 삼성전자) — 그 종목 하나만 (Deneb · 적립 몫 빼고 전부)
+
+💰 적립 (또는 /acc)
+  자동 적립 종목 보기 · [➕ 종목 추가] · [➖ 빼기] — 바꾸면 내일 적립분부터, 보유는 그대로
+  추가는 답장으로 '기호 금액' (예: PLTR 3 · 삼성전자 10000) → [✅ 추가]
+  한 줄로도: 적립 추가 PLTR 3 · 적립 빼기 BTQ
 
 💹 개별주 NVDA (또는 개별주 삼성전자 · /stock)
   얼마나 살지 추천: 현금(원화 + 달러)의 0.3% 까지만 잃게, 손절 −3% · 한 종목 최대 10%
@@ -140,6 +152,7 @@ COMMANDS_MENU = [
     ("paper", "Paper — 가상 장부 요약"),
     ("stock", "개별주 — 비중 추천 · 장 시작 매수 · −3% 손절"),
     ("deposit", "입금 — 바이낸스 입금 확인 · Vega / Altair 로 나누기"),
+    ("acc", "적립 — 자동 적립 종목 추가 · 빼기"),
     ("liquidate", "정리 — 보유 팔기 (미리 보기 + 버튼)"),
     ("unhalt", "정지풀기 — 멈춘 그룹 다시 켜기"),
     ("help", "사용법"),
@@ -174,7 +187,7 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
     return [
         [b("🧯 전부 정리", "all")],
         [b("Vega 만", "vega"), b("Deneb 만", "deneb")],
-        [b("자동 적립만", "acc"), b("개별주만", "stock")],
+        [b("자동 적립 (종목 고르기)", "accmenu"), b("개별주만", "stock")],
         [b("Altair 만", "altair"), b("Sirius 만", "sirius")],
         [b("취소", "cancel")],
     ]
@@ -199,6 +212,14 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
         if arg == "cancel":
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, "취소했어요 — 아무것도 바꾸지 않았어요")
+            return False
+        if kind == "liq" and arg == "accmenu":  # 자동 적립 — 종목을 골라 정리 (2026-10-18)
+            return _acc_liq_menu(bot, liq, now, msg.message_id)
+        if kind == "liq" and arg.startswith("a="):
+            sym = arg[2:]
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, f"🧯 자동 적립 {sym} 정리 시작 — 결과를 곧 보내요")
+            liq.start(f"acc:{sym}", "텔레그램")
             return False
         if kind == "liq" and arg.startswith("s="):
             sym = arg[2:]
@@ -258,6 +279,233 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
         )
         return True
     return False
+
+
+def _acc_liq_menu(bot: TelegramNotifier, liq: Any, now: int, message_id: int) -> bool:
+    """정리 → 자동 적립: 적립 몫이 있는 종목마다 버튼 + 적립 전부 + 취소."""
+    items, notes = liq.plan("acc")
+    nonce = liq.STORE.new_request(now, "liq")
+    rows = [
+        [{"text": f"🧯 {it.symbol} {it.want:f}주", "callback_data": f"liq:{nonce}:a={it.symbol}"}]
+        for it in items
+    ]
+    if items:
+        rows.append([{"text": "🧯 적립 전부 정리", "callback_data": f"liq:{nonce}:acc"}])
+    rows.append([{"text": "취소", "callback_data": f"liq:{nonce}:cancel"}])
+    lines = ["🧯 자동 적립 — 어느 종목을 정리할까요? (적립 몫만 · 지정가)"]
+    lines += [f"· {it.symbol} 적립 몫 {it.want:f}주" for it in items] or ["팔 적립 몫이 없어요"]
+    lines += [f"· {n}" for n in notes]
+    lines.append("종목을 고르면 그 종목 적립도 멈춰요(목록에서 빼기) — 다시 하려면 '적립' → 추가")
+    with contextlib.suppress(NotifyError):
+        bot.edit(message_id, "자동 적립 종목 고르기 ↓")
+    bot.send_message("\n".join(lines), buttons=rows)
+    return True
+
+
+# ------------------------------------------------------------------ 💰 자동 적립 추가 · 빼기
+
+ACC_STORE = Store(REPO / "data" / "telegram" / "acc_buttons")
+ACC_PENDING = REPO / "data" / "telegram" / "acc_pending.json"
+ACC_WAIT_S = 120
+
+
+def _acc_parse(text: str) -> tuple[str, str, str]:
+    """'PLTR 3' · '삼성전자 10000' · '005930 5000원' → (찾을 말, US · KR, 하루 금액 글)."""
+    import re
+
+    parts = text.strip().split()
+    daily = ""
+    if len(parts) >= 2:
+        last = parts[-1].replace(",", "").replace("$", "").replace("원", "").replace("₩", "")
+        try:
+            float(last)
+            daily, parts = last, parts[:-1]
+        except ValueError:
+            pass
+    query = " ".join(parts)
+    kr = re.fullmatch(r"\d{6}", query) is not None or re.search("[가-힣]", query) is not None
+    return query, "KR" if kr else "US", daily
+
+
+def _acc_pending(nonce: str | None = None, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """확인 버튼이 가리키는 할 일 (번호 → 추가 · 빼기 내용). 10 분 지난 것은 지운다."""
+    try:
+        d: dict[str, Any] = json.loads(ACC_PENDING.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    if nonce is not None and payload is not None:
+        d = {k: v for k, v in d.items() if time.time() - float(v.get("at", 0)) < 600}
+        d[nonce] = {**payload, "at": time.time()}
+        ACC_PENDING.parent.mkdir(parents=True, exist_ok=True)
+        ACC_PENDING.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return d
+
+
+def _acc_unit(x: dict[str, Any]) -> str:
+    return f"₩{x['daily']:,.0f}" if x["mkt"] == "KR" else f"${x['daily']:g}"
+
+
+def _acc_menu(bot: TelegramNotifier, root: Path) -> bool:
+    items = user_settings.acc_items(user_settings.load(root))
+    nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
+    lines = ["💰 자동 적립 종목 — 바꾸면 내일 적립분부터 (보유는 그대로)"]
+    lines += [
+        f"· {x['name']}({x['sym']}) 하루 {_acc_unit(x)}{'' if x['on'] else ' · 꺼짐'}"
+        for x in items
+    ] or ["· 적립 종목 없음"]
+    lines.append(
+        f"최대 {user_settings.MAX_ITEMS} 개 · QNDX 는 QS 전략과 얽혀 여기서 못 바꿔요 · "
+        "보유를 팔려면 '정리' → 자동 적립"
+    )
+    rows = [[{"text": "➕ 종목 추가", "callback_data": f"acc:{nonce}:add"}]]
+    rows += [
+        [{"text": f"➖ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:rm={x['key']}"}]
+        for x in items
+    ]
+    rows.append([{"text": "닫기", "callback_data": f"acc:{nonce}:cancel"}])
+    bot.send_message("\n".join(lines), buttons=rows)
+    return True
+
+
+def _acc_confirm_add(bot: TelegramNotifier, root: Path, text: str) -> bool:
+    from auto_trading.ops.kr_accumulate import read_universe
+
+    query, mkt, daily = _acc_parse(text)
+    if not query:
+        bot.send("⚠ 종목을 적어 주세요 — 예: PLTR 3 · 삼성전자 10000")
+        return False
+    current = user_settings.load(root)
+    universe = read_universe(root / "data" / "toss" / "universe.json")
+    new, errors = user_settings.add_item(current, query, mkt, daily, universe)
+    if errors:
+        bot.send("⚠ " + " · ".join(errors.values()) + " — 다시 '적립' 부터 해 주세요")
+        return False
+    changes = user_settings.diff(current, new)
+    nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
+    _acc_pending(nonce, {"action": "add", "query": query, "mkt": mkt, "daily": daily})
+    rows = [
+        [{"text": "✅ 추가", "callback_data": f"acc:{nonce}:ok"}],
+        [{"text": "취소", "callback_data": f"acc:{nonce}:cancel"}],
+    ]
+    what = changes[0].label if changes else query
+    bot.send_message(f"💰 {what} — 내일 적립분부터 사요. 맞으면 [✅ 추가]", buttons=rows)
+    return True
+
+
+def _acc_confirm_rm(bot: TelegramNotifier, root: Path, key: str) -> bool:
+    items = {x["key"]: x for x in user_settings.acc_items(user_settings.load(root))}
+    x = items.get(key)
+    if x is None:
+        bot.send("⚠ 이미 목록에 없는 종목이에요")
+        return False
+    nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
+    _acc_pending(nonce, {"action": "rm", "key": key})
+    rows = [
+        [{"text": f"✅ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:ok"}],
+        [{"text": "취소", "callback_data": f"acc:{nonce}:cancel"}],
+    ]
+    bot.send_message(
+        f"💰 {x['name']}({x['sym']}) 하루 {_acc_unit(x)} 적립을 목록에서 뺄까요?\n"
+        "내일 적립분부터 안 사요 · 보유는 그대로 (팔려면 '정리' → 자동 적립)",
+        buttons=rows,
+    )
+    return True
+
+
+def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> None:
+    from datetime import UTC, datetime
+
+    from auto_trading.ops.kr_accumulate import read_universe
+
+    current = user_settings.load(root)
+    if payload.get("action") == "rm":
+        try:
+            new = user_settings.remove_item(current, str(payload["key"]))
+        except ValueError as exc:
+            bot.send(f"⚠ {exc}")
+            return
+    else:
+        universe = read_universe(root / "data" / "toss" / "universe.json")
+        new, errors = user_settings.add_item(
+            current, str(payload["query"]), str(payload["mkt"]), str(payload["daily"]), universe
+        )
+        if errors:
+            bot.send("⚠ " + " · ".join(errors.values()))
+            return
+    changes = user_settings.diff(current, new)
+    user_settings.apply(root, changes, datetime.now(UTC), by="텔레그램", new=new)
+    bot.send("✅ " + " · ".join(c.label for c in changes) + " — 내일 적립분부터")
+
+
+def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> bool:
+    """'적립' 메뉴 · 버튼 · 추가 답장 · '적립 추가 PLTR 3' · '적립 빼기 BTQ'. 기다리면 True."""
+    if msg.data:
+        if msg.callback_id:
+            with contextlib.suppress(NotifyError):
+                bot.answer_callback(msg.callback_id, "접수했어요")
+        parts = msg.data.split(":", 2)
+        if len(parts) != 3:
+            return False
+        _kind, nonce, arg = parts
+        if not ACC_STORE.use_request(nonce, int(time.time() * 1000), "acc"):
+            bot.send("⌛ 지난 버튼이에요 (5 분 지남 · 이미 누름) — '적립' 을 다시 보내 주세요")
+            return False
+        if arg == "cancel":
+            with contextlib.suppress(NotifyError):
+                bot.edit(msg.message_id, "닫았어요 — 아무것도 바꾸지 않았어요")
+            return False
+        if arg == "add":
+            mid = bot.send_message(
+                "➕ 추가할 종목과 하루 금액을 답장해 주세요\n"
+                "미국: 기호 + 달러 (예: PLTR 3) · 국내: 이름이나 6 자리 코드 + 원"
+                " (예: 삼성전자 10000)\n금액을 빼면 기본(미국 $1 · 국내 5,000원)",
+                force_reply=True,
+                placeholder="예: PLTR 3",
+            )
+            set_acc_ask(mid, int(time.time()))
+            return True
+        if arg.startswith("rm="):
+            return _acc_confirm_rm(bot, root, arg[3:])
+        if arg == "ok":
+            payload = _acc_pending().get(nonce)
+            if payload is None:
+                bot.send("⌛ 확인할 내용이 사라졌어요 — '적립' 부터 다시 해 주세요")
+                return False
+            _acc_apply(bot, root, payload)
+        return False
+    if is_acc_answer(msg):
+        clear_acc_ask()
+        return _acc_confirm_add(bot, root, msg.text)
+    parts = msg.text.strip().split(maxsplit=2)
+    if len(parts) >= 3 and parts[1] in ("추가", "더하기"):
+        return _acc_confirm_add(bot, root, parts[2])
+    if len(parts) >= 3 and parts[1] in ("빼기", "삭제", "제거"):
+        sym = parts[2].strip().upper()
+        hit = [x for x in user_settings.acc_items(user_settings.load(root)) if x["sym"] == sym]
+        if not hit:
+            bot.send(f"⚠ {sym} 는 적립 목록에 없어요")
+            return False
+        return _acc_confirm_rm(bot, root, hit[0]["key"])
+    return _acc_menu(bot, root)
+
+
+def _acc(
+    bot: TelegramNotifier, msgs: list[InboxMessage], queue: InboxQueue, inbox: TelegramInbox
+) -> None:
+    from auto_trading.core.errors import AutoTradingError
+
+    try:
+        waiting = False
+        for m in msgs:
+            waiting = handle_acc(bot, m) or waiting
+        deadline = time.monotonic() + ACC_WAIT_S
+        while waiting and time.monotonic() < deadline:
+            time.sleep(3)
+            for m in queue.take(inbox, is_acc):
+                if handle_acc(bot, m):
+                    deadline = time.monotonic() + ACC_WAIT_S
+    except (AutoTradingError, KeyError, OSError, ValueError) as exc:
+        bot.send(f"⚠ 적립 처리 오류: {type(exc).__name__} {exc}"[:500])
 
 
 STOCK_STORE = Store(REPO / "data" / "size_guard" / "telegram")
@@ -573,12 +821,14 @@ def run(root: Path = REPO) -> int:
     deposits = [
         m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in DEPOSIT_WORDS
     ]
-    stock_msgs = [m for m in cmds if is_stock(m)]
+    acc_msgs = [m for m in cmds if is_acc(m)]
+    stock_msgs = [m for m in cmds if is_stock(m) and m not in acc_msgs]
     status_cmds = [
         m
         for m in cmds
         if not is_liquidation(m)
         and not is_stock(m)
+        and m not in acc_msgs
         and m not in helps
         and m not in papers
         and m not in deposits
@@ -598,6 +848,8 @@ def run(root: Path = REPO) -> int:
             _liquidation(bot, liq_msgs, queue, inbox)
         if stock_msgs:
             _stock(bot, stock_msgs, queue, inbox)
+        if acc_msgs:
+            _acc(bot, acc_msgs, queue, inbox)
         if deposits:
             bot.send("💰 바이낸스 입금 확인 중…")
             _deposit_watch(root, force=True)

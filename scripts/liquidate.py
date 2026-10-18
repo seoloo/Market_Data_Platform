@@ -55,6 +55,7 @@ from auto_trading.ops.liquidate import (
     Item,
     Job,
     Store,
+    acc_symbol_of,
     build_items,
     deneb_to_book,
     groups_of,
@@ -319,7 +320,8 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
     only = symbol_of(scope)
-    if "deneb" in groups or "acc" in groups or "stock" in groups or only:
+    acc_only = acc_symbol_of(scope)
+    if "deneb" in groups or "acc" in groups or "stock" in groups or only or acc_only:
         r = _reader()
         try:
             held = r.holdings()
@@ -345,6 +347,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         altair_positions=fut,
         stock_qty=_stock_qty(),
         only_symbol=only,
+        only_acc=acc_only,
     )
     return items, notes + more
 
@@ -359,7 +362,7 @@ def preview_text(scope: str = "all") -> str:
         "binance_fut": "바이낸스 선물",
     }
     lines = [f"🧯 전부 정리 미리 보기 · {scope_label(scope)} (아직 아무것도 안 팔았어요)"]
-    if symbol_of(scope):
+    if symbol_of(scope) or acc_symbol_of(scope):
         lines.append(
             ", ".join(f"{names[it.venue]} {it.symbol} {it.want:f}주" for it in items)
             or "팔 것 없음"
@@ -378,6 +381,12 @@ def preview_text(scope: str = "all") -> str:
     if "sirius" in groups_of(scope):
         lines.append(_sirius_preview())
     lines += [f"· {n}" for n in notes]
+    if acc_symbol_of(scope):
+        lines.append(
+            "누르면: ① 그 종목 자동 적립 멈춤(적립 목록에서 빼기 — 다시 하려면 '적립' → 추가) "
+            "② 그 종목 토스 미체결 매수 취소 ③ 적립 몫만 지정가로 매도 (토스는 정규장에서)"
+        )
+        return "\n".join(lines)
     if symbol_of(scope):
         lines.append(
             "누르면: ① 그 종목 토스 미체결 매수 취소 ② 지정가로 매도 (그룹 정지 없음 · "
@@ -471,7 +480,7 @@ def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
     log = []
     for o in trader.open_orders():
         deneb = o.symbol in DENEB_SYMBOLS
-        only = symbol_of(job.scope)
+        only = symbol_of(job.scope) or acc_symbol_of(job.scope)
         mine = (
             ("deneb" in groups and deneb)
             or ("acc" in groups and not deneb)
@@ -595,6 +604,7 @@ def step(job: Job) -> list[str]:
         or "acc" in groups
         or "stock" in groups
         or symbol_of(job.scope) is not None
+        or acc_symbol_of(job.scope) is not None
     )  # 팔 것이 없어도 매수 취소는 한 번
     if toss or first:
         r = _reader()
@@ -631,8 +641,8 @@ def step(job: Job) -> list[str]:
 
 
 def start(scope: str, source: str) -> str:
-    if scope not in SCOPES and not symbol_of(scope):
-        raise SystemExit(f"범위는 {', '.join(SCOPES)} 또는 sym:종목 중 하나")
+    if scope not in SCOPES and not symbol_of(scope) and not acc_symbol_of(scope):
+        raise SystemExit(f"범위는 {', '.join(SCOPES)} · sym:종목 · acc:종목 중 하나")
     with STORE.running() as ok:
         if not ok:
             return "다른 정리가 실행 중이에요 — 잠시 뒤 결과를 확인해 주세요"
@@ -645,6 +655,9 @@ def start(scope: str, source: str) -> str:
         if "sirius" in groups:  # Sirius 소수점 몫은 Sirius 실행기가 정규장에서 판다
             sirius_core.request_liquidation(REPO, reason, now)
             notes += _sirius_liquidate()
+        acc_sym = acc_symbol_of(scope)
+        if acc_sym:  # 자동 적립 한 종목: 그 종목 적립을 멈춘다(다시 사지 않게)
+            notes.append(_stop_acc(acc_sym, source))
         handover = (
             {symbol_of(scope) or ""}
             if symbol_of(scope)
@@ -688,6 +701,23 @@ def _sirius_resume() -> None:
         _notify(f"🧯 Sirius 정리 진행\n{note}")
     elif lines and any("정리 끝" in x for x in lines):
         _notify(f"🧯 Sirius\n{note}")
+
+
+def _stop_acc(sym: str, source: str) -> str:
+    """그 종목을 자동 적립 목록에서 뺀다(설정 화면 '빼기' 와 같음). 보유는 정리가 판다."""
+    from datetime import UTC, datetime
+
+    from auto_trading.ops import user_settings
+
+    current = user_settings.load(REPO)
+    hit = next((x for x in user_settings.acc_items(current) if x["sym"] == sym), None)
+    if hit is None:
+        return f"{sym} 는 적립 목록에 없음 (이미 뺐거나 적립 종목 아님)"
+    new = user_settings.remove_item(current, hit["key"])
+    user_settings.apply(
+        REPO, user_settings.diff(current, new), datetime.now(UTC), by=f"정리 · {source}", new=new
+    )
+    return f"{sym} 자동 적립 멈춤 (목록에서 뺌 — 다시 하려면 '적립' → 추가)"
 
 
 def resume() -> list[str]:
