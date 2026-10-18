@@ -59,6 +59,37 @@ def test_signed_request_has_key_header_timestamp_offset_and_valid_signature() ->
     assert parse_qs(body)["timestamp"] == ["1000500"]  # 로컬 1,000,000 + 서버 차이 500
 
 
+def test_timestamp_error_remeasures_clock_and_retries_read_once() -> None:
+    times = iter([1_000_500, 1_002_000])  # 두 번째로 잴 때 서버가 1.5 초 앞섬
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/api/v3/time":
+            return httpx.Response(200, json={"serverTime": next(times)})
+        ts = parse_qs(urlparse(str(request.url)).query)["timestamp"][0]
+        if ts == "1000500":
+            return httpx.Response(400, json={"code": -1021, "msg": "Timestamp ahead"})
+        return httpx.Response(200, json={"balances": []})
+
+    assert adapter(handler).balances() == {}
+    assert calls == ["/api/v3/time", "/api/v3/account", "/api/v3/time", "/api/v3/account"]
+
+
+def test_other_errors_are_not_retried() -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/api/v3/time":
+            return httpx.Response(200, json={"serverTime": 1_000_500})
+        return httpx.Response(400, json={"code": -2015, "msg": "Invalid API-key"})
+
+    with pytest.raises(ExchangeError, match="-2015"):
+        adapter(handler).balances()
+    assert calls.count("/api/v3/account") == 1
+
+
 def test_balances_filters_and_price_are_parsed() -> None:
     handler = routes(
         {

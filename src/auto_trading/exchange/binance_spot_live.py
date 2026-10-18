@@ -106,6 +106,8 @@ class BinanceSpotLive(BinanceSpotReadOnly):
         code = body.get("code") if isinstance(body, dict) else None
         msg = body.get("msg", "") if isinstance(body, dict) else ""
         text = f"Binance 오류 {response.status_code} code={code}: {msg} ({path})"
+        if code == -1021:  # 거래소가 시간 때문에 받지 않음 — 다음 요청부터 시간 차이를 다시 잰다
+            self._offset_ms = None
         if code is None or code in _UNKNOWN_CODES or response.status_code >= 500:
             raise OrderStateUnknownError(f"전송 결과 모름: {text}")
         raise OrderRejectedError(text)

@@ -56,6 +56,16 @@ class BinanceSpotReadOnly:
     def _request(
         self, path: str, params: Mapping[str, Any] | None = None, *, signed: bool = False
     ) -> Any:
+        try:
+            return self._request_once(path, params, signed=signed)
+        except ExchangeError as exc:
+            # -1021 timestamp 오류: 잰 시간 차이가 낡았다 — 다시 재고 한 번만 다시 (조회 전용 경로)
+            if not signed or "code=-1021" not in str(exc):
+                raise
+            self._offset_ms = None
+            return self._request_once(path, params, signed=signed)
+
+    def _request_once(self, path: str, params: Mapping[str, Any] | None, *, signed: bool) -> Any:
         query = dict(params or {})
         headers = {}
         if signed:
