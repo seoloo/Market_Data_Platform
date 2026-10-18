@@ -72,7 +72,11 @@ def fit_transform(
     )
 
 
-def predict(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def predict(
+    rows: list[dict[str, Any]],
+    *,
+    replay_saved: bool = False,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     from scripts.deneb_macro_281.data_audit import DATA, REPO
 
     np = import_module("numpy")
@@ -131,14 +135,17 @@ def predict(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict
                     )
                 else:
                     model = lr_class(C=0.1, max_iter=2000, class_weight=None, random_state=281)
-                model.fit(at, y)
-                probs[name] = model.predict_proba(bt)[:, 1].tolist()
                 folder = DATA / "models"
                 folder.mkdir(exist_ok=True)
                 artifact = folder / f"{year}_{name}.joblib"
-                if artifact.exists():
-                    raise FileExistsError("A frozen model artifact already exists")
-                joblib.dump(model, artifact)
+                if replay_saved:
+                    model = joblib.load(artifact)
+                else:
+                    if artifact.exists():
+                        raise FileExistsError("A frozen model artifact already exists")
+                    model.fit(at, y)
+                    joblib.dump(model, artifact)
+                probs[name] = model.predict_proba(bt)[:, 1].tolist()
                 replay = joblib.load(artifact).predict_proba(bt)[:, 1]
                 if not np.allclose(replay, probs[name], rtol=0, atol=1e-12):
                     raise ValueError("Saved-model replay mismatch")

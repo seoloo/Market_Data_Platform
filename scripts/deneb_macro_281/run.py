@@ -91,10 +91,10 @@ def attribution(base: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[s
     }
 
 
-def main() -> dict[str, Any]:
+def main(*, resume_saved: bool = False) -> dict[str, Any]:
     target = OUT / "pilot_result.json"
     marker = OUT / "pilot_attempt.json"
-    if target.exists() or marker.exists():
+    if target.exists() or (marker.exists() and not resume_saved):
         raise FileExistsError("This fixed pilot already started; do not silently rerun")
     code = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
     subprocess.run(
@@ -112,27 +112,59 @@ def main() -> dict[str, Any]:
     )
     panel_path = DATA / "panel.json"
     panel = json.loads(panel_path.read_text(encoding="utf-8"))
-    marker.write_text(
-        json.dumps(
-            {
-                "code_commit": code,
-                "started_ms": time.time_ns() // 1_000_000,
-                "panel_sha256": hashlib.sha256(panel_path.read_bytes()).hexdigest(),
-                "prereg_sha256": hashlib.sha256(
-                    (REPO / "docs/research/281-deneb-macro-risk-pilot.md").read_bytes()
-                ).hexdigest(),
-            },
-            indent=2,
+    attempt = {
+        "code_commit": code,
+        "panel_sha256": hashlib.sha256(panel_path.read_bytes()).hexdigest(),
+        "prereg_sha256": hashlib.sha256(
+            (REPO / "docs/research/281-deneb-macro-risk-pilot.md").read_bytes()
+        ).hexdigest(),
+    }
+    if resume_saved:
+        if (OUT / "pilot_resume.json").exists():
+            raise FileExistsError("Saved-model recovery has already started")
+        checkpoint = json.loads((OUT / "saved_checkpoint.json").read_text(encoding="utf-8"))
+        for key in ("panel_sha256", "prereg_sha256"):
+            if checkpoint["original_attempt"][key] != attempt[key]:
+                raise ValueError("Resume would change frozen inputs or preregistration")
+        for name, digest in checkpoint["sha256"].items():
+            if hashlib.sha256((REPO / name).read_bytes()).hexdigest() != digest:
+                raise ValueError("Saved model changed before resume")
+        if checkpoint["model_count"] != 30 or (DATA / "pilot_ledgers.json").exists():
+            raise ValueError("Resume is permitted only from complete pre-PnL checkpoint")
+        (OUT / "pilot_resume.json").write_text(
+            json.dumps(
+                {
+                    **attempt,
+                    "model_fits_this_run": 0,
+                    "original_training_code": checkpoint["original_attempt"]["code_commit"],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
+    else:
+        marker.write_text(
+            json.dumps(
+                {
+                    "code_commit": code,
+                    "started_ms": time.time_ns() // 1_000_000,
+                    "panel_sha256": hashlib.sha256(panel_path.read_bytes()).hexdigest(),
+                    "prereg_sha256": hashlib.sha256(
+                        (REPO / "docs/research/281-deneb-macro-risk-pilot.md").read_bytes()
+                    ).hexdigest(),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    data = prices()
     started = time.monotonic()
-    predictions, fits = predict(panel["rows"])
+    predictions, fits = predict(panel["rows"], replay_saved=resume_saved)
     fits_seconds = time.monotonic() - started
     if fits_seconds > 900:
         raise TimeoutError("Fixed fifteen-minute fitting budget exceeded")
-    data = prices()
     constant = 1 - 0.5 * predictions[0]["base"]
     all_accounts: dict[str, Any] = {}
     comparisons: dict[str, Any] = {}
@@ -186,6 +218,8 @@ def main() -> dict[str, Any]:
     result = {
         "research": 281,
         "code_commit": code,
+        "resumed_saved_models": resume_saved,
+        "model_fits_this_run": 0 if resume_saved else 30,
         "status": "EXPLANATORY_RETROSPECTIVE_ONLY",
         "adoption": "UNVERIFIED",
         "verdict": verdict,
@@ -231,4 +265,6 @@ def main() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(resume_saved="--resume-saved" in sys.argv)
