@@ -17,8 +17,8 @@ import subprocess
 import sys
 import zipfile
 from collections import defaultdict
-from itertools import pairwise
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
