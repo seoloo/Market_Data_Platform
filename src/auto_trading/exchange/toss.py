@@ -21,7 +21,7 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -479,6 +479,10 @@ class TossTrader(TossReader):
     sell_symbols: frozenset[str] = frozenset()
     max_limit_usd: Decimal = Decimal(0)
     max_limit_krw: Decimal = Decimal(0)
+    fraction_symbols: frozenset[str] = frozenset()
+    """금액(소수점) 매수 · 소수점 시장가 매도를 허용할 미국 종목 (Sirius, 2026-10-18)."""
+    max_amount_usd: Decimal = Decimal(0)
+    """금액 주문 한 건 상한 (달러)."""
 
     def order(
         self,
@@ -517,6 +521,55 @@ class TossTrader(TossReader):
             "quantity": str(qty),
             "price": f"{int(limit)}" if kr else (f"{limit:.2f}" if limit >= 1 else f"{limit:.4f}"),
         }
+        return self._send(body)
+
+    def amount_buy(self, symbol: str, usd: Decimal, *, client_order_id: str) -> TossOrderResult:
+        """미국 금액 주문 매수 (``MARKET`` + ``orderAmount``, 소수점 수량으로 체결).
+
+        정규장 시작 ~ 종료 1 시간 전만 접수(그 밖은 422 ``amount-order-outside-regular-hours``)."""
+        symbol = symbol.upper()
+        if not self.credentials.trading_enabled:
+            raise TradingDisabledError("TOSS_TRADING_ENABLED 가 true 가 아니다 — 주문하지 않는다")
+        if symbol not in self.fraction_symbols or is_kr_symbol(symbol):
+            raise TradingDisabledError(f"금액 주문이 허용되지 않은 종목: {symbol}")
+        amount = usd.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        if not Decimal(0) < amount <= self.max_amount_usd:
+            raise TradingDisabledError(
+                f"주문 금액 {amount} 가 허용 범위 (0, {self.max_amount_usd}] 밖"
+            )
+        return self._send(
+            {
+                "clientOrderId": client_order_id,
+                "symbol": symbol,
+                "side": "BUY",
+                "orderType": "MARKET",
+                "orderAmount": f"{amount:.2f}",
+            }
+        )
+
+    def fractional_sell(
+        self, symbol: str, qty: Decimal, *, client_order_id: str
+    ) -> TossOrderResult:
+        """미국 소수점 수량 시장가 매도 (소수점 6 자리까지, 정규장 종료 1 시간 전까지)."""
+        symbol = symbol.upper()
+        if not self.credentials.trading_enabled:
+            raise TradingDisabledError("TOSS_TRADING_ENABLED 가 true 가 아니다 — 주문하지 않는다")
+        if symbol not in self.fraction_symbols or is_kr_symbol(symbol):
+            raise TradingDisabledError(f"소수점 매도가 허용되지 않은 종목: {symbol}")
+        q = qty.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+        if q <= 0:
+            raise TradingDisabledError(f"매도 수량 오류: {qty}")
+        return self._send(
+            {
+                "clientOrderId": client_order_id,
+                "symbol": symbol,
+                "side": "SELL",
+                "orderType": "MARKET",
+                "quantity": format(q.normalize(), "f"),
+            }
+        )
+
+    def _send(self, body: Mapping[str, str]) -> TossOrderResult:
         try:
             response = self.client.post(
                 f"{self.base_url}/api/v1/orders", json=body, headers=self._headers(True)

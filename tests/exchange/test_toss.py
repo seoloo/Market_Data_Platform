@@ -346,3 +346,55 @@ def test_under_one_dollar_price_has_four_decimals(tmp_path: Path) -> None:
     t.order("TQQQ", "SELL", 1, Decimal("0.9876"), client_order_id="c", time_in_force="DAY")
     body = json.loads(seen[-1].content)
     assert body["price"] == "0.9876" and body["timeInForce"] == "DAY"
+
+
+def _frac(tmp_path: Path, routes: dict[str, Any], seen: list[httpx.Request]) -> TossTrader:
+    t = _make(tmp_path, routes, seen)
+    t.fraction_symbols = frozenset({"MU", "SNDK"})
+    t.max_amount_usd = Decimal("50")
+    return t
+
+
+def test_amount_buy_and_fractional_sell_shapes(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    t = _frac(tmp_path, {"POST /api/v1/orders": {"orderId": "OID-9"}}, seen)
+    assert t.amount_buy("mu", Decimal("12.349"), client_order_id="SIR-1").code == "OID-9"
+    t.fractional_sell("SNDK", Decimal("0.01234567"), client_order_id="SIR-2")
+    bodies = [json.loads(q.content) for q in seen if q.method == "POST" and "orders" in q.url.path]
+    assert bodies[0] == {
+        "clientOrderId": "SIR-1",
+        "symbol": "MU",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "orderAmount": "12.34",
+    }
+    assert bodies[1] == {
+        "clientOrderId": "SIR-2",
+        "symbol": "SNDK",
+        "side": "SELL",
+        "orderType": "MARKET",
+        "quantity": "0.012345",
+    }
+
+
+@pytest.mark.parametrize(
+    ("symbol", "usd"),
+    [("QNDX", "10"), ("MU", "50.01"), ("MU", "0.004"), ("005930", "10")],
+)
+def test_amount_buy_guards_send_nothing(tmp_path: Path, symbol: str, usd: str) -> None:
+    seen: list[httpx.Request] = []
+    t = _frac(tmp_path, {}, seen)
+    with pytest.raises(TradingDisabledError):
+        t.amount_buy(symbol, Decimal(usd), client_order_id="a")
+    with pytest.raises(TradingDisabledError):
+        t.fractional_sell("MU", Decimal("0.0000001"), client_order_id="b")
+    assert seen == []
+
+
+def test_amount_buy_needs_switch(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    t = _make(tmp_path, {}, seen, enabled=False)
+    t.fraction_symbols, t.max_amount_usd = frozenset({"MU"}), Decimal("50")
+    with pytest.raises(TradingDisabledError):
+        t.amount_buy("MU", Decimal("10"), client_order_id="a")
+    assert seen == []
