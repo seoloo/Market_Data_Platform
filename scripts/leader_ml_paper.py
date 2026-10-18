@@ -242,15 +242,17 @@ def load_panel() -> tuple[list[str], Series, Series, list[float], Series]:
     return days, close, dvol, spy, opens
 
 
-def refresh_sec(symbols: Sequence[str], month: str) -> dict[str, Any]:
-    """결정 달마다 한 번 SEC companyfacts 갱신(261 과 같은 추출). 실패한 종목은 직전 파일 유지."""
+def refresh_sec(symbols: Sequence[str], asof: str) -> dict[str, Any]:
+    """결정일마다 한 번 SEC companyfacts 갱신(261 과 같은 추출). 실패한 종목은 직전 파일 유지.
+
+    같은 날짜로 이미 받았으면 건너뛴다(달 단위로 하면 월 중 점검이 월말 결정의 갱신을 막는다)."""
     import httpx
     from scripts.fetch_sec_facts_261 import extract
 
     from auto_trading.config.secrets import read_env_file
 
     stamp = SEC / "_stamp.json"
-    if stamp.exists() and json.loads(stamp.read_text(encoding="utf-8")).get("month") == month:
+    if stamp.exists() and json.loads(stamp.read_text(encoding="utf-8")).get("asof") == asof:
         return {"skipped": "already refreshed"}
     email = read_env_file(REPO / ".env").get("SEC_CONTACT_EMAIL", "").strip()
     if not email:
@@ -276,7 +278,7 @@ def refresh_sec(symbols: Sequence[str], month: str) -> dict[str, Any]:
                 (SEC / f"{sym}.json").write_text(json.dumps(extract(r.json())), encoding="utf-8")
             except (httpx.HTTPError, ValueError) as exc:
                 failed.append(f"{sym}:{type(exc).__name__}")
-    stamp.write_text(json.dumps({"month": month, "failed": failed}), encoding="utf-8")
+    stamp.write_text(json.dumps({"asof": asof, "failed": failed}), encoding="utf-8")
     return {"refreshed": len(symbols) - len(failed), "failed": failed}
 
 
@@ -291,7 +293,7 @@ def make_decider(
 
         from scripts import run_leader_ml_274 as m
 
-        sec_log = refresh_sec(sorted(close), days[t][:7])
+        sec_log = refresh_sec(sorted(close), days[t])
         print(json.dumps({"sec": sec_log}, ensure_ascii=False), flush=True)
         sector = {
             k: str(v) for k, v in json.loads(SECTORS.read_text(encoding="utf-8"))["sectors"].items()
