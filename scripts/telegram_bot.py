@@ -175,7 +175,8 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
         [b("🧯 전부 정리", "all")],
         [b("Vega 만", "vega"), b("Deneb 만", "deneb")],
         [b("자동 적립만", "acc"), b("개별주만", "stock")],
-        [b("Altair 만", "altair"), b("취소", "cancel")],
+        [b("Altair 만", "altair"), b("Sirius 만", "sirius")],
+        [b("취소", "cancel")],
     ]
 
 

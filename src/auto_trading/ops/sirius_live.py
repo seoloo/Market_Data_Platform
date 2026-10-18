@@ -16,7 +16,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 N_PICKS = 10
@@ -200,4 +202,56 @@ def holdings(state: Mapping[str, Any]) -> dict[str, tuple[float, float]]:
     for lot in state["lots"]:
         q, c = out.get(lot["sym"], (0.0, 0.0))
         out[lot["sym"]] = (q + float(lot["qty"]), c + float(lot["cost_usd"]))
+    return out
+
+
+# ------------------------------------------------------------------ 정리 (전부 정리 · Sirius 만)
+
+LIQUIDATE = Path("data") / "sirius" / "LIQUIDATE.json"
+"""정리 요청 (저장소 루트 기준).
+
+있으면 Sirius 는 사지 않고, 정규장에서 제 몫을 소수점 시장가로 판다."""
+
+
+def request_liquidation(root: Path, reason: str, at_ms: int) -> bool:
+    """정리 요청을 남긴다. 이미 있으면 그대로(False)."""
+    path = root / LIQUIDATE
+    if path.exists():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"reason": reason, "at_ms": at_ms}, ensure_ascii=False), "utf-8")
+    return True
+
+
+def liquidation_request(root: Path) -> dict[str, Any] | None:
+    try:
+        d = json.loads((root / LIQUIDATE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) else None
+
+
+def clear_liquidation(root: Path) -> bool:
+    path = root / LIQUIDATE
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
+def liquidation_orders(
+    state: Mapping[str, Any], prices: Mapping[str, float]
+) -> list[dict[str, Any]]:
+    """보유 묶음 전부를 종목별 소수점 매도 한 건씩으로."""
+    by: dict[str, list[Mapping[str, Any]]] = {}
+    for lot in state["lots"]:
+        by.setdefault(lot["sym"], []).append(lot)
+    out = []
+    for sym, lots in sorted(by.items()):
+        qty = round(sum(float(lot["qty"]) for lot in lots), 6)
+        if qty <= 0:
+            continue
+        out.append({"sym": sym, "kind": "sell", "side": "SELL", "qty": qty,
+                    "lots": [lot["id"] for lot in lots], "tranche": None,
+                    "ref_price": prices.get(sym)})  # fmt: skip
     return out

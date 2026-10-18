@@ -52,7 +52,9 @@ class FakeToss:
         self, symbol: str, qty: Decimal, *, client_order_id: str
     ) -> TossOrderResult:
         self.sent.append((symbol, "SELL", qty))
-        return TossOrderResult(True, f"S-{symbol}", "접수")
+        oid = f"S-{symbol}"
+        self.status[oid] = TossOrderStatus("FILLED", qty, Decimal(12), qty * 12, Decimal("0.01"))
+        return TossOrderResult(True, oid, "접수")
 
     def order_status(self, order_id: str) -> TossOrderStatus:
         return self.status[order_id]
@@ -62,6 +64,7 @@ class FakeToss:
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     fake = FakeToss()
     box: dict[str, Any] = {"fake": fake, "notes": [], "on": True}
+    monkeypatch.setattr(sl, "REPO", tmp_path)
     monkeypatch.setattr(sl, "ROOT", tmp_path / "sirius")
     monkeypatch.setattr(sl, "STATE", tmp_path / "sirius" / "state.json")
     monkeypatch.setattr(sl, "REPORTS", tmp_path / "reports")
@@ -134,3 +137,44 @@ def test_halt_file_blocks_orders(env: dict[str, Any]) -> None:
     sl.HALT.write_text("테스트 정지", encoding="utf-8")
     sl.run()
     assert env["fake"].sent == []
+
+
+def _with_lots() -> None:
+    st = _state()
+    st["lots"] = [
+        {"id": "T:MU", "sym": "MU", "qty": 0.5, "buy_day": "2026-10-01", "cost_usd": 5.0,
+         "tranche": "T"},
+        {"id": "T2:MU", "sym": "MU", "qty": 0.25, "buy_day": "2026-10-02", "cost_usd": 3.0,
+         "tranche": "T2"},
+        {"id": "T:DELL", "sym": "DELL", "qty": 0.1, "buy_day": "2026-10-01", "cost_usd": 1.0,
+         "tranche": "T"},
+    ]  # fmt: skip
+    sl._save(st)
+
+
+def test_liquidation_sells_all_own_lots_and_clears_request(env: dict[str, Any]) -> None:
+    _with_lots()
+    env["on"] = False  # 설정이 꺼져 있어도 사람이 누른 정리는 한다
+    core.request_liquidation(sl.REPO, "테스트", NOW)
+    lines = sl.liquidate_step(NOW)
+    sent = {(s, side): q for s, side, q in env["fake"].sent}
+    assert sent == {("DELL", "SELL"): Decimal("0.1"), ("MU", "SELL"): Decimal("0.75")}
+    st = _state()
+    assert st["lots"] == [] and len(st["closed"]) == 3
+    assert core.liquidation_request(sl.REPO) is None
+    assert any("정리 끝" in x for x in lines)
+
+
+def test_liquidation_waits_outside_session(env: dict[str, Any]) -> None:
+    _with_lots()
+    env["fake"].session = False
+    core.request_liquidation(sl.REPO, "테스트", NOW)
+    assert sl.liquidate_step(NOW) == []
+    assert env["fake"].sent == [] and core.liquidation_request(sl.REPO) is not None
+
+
+def test_run_with_request_does_not_buy(env: dict[str, Any]) -> None:
+    core.request_liquidation(sl.REPO, "테스트", NOW)
+    sl.run()
+    assert all(side == "SELL" for _, side, _ in env["fake"].sent)
+    assert _state()["decisions"] == {}

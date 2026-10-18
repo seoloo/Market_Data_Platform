@@ -68,6 +68,7 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
         "acc",
         "stock",
         "altair",
+        "sirius",
         "cancel",
     ]
     deneb = next(d for d in data if d.endswith(":deneb"))

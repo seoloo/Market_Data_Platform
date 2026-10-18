@@ -41,6 +41,7 @@ from auto_trading.exchange.toss import (
 )
 from auto_trading.exchange.upbit import UpbitClient, upbit_trading_enabled
 from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNotifier
+from auto_trading.ops import sirius_live as sirius_core
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.deneb_live import DenebOrder, DenebState
 from auto_trading.ops.kill_switch import (
@@ -364,6 +365,8 @@ def preview_text(scope: str = "all") -> str:
             or "팔 것 없음"
         )
     for g in groups_of(scope):
+        if g == "sirius":  # 아래 줄로 따로 (Sirius 실행기가 소수점으로 판다)
+            continue
         rows = [it for it in items if g in it.groups]
         lines.append(
             f"[{GROUPS[g]}] "
@@ -372,6 +375,8 @@ def preview_text(scope: str = "all") -> str:
                 or "팔 것 없음"
             )
         )
+    if "sirius" in groups_of(scope):
+        lines.append(_sirius_preview())
     lines += [f"· {n}" for n in notes]
     if symbol_of(scope):
         lines.append(
@@ -382,8 +387,21 @@ def preview_text(scope: str = "all") -> str:
     lines.append(
         "누르면: ① 그 그룹 새 매수 정지 ② 토스 미체결 매수 취소 ③ 지정가로 매도 "
         "(업비트 · 바이낸스는 바로, 토스는 정규장에서 — 닫혀 있으면 열린 뒤)"
+        + (" · Sirius 는 소수점 시장가" if "sirius" in groups_of(scope) else "")
     )
     return "\n".join(lines)
+
+
+def _sirius_preview() -> str:
+    try:
+        st = json.loads((REPO / "data" / "sirius" / "state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "[Sirius] 장부 없음"
+    held = sirius_core.holdings(st)
+    if not held:
+        return "[Sirius] 팔 것 없음 (보유 없음)"
+    rows = ", ".join(f"{s} {q:.6g}" for s, (q, _c) in sorted(held.items()))
+    return f"[Sirius] 토스 미국 소수점 {rows} — 정규장(마감 1 시간 전까지)에서 소수점 시장가로"
 
 
 # ------------------------------------------------------------------ 장 시간
@@ -624,6 +642,9 @@ def start(scope: str, source: str) -> str:
         set_group_halts(HALT, groups_of(scope), reason)
         items, notes = plan(scope)
         groups = groups_of(scope)
+        if "sirius" in groups:  # Sirius 소수점 몫은 Sirius 실행기가 정규장에서 판다
+            sirius_core.request_liquidation(REPO, reason, now)
+            notes += _sirius_liquidate()
         handover = (
             {symbol_of(scope) or ""}
             if symbol_of(scope)
@@ -642,8 +663,36 @@ def start(scope: str, source: str) -> str:
         return text
 
 
+def _sirius_liquidate() -> list[str]:
+    """Sirius 정리 요청이 있으면 한 걸음 (정규장 밖이면 대기 줄). 실패는 줄로."""
+    if sirius_core.liquidation_request(REPO) is None:
+        return []
+    from scripts import sirius_live
+
+    try:
+        return sirius_live.liquidate_step()
+    except AutoTradingError as exc:
+        return [f"⚠ Sirius 정리 실패 — 다음 확인 때 ({exc})"]
+
+
+def _sirius_resume() -> None:
+    """봇이 2 분마다: Sirius 정리 진행. 새 줄이 바뀌었을 때만 알린다."""
+    req = sirius_core.liquidation_request(REPO)
+    if req is None:
+        return
+    lines = _sirius_liquidate()
+    note = "\n".join(lines)
+    if lines and note != req.get("last_note") and sirius_core.liquidation_request(REPO) is not None:
+        req["last_note"] = note
+        (REPO / sirius_core.LIQUIDATE).write_text(json.dumps(req, ensure_ascii=False), "utf-8")
+        _notify(f"🧯 Sirius 정리 진행\n{note}")
+    elif lines and any("정리 끝" in x for x in lines):
+        _notify(f"🧯 Sirius\n{note}")
+
+
 def resume() -> list[str]:
     """진행 중 정리를 이어 한다. 끝나면 마지막 보고 한 번."""
+    _sirius_resume()
     out: list[str] = []
     if not STORE.active():
         return out
@@ -678,6 +727,8 @@ def unhalt(group: str, source: str) -> str:
         return f"{GROUPS[group]} 는 정지 중이 아니에요"
     for p in found:
         p.unlink()
+    if group == "sirius" and sirius_core.clear_liquidation(REPO):
+        _notify("✨ Sirius 정리 요청도 취소 — 남은 보유는 그대로")
     text = f"▶ {GROUPS[group]} 정지 풀림 ({source}) — 다음 실행부터 그 전략 규칙대로 다시 사요" + (
         " · 전체 비상 정지는 아직 켜져 있어요" if HALT.exists() else ""
     )

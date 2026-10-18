@@ -17,12 +17,13 @@ from auto_trading.ops.liquidate import SCOPES
 __all__ = ["liquidate_panel"]
 
 _ASK = {
-    "all": "Vega · Deneb · 자동 적립 · 개별주 · Altair 를 모두",
+    "all": "Vega · Deneb · 자동 적립 · 개별주 · Altair · Sirius 를 모두",
     "vega": "Vega(업비트 BTC · ETH · SOL)를",
     "deneb": "Deneb(토스 TQQQ · SCHD Deneb 몫)를",
     "acc": "자동 적립(미국 · 국내)을",
     "stock": "개별주(💹 개별주로 산 종목)를",
     "altair": "Altair(바이낸스 선물 BTC · ETH 포지션)를",
+    "sirius": "Sirius(토스 미국 소수점, 정규장에서 소수점 시장가)를",
 }
 
 

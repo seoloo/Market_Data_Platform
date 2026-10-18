@@ -67,6 +67,7 @@ SCOPES: dict[str, str] = {
     "acc": "자동 적립만",
     "stock": "개별주만",
     "altair": "Altair 만",
+    "sirius": "Sirius 만",
 }
 SYMBOL_SCOPE = "sym:"
 """한 종목 정리 범위 머리 (``sym:NVDA``)."""

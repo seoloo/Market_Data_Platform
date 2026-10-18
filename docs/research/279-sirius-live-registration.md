@@ -32,7 +32,14 @@
 - 예약 `AutoTrading_Sirius` — 평일 23:45 · 화 ~ 토 02:00 KST (연구 venv pythonw). 텔레그램 ✨ 알림(주문 · 체결 · 달러 부족), 현황(/status)에 Sirius 장부.
 - `build/tcn-venv/Scripts/python.exe -m scripts.sirius_live status | preview`.
 
-## 4. 아직 안 된 것
+## 4. 정리 (2026-10-18 추가 — 사용자 "소수점 정리하는 기능도 만들어줘")
 
-- '전부 정리' 는 Sirius 의 **새 주문만 멈춘다**. 보유 소수점 주식을 파는 정리 경로는 아직 없다(기존 정리 경로는 정수 주 지정가 — 소수점은 '수동 보유'로 남김). 필요하면 다음 작업.
-- 양도세 · 연말 손익 정리(us_tax)에 Sirius 체결 반영은 토스 체결 내역으로 자동 포함되는지 확인 필요.
+- 텔레그램 '정리' · 오르빗 설정 정리에 **"Sirius 만"** 버튼, '전부' 에도 포함. 누르면 ① `HALT_sirius`(새 주문 정지) ② 정리 요청 `data/sirius/LIQUIDATE.json` ③ Sirius 실행기가 **정규장(시작 + 1 분 ~ 종료 − 61 분)에서 Sirius 묶음 전부를 종목별 소수점 시장가 매도**. 장 밖이면 기다리다가 봇(2 분마다) · 예약 실행이 장 열린 뒤 판다.
+- 설정 `live.sirius` 가 꺼져 있어도 사람이 누른 정리는 한다(토스 주문 허용은 필요). 결과 모름 · 미확인 주문이 있으면 확인 뒤 다음 걸음.
+- 다 팔리면 요청을 지우고 "✅ Sirius 정리 끝" 알림. '정지풀기 → Sirius' 를 누르면 정리 요청도 취소(남은 보유는 그대로).
+- 직접: `build/tcn-venv/Scripts/python.exe -m scripts.sirius_live liquidate`.
+- 사용자 보유 · 다른 전략의 같은 종목은 건드리지 않는다(Sirius 장부 수량만).
+
+## 5. 아직 안 된 것
+
+- 양도세 · 연말 손익 정리(us_tax)에 Sirius 체결이 토스 체결 내역으로 자동 포함되는지 확인 필요.

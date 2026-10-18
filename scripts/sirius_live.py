@@ -201,12 +201,59 @@ def _send(trader: TossTrader, state: dict[str, Any], order: dict[str, Any], toda
     )
 
 
+def liquidate_step(now_ms: int | None = None) -> list[str]:
+    """정리 요청이 있으면 정규장(종료 1 시간 전까지)에서 Sirius 몫 전부를 소수점 시장가로 판다.
+
+    설정 ``live.sirius`` · 정지 파일과 상관없이(사람이 누른 정리) — 토스 주문 허용은 필요.
+    알림은 부르는 쪽이 보낸다. 다 팔면 요청을 지운다."""
+    now = _now_ms() if now_ms is None else now_ms
+    req = core.liquidation_request(REPO)
+    state = _load()
+    if req is None or state is None:
+        return []
+    trader = _trader(set(), MIN_MAX_ORDER_USD)
+    if not trader.credentials.trading_enabled:
+        return ["⛔ Sirius 정리 — TOSS_TRADING_ENABLED 꺼짐, 못 팖"]
+    today = _us_today(now)
+    lines = _reconcile(trader, state, today)
+    _save(state)
+    if not state["lots"]:
+        core.clear_liquidation(REPO)
+        return [*lines, f"✅ Sirius 정리 끝 — 보유 없음 · 현금 ${state['cash_usd']:,.2f}"]
+    why = _window(trader, today, now)
+    if why:
+        return [*lines, f"⏳ Sirius 정리 대기 — {why}"] if lines else []
+    if any(o["status"] in ("SENT", "UNKNOWN") for o in state["orders"]):
+        return [*lines, "⏳ Sirius 정리 — 확인 안 된 주문이 있어 다음 확인 때"]
+    syms = {lot["sym"] for lot in state["lots"]}
+    prices = {k: float(v) for k, v in trader.prices(sorted(syms)).items()}
+    trader = _trader(syms, MIN_MAX_ORDER_USD)
+    for o in core.liquidation_orders(state, prices):
+        lines.append(_send(trader, state, o, today))
+    for wait in POLL:
+        if not any(o["status"] == "SENT" for o in state["orders"]):
+            break
+        time.sleep(wait)
+        lines += _reconcile(trader, state, today)
+        _save(state)
+    _report(state, prices)
+    if not state["lots"]:
+        core.clear_liquidation(REPO)
+        lines.append(f"✅ Sirius 정리 끝 — 현금 ${state['cash_usd']:,.2f}")
+    return lines
+
+
 def run(preview: bool = False) -> int:
     now = _now_ms()
     state = _load()
     if state is None:
         print("장부가 없다 — 먼저 start --krw <금액>")
         return 2
+    if core.liquidation_request(REPO) is not None and not preview:
+        out = liquidate_step(now)
+        if out:
+            _notify("\n".join([f"{TAG} 정리 {_kst(now)}", RULE, *out]))
+        return 0
     today = _us_today(now)
     on = bool(user_settings.get(REPO, "live.sirius"))
     halted = halted_for(HALT, "sirius")
@@ -389,6 +436,17 @@ def main(argv: list[str]) -> int:
         return 0
     if cmd == "start" and len(argv) > 3 and argv[2] == "--krw":
         return start(float(argv[3]))
+    if cmd == "liquidate":  # 사람이 직접: 요청 + Sirius 정지, 정규장이면 바로 판다
+        from auto_trading.ops.liquidate import set_group_halts
+
+        reason = f"Sirius 정리 {_kst(_now_ms())} · 명령"
+        set_group_halts(HALT, ["sirius"], reason)
+        core.request_liquidation(REPO, reason, _now_ms())
+        out = liquidate_step()
+        print("\n".join(out) or "정리 요청 남김 — 다음 정규장에서 판다")
+        if out:
+            _notify("\n".join([f"{TAG} 정리", RULE, *out]))
+        return 0
     print(__doc__)
     return 2
 
