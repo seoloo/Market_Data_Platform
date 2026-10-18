@@ -1,0 +1,213 @@
+{
+  "validation": {
+    "A_DENEB": {
+      "2017": {
+        "return_before_final_liquidation": 0.7035230622126878,
+        "ending_value_krw": "1562469.318140624880801481474",
+        "macro_events": []
+      },
+      "2018": {
+        "return_before_final_liquidation": -0.04153283925941456,
+        "ending_value_krw": "2518709.175404010763499871350",
+        "macro_events": []
+      },
+      "2019": {
+        "return_before_final_liquidation": 0.655406761561115,
+        "ending_value_krw": "5756475.858425220005419355228",
+        "macro_events": []
+      }
+    },
+    "B_STATIC": {
+      "2017": {
+        "return_before_final_liquidation": 0.6452574713514473,
+        "ending_value_krw": "1536660.221309217395622018503",
+        "macro_events": []
+      },
+      "2018": {
+        "return_before_final_liquidation": -0.03881548756086822,
+        "ending_value_krw": "2508799.521649719946070760247",
+        "macro_events": []
+      },
+      "2019": {
+        "return_before_final_liquidation": 0.6020095643707062,
+        "ending_value_krw": "5576907.002638878089929383081",
+        "macro_events": []
+      }
+    },
+    "C_MACRO": {
+      "2017": {
+        "return_before_final_liquidation": 0.7035230622126878,
+        "ending_value_krw": "1562469.318140624880801481474",
+        "macro_events": []
+      },
+      "2018": {
+        "return_before_final_liquidation": -0.04153283925941456,
+        "ending_value_krw": "2518709.175404010763499871350",
+        "macro_events": []
+      },
+      "2019": {
+        "return_before_final_liquidation": 0.655406761561115,
+        "ending_value_krw": "5756475.858425220005419355228",
+        "macro_events": []
+      }
+    }
+  },
+  "historical_confirmation": {
+    "A_DENEB": {
+      "2020": {
+        "return_before_final_liquidation": 0.7973498547833929,
+        "ending_value_krw": "1870565.472151549582364423088",
+        "macro_events": []
+      },
+      "2021": {
+        "return_before_final_liquidation": 0.6313402485522914,
+        "ending_value_krw": "4612857.862603029566821035112",
+        "macro_events": []
+      },
+      "2022": {
+        "return_before_final_liquidation": -0.2556255856240957,
+        "ending_value_krw": "4480984.894514055515395424669",
+        "macro_events": []
+      },
+      "2023": {
+        "return_before_final_liquidation": 0.8135135606692155,
+        "ending_value_krw": "9850644.199662667679674535483",
+        "macro_events": []
+      },
+      "2024": {
+        "return_before_final_liquidation": 0.37949985471476116,
+        "ending_value_krw": "14997931.22049386406834352758",
+        "macro_events": []
+      },
+      "2025": {
+        "return_before_final_liquidation": 0.20460808223481883,
+        "ending_value_krw": "19448399.94038788674321665918",
+        "macro_events": []
+      },
+      "2026": {
+        "return_before_final_liquidation": 0.4267087666178493,
+        "ending_value_krw": "28733701.74776612033521495253",
+        "macro_events": []
+      }
+    },
+    "B_STATIC": {
+      "2020": {
+        "return_before_final_liquidation": 0.7211654318015416,
+        "ending_value_krw": "1818963.690098543743262416675",
+        "macro_events": []
+      },
+      "2021": {
+        "return_before_final_liquidation": 0.5734326631091622,
+        "ending_value_krw": "4390700.808033450035058949913",
+        "macro_events": []
+      },
+      "2022": {
+        "return_before_final_liquidation": -0.23533381543057577,
+        "ending_value_krw": "4423055.081669093783831418398",
+        "macro_events": []
+      },
+      "2023": {
+        "return_before_final_liquidation": 0.7265493836234888,
+        "ending_value_krw": "9311980.149485330858724377368",
+        "macro_events": []
+      },
+      "2024": {
+        "return_before_final_liquidation": 0.351581349227599,
+        "ending_value_krw": "13978904.90729242896880720263",
+        "macro_events": []
+      },
+      "2025": {
+        "return_before_final_liquidation": 0.18821540058469272,
+        "ending_value_krw": "17978690.72371517912255903758",
+        "macro_events": []
+      },
+      "2026": {
+        "return_before_final_liquidation": 0.4069324856891692,
+        "ending_value_krw": "26271042.45098412100703855892",
+        "macro_events": []
+      }
+    },
+    "C_MACRO": {
+      "2020": {
+        "return_before_final_liquidation": 0.7973498547833929,
+        "ending_value_krw": "1870565.472151549582364423088",
+        "macro_events": []
+      },
+      "2021": {
+        "return_before_final_liquidation": 0.6313402485522914,
+        "ending_value_krw": "4612857.862603029566821035112",
+        "macro_events": []
+      },
+      "2022": {
+        "return_before_final_liquidation": -0.2556255856240957,
+        "ending_value_krw": "4480984.894514055515395424669",
+        "macro_events": []
+      },
+      "2023": {
+        "return_before_final_liquidation": 0.7818150242481782,
+        "ending_value_krw": "9699389.169728195656893260590",
+        "macro_events": [
+          {
+            "day": "2023-03-01",
+            "reason": "MACRO_ENTER",
+            "brake_stage": 0,
+            "from": "1",
+            "to": "0.5"
+          },
+          {
+            "day": "2023-03-08",
+            "reason": "PRICE_RETURN",
+            "brake_stage": 0,
+            "from": "0.5",
+            "to": "1"
+          }
+        ]
+      },
+      "2024": {
+        "return_before_final_liquidation": 0.3794965155863748,
+        "ending_value_krw": "14789240.03998301862610867802",
+        "macro_events": []
+      },
+      "2025": {
+        "return_before_final_liquidation": 0.20847577895542618,
+        "ending_value_krw": "19257946.95393646761307027818",
+        "macro_events": [
+          {
+            "day": "2025-12-01",
+            "reason": "MISSING_REDUCE",
+            "brake_stage": 1,
+            "from": "1",
+            "to": "0.5"
+          }
+        ]
+      },
+      "2026": {
+        "return_before_final_liquidation": 0.3908048818536368,
+        "ending_value_krw": "27758136.30625214192266845754",
+        "macro_events": [
+          {
+            "day": "2026-01-02",
+            "reason": "MACRO_CLEAR",
+            "brake_stage": 1,
+            "from": "0.5",
+            "to": "1"
+          },
+          {
+            "day": "2026-04-01",
+            "reason": "MACRO_ENTER",
+            "brake_stage": 1,
+            "from": "1",
+            "to": "0.5"
+          },
+          {
+            "day": "2026-04-10",
+            "reason": "PRICE_RETURN",
+            "brake_stage": 1,
+            "from": "0.5",
+            "to": "1"
+          }
+        ]
+      }
+    }
+  }
+}

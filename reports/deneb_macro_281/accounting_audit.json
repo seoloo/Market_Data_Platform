@@ -1,0 +1,19 @@
+{
+  "accounts_replayed_from_orders": 18,
+  "daily_rows": 21852,
+  "maximum_quantity_error": "0",
+  "maximum_cash_error_krw": "5.5E-21",
+  "maximum_equity_error_krw": "1E-20",
+  "baseline_184_real_price_golden": {
+    "validation": {
+      "max_nav_absolute_error": 1.7763568394002505e-15,
+      "legacy_final_krw_error": 2.7939677238464355e-9
+    },
+    "historical_confirmation": {
+      "max_nav_absolute_error": 1.0658141036401503e-14,
+      "legacy_final_krw_error": 7.450580596923828e-9
+    }
+  },
+  "all_30_saved_models_unchanged": true,
+  "model_refits_in_recovery": 0
+}
