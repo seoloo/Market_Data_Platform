@@ -965,3 +965,7 @@ T/v2 롱 허용에서 작은 선물 진입 후 고정ATR +2A/+4A에서 최초 �
 - 토스 어댑터 `amount_buy` · `fractional_sell`(허용 종목 · 금액 상한 · 주문 스위치), 순수 계산 `ops/sirius_live.py`(결정 시점 · 126 거래일 · 평가액 ÷ 6 · 같은 종목 넘기기 · 장부), 실행기 `scripts/sirius_live.py`(연구 venv), 설정 `live.sirius`(기본 꺼짐), 정지 그룹 `sirius`, 현황 ✨ 장부, 예약 `AutoTrading_Sirius` 평일 23:45 · 화 ~ 토 02:00 KST.
 - 장부 시작 ₩1,000,000 = $745.55(환율 1,341.3) → 첫 달 약 $124(종목당 $12.4). 11-02 전 토스 달러 약 $750 필요. 첫 결정 10-30 종가 → 11-02 정규장.
 - 안 된 것: 전부 정리는 Sirius 새 주문만 멈춤(소수점 보유 매도 경로 없음).
+
+## 2026-10-18 Sirius 실거래 보류
+
+- 사용자 "sirius는 실거래는 아직 하지 않도록 하고 paper만" → 예약 `AutoTrading_Sirius` Disabled · 설정 `live.sirius` 꺼짐 그대로. 장부 · 정리 기능은 남겨 둠(다시 켜면 바로). Paper 277(GBM10 · GBM5 · GBM10F · GBM5F · BASE10 · SPY) 계속, 첫 결정 10-30.
