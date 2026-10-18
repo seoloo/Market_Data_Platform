@@ -161,3 +161,25 @@ def test_multi_asset_mode_required_and_used_for_equity(monkeypatch: pytest.Monke
 
     eq, _pos = core._equity(Live(), {"live": True, "multi": True})  # type: ignore[arg-type]
     assert eq == 1234.5
+
+
+def test_halt_releases_when_btc_trend_turns_off_then_on() -> None:
+    """문서 266 TREND (사용자 2026-10-18): 정지 중 BTC 롱 목표 0 → 다시 > 0 이면 스스로 풀림."""
+    st: dict[str, Any] = {"long_w": {"BTC": 0.1, "ETH": 0.1}}
+    m.update_nav(st, 1_000.0, [])
+    m.update_nav(st, 690.0, [])
+    assert st["dd_halt"] and st["halt_off_seen"] is False  # 정지 때 추세 켜짐
+    assert m.trend_release(st, 0.12, 0.69) == []  # 켜진 채로는 안 풂
+    assert m.trend_release(st, 0.0, 0.65) == [] and st["halt_off_seen"] is True
+    msgs = m.trend_release(st, 0.05, 0.70)
+    assert "스스로 풀림" in msgs[0] and "dd_halt" not in st and st["nav_peak"] == 0.70
+    assert m.stop_reason(st, None) is None
+    assert m.trend_release({}, 0.1, 1.0) == []  # 정지 아니면 아무것도 안 함
+
+
+def test_halt_when_trend_already_off_releases_on_next_turn_on() -> None:
+    st: dict[str, Any] = {"long_w": {"BTC": 0.0}}
+    m.update_nav(st, 1_000.0, [])
+    m.update_nav(st, 690.0, [])
+    assert st["halt_off_seen"] is True
+    assert m.trend_release(st, 0.08, 0.72) and "dd_halt" not in st

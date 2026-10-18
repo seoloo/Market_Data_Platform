@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-18 — Altair 30% 정지 자동 풀기 · 연구 265 ~ 268 (Claude)
+
+- **Altair 실거래 낙폭 30% 정지 풀기 = 추세 꺼짐 → 다시 켜짐(사용자 결정)**: 정지 중 BTC 롱 목표가 0 이 된 뒤 다시 0 보다 커지는 날 스스로 풀고 고점을 그때 단위 가치로(`scripts/altair_live.py` `trend_release`). 근거 [266](research/266-altair-live-halt-rule.md): 백테스트 시작 9 곳 모두 정지가 걸렸고, 안 풀면 수익이 거의 사라짐(2020-06 시작 순손익 186k → 1.7k), 30 일 자동 풀기는 더 나쁨, 추세 풀기는 8/9 곳에서 정지 없음 이상. 손으로 `unhalt` 도 그대로. Vega 는 그대로(30 일째 알림 · 사람이 풂, 199).
+- 265 코인 상대 강도 갈아타기 REJECT · 267 V 당일 돌파 실제 체결 닫음(단기 연구 비용 재분류 — 웹소켓 Paper 로 갈 단기 후보 없음) · 268 유튜브 볼린저 A′ · B REJECT(A′ 거래당 +1.04% 지만 칸 10 개 계좌 연 −3.2%).
+
 ## 2026-10-17 — 🧭 Polaris 나무증권 안정 적립 · 나무 해외 원화 주문 (Claude)
 
 나무증권 해외주식 원화 증거금 주문 클라이언트(지정가, 실전 스위치 기본 꺼짐). 새 전략 Polaris: SPYM 30 · QQQM 30 · IEF 20 · GLDM 20, 사기만(자동 매도 없음), 100 만 원 × 4 회차(2026-11 부터, 매달 버튼 확인). 토스와 완전 분리, 같은 계좌의 사용자 개별주는 계산 제외. 참고 계산 2005 ~ 2026: 연 11.2% · 낙폭 −33% (S&P 만 −55%, Deneb −81%).

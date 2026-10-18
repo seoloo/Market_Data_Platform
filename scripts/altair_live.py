@@ -3,7 +3,7 @@
     python -m scripts.altair_live plan     # 지금 낼 주문 미리 보기 (주문 없음, 키만 있으면 됨)
     python -m scripts.altair_live tick     # 할 차례면 실행 (예약 AutoTrading_Altair 가 5 분마다)
     python -m scripts.altair_live status
-    python -m scripts.altair_live unhalt   # 낙폭 30% 정지를 풀고 고점을 지금으로
+    python -m scripts.altair_live unhalt   # 낙폭 30% 정지를 손으로 풀고 고점을 지금으로
 
 사용자 (2026-10-16): "실행기 작업해줘" — 데모(scripts/altair_demo) 2 주 이상 본 뒤 켠다.
 
@@ -18,7 +18,9 @@
 * **입금 · 출금은 손익이 아니다**: 선물 지갑 이체(``TRANSFER``)를 단위(NAV)로 바꿔 낙폭을 잰다
   (Vega 와 같은 방식).
 * **낙폭 30% 정지**: 단위 가치가 고점에서 30% 빠지면 새 노출(롱 늘리기 · 새 숏) 금지 —
-  줄이기 · 정리 · 스톱은 그대로. ``unhalt`` 로만 푼다.
+  줄이기 · 정리 · 스톱은 그대로. **BTC 롱 목표가 0(추세 꺼짐)이 된 뒤 다시 0 보다 커지면(추세
+  다시 켜짐) 스스로 풀고 고점을 그때 단위 가치로** 다시 잡는다(문서 266 TREND, 사용자 2026-10-18
+  "추세가 꺼졌다 다시 켜지면 품으로 변경해줘"). 손으로는 ``unhalt``.
   전체 정지 · Altair 그룹 정지(전부 정리 · 텔레그램 정지) 동안도 새 노출 금지.
 * 상태 ``data/altair_live/state.json``, 알림 기록 ``reports/altair_live/outbox.log``.
 """
@@ -131,12 +133,41 @@ def update_nav(
     dd = 1 - nav / peak if peak > 0 else 0.0
     if dd >= DD_HALT and not st.get("dd_halt"):
         st["dd_halt"] = f"계좌 낙폭 {dd:.0%} (30% 정지)"
+        st["halt_off_seen"] = _f((st.get("long_w") or {}).get("BTC")) <= 0
         msgs.append(
             f"⛔ 계좌 낙폭 {dd:.0%} — 새 노출(롱 늘리기 · 새 숏) 멈춤."
             " 줄이기 · 정리 · 스톱은 그대로."
-            " 풀기: python -m scripts.altair_live unhalt"
+            " BTC 추세가 꺼졌다 다시 켜지면 스스로 풀림"
+            " (손으로: python -m scripts.altair_live unhalt)"
         )
     return nav, dd, msgs
+
+
+def _f(x: Any) -> float:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def trend_release(st: dict[str, Any], btc_w: float, nav: float) -> list[str]:
+    """낙폭 정지 중 하루 한 번(롱 맞출 때) — BTC 롱 목표가 0 이 된 적이 있고 지금 0 보다 크면 푼다.
+
+    문서 266 TREND: 정지 9 곳 모두 걸렸고, 안 풀면 수익이 거의 사라졌다(2020-06 시작 186k → 1.7k).
+    추세 꺼짐 → 다시 켜짐에 풀면 9 곳 중 8 곳에서 정지 없음과 같거나 나았다. 풀 때 고점 = 지금."""
+    if not st.get("dd_halt"):
+        return []
+    if btc_w <= 0:
+        st["halt_off_seen"] = True
+        return []
+    if not st.get("halt_off_seen"):
+        return []
+    reason = st.pop("dd_halt")
+    st.pop("halt_off_seen", None)
+    st["nav_peak"] = nav
+    return [
+        f"▶ 낙폭 정지 스스로 풀림 ({reason}) — BTC 추세가 꺼졌다 다시 켜짐, 고점을 지금 단위 가치로"
+    ]
 
 
 def stop_reason(st: dict[str, Any], halt: str | None) -> str | None:
@@ -207,6 +238,9 @@ def tick(now_ms: int | None = None) -> list[str]:
             lines.append(f"이체 기록 못 읽음 — {exc}")
         nav, dd, msgs = update_nav(st, eq, flows)
         alert += msgs
+        if due_long and st.get("dd_halt"):  # 오늘 롱 목표로 정지 풀기 판단 (문서 266)
+            w, _info = core.long_targets(now_ms)
+            alert += trend_release(st, w.get("BTC", 0.0), nav)
         if eq < MIN_EQUITY:
             lines.append(f"USDC 장부 {eq:,.2f} < {MIN_EQUITY:,.0f} — 입금 전이라 쉼")
             return lines
@@ -287,6 +321,7 @@ def status() -> dict[str, Any]:
         "nav": hist[-1][2] if hist else None,
         "nav_peak": st.get("nav_peak"),
         "dd_halt": st.get("dd_halt"),
+        "halt_off_seen": st.get("halt_off_seen"),
         "margin": "CROSSED" if st.get("cross") else "아직 설정 전",
         "long_w": st.get("long_w"),
         "shorts": st.get("shorts"),
@@ -300,6 +335,7 @@ def unhalt() -> str:
     if not st.get("dd_halt"):
         return "낙폭 정지 아님"
     reason = st.pop("dd_halt")
+    st.pop("halt_off_seen", None)
     hist = st.get("history") or []
     if hist and len(hist[-1]) > 2:
         st["nav_peak"] = hist[-1][2]
