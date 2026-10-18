@@ -1,0 +1,62 @@
+{
+  "schema_version": "283.audit.1",
+  "as_of_date_kst": "2026-10-18",
+  "scope": "Selected existing SEC snapshots and extraction code; no stock prices or strategy performance read",
+  "reduced_snapshots": {
+    "directory": "data/research/sec_facts_261",
+    "company_files": 493,
+    "top_level_shapes": {
+      "float,opinc,revenue": 493
+    },
+    "files_missing_all_rows_metadata": {
+      "accn": 493,
+      "unit": 493,
+      "accepted_at_ms": 493,
+      "first_seen_at_ms": 493
+    },
+    "files_with_future_filed_dates": 0,
+    "manifest_method": "SHA256 of UTF-8 JSON sorted filename and raw SHA256 pairs, compact separators",
+    "manifest_sha256": "fc64788b9dc7f8436fd4d35b4aea8b7b1f59ba8cdd40edf4c9fac8fb2842cb57",
+    "supports_full_business_quality_alert": false
+  },
+  "full_raw_samples": [
+    {
+      "sample": "apple",
+      "path": "data/research/fundamental_pilot/apple-companyfacts.json",
+      "sha256": "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43",
+      "standard_tag_present": {
+        "NetCashProvidedByUsedInOperatingActivities": true,
+        "PaymentsToAcquirePropertyPlantAndEquipment": true,
+        "NetIncomeLoss": true,
+        "ShareBasedCompensation": true,
+        "LongTermDebtCurrent": true,
+        "LongTermDebtNoncurrent": true,
+        "StockholdersEquity": true,
+        "CommonStockSharesOutstanding": true,
+        "InterestExpense": true
+      },
+      "interpretation": "Tag presence only, not period/unit/recency validation or a company recommendation"
+    },
+    {
+      "sample": "msft",
+      "path": "data/research/fundamental_pilot/msft-companyfacts.json",
+      "sha256": "f8aae2965b20ad0df44bdf7ccbedf797d275b6b8dc030154a7a311361bb7246f",
+      "standard_tag_present": {
+        "NetCashProvidedByUsedInOperatingActivities": true,
+        "PaymentsToAcquirePropertyPlantAndEquipment": true,
+        "NetIncomeLoss": true,
+        "ShareBasedCompensation": true,
+        "LongTermDebtCurrent": true,
+        "LongTermDebtNoncurrent": true,
+        "StockholdersEquity": true,
+        "CommonStockSharesOutstanding": true,
+        "InterestExpense": true
+      },
+      "interpretation": "Tag presence only, not period/unit/recency validation or a company recommendation"
+    }
+  ],
+  "new_company_facts_downloads": 0,
+  "profit_calculations": 0,
+  "qualified_companies_assessed": 0,
+  "automatic_alerts_registered": 0
+}
