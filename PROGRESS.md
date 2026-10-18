@@ -2328,3 +2328,4 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - **272 그림자 기록 시작**(2026-10-19 ~): H1 숏 · Altair 펀딩비 끄기, 텔레그램 봇이 4 시간마다 공개 시세로 다시 계산(주문 · 알림 없음), `python -m scripts.shadow_272 status`.
 - 증거금 이자(BFUSD 등): 선물 다중 자산 모드에서 BFUSD · LDUSDT 가 증거금으로 쓰임 확인(공개 exchangeInfo). 이율 연 3 ~ 4.5% 안팎(제3자 자료) · 지금 Altair 약 840 USDC 라 연 약 30 달러 — 실거래 반영은 사용자 결정 대기.
 - **Altair 메이커 반영(사용자 결정)**: 하루 롱 맞추기를 최우선 호가 post-only → 30 분 뒤 남은 양 IOC(`altair_demo.maker_check`), 정리 때 걸린 주문 취소. 시험 9 개.
+- **273 Altair 단일 코인 (설명용)**: BTC 만 전액은 연 수익 비슷(+0.6%p)하나 낙폭 15%p 깊고 Calmar 9 곳 모두 낮음, ETH 만은 모두 나쁨 → BTC + ETH 나눠 들기 유지.
