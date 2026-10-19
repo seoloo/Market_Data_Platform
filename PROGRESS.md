@@ -2540,3 +2540,9 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자 유망 종목 질문에 공식 공시·제품 자료 기반으로 ISRG(수술 보조 로봇·반복 매출), SYM(물류 자동화·고객 집중), TER(협동/이동 로봇·반도체 검사 본업)를 비교. 사업 관점 ISRG 우선 검토, 성장 노출 SYM, 산업 로봇과 반도체 복합 노출 TER라는 조건부 의견이며 현재 가격의 저평가/매수 적정성은 미판정. NVDA는 로봇 개발·컴퓨팅 플랫폼을 통한 간접 노출로 구분.
 - [ISRG 2026-06-30 10-Q](https://www.sec.gov/Archives/edgar/data/1035267/000103526726000058/isrg-20260630.htm)의 반복 매출 85%, [SYM 2026 회계연도 3분기](https://ir.symbotic.com/news-releases/news-release-details/symbotic-reports-third-quarter-fiscal-year-2026-results)의 매출 7.21억 달러·분기 순이익 5,500만 달러, [TER 2026년 2분기](https://investors.teradyne.com/news-events/press-releases/detail/445/teradyne-reports-second-quarter-2026-results)의 전체 매출 13.29억 달러 중 로봇 약 1억 달러(약 7.5%) 확인. 서로 다른 회계연도 분기 명칭을 같은 분기로 오인하지 않음. ISRG 3분기 실적은 발표 전이며 선반영하지 않음.
 - Phase 0 정보 검토, 기존 연구·운영 상태 불변. 코드·적립 설정·계좌·주문·알림·예약 변경 및 전달용 파일 생성 없음. 검증은 원문 대조·비중 산술·기존 기록 보존·문서 diff 범위 검사이며 코드 테스트 미실행.
+
+## 2026-10-19 — 초기 성장 로봇 기업 OUST · SERV · RR 검토 (Codex)
+
+- 사용자 "페이사인 느낌"을 비상장 투자 대신 거래 가능한 초기 성장 상장사라는 의미로 해석해 3개 후보를 설명. [PAYS 2026년 2분기](https://www.sec.gov/Archives/edgar/data/1496443/000168316826005988/paysign_ex9901.htm)의 흑자와 이들 기업의 성장·수익성 검증 단계를 구분. 사업 규모가 작다는 사실을 낮은 시가총액·저평가·높은 기대수익으로 치환하지 않음.
+- [OUST](https://investors.ouster.com/news-releases/news-release-details/ouster-announces-results-second-quarter-2026)는 센서·인지 플랫폼이며 완성 로봇 업체 아님. 분기 매출 약 5,500만 달러·순손실 약 1,800만 달러, StereoLabs 인수와 주식 발행을 확인. [SERV](https://ir.serverobotics.com/news-releases/news-release-details/serve-robotics-announces-second-quarter-2026-results)는 분기 매출 약 320만 달러·연간 매출 전망 900만~1,000만 달러로 하향, 로봇 배치와 가동·수익성을 구분. [RR 공시](https://ir.richtechrobotics.com/node/7606/html)는 6월 종료 분기 매출 약 137만 달러·순손실 약 998만 달러, 전시·개발 발표를 대량 유상 도입으로 해석하지 않음.
+- Phase 0 정보 검토, 새 연구 판정·운영 상태 변경 없음. 코드·적립 종목·설정·주문·계좌·예약·알림·자격정보 불변. 원문 대조·산술·기존 기록 보존·문서 diff 검사만 수행, 코드 시험 미실행. 현재 가격 기반 가치평가와 매수 승인 아님.
