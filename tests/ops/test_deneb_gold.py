@@ -114,3 +114,45 @@ def test_messages_show_gold() -> None:
         gold=GOLD_MIX,
     )  # fmt: skip
     assert "IAUM(금) 20%" in msg and "🛒 IAUM 1주" in msg
+
+
+# ------------------------------------------ 계좌 단계 · 브레이크 한 줄 (10-19 '1번 2번')
+
+
+def test_account_steps_and_brake_line() -> None:
+    from auto_trading.ops.deneb_guard import brake_ask_line, step_due_account
+    from auto_trading.ops.deposit_split import ask_text
+
+    assert step_due_account(0, 119_000_000) is None
+    assert step_due_account(0, 121_000_000) == 0
+    assert step_due_account(1, 200_000_000) is None and step_due_account(1, 360_000_000) == 1
+    assert step_due_account(4, 5e9) is None
+    assert brake_ask_line(0, True) == ""
+    assert "1단계" in brake_ask_line(1, True) and "SCHD · 금으로" in brake_ask_line(1, True)
+    assert "2단계" in brake_ask_line(2, False) and "SCHD로" in brake_ask_line(2, False)
+    msg = ask_text("2026-11-02", 300_000, brake_ask_line(2, True))
+    assert msg.splitlines()[-1].startswith("🛑 Deneb 브레이크 2단계")
+    assert "🛑" not in ask_text("2026-11-02", 300_000)
+
+
+def test_div_step_uses_account_size_when_gold_on(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import scripts.toss_accumulate as mod
+
+    st = DenebState("2026-10-09", cash_usd=0.0, qty={LEV: 1000.0, DIV: 900.0, GOLD: 700.0})
+    px = {LEV: 70.0, DIV: 35.0, GOLD: 42.0}  # 평가 $130,900 ≈ 1.83 억 (환율 1,400)
+    monkeypatch.setattr(mod, "_deneb_gold", lambda: GOLD_MIX)
+    prop, text = mod._new_div_step(st, "2026-11-03", px, 1400.0, [])
+    assert prop is not None and text is not None
+    assert "계좌 단계 도달 (1.2억 원)" in text and "TQQQ 목표 60% → 50%" in text
+    assert prop.plan["next_step_krw"] == 350_000_000.0
+    monkeypatch.setattr(mod, "_deneb_gold", lambda: 0.0)  # 금 섞기 꺼짐 → 배당 기준(배당 없음)
+    assert mod._new_div_step(st, "2026-11-03", px, 1400.0, []) == (None, None)
+
+
+def test_step_buy_symbol_picks_more_lacking() -> None:
+    import scripts.toss_accumulate as mod
+
+    st = DenebState("2026-10-09", qty={LEV: 10.0, DIV: 2.0, GOLD: 6.0})
+    assert mod._step_buy_symbol(st, PX, 0.5) == DIV
+    st2 = DenebState("2026-10-09", qty={LEV: 10.0, DIV: 8.0, GOLD: 1.0})
+    assert mod._step_buy_symbol(st2, PX, 0.5) == GOLD

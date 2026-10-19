@@ -33,6 +33,10 @@ STAGE_SHARE = {0: 1.0, 1: 0.5, 2: 0.0}
 """브레이크 단계별 매달 TQQQ 목표 배수 (183 · 184 와 같음)."""
 HIGH_DAYS = 252
 DIV_STEPS_KRW = (100_000.0, 300_000.0, 500_000.0, 1_000_000.0)
+ACCOUNT_STEPS_KRW = (120_000_000.0, 350_000_000.0, 600_000_000.0, 1_200_000_000.0)
+"""금 섞기 켜짐일 때 단계 기준 — Deneb 계좌(원). SCHD 40% · 배당률 3% · 세후 85% 에서 위 배당 단계
+(월 10 · 30 · 50 · 100 만 원)가 오는 계좌 크기와 비슷하게 (사용자 2026-10-19 '1번 진행').
+금을 섞으면 SCHD 배당이 절반이라 배당 기준으로는 질문이 계좌가 두 배일 때 온다."""
 STEP_CUT = 0.10
 CANCEL_UNTIL = "20:50"
 """답한 날 이 시각(KST)까지 '취소' 를 받는다. 21:00 실행이 주문을 낸다."""
@@ -173,6 +177,29 @@ def step_due(steps_done: int, monthly_krw: float) -> int | None:
     if steps_done < len(DIV_STEPS_KRW) and monthly_krw >= DIV_STEPS_KRW[steps_done]:
         return steps_done
     return None
+
+
+def step_due_account(steps_done: int, account_krw: float) -> int | None:
+    """금 섞기 켜짐: 계좌(원)가 다음 단계(:data:`ACCOUNT_STEPS_KRW`)에 닿았으면 그 번호."""
+    if steps_done < len(ACCOUNT_STEPS_KRW) and account_krw >= ACCOUNT_STEPS_KRW[steps_done]:
+        return steps_done
+    return None
+
+
+def brake_ask_line(stage: int, gold_on: bool) -> str:
+    """입금 안내 알림에 붙일 브레이크 한 줄 (단계 0 이면 빈 글, 사용자 2026-10-19 '2번 진행')."""
+    safe = "SCHD · 금으" if gold_on else "SCHD"  # 뒤에 '로' 가 붙는다
+    if stage >= 2:
+        return (
+            f"🛑 Deneb 브레이크 2단계 (TQQQ 전부 팔아 달러로 보관 중) — 이번 달 Deneb 돈은 {safe}"
+            "로 가고, 나스닥 추세가 다시 켜지면 보관한 달러로 TQQQ 를 되사요"
+        )
+    if stage == 1:
+        return (
+            "🛑 Deneb 브레이크 1단계 (TQQQ 절반 팔아 달러로 보관 중) — 이번 달 TQQQ 목표는 평소의"
+            f" 절반, 나머지는 {safe}로. 추세가 다시 켜지면 보관한 달러로 TQQQ 를 되사요"
+        )
+    return ""
 
 
 def lev_cap(steps_done: int) -> float:
@@ -368,27 +395,42 @@ def div_step_message(
     added_krw: float,
     gain_krw: float | None,
     room_krw: float | None,
+    account_krw: float | None = None,
+    buy_symbol: str = "SCHD",
 ) -> str:
+    """``account_krw`` 가 있으면 계좌 단계(금 섞기 켜짐) 글, 없으면 배당 단계 글."""
     usd = sell * lev_px
-    lines = [
-        f"💰 Deneb · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
-        RULE,
-        f"최근 12개월 SCHD 배당(세후)이 월 평균 {monthly_krw:,.0f}원이 됐어요.",
-        "이제 공격 비중을 조금 줄여 배당을 키울 때예요.",
-        "",
-        f"제안: TQQQ 목표 {cap * 100:.0f}% → {new_cap * 100:.0f}%",
-        f"· TQQQ {sell}주 매도 (약 ${usd:,.0f} · 약 {usd * fx:,.0f}원)",
-        f"· SCHD {buy}주 매수",
-        f"→ 월 배당 약 {monthly_krw:,.0f}원 → 약 {monthly_krw + added_krw:,.0f}원"
-        f" (+{added_krw:,.0f}원)",
-    ]
+    if account_krw is not None:
+        lines = [
+            f"💰 Deneb · 계좌 단계 도달 ({step_krw / 100_000_000:,.1f}억 원)",
+            RULE,
+            f"Deneb 계좌가 약 {account_krw:,.0f}원이 됐어요.",
+            "이제 공격 비중을 조금 줄여 지킬 때예요.",
+            "",
+            f"제안: TQQQ 목표 {cap * 100:.0f}% → {new_cap * 100:.0f}%",
+            f"· TQQQ {sell}주 매도 (약 ${usd:,.0f} · 약 {usd * fx:,.0f}원)",
+            f"· {buy_symbol} 약 {buy}주 매수 (SCHD · 금 중 더 모자란 쪽, 나머지는 매달 맞추기로)",
+        ]
+    else:
+        lines = [
+            f"💰 Deneb · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)",
+            RULE,
+            f"최근 12개월 SCHD 배당(세후)이 월 평균 {monthly_krw:,.0f}원이 됐어요.",
+            "이제 공격 비중을 조금 줄여 배당을 키울 때예요.",
+            "",
+            f"제안: TQQQ 목표 {cap * 100:.0f}% → {new_cap * 100:.0f}%",
+            f"· TQQQ {sell}주 매도 (약 ${usd:,.0f} · 약 {usd * fx:,.0f}원)",
+            f"· SCHD {buy}주 매수",
+            f"→ 월 배당 약 {monthly_krw:,.0f}원 → 약 {monthly_krw + added_krw:,.0f}원"
+            f" (+{added_krw:,.0f}원)",
+        ]
     if gain_krw is not None and room_krw is not None:
         tax = max(gain_krw - room_krw, 0) * 0.22
         note = "올해 공제 안이라 세금 0원" if tax <= 0 else f"예상 세금 약 {tax:,.0f}원"
         lines.append(sub(f"이번 매도 실현 손익 {gain_krw:+,.0f}원 · {note}"))
     lines += [
         "",
-        "TQQQ를 매도하고 SCHD로 옮길까요?",
+        f"TQQQ를 매도하고 {'SCHD · 금으로' if account_krw is not None else 'SCHD로'} 옮길까요?",
         sub('"네" — 오늘 밤 장 마감 지정가로 진행'),
         sub('"아니요" — 이번엔 그대로 (다음 단계에서 다시 여쭤요)'),
         sub(f'"{max(sell // 2, 1)}주만" — 일부만 진행'),

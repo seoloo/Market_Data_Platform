@@ -52,8 +52,8 @@ def _mix_label() -> str:
     return " · ".join(f"{n} {w * 100:.0f}" for n, w in MIX)
 
 
-def ask_text(today: str, deneb_default_krw: float) -> str:
-    """매수 당일 아침 — 이번 달 넣을 돈(합계)을 묻는다."""
+def ask_text(today: str, deneb_default_krw: float, extra: str = "") -> str:
+    """매수 당일 아침 — 이번 달 넣을 돈(합계)을 묻는다. ``extra`` = 맨 아래 줄(브레이크 등)."""
     from auto_trading.notify.style import RULE, sub
 
     total = default_total(deneb_default_krw)
@@ -66,6 +66,7 @@ def ask_text(today: str, deneb_default_krw: float) -> str:
             sub(f"답이 없으면 합계 {total:,.0f}원 기준"),
             sub(f"그때는 Deneb {deneb_default_krw:,.0f}원만 삽니다"),
             sub(f"🌟 Deneb 은 오늘({today}) 밤 그 몫으로 매수해요"),
+            *(["", extra] if extra else []),
         ]
     )
 

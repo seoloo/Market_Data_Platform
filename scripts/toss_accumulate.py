@@ -30,7 +30,7 @@ import math
 import re
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -58,12 +58,14 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.notify.style import RULE, SUB, sub
 from auto_trading.ops import deposit_split, user_settings
 from auto_trading.ops.deneb_guard import (
+    ACCOUNT_STEPS_KRW,
     DIV_STEPS_KRW,
     STAGE_SHARE,
     STEP_CUT,
     Brake,
     Proposal,
     added_monthly_krw,
+    brake_ask_line,
     brake_lines,
     brake_sell,
     div_step_message,
@@ -84,6 +86,7 @@ from auto_trading.ops.deneb_guard import (
     sold,
     status_line,
     step_due,
+    step_due_account,
     typed,
 )
 from auto_trading.ops.deneb_live import (
@@ -108,6 +111,7 @@ from auto_trading.ops.deneb_live import (
     limit_price,
     plan_message,
     ratio_text,
+    targets,
 )
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.kill_switch import halted_for
@@ -813,7 +817,9 @@ def _deneb_ask_today(today: str, telegram: bool) -> bool:
         return False  # 이미 물었거나 이번 달 금액을 미리 정해 두었다
     deneb.ask_month, deneb.ask_ts = today[:7], int(time.time())
     _save_deneb(deneb)
-    _notify(deposit_split.ask_text(today, _deneb_monthly()), telegram)
+    stage = int(_brake_of(deneb).stage) if DENEB_BRAKE else 0
+    extra = brake_ask_line(stage, bool(_deneb_gold()))
+    _notify(deposit_split.ask_text(today, _deneb_monthly(), extra), telegram)
     return True
 
 
@@ -1107,20 +1113,34 @@ def _new_div_step(
     fx_rate: float,
     events: list[tuple[str, str, float]],
 ) -> tuple[Proposal | None, str | None]:
-    """배당 단계에 닿았으면 (제안, 글). 팔 TQQQ 가 없으면 상한만 낮추고 알림 글만."""
+    """배당 단계에 닿았으면 (제안, 글). 팔 TQQQ 가 없으면 상한만 낮추고 알림 글만.
+
+    금 섞기 켜짐이면 배당 대신 Deneb 계좌 크기(:data:`ACCOUNT_STEPS_KRW`)로 단계를 잰다."""
+    gold = _deneb_gold()
     monthly = monthly_dividend_krw(deneb.dividends, today, fx_rate)
-    k = step_due(deneb.div_steps, monthly)
+    total = deneb.cash_usd + sum(deneb.qty.get(s, 0.0) * prices[s] for s in DENEB_SYMBOLS)
+    account = total * fx_rate if gold else None
+    if account is not None:
+        k = step_due_account(deneb.div_steps, account)
+    else:
+        k = step_due(deneb.div_steps, monthly)
     if k is None:
         return None, None
     cap = deneb.lev_cap
     new_cap = max(cap - STEP_CUT, 0.0)
-    total = deneb.cash_usd + sum(deneb.qty.get(s, 0.0) * prices[s] for s in DENEB_SYMBOLS)
-    sell, buy = shift_plan(deneb.qty.get(LEV, 0.0), prices[LEV], prices[DIV], total, new_cap)
-    step_krw = DIV_STEPS_KRW[k]
+    buy_sym = _step_buy_symbol(deneb, prices, new_cap) if gold else DIV
+    sell, buy = shift_plan(deneb.qty.get(LEV, 0.0), prices[LEV], prices[buy_sym], total, new_cap)
+    steps = ACCOUNT_STEPS_KRW if account is not None else DIV_STEPS_KRW
+    step_krw = steps[k]
     if sell < 1:
         deneb.div_steps, deneb.lev_cap = k + 1, new_cap
+        what = (
+            f"계좌 단계 도달 ({step_krw / 100_000_000:,.1f}억 원)"
+            if account is not None
+            else f"배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)"
+        )
         return None, (
-            f"💰 Deneb · 배당 단계 도달 (월 {step_krw / 10_000:,.0f}만 원)\n{RULE}\n"
+            f"💰 Deneb · {what}\n{RULE}\n"
             f"TQQQ 비중이 이미 낮아 팔 것이 없어요. 앞으로 TQQQ 목표를 {new_cap:.0%}로 낮춰 둘게요."
         )
     since = (datetime.fromisoformat(today) - timedelta(days=365)).date().isoformat()
@@ -1137,9 +1157,11 @@ def _new_div_step(
         added_krw=added_monthly_krw(buy, dps, fx_rate),
         gain_krw=None,
         room_krw=None,
+        account_krw=account,
+        buy_symbol=buy_sym,
     )
     deadline = (datetime.fromisoformat(today) + timedelta(days=DIV_STEP_DAYS)).date().isoformat()
-    nxt = DIV_STEPS_KRW[k + 1] if k + 1 < len(DIV_STEPS_KRW) else None
+    nxt = steps[k + 1] if k + 1 < len(steps) else None
     plan = {
         "text": text,
         "cap": cap,
@@ -1150,6 +1172,17 @@ def _new_div_step(
         "div_px": prices[DIV],
     }
     return Proposal(f"d{k}-{today}", "div_step", today, deadline, LEV, sell, plan), text
+
+
+def _step_buy_symbol(deneb: DenebState, prices: Mapping[str, float], cap: float) -> str:
+    """금 섞기 켜짐: 단계 매도 돈으로 살 종목 — SCHD · IAUM 중 새 목표보다 더 모자란 쪽.
+
+    나머지 차이는 매달 맞추기 · 다음 날 채우기가 새 돈으로 메운다(팔지 않고)."""
+    syms = (LEV, DIV, GOLD)
+    total = deneb.cash_usd + sum(deneb.qty.get(s, 0.0) * prices[s] for s in syms)
+    tgt = targets(total, cap, GOLD_MIX)
+    gap = {s: tgt[s] - deneb.qty.get(s, 0.0) * prices[s] for s in (DIV, GOLD)}
+    return GOLD if gap[GOLD] > gap[DIV] else DIV
 
 
 def _deneb_morning(now: datetime, telegram: bool) -> None:
@@ -1280,9 +1313,9 @@ def _deneb_actions(
             if x.kind == "harvest":
                 sym, n = x.symbol, math.floor(sold_o.filled_qty)
             else:
-                sym = DIV
+                sym = _step_buy_symbol(deneb, day.prices, deneb.lev_cap) if _deneb_gold() else DIV
                 net = min(sold_o.filled_usd - sold_o.commission, deneb.cash_usd)
-                n = math.floor(net / (limit_price(day.prices[DIV], "BUY") * (1 + day.fee)))
+                n = math.floor(net / (limit_price(day.prices[sym], "BUY") * (1 + day.fee)))
             if n < 1:
                 x.status, x.phase = "done", "done"
                 _refresh(bot, x)

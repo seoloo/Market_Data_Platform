@@ -2517,3 +2517,8 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자가 Deneb 정지를 풂 → 그날 21:00 다음 날 채우기가 남은 전략 현금 $220 로 TQQQ 2 · SCHD 2 접수(사용자는 다음 달부터로 알았음). 사용자 선택 A: 그대로 두고 금 섞기 만들기.
 - `ops/deneb_live`: `GOLD`(IAUM) · `GOLD_MIX` 0.5 · `targets` · `ratio_text` · `active_symbols`, `choose` · `fill` 에 `gold`. `choose` 는 사는 수를 목표까지 모자란 주수(올림)로 묶어 세 종목도 빠르게(결과는 예전과 같음 — 300 경우 비교). 설정 `deneb.gold_on`(기본 꺼짐 → 사용자 요청으로 켬). `toss_accumulate` 가격 · 상한 · 매도 허용 · 알림 · 현황에 IAUM, 실거래 홈 · 아이콘 · 정리 안내 문구. 그림자(280)는 두 종목 유지.
 - 시험: `tests/ops/test_deneb_gold.py` 9 개 + 전체 통과. 11 월 계획부터 새 돈이 IAUM 을 먼저 채움(지금 보유를 팔지 않음).
+
+## 2026-10-19 — Vega · Altair 기다리기 비교 · Deneb 계좌 단계 · 브레이크 한 줄 (Claude)
+
+- 참고 계산(커밋 안 함): Vega(T/v2 BTC · ETH · SOL) · Altair 근사(BTC · ETH × 4 선물 롱, 숏 · 장중 손절 빼고 펀딩 연 10%), 2018 ~ 월 적립 3 · 5 년 창. 'BTC −30 · −50% 올 때까지 기다리기' vs 바로 적립: 차이 중간 0 ~ −2%, 비관론이 맞은 창도 중간 0 ~ +1% — 추세가 꺼지면 스스로 현금이라 기다림과 같아짐. Altair 근사는 한 번(+67%, 4 배 롱이 추세 꺼지기 전 급락을 맞은 경우) 큰 차이.
+- 사용자 '1번 2번 진행': 금 섞기 켜짐이면 TQQQ 상한 단계를 계좌 1.2 · 3.5 · 6 · 12 억 원 기준으로(`deneb_guard.step_due_account` · `toss_accumulate._new_div_step` · `_step_buy_symbol`), 입금 안내에 브레이크 단계 한 줄(`brake_ask_line` · `deposit_split.ask_text(extra)`). 시험 3 개 추가 · 전체 통과.
