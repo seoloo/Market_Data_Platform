@@ -2546,3 +2546,10 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자 "페이사인 느낌"을 비상장 투자 대신 거래 가능한 초기 성장 상장사라는 의미로 해석해 3개 후보를 설명. [PAYS 2026년 2분기](https://www.sec.gov/Archives/edgar/data/1496443/000168316826005988/paysign_ex9901.htm)의 흑자와 이들 기업의 성장·수익성 검증 단계를 구분. 사업 규모가 작다는 사실을 낮은 시가총액·저평가·높은 기대수익으로 치환하지 않음.
 - [OUST](https://investors.ouster.com/news-releases/news-release-details/ouster-announces-results-second-quarter-2026)는 센서·인지 플랫폼이며 완성 로봇 업체 아님. 분기 매출 약 5,500만 달러·순손실 약 1,800만 달러, StereoLabs 인수와 주식 발행을 확인. [SERV](https://ir.serverobotics.com/news-releases/news-release-details/serve-robotics-announces-second-quarter-2026-results)는 분기 매출 약 320만 달러·연간 매출 전망 900만~1,000만 달러로 하향, 로봇 배치와 가동·수익성을 구분. [RR 공시](https://ir.richtechrobotics.com/node/7606/html)는 6월 종료 분기 매출 약 137만 달러·순손실 약 998만 달러, 전시·개발 발표를 대량 유상 도입으로 해석하지 않음.
 - Phase 0 정보 검토, 새 연구 판정·운영 상태 변경 없음. 코드·적립 종목·설정·주문·계좌·예약·알림·자격정보 불변. 원문 대조·산술·기존 기록 보존·문서 diff 검사만 수행, 코드 시험 미실행. 현재 가격 기반 가치평가와 매수 승인 아님.
+
+## 2026-10-19 — Tesla형 휴머노이드 직접 개발사 검토 (Codex)
+
+- 사용자 요구를 센서·배달 로봇이 아닌 휴머노이드 직접 개발사로 좁혀 Agility Robotics(Digit), Figure AI(Figure 03·Helix), Apptronik(Apollo)을 비교. Figure·Apptronik 비상장과 일반 상장주 투자를 구분. 기술·사업의 관심 후보이지 현재 가격의 저평가/매수 판정 아님.
+- [Agility 합병 발표](https://www.agilityrobotics.com/content/agility-robotics-to-go-public-through-merger-with-churchill-capital-corp-xi) 및 [2026-10-13 8-K](https://www.sec.gov/Archives/edgar/data/2074973/000121390026109077/ea0308496-8k425_church11.htm) 대조: 현재 상장 SPAC CCXI와 합병 후 예정 티커 AGLT 구분, S-4 효력 10/13·주주총회 예정 11/02는 합병 완료·투자 적정성 승인 아님. Digit 4 상업 배치와 Digit 5의 2027년 공급 계획, 조건부 다년 주문을 실현 매출과 분리.
+- [Figure BMW 실증](https://www.figure.ai/news/f-03-at-bmw), [비인가 주식 이전 경고](https://www.figure.ai/news/notice-regarding-unauthorized-attempts-to-sell-figure-stock), [Apptronik Apollo 2·Robot Park](https://apptronik.com/news-collection/welcome-to-robot-park-where-apptroniks-apollo-goes-to-work) 확인. 공장 작업·훈련 실증과 범용 자율성·수익성·대량 유상 납품을 구분. Apptronik 데이터 수집의 원격조종·자율 실행 혼합을 완전 자율 상용화로 해석하지 않음.
+- Phase 0 정보 검토, 연구·운영 상태 불변. 코드·적립·주문·예약·알림 변경 없음. 타 세션 코드 변경 7파일 보존, PROGRESS 추가만 검증·커밋. 원문·문서 링크·기존 기록 보존·diff 범위 검사 수행, 코드 시험 미실행.
