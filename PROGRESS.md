@@ -2566,3 +2566,9 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 바이낸스 남은 돈(10-19 23:4x): 현물 USDT 252.31 · 유동형 Earn 599.00 · 선물 지갑 843.38(USDT 852.77 · USDC −8.21) — 사용자가 업비트로 옮김.
 - 업비트 원화 2,272,507 원이 이미 있음 — 업비트 원화 전체가 Vega 현금이라 확인 전까지 `HALT_vega` 유지, `UPBIT_TRADING_ENABLED` 꺼짐 그대로.
 - 10-20 00:3x 사용자 "180만원 옮겼어 남음 금액으로 vega 정지 풀어줘" → 업비트 원화 471,507 원, `.env` 에 `UPBIT_TRADING_ENABLED=true` 추가(10-16 에 생긴 스위치가 없었음) · `HALT_vega` 풀음. 계획 보기: BTC ≈ 65,441 · ETH ≈ 56,686 · SOL ≈ 42,782 원 매수 예정(10-20 09:05).
+
+## 2026-10-20 — 미국 대형 상선·LNG·쇄빙선 조선사 정보 검토 (Codex)
+
+- 사용자 요청은 해운·보트가 아닌 국내 조선 3사와 같은 대형 선박 건조사 비교. 미국 상장 HII(군함 중심)·GD(복합 그룹 내 NASSCO 상선/군수지원선)를 구분, 미국 소재 Hanwha Philly와 비상장 Bollinger를 미국 독립 상장 종목으로 오인하지 않음. 현재 주가·매수 적정성 판정 없음.
+- [NASSCO 상선 제품](https://nassco.com/products/construction/commercial-construction/)의 LNG 추진 컨테이너선과 LNG 화물 운반선은 별개. [Hanwha 2025년 LNG선 계약](https://www.hanwha.com/newsroom/news/press-releases/hanwha-shipping-orders-lng-carrier-from-hanwha-philly-shipyard.do)은 거제와 공동 건조이며 미국 현지 전체 건조/기인도와 구분, [2026년 회사 설명](https://www.hanwha.com/newsroom/news/feature-stories/building-what-deterrence-demands-how-hanwha-is-reinforcing-americas-defense-industrial-base.do)의 LNG선 2척·MR 탱커 10척 수주 언급 확인.
+- [USCG 북극 쇄빙선 사업](https://www.dcms.uscg.mil/Our-Organization/Assistant-Commandant-for-Acquisitions-CG-9/Programs/Surface-Programs/Arctic-Security-Cutter/)과 [Bollinger ASC 계약](https://www.bollingershipyards.com/news/bollinger-shipyards-finalizes-us-coast-guard-contract-to-begin-production-on-arctic-security-cutter-program/)을 통해 실제 건조사를 확인. 북극 테마를 HII/GD 또는 모든 LNG선에 자동 연결하지 않음. Phase 0 정보 검토·운영 상태 불변, 문서 원문/링크·기존 기록 보존·diff 범위 검사만 수행, 코드 시험·계좌 조회·주문·설정 변경 없음.
