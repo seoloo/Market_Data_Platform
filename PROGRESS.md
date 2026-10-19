@@ -2553,3 +2553,8 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - [Agility 합병 발표](https://www.agilityrobotics.com/content/agility-robotics-to-go-public-through-merger-with-churchill-capital-corp-xi) 및 [2026-10-13 8-K](https://www.sec.gov/Archives/edgar/data/2074973/000121390026109077/ea0308496-8k425_church11.htm) 대조: 현재 상장 SPAC CCXI와 합병 후 예정 티커 AGLT 구분, S-4 효력 10/13·주주총회 예정 11/02는 합병 완료·투자 적정성 승인 아님. Digit 4 상업 배치와 Digit 5의 2027년 공급 계획, 조건부 다년 주문을 실현 매출과 분리.
 - [Figure BMW 실증](https://www.figure.ai/news/f-03-at-bmw), [비인가 주식 이전 경고](https://www.figure.ai/news/notice-regarding-unauthorized-attempts-to-sell-figure-stock), [Apptronik Apollo 2·Robot Park](https://apptronik.com/news-collection/welcome-to-robot-park-where-apptroniks-apollo-goes-to-work) 확인. 공장 작업·훈련 실증과 범용 자율성·수익성·대량 유상 납품을 구분. Apptronik 데이터 수집의 원격조종·자율 실행 혼합을 완전 자율 상용화로 해석하지 않음.
 - Phase 0 정보 검토, 연구·운영 상태 불변. 코드·적립·주문·예약·알림 변경 없음. 타 세션 코드 변경 7파일 보존, PROGRESS 추가만 검증·커밋. 원문·문서 링크·기존 기록 보존·diff 범위 검사 수행, 코드 시험 미실행.
+
+## 2026-10-19 — Tesla 1달러 소액 적립 검토 (Codex)
+
+- 사용자 질문을 거래일마다 1달러 매수라는 가정으로 설명. 월 약 20~22달러·연 약 250달러 납입 규모이며 수익 예측 아님. TSLA는 자동차·에너지·AI 등 전체 기업에 대한 투자이고 순수 Optimus 지분 아님. [2026년 2분기 공시](https://www.sec.gov/Archives/edgar/data/1318605/000162828026049270/tsla-20260630.htm)와 [공식 업데이트](https://ir.tesla.com/_flysystem/s3/sec/000162828026049213/tsla-20260722-gen.pdf)의 기존 사업·유동성 및 Optimus 생산 준비/초기 학습용 제작을 확인, 로봇 대량 유상 판매·수익성으로 해석하지 않음.
+- 소액으로 손실 금액을 제한하는 선택과 현재 가격의 매수 적정성을 분리. 최소 주문·수수료·환전 비용·단일 종목 집중을 확인하기 전 자동 적립 변경 없음. Phase 0 정보 검토·운영 상태 불변, 타 세션 변경 보존. 문서 범위·기존 기록 보존 검증만 수행, 코드 시험 미실행.
