@@ -2572,3 +2572,8 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자 요청은 해운·보트가 아닌 국내 조선 3사와 같은 대형 선박 건조사 비교. 미국 상장 HII(군함 중심)·GD(복합 그룹 내 NASSCO 상선/군수지원선)를 구분, 미국 소재 Hanwha Philly와 비상장 Bollinger를 미국 독립 상장 종목으로 오인하지 않음. 현재 주가·매수 적정성 판정 없음.
 - [NASSCO 상선 제품](https://nassco.com/products/construction/commercial-construction/)의 LNG 추진 컨테이너선과 LNG 화물 운반선은 별개. [Hanwha 2025년 LNG선 계약](https://www.hanwha.com/newsroom/news/press-releases/hanwha-shipping-orders-lng-carrier-from-hanwha-philly-shipyard.do)은 거제와 공동 건조이며 미국 현지 전체 건조/기인도와 구분, [2026년 회사 설명](https://www.hanwha.com/newsroom/news/feature-stories/building-what-deterrence-demands-how-hanwha-is-reinforcing-americas-defense-industrial-base.do)의 LNG선 2척·MR 탱커 10척 수주 언급 확인.
 - [USCG 북극 쇄빙선 사업](https://www.dcms.uscg.mil/Our-Organization/Assistant-Commandant-for-Acquisitions-CG-9/Programs/Surface-Programs/Arctic-Security-Cutter/)과 [Bollinger ASC 계약](https://www.bollingershipyards.com/news/bollinger-shipyards-finalizes-us-coast-guard-contract-to-begin-production-on-arctic-security-cutter-program/)을 통해 실제 건조사를 확인. 북극 테마를 HII/GD 또는 모든 LNG선에 자동 연결하지 않음. Phase 0 정보 검토·운영 상태 불변, 문서 원문/링크·기존 기록 보존·diff 범위 검사만 수행, 코드 시험·계좌 조회·주문·설정 변경 없음.
+
+## 2026-10-20 — 대형 조선사 투자 지역 보완 설명 (Codex)
+
+- 한국만 가능하다는 결론은 아님. [Yangzijiang 공식 소개](https://www.yzjship.com/en/index.html)의 중국 조선 기반·싱가포르 BS6 상장, [Kawasaki 선박해양 사업](https://www.khi.co.jp/corporate/division/ship/index.html)의 가스선·잠수함 등 건조 사업 확인. 사업 노출과 국내 투자자의 접근성을 기준으로 국내 조선 3사가 직접적인 후보라는 설명이지 중국·일본 조선사 부재나 한국 주식 저평가를 뜻하지 않음. 현재 주가·증권사별 거래 가능 여부는 미확인.
+- Phase 0 정보 검토·운영 상태 불변. PROGRESS 추가만 원문·기존 기록 보존·diff 범위 검증, 코드·주문·설정 변경 및 코드 시험 없음.
