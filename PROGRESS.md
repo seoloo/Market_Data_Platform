@@ -2565,3 +2565,4 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - `AutoTrading_Vega` → `vega_upbit run`. 업비트 실행기 잠금(`CRUISE_UPBIT`) 뺌 · 자동 해제 이식. `deposit_split.MIX` 90 : 10, 알림 한 줄 업비트 원화, 텔레그램 '/deposit' 메뉴 · 바이낸스 입금 자동 확인 주석. 실거래 홈 업비트 Vega. 주간 요약 예약(`AutoTrading_Upbit_T2_Weekly`)은 관리자 권한이라 못 바꿈(꺼짐).
 - 바이낸스 남은 돈(10-19 23:4x): 현물 USDT 252.31 · 유동형 Earn 599.00 · 선물 지갑 843.38(USDT 852.77 · USDC −8.21) — 사용자가 업비트로 옮김.
 - 업비트 원화 2,272,507 원이 이미 있음 — 업비트 원화 전체가 Vega 현금이라 확인 전까지 `HALT_vega` 유지, `UPBIT_TRADING_ENABLED` 꺼짐 그대로.
+- 10-20 00:3x 사용자 "180만원 옮겼어 남음 금액으로 vega 정지 풀어줘" → 업비트 원화 471,507 원, `.env` 에 `UPBIT_TRADING_ENABLED=true` 추가(10-16 에 생긴 스위치가 없었음) · `HALT_vega` 풀음. 계획 보기: BTC ≈ 65,441 · ETH ≈ 56,686 · SOL ≈ 42,782 원 매수 예정(10-20 09:05).

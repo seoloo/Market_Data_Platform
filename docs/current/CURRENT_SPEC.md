@@ -419,5 +419,5 @@ Phase 0 자료 감사·정보 도구 기능 검증이지 Phase 4 PASS·새 OOS·
 - 입금 비율 `deposit_split.MIX` = Deneb 0.9 · Vega 0.1 (Altair 빠짐). 입금 안내 · Deneb 계획 알림 한 줄은
   '🌌 업비트(Vega)엔 N원 — Deneb : Vega = 90 : 10'. 텔레그램 '/deposit'(바이낸스 입금 확인) 메뉴 · 10 분 자동 확인 주석 처리.
 - 실거래 홈은 업비트 Vega 장부를 보임(`live_home.VEGA_ON_UPBIT`). 바이낸스 Vega · Altair 코드 · 장부 · 분배 코드는 기록으로 남김.
-- **아직 남은 사용자 결정**: 업비트 원화 계좌 전체가 Vega 현금이라 그 금액 확인 → `HALT_vega` 풀기 · `UPBIT_TRADING_ENABLED` 켜기.
+- 10-20 사용자가 업비트에서 180 만 원을 옮겨 471,507 원을 남기고 "남은 금액으로 vega 정지 풀어줘" → `.env` `UPBIT_TRADING_ENABLED=true` 추가 · `HALT_vega` 풀음. 첫 업비트 실행 10-20 09:05.
 
