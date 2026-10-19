@@ -31,7 +31,14 @@ _SYMBOLS = {
     "ETH": "eth.svg",
     "SOL": "sol.svg",
 }
-_STOCKS = {"TQQQ": "chart", "SCHD": "leaf", "BTQ": "quantum", "QS": "stock", "WQTM": "quantum"}
+_STOCKS = {
+    "TQQQ": "chart",
+    "SCHD": "leaf",
+    "IAUM": "coins",
+    "BTQ": "quantum",
+    "QS": "stock",
+    "WQTM": "quantum",
+}
 # 예전 정적 내보내기/주소와 원본 보존. 최신 홈은 작은 비트맵 로고를 확대하지 않는다.
 _LEGACY = ("tqqq.png", "schd.ico", "btq.ico", "qs.png")
 ICON_ASSETS = tuple(

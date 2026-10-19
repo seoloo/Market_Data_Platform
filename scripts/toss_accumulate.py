@@ -88,6 +88,8 @@ from auto_trading.ops.deneb_guard import (
 )
 from auto_trading.ops.deneb_live import (
     DIV,
+    GOLD,
+    GOLD_MIX,
     LEV,
     DenebOrder,
     DenebState,
@@ -105,6 +107,7 @@ from auto_trading.ops.deneb_live import (
     lev_share,
     limit_price,
     plan_message,
+    ratio_text,
 )
 from auto_trading.ops.deneb_live import SYMBOLS as DENEB_SYMBOLS
 from auto_trading.ops.kill_switch import halted_for
@@ -175,8 +178,8 @@ DENEB_START = "2026-10-09"
 DENEB_MONTHLY_KRW = 300_000.0
 """2026-10-09 사용자 "첫 거래일로 하고 당분간은 월 30만원으로만 매수해줘" (문서 182 M3, 토스)."""
 DENEB_FILE = "DENEB.json"
-DENEB_MAX_QTY = {DIV: 40}
-"""한 번에 SCHD 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
+DENEB_MAX_QTY = {DIV: 40, GOLD: 40}
+"""한 번에 SCHD · IAUM 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
 DENEB_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
 DENEB_BRAKE = True
 """T 브레이크 (문서 183 ~ 188, 사용자 2026-10-09 '처음부터'): TQQQ 고점 −15% 절반 · −30% 전부,
@@ -210,6 +213,11 @@ def _pref(key: str) -> Any:
 
 def _deneb_monthly() -> float:
     return float(_pref("deneb.monthly_krw"))
+
+
+def _deneb_gold() -> float:
+    """금 섞기 설정 (``deneb.gold_on``, 사용자 2026-10-19) → 나머지 중 금 몫 (꺼지면 0)."""
+    return GOLD_MIX if _pref("deneb.gold_on") else 0.0
 
 
 def _deneb_max() -> float:
@@ -375,7 +383,7 @@ def _trader() -> TossTrader:
         TossTokenCache(TOKEN),
         allowed_symbols=frozenset(symbols),
         max_qty={TQQQ: MAX_TQQQ_QTY, **DENEB_MAX_QTY},
-        sell_symbols=frozenset({TQQQ, DIV}),
+        sell_symbols=frozenset({TQQQ, DIV, GOLD}),
         max_limit_usd=Decimal(str(limit)),
     )
 
@@ -665,7 +673,7 @@ def _deneb_plan(
         notes.append("이번 달 납입 0원(텔레그램 답) — 이월 현금 · 배당만으로")
     last = {s: day.prices[s] for s in DENEB_SYMBOLS}
     qty, cash = _deneb_today(day, deneb)
-    return choose(qty, cash, last, share, day.fee), vol, share, notes
+    return choose(qty, cash, last, share, day.fee, _deneb_gold()), vol, share, notes
 
 
 def _deneb_fill(
@@ -682,7 +690,9 @@ def _deneb_fill(
     _, share = _deneb_share(day, deneb)
     qty, cash = _deneb_today(day, deneb)
     last = {s: day.prices[s] for s in DENEB_SYMBOLS}
-    plan = fill(qty, cash, last, share, day.fee, {LEV: MAX_TQQQ_QTY, **DENEB_MAX_QTY})
+    plan = fill(
+        qty, cash, last, share, day.fee, {LEV: MAX_TQQQ_QTY, **DENEB_MAX_QTY}, _deneb_gold()
+    )
     lines: list[str] = []
     for sym, n in sorted(plan.items()):
         limit = limit_price(day.prices[sym], "BUY")
@@ -849,6 +859,7 @@ def _deneb_preview(now: datetime, *, title: str = "") -> str:
             *([b[2:]] if (b := brake_lines(_brake_of(before))) else []),
             *([_tax_section(tax)] if tax else []),
         ],
+        gold=_deneb_gold(),
     )
     return f"{title}\n{text}" if title else text
 
@@ -903,12 +914,10 @@ def _deneb_run(
     plan, vol, share, more = _deneb_plan(day, deneb)
     notes += more
     if not any(str(x[0]) == day.today[:7] for x in deneb.months):
-        deneb.months.append([day.today[:7], vol, share])
+        deneb.months.append([day.today[:7], vol, share, _deneb_gold()])
     vol_txt = f"{vol:.1%}" if vol is not None else "모름"
-    head = (
-        f"🌟 Deneb · {day.today[:7]} TQQQ {share:.0%} / SCHD {1 - share:.0%}"
-        f" (QQQ 20일 변동성 {vol_txt})"
-    )
+    ratio = ratio_text(share, _deneb_gold())
+    head = f"🌟 Deneb · {day.today[:7]} {ratio} (QQQ 20일 변동성 {vol_txt})"
     if not enabled or halted:
         _save_deneb(deneb)
         why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
@@ -952,7 +961,7 @@ def _deneb_run(
         deneb.done_month = day.today[:7]
     lines.append(
         f"전략 현금 ${deneb.cash_usd:,.2f} (체결 뒤 정산) · 보유 TQQQ {deneb.qty.get(LEV, 0):g}"
-        f" · SCHD {deneb.qty.get(DIV, 0):g}"
+        f" · SCHD {deneb.qty.get(DIV, 0):g} · IAUM {deneb.qty.get(GOLD, 0):g}"
     )
     _save_deneb(deneb)
     return [head, *notes, *lines, *alerts]
@@ -1343,7 +1352,7 @@ class Day:
         self.holdings: dict[str, TossPosition] = reader.holdings()
         self.prices = {
             k: float(v)
-            for k, v in reader.prices([p.symbol for p in _plans()] + [TQQQ, DIV]).items()
+            for k, v in reader.prices([p.symbol for p in _plans()] + [TQQQ, DIV, GOLD]).items()
         }
         self.fx = float(reader.usd_krw())
         fee = reader.us_commission()
@@ -1869,7 +1878,8 @@ def status() -> int:
         print(
             f"Deneb(M3): 시작 {deneb.start} · 이번 달 끝 {deneb.done_month or '아직'}"
             f" · 전략 현금 ${deneb.cash_usd:,.2f} · TQQQ {deneb.qty.get(LEV, 0):g}"
-            f" · SCHD {deneb.qty.get(DIV, 0):g} · 월 {_deneb_monthly():,.0f}원"
+            f" · SCHD {deneb.qty.get(DIV, 0):g} · IAUM {deneb.qty.get(GOLD, 0):g}"
+            f" · 금 섞기 {'켜짐' if _deneb_gold() else '꺼짐'} · 월 {_deneb_monthly():,.0f}원"
         )
         b = _brake_of(deneb)
         print(

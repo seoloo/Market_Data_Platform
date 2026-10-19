@@ -158,7 +158,7 @@ class Item:
     groups: list[str]
     want: Decimal
     deneb_part: Decimal = ZERO
-    """Deneb 장부 몫 (토스 미국 TQQQ · SCHD). 팔린 만큼 Deneb 장부에서 뺀다."""
+    """Deneb 장부 몫 (토스 미국 TQQQ · SCHD · IAUM). 팔린 만큼 Deneb 장부에서 뺀다."""
     deneb_booked: Decimal = ZERO
     status: str = "waiting"
     """waiting · working · done · failed."""
@@ -384,7 +384,7 @@ def build_items(
 
     * Vega = 업비트 · 바이낸스 현물의 BTC · ETH · SOL 전량 (다른 코인은 건드리지 않는다).
       Vega 는 2026-10-15 바이낸스로 옮겼다 — 업비트에 남은 몫도 Vega 로 함께 판다.
-    * Deneb = 토스 TQQQ · SCHD 중 Deneb 장부 수량.
+    * Deneb = 토스 TQQQ · SCHD · IAUM 중 Deneb 장부 수량.
     * 토스 적립 = 적립 장부가 산 몫(``acc_qty``) — 장부 밖 보유(사람이 직접 산 종목 · 적립 시작 전
       수량)는 **수동 보유로 남긴다**.
     * 토스 지정가는 정수 주만 — 소수점은 남기고 알린다(소수점 매도는 시장가만 된다).

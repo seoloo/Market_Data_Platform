@@ -7,6 +7,9 @@
 — 지정가(전날 종가 ±3%) 밖이면 미체결.
 
 빠진 것(실거래에서 사람이 버튼으로 하는 것): 배당 단계 TQQQ 상한 낮추기 · 12 월 공제 실현.
+
+2026-10-19 실거래에 금 섞기(설정 ``deneb.gold_on``)가 생긴 뒤에도 그림자는 **TQQQ · SCHD 두 종목**
+그대로 둔다 — 금 섞기를 켜면 '금 없이 했다면' 과 나란히 보는 기록이 된다(문서 285).
 """
 
 from __future__ import annotations
@@ -26,7 +29,6 @@ from auto_trading.ops.deneb_guard import (
 from auto_trading.ops.deneb_live import (
     DIV,
     LEV,
-    SYMBOLS,
     DenebOrder,
     DenebState,
     apply_fill,
@@ -39,6 +41,8 @@ from auto_trading.ops.deneb_live import (
 )
 from auto_trading.ops.mf_paper import LEV_MAX
 
+SYMBOLS = (LEV, DIV)
+"""그림자는 금 없이 두 종목."""
 Closes = Mapping[str, Sequence[tuple[str, float]]]
 """종목 → (미국 날짜, 수정 종가) 오래된 것 먼저."""
 

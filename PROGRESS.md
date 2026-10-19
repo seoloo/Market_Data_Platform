@@ -2511,3 +2511,9 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 참고 계산(커밋 안 함, 판정 아님): Deneb 나머지 몫 비교(SCHD · SCHD + 금 · QQQ + 금 · QQQ + SCHD · SPY + 금 · SPY + SCHD), 금 비중 0 ~ 40%, 월 5 ~ 150 만 원 최종 금액 · 10 년 창, SCHD 배당 금액, 배당 ETF 15 개 비교, 익절 7 방식. 결론: SCHD + 금이 수익 같고 낙폭 가장 작음, QQQ · SPY 는 나스닥 단독 폭락에 약함.
 - 사용자 "3번에 대해 자세히 확인해줄래?" → [286](docs/research/286-deneb-band-rebalance-preregistration.md) 사전 고정 `346bf5f` → 코드 `e0a9c2a` → 1 회. S2 10 년 창 93% · T 1986 ~ IRR 20.78% vs 20.38% 였지만 B15 가 S2 에서 낮아 **`불명`**. 차이 ±0.5%p · 문턱마다 들쭉날쭉, 실제 지금 Deneb 에선 B10 −0.85%p. 매도만 1/2 ~ 1/3.
 - Deneb 정지 · 설정 그대로. 금 섞기 실거래 코드는 아직 안 함(사용자 결정 대기).
+
+## 2026-10-19 — Deneb 정지 해제 · 금 섞기 실거래 반영 (Claude)
+
+- 사용자가 Deneb 정지를 풂 → 그날 21:00 다음 날 채우기가 남은 전략 현금 $220 로 TQQQ 2 · SCHD 2 접수(사용자는 다음 달부터로 알았음). 사용자 선택 A: 그대로 두고 금 섞기 만들기.
+- `ops/deneb_live`: `GOLD`(IAUM) · `GOLD_MIX` 0.5 · `targets` · `ratio_text` · `active_symbols`, `choose` · `fill` 에 `gold`. `choose` 는 사는 수를 목표까지 모자란 주수(올림)로 묶어 세 종목도 빠르게(결과는 예전과 같음 — 300 경우 비교). 설정 `deneb.gold_on`(기본 꺼짐 → 사용자 요청으로 켬). `toss_accumulate` 가격 · 상한 · 매도 허용 · 알림 · 현황에 IAUM, 실거래 홈 · 아이콘 · 정리 안내 문구. 그림자(280)는 두 종목 유지.
+- 시험: `tests/ops/test_deneb_gold.py` 9 개 + 전체 통과. 11 월 계획부터 새 돈이 IAUM 을 먼저 채움(지금 보유를 팔지 않음).

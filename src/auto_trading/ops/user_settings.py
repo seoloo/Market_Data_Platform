@@ -101,6 +101,13 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field("deneb.ask_on", "매수 전날 금액 묻기", "bool", True, "다음 매수 달부터"),
     Field("deneb.harvest_on", "12월 양도세 공제 실현", "bool", True, "올해 12월 공지부터"),
+    Field(
+        "deneb.gold_on",
+        "금 섞기 (SCHD 절반 → 금 IAUM)",
+        "bool",
+        False,
+        "다음 실행(매일 21:00)부터 — 새 돈 · 채우기로 맞춤",
+    ),
     Field("alerts.vega_trade", "Vega 매매 알림", "bool", True, "다음 09:05 실행부터"),
     Field("alerts.vega_weekly", "Vega 주간 요약", "bool", True, "다음 토요일부터"),
     Field("alerts.fx", "환전 알림", "bool", True, "다음 환전 확인(평일 09 · 12 · 15시)부터"),

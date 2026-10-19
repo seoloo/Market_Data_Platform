@@ -38,6 +38,7 @@ class FakeToss:
             "QS": "4.57",
             "TQQQ": "81.07",
             "SCHD": "33.15",
+            "IAUM": "41.5",
         }
         return {s: Decimal(table[s]) for s in symbols}
 

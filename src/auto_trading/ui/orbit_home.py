@@ -23,6 +23,7 @@ _NAMES = {
     "SOL": "솔라나",
     "TQQQ": "ProShares UltraPro QQQ",
     "SCHD": "Schwab US Dividend Equity ETF",
+    "IAUM": "iShares Gold Trust Micro (금)",
     "BTQ": "BTQ",
     "WQTM": "WQTM",
     "QS": "QuantumScape",
@@ -542,6 +543,7 @@ _COLORS = {
     "SOL": "#1D9E75",
     "TQQQ": "#378ADD",
     "SCHD": "#1D9E75",
+    "IAUM": "#BA7517",
 }
 _SPARE = ("#D4537E", "#378ADD", "#BA7517", "#5DCAA5", "#7F77DD")
 

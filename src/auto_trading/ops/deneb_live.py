@@ -12,6 +12,10 @@
   놀고 있는 현금 평균 3 ~ 4% → 1% 아래, 모의 20 년 +18%(같은 낙폭).
 * 체결은 주문 상세(체결 수량 · 금액 · 수수료)로만 장부에 넣는다.
   사용자가 따로 가진 같은 종목과 섞지 않는다.
+* **금 섞기** (사용자 2026-10-19 "A로 진행해줘", 문서 285 TG `우위`):
+  설정 ``deneb.gold_on`` 이 켜지면 TQQQ 를 뺀 나머지를 SCHD : IAUM = 1 : 1
+  (``gold`` = 금 몫 0.5). 브레이크 · 되사기는 TQQQ 만 그대로.
+  금 몫 0 이고 IAUM 을 안 들고 있으면 계산은 예전(TQQQ · SCHD 두 종목)과 같다.
 """
 
 from __future__ import annotations
@@ -24,8 +28,11 @@ from typing import Any
 
 from auto_trading.ops.mf_paper import LEV_MAX, VOL_REF, lev_share_vol, realized_vol
 
-LEV, DIV = "TQQQ", "SCHD"
-SYMBOLS = (LEV, DIV)
+LEV, DIV, GOLD = "TQQQ", "SCHD", "IAUM"
+SYMBOLS = (LEV, DIV, GOLD)
+"""Deneb 이 다루는 종목 전부 (가격 · 정리 · 위험 뉴스 · 크기 확인). 금은 설정이 켜졌을 때만 산다."""
+GOLD_MIX = 0.5
+"""금 섞기 켜짐: TQQQ 를 뺀 나머지 중 금 몫 (문서 285 TG)."""
 LIMIT_BUFFER = 0.03
 WITHHOLDING = 0.15
 DIV_WAIT_DAYS = 10
@@ -57,7 +64,7 @@ class DenebOrder:
 class DenebState:
     start: str
     cash_usd: float = 0.0
-    qty: dict[str, float] = field(default_factory=lambda: dict.fromkeys(SYMBOLS, 0.0))
+    qty: dict[str, float] = field(default_factory=lambda: dict.fromkeys((LEV, DIV), 0.0))
     done_month: str = ""
     deposits: list[list[Any]] = field(default_factory=list)
     """[날짜, 원화, 달러, 환율]."""
@@ -131,6 +138,27 @@ def next_weekday(today: str) -> str:
     return d.isoformat()
 
 
+def active_symbols(qty: Mapping[str, float], gold: float) -> tuple[str, ...]:
+    """이번 계산에 쓸 종목 — 금 몫이 있거나 IAUM 을 들고 있으면 셋, 아니면 TQQQ · SCHD."""
+    if gold > 0 or qty.get(GOLD, 0.0) > 0:
+        return SYMBOLS
+    return (LEV, DIV)
+
+
+def targets(total: float, share: float, gold: float = 0.0) -> dict[str, float]:
+    """평가액 ``total`` → 종목별 목표 금액. 금 몫 0 이면 IAUM 목표 0 (들고 있으면 판다)."""
+    rest = (1 - share) * total
+    return {LEV: share * total, DIV: rest * (1 - gold), GOLD: rest * gold}
+
+
+def ratio_text(share: float, gold: float = 0.0) -> str:
+    """'TQQQ 60% : SCHD 40%' · 금 섞기면 'TQQQ 60% : SCHD 20% : IAUM 20%'."""
+    if gold <= 0:
+        return f"TQQQ {share:.0%} : SCHD {1 - share:.0%}"
+    rest = 1 - share
+    return f"TQQQ {share:.0%} : SCHD {rest * (1 - gold):.0%} : IAUM(금) {rest * gold:.0%}"
+
+
 def share_reason(vol: float | None, share: float) -> str:
     """TQQQ 몫을 왜 그렇게 정했는지 한 줄 (182 M3: 60% × min(1, 0.20 / σ20))."""
     if vol is None or vol <= 0:
@@ -157,6 +185,7 @@ def plan_message(
     usd_now: float,
     need_all: float,
     sections: Sequence[Sequence[str]] = (),
+    gold: float = 0.0,
 ) -> str:
     """텔레그램 답장: 오늘 밤 M3 매수 계획 + 덧붙일 구역(보유 · 배당) (순수).
 
@@ -168,10 +197,10 @@ def plan_message(
         lines.append(f"이번 달 납입 {krw:,.0f}원 ({source}) ≈ ${krw / fx_rate:,.2f}")
     else:
         lines.append("이번 달 납입 0원 — 이월 현금 · 배당만으로")
-    lines.append(f"비율 TQQQ {share:.0%} : SCHD {1 - share:.0%}")
+    lines.append(f"비율 {ratio_text(share, gold)}")
     lines.append(sub(f"이유: {share_reason(vol, share)}"))
     need_deneb = 0.0
-    for sym in SYMBOLS:
+    for sym in SYMBOLS if gold > 0 or plan.get(GOLD) else (LEV, DIV):
         n = plan.get(sym, 0)
         if n > 0:
             approx = n * prices[sym] * (1 + fee)
@@ -241,6 +270,8 @@ def holdings_lines(state: DenebState, prices: Mapping[str, float]) -> list[str]:
     value_all = cost_all = 0.0
     for sym in SYMBOLS:
         q = state.qty.get(sym, 0.0)
+        if q <= 0 and sym == GOLD:
+            continue  # 금을 안 들고 있으면 줄을 만들지 않는다
         if q <= 0:
             lines.append(f"· {sym} 0주")
             continue
@@ -327,25 +358,31 @@ def choose(
     last: Mapping[str, float],
     share: float,
     fee: float,
+    gold: float = 0.0,
 ) -> dict[str, int]:
-    """종목 → 사고팔 주수(+ 사기, − 팔기). 목표와의 차이 제곱합이 가장 작은 정수 조합 (순수)."""
-    total = cash + sum(qty.get(s, 0.0) * last[s] for s in SYMBOLS)
-    target = {LEV: share * total, DIV: (1 - share) * total}
+    """종목 → 사고팔 주수(+ 사기, − 팔기). 목표와의 차이 제곱합이 가장 작은 정수 조합 (순수).
+
+    사는 수는 목표까지 모자란 주수(올림)를 넘지 않는다 — 그보다 더 사면 차이도 돈도 늘 뿐이라
+    가장 좋은 조합은 바뀌지 않고, 세 종목일 때 찾는 범위만 줄어든다."""
+    syms = active_symbols(qty, gold)
+    total = cash + sum(qty.get(s, 0.0) * last[s] for s in syms)
+    target = targets(total, share, gold)
     ranges = []
-    for s in SYMBOLS:
+    for s in syms:
         hold = qty.get(s, 0.0)
         over = hold * last[s] - target[s]
         lo = -math.floor(over / last[s]) if over > last[s] else 0
         lo = max(lo, -math.floor(hold))
         hi = math.floor(cash / (limit_price(last[s], "BUY") * (1 + fee))) if cash > 0 else 0
-        ranges.append(range(lo, hi + 1))
+        hi = min(hi, max(0, math.ceil(-over / last[s])))
+        ranges.append(range(lo, max(lo, hi) + 1))
     best: tuple[float, dict[str, int]] | None = None
     for combo in itertools.product(*ranges):
-        d = dict(zip(SYMBOLS, combo, strict=True))
+        d = dict(zip(syms, combo, strict=True))
         spend = sum(n * limit_price(last[s], "BUY") * (1 + fee) for s, n in d.items() if n > 0)
         if spend > cash + 1e-9:
             continue
-        err = sum((target[s] - (qty.get(s, 0.0) + d[s]) * last[s]) ** 2 for s in SYMBOLS)
+        err = sum((target[s] - (qty.get(s, 0.0) + d[s]) * last[s]) ** 2 for s in syms)
         key = (round(err, 6), sum(abs(n) for n in combo))
         if best is None or key < (round(best[0], 6), sum(abs(n) for n in best[1].values())):
             best = (err, d)
@@ -359,6 +396,7 @@ def fill(
     share: float,
     fee: float,
     max_qty: Mapping[str, int] | None = None,
+    gold: float = 0.0,
 ) -> dict[str, int]:
     """다음 날 채우기 — 종목 → 살 주수 (사기만, 순수).
 
@@ -366,14 +404,15 @@ def fill(
     가장 모자란 종목부터 — 그 종목 1 주 값이 안 되면 살 수 있는 다음 종목(참고 계산과 같은 규칙).
     목표가 0 인 종목은 사지 않는다. ``max_qty`` (종목마다 한 번 주문 상한)에 닿으면 그날은 멈춘다.
     1 주도 못 사면 빈 dict."""
-    q = {s: qty.get(s, 0.0) for s in SYMBOLS}
+    syms = active_symbols(qty, gold)
+    q = {s: qty.get(s, 0.0) for s in syms}
     left = cash
     out: dict[str, int] = {}
-    cost = {s: limit_price(last[s], "BUY") * (1 + fee) for s in SYMBOLS}
+    cost = {s: limit_price(last[s], "BUY") * (1 + fee) for s in syms}
     while True:
-        val = left + sum(q[s] * last[s] for s in SYMBOLS)
-        target = {LEV: share * val, DIV: (1 - share) * val}
-        for s in sorted(SYMBOLS, key=lambda x: -(target[x] - q[x] * last[x])):
+        val = left + sum(q[s] * last[s] for s in syms)
+        target = targets(val, share, gold)
+        for s in sorted(syms, key=lambda x: -(target[x] - q[x] * last[x])):
             if target[s] <= 0:  # 목표 0 (브레이크 2 단계의 TQQQ 등)은 사지 않는다
                 continue
             if max_qty and out.get(s, 0) >= max_qty.get(s, 10**9):

@@ -27,7 +27,7 @@ SHOW_UPBIT = False
 """업비트 Vega 장부를 보일지. 2026-10-15 사용자 "vega를 이제 바이낸스로 변경해줘 업비트는
 지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
 """바이낸스 Vega 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
-DENEB_TICKERS = ("TQQQ", "SCHD")
+DENEB_TICKERS = ("TQQQ", "SCHD", "IAUM")
 DUST_KRW = 1_000.0
 """이보다 작은 코인 잔고는 보유로 보이지 않는다 (매도 뒤 남는 먼지)."""
 _SKIP = frozenset({"M3", "QS_SWITCH"})
@@ -257,7 +257,13 @@ def deneb_book(state: Mapping[str, Any], q: Quotes) -> Book:
             pending.append(f"{sym} {_f(o.get('qty')):g}주 · 지정가 ${_f(o.get('limit')):,.2f}")
     months = [m for m in state.get("months") or [] if isinstance(m, list) and len(m) >= 3]
     lev_target = _f(months[-1][2]) if months else None
-    targets = {"TQQQ": lev_target, "SCHD": None if lev_target is None else 1 - lev_target}
+    gold = _f(months[-1][3]) if months and len(months[-1]) > 3 else 0.0  # 금 섞기 몫 (10-19 ~)
+    rest = None if lev_target is None else 1 - lev_target
+    targets = {
+        "TQQQ": lev_target,
+        "SCHD": None if rest is None else rest * (1 - gold),
+        "IAUM": None if rest is None or gold <= 0 else rest * gold,
+    }
     holdings = []
     for sym in DENEB_TICKERS:
         n = _f(qty.get(sym))
