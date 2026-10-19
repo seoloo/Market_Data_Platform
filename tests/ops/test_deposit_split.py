@@ -1,4 +1,4 @@
-"""월 입금 나누기 시안 A — 합계가 정확히 맞고 · 안내 문구."""
+"""월 입금 나누기 — 합계가 정확히 맞고 · 안내 문구 (2026-10-19 Deneb 90 · Vega 10 업비트)."""
 
 from __future__ import annotations
 
@@ -6,22 +6,20 @@ from auto_trading.ops.deposit_split import ask_text, default_total, split, split
 
 
 def test_split_sums_exactly_and_rounds_others() -> None:
-    assert split(1_000_000) == {"Deneb": 800_000.0, "Vega": 100_000.0, "Altair": 100_000.0}
+    assert split(1_000_000) == {"Deneb": 900_000.0, "Vega": 100_000.0}
     odd = split(333_333)
-    assert odd["Vega"] == odd["Altair"] == 33_000.0
+    assert odd["Vega"] == 33_000.0
     assert sum(odd.values()) == 333_333
-    assert split(0) == {"Deneb": 0.0, "Vega": 0.0, "Altair": 0.0}
+    assert split(0) == {"Deneb": 0.0, "Vega": 0.0}
 
 
 def test_default_total_and_texts() -> None:
-    assert default_total(300_000) == 375_000
+    assert round(default_total(300_000)) == 333_333
     ask = ask_text("2026-11-03", 300_000)
-    assert "2026년 11월 입금 안내" in ask and "합계 375,000원" in ask
+    assert "2026년 11월 입금 안내" in ask and "합계 333,333원" in ask
     text = split_text("2026-11", 1_000_000, 1_400.0)
-    assert "Deneb · 토스 증권  800,000원" in text
-    assert "Altair · 바이낸스 선물(USDⓈ-M)  100,000원 ≈ 71 USDT" in text
-    assert "비율대로 자동으로 나눠요" in text
-    no_rate = split_text("2026-11", 1_000_000, None)
-    assert "≈" not in no_rate
+    assert "Deneb · 토스 증권  900,000원" in text
+    assert "Vega · 업비트 원화  100,000원" in text
+    assert "≈" not in text and "바이낸스" not in text
     only_deneb = split_text("2026-11", 0, 1_400.0)
-    assert "바이낸스로 보내는 법" not in only_deneb
+    assert "Vega · 업비트 원화  0원" in only_deneb

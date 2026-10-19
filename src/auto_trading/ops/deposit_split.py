@@ -7,24 +7,21 @@
 
 순수 함수만. 돈을 옮기거나 주문하지 않는다 — 금액만 계산해 알린다. 입금은 사용자가 직접 한다.
 Deneb 몫은 그달 Deneb 매수 금액이 된다(토스).
-Vega · Altair 몫은 바이낸스 현물 · USDⓈ-M 선물로 보낼 원화다.
+Vega 몫은 업비트에 넣을 원화다 — 2026-10-19 사용자 "altair는 정리하고 vega를 업비트로 옮기도록
+하자 · deneb:vega = 90:10" (그 전: 80 · 10 · 10, Vega · Altair 는 바이낸스).
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+__all__ = ["MIX", "ask_text", "default_total", "split", "split_text", "vega_line"]
 
-__all__ = ["MIX", "ask_text", "binance_line", "default_total", "split", "split_text"]
-
-MIX: tuple[tuple[str, float], ...] = (("Deneb", 0.80), ("Vega", 0.10), ("Altair", 0.10))
-"""목표 비율 (사용자 2026-10-15 "80 10 10"). 합 1.
-
-Altair = 옛 AG4S2 (사용자 2026-10-15 이름)."""
+MIX: tuple[tuple[str, float], ...] = (("Deneb", 0.90), ("Vega", 0.10))
+"""목표 비율 (사용자 2026-10-19 "deneb:vega = 90:10"). 합 1. Altair 는 정리(빠짐)."""
 UNIT = 1_000
 """원 단위 반올림 — 나머지는 Deneb 에 붙인다(합계가 정확히 맞게)."""
 _WHERE = {
     "Deneb": ("🌟", "토스 증권", "오늘 밤 이 금액으로 매수해요"),
-    "Vega": ("🌌", "바이낸스 현물", ""),
+    "Vega": ("🌌", "업비트 원화", "넣어 두면 다음 09:05 Vega 실행이 입금으로 알아채요"),
     "Altair": ("☄️", "바이낸스 선물(USDⓈ-M)", "현물로 보내면 자동 이체 (선물 몫 500 USDT 부터)"),
 }
 
@@ -48,17 +45,12 @@ def default_total(deneb_krw: float) -> float:
     return deneb_krw / _weight("Deneb")
 
 
-def binance_line(deneb_krw: float, usdt_krw: float | None = None) -> str:
-    """Deneb 금액 → 같은 비율로 바이낸스(Vega · Altair)에 넣을 돈 한 줄 (사용자 2026-10-19
-    'deneb 입금 알림오면 80:20의 비율로 바이낸스에 얼마 입금해야하는지도 알려줘')."""
-    parts = split(default_total(deneb_krw))
-    v, a = parts["Vega"], parts["Altair"]
-    usdt = f" ≈ {(v + a) / usdt_krw:,.0f} USDT" if usdt_krw else ""
+def vega_line(deneb_krw: float) -> str:
+    """Deneb 금액 → 같은 비율로 업비트(Vega)에 넣을 원화 한 줄 (사용자 2026-10-19 'deneb 입금
+    알림오면 … 얼마 입금해야하는지도 알려줘', 같은 날 바이낸스 80 : 20 → 업비트 90 : 10)."""
+    v = split(default_total(deneb_krw))["Vega"]
     d_w = _weight("Deneb") * 100
-    return (
-        f"🧭 바이낸스엔 {v + a:,.0f}원{usdt} (Vega {v:,.0f} · Altair {a:,.0f})"
-        f" — Deneb : 바이낸스 = {d_w:.0f} : {100 - d_w:.0f}"
-    )
+    return f"🌌 업비트(Vega)엔 {v:,.0f}원 — Deneb : Vega = {d_w:.0f} : {100 - d_w:.0f}"
 
 
 def _mix_label() -> str:
@@ -76,11 +68,11 @@ def ask_text(
         [
             f"💰 {today[:4]}년 {int(today[5:7])}월 입금 안내 · 목표 {_mix_label()}",
             RULE,
-            "이번 달 세 곳에 넣을 돈(합계)을 알려 주세요",
+            "이번 달 두 곳에 넣을 돈(합계)을 알려 주세요",
             sub("예시 답: 100만  (0 = 이번 달 쉬기)"),
             sub(f"답이 없으면 합계 {total:,.0f}원 기준"),
             sub(f"그때는 Deneb {deneb_default_krw:,.0f}원만 삽니다"),
-            sub(binance_line(deneb_default_krw, usdt_krw)),
+            sub(vega_line(deneb_default_krw)),
             sub(f"🌟 Deneb 은 오늘({today}) 밤 그 몫으로 매수해요"),
             *(["", extra] if extra else []),
         ]
@@ -90,27 +82,16 @@ def ask_text(
 def split_text(month: str, total_krw: float, usdt_krw: float | None) -> str:
     """답을 받은 뒤 — 곳마다 얼마를 어디에 넣을지.
 
-    ``usdt_krw`` = 업비트 USDT 원화 값(없으면 생략)."""
+    ``usdt_krw`` 는 바이낸스로 보내던 때(~ 2026-10-19) 의 USDT 환산용 — 지금은 안 쓴다."""
     from auto_trading.notify.style import RULE, sub
 
     y, m = month[:4], int(month[5:7])
     parts = split(total_krw)
     lines = [f"💰 {y}년 {m}월 입금 {total_krw:,.0f}원 → 이렇게 넣어 주세요", RULE]
-    usdt: Mapping[str, float] = {}
-    if usdt_krw:
-        usdt = {n: v / usdt_krw for n, v in parts.items() if n != "Deneb"}
     for name, krw in parts.items():
         icon, where, note = _WHERE[name]
-        tail = f" ≈ {usdt[name]:,.0f} USDT" if name in usdt else ""
-        lines.append(f"{icon} {name} · {where}  {krw:,.0f}원{tail}")
+        lines.append(f"{icon} {name} · {where}  {krw:,.0f}원")
         if note:
             lines.append(sub(note))
-    coin = sum(v for n, v in parts.items() if n != "Deneb")
-    if coin > 0:
-        lines += ["", RULE, "🧭 바이낸스로 보내는 법"]
-        lines.append(sub(f"업비트에서 USDT {coin:,.0f}원어치 사서 바이낸스 현물로 보내기"))
-        lines.append(sub("Vega · Altair 몫을 모두 현물로 보내면 비율대로 자동으로 나눠요"))
-        if usdt_krw:
-            lines.append(sub(f"USDT 값: 업비트 {usdt_krw:,.0f}원 기준"))
     lines += ["", "✏️ 금액을 바꾸려면 오늘 21:00 전에 다시 보내 주세요"]
     return "\n".join(lines)

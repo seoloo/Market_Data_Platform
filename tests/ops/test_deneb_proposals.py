@@ -207,5 +207,5 @@ def test_amount_answer_still_works_with_open_proposal(
     monkeypatch.setattr(mod, "_kst_now", lambda: datetime(2026, 12, 1, 9, 5, tzinfo=UTC))
     monkeypatch.setattr(mod, "_usdt_krw", lambda: None)
     mod._deneb_poll("2026-12-01", True)
-    assert _state(tmp_path)["amounts"] == {"2026-12": 400_000.0}
+    assert _state(tmp_path)["amounts"] == {"2026-12": 450_000.0}  # 합계 × Deneb 90%
     assert _state(tmp_path)["proposals"][0]["status"] == "open"

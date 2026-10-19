@@ -139,7 +139,7 @@ def test_help_words_route_to_bot_and_pin_help(
     assert calls[0][0] == "send" and calls[1:3] == [("unpin_all",), ("pin", 55)]
     assert calls[3] == (
         "menu",
-        ["status", "paper", "stock", "deposit", "acc", "liquidate", "unhalt", "help"],
+        ["status", "paper", "stock", "acc", "liquidate", "unhalt", "help"],
     )
 
 

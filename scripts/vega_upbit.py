@@ -16,7 +16,11 @@
 * 매도 먼저, 매수는 가진 원화 안에서. 원화 계좌 전체를 이 전략의 현금으로 본다
   (다른 용도의 원화는 업비트에 두지 않는다). BTC · ETH · SOL 외 코인은 건드리지 않는다.
 * 긴급 정지 ``data/HALT`` 면 주문하지 않는다. 계좌 낙폭(NAV) 30% 면 새 매수를 멈춘다.
-  정지 30 일째부터 30 일마다 텔레그램으로 다시 알린다(풀기는 사람이, 문서 199 · 사용자 2026-10-10).
+  정지는 **BTC 목표 비중이 0(추세 꺼짐)이 된 뒤 다시 0 보다 커지면 스스로 풀고** 고점을 그날
+  단위 가치로 다시 잡는다 — 바이낸스판(``scripts.vega_live``, 사용자 2026-10-18)과 같다.
+  정지 30 일째부터 30 일마다 텔레그램으로 다시 알린다. 손으로는 ``release-dd``.
+* 2026-10-19 사용자 "altair는 정리하고 vega를 업비트로 옮기도록 하자 · deneb:vega = 90:10" →
+  바이낸스에서 업비트로 되돌림(10-15 의 반대). 예약 ``AutoTrading_Vega`` 가 이 실행기를 부른다.
 * 상태 ``data/upbit_t2/state.json`` · 보고 ``reports/upbit_t2/<날짜>.json`` · 알림 텔레그램.
 """
 
@@ -126,6 +130,18 @@ def _decision(now_ms: int) -> tuple[int, str]:
     return d, datetime.fromtimestamp(d / 1000, UTC).strftime("%Y-%m-%d")
 
 
+def trend_ready(st: dict[str, Any], btc_w: Decimal | None) -> bool:
+    """낙폭 정지 중 — 오늘 BTC 목표가 0 이면 꺼짐을 적고, 꺼짐을 본 뒤 0 보다 크면 True(풀 때).
+
+    바이낸스판 :func:`scripts.vega_live.trend_ready` 와 같다."""
+    if not st.get("stopped") or btc_w is None:
+        return False
+    if btc_w <= 0:
+        st["halt_off_seen"] = True
+        return False
+    return bool(st.get("halt_off_seen"))
+
+
 def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, Any]:
     dms, day = _decision(now_ms)
     krw, hold, prices = _snapshot(c)
@@ -139,9 +155,12 @@ def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, An
         holdings=hold,
         prices=prices,
     )
-    stopped = bool(st.get("stopped")) or (Decimal(st["units"]) > 0 and ns.dd >= DD_STOP)
     daily = {k: c.closed_daily(MARKETS[k], dms) for k in COINS}
     w = targets(daily, dms)
+    released = trend_ready(st, w.get("BTC"))
+    stopped = not released and (
+        bool(st.get("stopped")) or (Decimal(st["units"]) > 0 and ns.dd >= DD_STOP)
+    )
     sig = signals(daily, dms)
     eq = equity(krw, hold, prices)
     intents = plan(w, hold, prices, eq, allow_buy=not stopped)
@@ -153,6 +172,7 @@ def _plan_today(c: UpbitClient, st: dict[str, Any], now_ms: int) -> dict[str, An
         "equity": eq,
         "nav": ns,
         "stopped": stopped,
+        "released": released,
         "weights": w,
         "signals": sig,
         "intents": intents,
@@ -222,13 +242,7 @@ def _send(
 
 
 def run_cmd() -> int:
-    # 2026-10-15 Vega 를 바이낸스로 옮김(scripts.vega_live) — 옛 예약이 남아 있어도 업비트에
-    # 남은 원화로 사지 않게, 환경변수 CRUISE_UPBIT=on 일 때만 업비트에서 주문한다.
-    import os
-
-    if os.environ.get("CRUISE_UPBIT", "").strip().lower() != "on":
-        print("Vega 는 바이낸스로 옮겼어요(2026-10-15) — 업비트 실행은 하지 않아요")
-        return 0
+    # 2026-10-15 바이낸스로 옮기며 걸었던 CRUISE_UPBIT 잠금은 10-19 업비트로 되돌리며 뺐다.
     now_ms = int(time.time() * 1000)
     st = _load()
     halted = halted_for(HALT, "vega")  # 전체 정지 또는 Vega 정지(전부 정리 뒤)
@@ -253,11 +267,29 @@ def run_cmd() -> int:
             deposits.append([p["day"], str(ns.flow)])
             word = "입금" if ns.flow > 0 else "출금"
             lines.append(f"💰 {word} 감지 {ns.flow:+,.0f} 원 → 총 입금에 반영")
+        if p["released"]:
+            lines.append(
+                "▶ 계좌 낙폭 정지 스스로 풀림 — BTC 추세가 꺼졌다 다시 켜짐,"
+                " 고점을 지금 단위 가치로"
+            )
+            st.setdefault("releases", []).append(
+                [datetime.now(UTC).isoformat(timespec="seconds"), "BTC 추세 다시 켜짐 (자동)"]
+            )
+            for k in ("stopped_since", "stop_reminded", "halt_off_seen"):
+                st.pop(k, None)
         if p["stopped"] and not st.get("stopped"):
-            lines.append(f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤 (해제는 사람이)")
+            lines.append(
+                f"🛑 계좌 낙폭 {ns.dd:.1%} ≥ 30% — 새 매수 멈춤"
+                " (BTC 추세가 꺼졌다 다시 켜지면 스스로 풀림)"
+            )
             st["stopped_since"], st["stop_reminded"] = p["day"], []
+            btc = p["weights"].get("BTC")
+            st["halt_off_seen"] = btc is not None and btc <= 0
         st.update(
-            units=str(ns.units), peak=str(ns.peak), stopped=p["stopped"], last_nav=str(ns.nav)
+            units=str(ns.units),
+            peak=str(ns.nav if p["released"] else ns.peak),
+            stopped=p["stopped"],
+            last_nav=str(ns.nav),
         )
         if p["stopped"]:
             since = st.setdefault("stopped_since", p["day"])
@@ -567,9 +599,9 @@ def kimp_line(upbit_btc: Decimal, get: Any = _get_json) -> str:
 def stop_remind_lines(days: int) -> list[str]:
     """정지 N 일째 다시 알림 (문서 199)."""
     return [
-        f"⏰ 새 매수 정지 {days}일째 — 이제 푸는 편이 낫습니다",
+        f"⏰ 새 매수 정지 {days}일째 — BTC 추세가 다시 켜지면 스스로 풀려요",
         sub("문서 199: 풀기만 하면 언제 풀든 10 년 차이 1% 안, 안 풀면 −15 ~ −53%"),
-        sub('풀기: python -m scripts.vega_upbit release-dd "사유"'),
+        sub('손으로 풀기: python -m scripts.vega_upbit release-dd "사유"'),
     ]
 
 
@@ -579,6 +611,7 @@ def release_cmd(reason: str) -> int:
     st.pop("stopped_since", None)
     st.pop("stop_reminded", None)
     st["peak"] = st.get("last_nav", st.get("peak", "0"))
+    st.pop("halt_off_seen", None)
     st.setdefault("releases", []).append([datetime.now(UTC).isoformat(), reason])
     _save(st)
     print(f"낙폭 정지 해제: {reason}")

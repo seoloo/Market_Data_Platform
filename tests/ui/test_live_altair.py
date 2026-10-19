@@ -5,7 +5,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_trading.ui.live_home import Quotes, build_books
+
+
+@pytest.fixture(autouse=True)
+def _binance_era(monkeypatch: pytest.MonkeyPatch) -> None:
+    """바이낸스 Vega · Altair 시기(10-15 ~ 10-19) 화면 — 장부 코드는 남겨 두고 시험한다."""
+    monkeypatch.setattr("auto_trading.ui.live_home.VEGA_ON_UPBIT", False)
+    monkeypatch.setattr("auto_trading.ui.live_home.SHOW_UPBIT", False)
 
 
 def _write(root: Path, rel: str, data: object) -> None:

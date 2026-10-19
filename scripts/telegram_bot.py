@@ -130,15 +130,12 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
   메뉴(/stock)나 '개별주' 만 보내면 "어떤 종목을 살까요?" 라고 물어요 → 종목 이름으로 답장
   (예약 · 손절 중인 종목이 있으면 현황 + [손절 해제] 버튼도)
 
-💰 입금확인 (또는 /deposit)
-  바이낸스에 입금했으면 바로 Vega · Altair 로 나눠요 (안 보내도 10분마다 자동 확인)
-
 ▶ 정지풀기 (또는 /unhalt)
   정리 뒤 멈춘 그룹 다시 켜기 → 다음 실행부터 규칙대로 다시 사요
 
-💵 이번 달 입금 (세 곳 합계)
+💵 이번 달 입금 (두 곳 합계)
   매달 매수일 아침 질문에 합계로 답: 100만 · 1000000 · 0(쉬기)
-  → Deneb 80 · Vega 10 · Altair 10 으로 나눠 어디에 얼마 넣을지 알려 줘요
+  → Deneb 90 (토스) · Vega 10 (업비트 원화) 으로 나눠 어디에 얼마 넣을지 알려 줘요
 
 🔘 제안 버튼 (배당 단계 · 12월 공제 실현)
   메시지 아래 버튼으로 답해요
@@ -153,7 +150,9 @@ COMMANDS_MENU = [
     ("status", "현황 — 실거래 요약"),
     ("paper", "Paper — 가상 장부 요약"),
     ("stock", "개별주 — 비중 추천 · 장 시작 매수 · −3% 손절"),
-    ("deposit", "입금 — 바이낸스 입금 확인 · Vega / Altair 로 나누기"),
+    # 2026-10-19 사용자 "입금 같은 경우는 바이낸스에 돈을 넣기 위해서 넣었는데 그냥 주석쳐서
+    # 메뉴에서 지워줘" — Vega 를 업비트로 되돌리고 Altair 를 정리해 바이낸스 입금 확인이 필요 없다.
+    # ("deposit", "입금 — 바이낸스 입금 확인 · Vega / Altair 로 나누기"),
     ("acc", "적립 — 자동 적립 종목 추가 · 빼기"),
     ("liquidate", "정리 — 보유 팔기 (미리 보기 + 버튼)"),
     ("unhalt", "정지풀기 — 멈춘 그룹 다시 켜기"),
@@ -925,9 +924,8 @@ def run(root: Path = REPO) -> int:
             _stock(bot, stock_msgs, queue, inbox)
         if acc_msgs:
             _acc(bot, acc_msgs, queue, inbox)
-        if deposits:
-            bot.send("💰 바이낸스 입금 확인 중…")
-            _deposit_watch(root, force=True)
+        if deposits:  # 2026-10-19 바이낸스 입금 확인 · 분배 멈춤 (Vega 업비트로, Altair 정리)
+            bot.send("💰 바이낸스 입금 확인은 멈췄어요 — Vega 는 업비트 원화로 넣으면 돼요")
     finally:
         bot.close()
     _resume_liquidation()
@@ -938,7 +936,7 @@ def run(root: Path = REPO) -> int:
     _shadow_272()
     _paper_daily(root)
     _safety_daily()
-    _deposit_watch(root)
+    # _deposit_watch(root)  # 2026-10-19 멈춤 — 바이낸스 Vega · Altair 정리, Vega 는 업비트로
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(

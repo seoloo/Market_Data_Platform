@@ -22,6 +22,14 @@ DAY = 86_400_000
 NOW = 1_792_000_000_000 - 1_792_000_000_000 % DAY + 5 * 60_000  # 어떤 날 00:05 UTC
 
 
+@pytest.fixture(autouse=True)
+def _old_mix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """바이낸스 Vega → Altair 분배 시험은 10-19 전 비율(80 · 10 · 10)로 — 분배 코드는 남겨 둠."""
+    monkeypatch.setattr(
+        "auto_trading.ops.altair_split.MIX", (("Deneb", 0.8), ("Vega", 0.1), ("Altair", 0.1))
+    )
+
+
 def _candles(dms: int, growth: float) -> list[Candle]:
     out = []
     for k in range(200, 0, -1):

@@ -91,7 +91,6 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Any, FakeUpbit
     monkeypatch.setattr(mod, "HALT", tmp_path / "HALT")
     monkeypatch.setattr(mod, "_client", lambda: fake)
     monkeypatch.setattr(mod, "_notify", sent.append)
-    monkeypatch.setenv("CRUISE_UPBIT", "on")  # 2026-10-15 바이낸스로 옮긴 뒤엔 켜야만 돈다
     monkeypatch.setattr("scripts.vega_upbit.time.sleep", lambda s: None)
     monkeypatch.setattr("scripts.vega_upbit.time.time", lambda: 300 * DAY / 1000 + 3600)
     return mod, fake, sent
@@ -192,11 +191,11 @@ def test_kimp_line_and_failure_does_not_block() -> None:
     assert "확인 실패" in mod.kimp_line(Decimal(1), bad)
 
 
-def test_retired_upbit_run_orders_nothing_without_flag(
-    env: tuple[Any, FakeUpbit, list[str]], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """2026-10-15 Vega 를 바이낸스로 옮김 — 옛 업비트 예약이 남아 있어도 주문하지 않는다."""
-    m, fake, sent = env
-    monkeypatch.delenv("CRUISE_UPBIT")
-    assert m.run_cmd() == 0
-    assert fake.sent == [] and sent == []
+def test_dd_stop_releases_after_btc_trend_off_then_on() -> None:
+    """2026-10-19 업비트로 되돌리며 바이낸스판과 같은 자동 해제 (BTC 꺼짐 → 켜짐)."""
+    st: dict[str, Any] = {"stopped": True}
+    assert not mod.trend_ready(st, Decimal("0.2"))  # 꺼짐을 아직 못 봄
+    assert not mod.trend_ready(st, Decimal(0)) and st["halt_off_seen"] is True
+    assert mod.trend_ready(st, Decimal("0.1"))
+    assert not mod.trend_ready({"stopped": False}, Decimal("0.1"))
+    assert not mod.trend_ready({"stopped": True, "halt_off_seen": True}, None)

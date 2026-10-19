@@ -158,16 +158,28 @@ def test_step_buy_symbol_picks_more_lacking() -> None:
     assert mod._step_buy_symbol(st2, PX, 0.5) == GOLD
 
 
-def test_binance_line_in_alerts() -> None:
-    from auto_trading.ops.deposit_split import ask_text, binance_line
+def test_vega_line_in_alerts() -> None:
+    """2026-10-19 Deneb : Vega = 90 : 10 (업비트 원화) — 입금 안내 · 계획 알림 한 줄."""
+    from auto_trading.ops.deposit_split import MIX, ask_text, split, split_text, vega_line
 
-    line = binance_line(300_000, 1450.0)
-    assert "바이낸스엔 74,000원" in line and "≈ 51 USDT" in line and "80 : 20" in line
-    assert "바이낸스엔 200,000원" in binance_line(800_000)
-    assert "🧭 바이낸스엔" in ask_text("2026-11-02", 300_000)
+    assert dict(MIX) == {"Deneb": 0.9, "Vega": 0.1}
+    assert split(1_000_000) == {"Deneb": 900_000.0, "Vega": 100_000.0}
+    line = vega_line(300_000)
+    assert "업비트(Vega)엔 33,000원" in line and "90 : 10" in line
+    ask = ask_text("2026-11-02", 300_000)
+    assert "두 곳" in ask and "Vega 10" in ask and "Altair" not in ask
+    assert "🌌 업비트(Vega)엔" in ask
+    txt = split_text("2026-11", 1_000_000, 1450.0)
+    assert "업비트 원화  100,000원" in txt and "바이낸스" not in txt and "USDT" not in txt
     msg = plan_message(
         today="2026-11-02", krw=300_000, source="기본", fx_rate=1400, vol=0.15, share=0.6,
         plan={LEV: 2}, prices=PX, fee=0.001, usd_now=500, need_all=0,
-        binance=binance_line(300_000),
+        binance=vega_line(300_000),
     )  # fmt: skip
-    assert "🧭 바이낸스엔 74,000원" in msg
+    assert "🌌 업비트(Vega)엔 33,000원" in msg
+
+
+def test_altair_share_zero_without_altair() -> None:
+    from auto_trading.ops.altair_split import altair_share
+
+    assert altair_share() == 0

@@ -29,7 +29,8 @@ MIN_MOVE = Decimal(5)
 def altair_share() -> Decimal:
     """바이낸스 돈 중 선물(Altair) 목표 비율 = Altair ÷ (Vega + Altair)."""
     w = dict(MIX)
-    return Decimal(str(w["Altair"])) / Decimal(str(w["Vega"] + w["Altair"]))
+    altair = w.get("Altair", 0.0)  # 2026-10-19 Altair 정리 — MIX 에서 빠지면 0 (분배 안 함)
+    return Decimal(str(altair)) / Decimal(str(w["Vega"] + altair))
 
 
 def move_amount(

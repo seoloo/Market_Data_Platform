@@ -415,8 +415,14 @@ def test_kr_accumulate_state_is_valued_in_krw(tmp_path: Path) -> None:
     assert book.holdings[0].name == "KODEX 200"
 
 
-def test_binance_vega_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> None:
-    """2026-10-15 Vega 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로."""
+def test_binance_vega_replaces_upbit_book_and_converts_usdt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-15 Vega 를 바이낸스로 옮김 — 바이낸스 장부가 있으면 그것만, USDT 는 원화로.
+
+    10-19 업비트로 되돌린 뒤엔 :data:`VEGA_ON_UPBIT` 를 꺼야 이 모습 (코드는 남김)."""
+    monkeypatch.setattr("auto_trading.ui.live_home.VEGA_ON_UPBIT", False)
+    monkeypatch.setattr("auto_trading.ui.live_home.SHOW_UPBIT", False)
     up = tmp_path / "data" / "upbit_t2"
     up.mkdir(parents=True)
     (up / "state.json").write_text(
@@ -451,3 +457,20 @@ def test_binance_vega_replaces_upbit_book_and_converts_usdt(tmp_path: Path) -> N
     assert vega.holdings[0].value_krw == pytest.approx(84_000)  # 0.001 × 60,000 × 1,400
     assert vega.deposits_krw == pytest.approx(224_000)
     assert vega.holdings[0].cost_krw == pytest.approx(60.06 * 1_400)
+
+
+def test_upbit_vega_shown_after_moving_back(tmp_path: Path) -> None:
+    """2026-10-19 Vega 를 업비트로 되돌림 — 바이낸스 장부가 남아 있어도 업비트 장부만 보인다."""
+    from auto_trading.ui.live_home import Quotes, build_books
+
+    up = tmp_path / "data" / "upbit_t2"
+    up.mkdir(parents=True)
+    (up / "state.json").write_text(
+        json.dumps({"expected": {"KRW": "300000"}, "deposits": [["2026-10-20", "300000"]]}),
+        encoding="utf-8",
+    )
+    bn = tmp_path / "data" / "vega"
+    bn.mkdir(parents=True)
+    (bn / "state.json").write_text(json.dumps({"expected": {"USDT": "100"}}), encoding="utf-8")
+    books = build_books(tmp_path, Quotes(fx=1400.0))
+    assert [b.key for b in books] == ["vega"]

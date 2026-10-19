@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.3" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>Vega — T/v2 바이낸스 실거래 BTC·ETH·SOL USDT (2026-10-15 업비트에서 옮김, 지정가 IOC)</Description>
+    <Description>Vega — T/v2 업비트 실거래 BTC·ETH·SOL 원화 (2026-10-19 바이낸스에서 되돌림, 지정가 IOC)</Description>
     <URI>\AutoTrading_Vega</URI>
   </RegistrationInfo>
   <Principals>
@@ -33,7 +33,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>{REPO}\.venv\Scripts\pythonw.exe</Command>
-      <Arguments>"{REPO}\scripts\task_launcher.py" -m scripts.vega_live run</Arguments>
+      <Arguments>"{REPO}\scripts\task_launcher.py" -m scripts.vega_upbit run</Arguments>
       <WorkingDirectory>{REPO}</WorkingDirectory>
     </Exec>
   </Actions>

@@ -295,10 +295,11 @@ DATA_NOT_READY/어댑터 미완료, 새 시장성과0. 일반 주문·위험·�
 | 경로 | 거래소 · 상품 | 켜기 조건 | 막는 장치 |
 |---|---|---|---|
 | Deneb · 자동 적립 · 국내 적립 | 토스 | `TOSS_TRADING_ENABLED=true` | 종목 · 수량 · 지정가 상한(`TossTrader`), 그룹 정지 `deneb` · `acc` |
-| Vega | 바이낸스 현물 USDT | `BINANCE_LIVE_TRADING_ENABLED=true` | 지정가 IOC 만, 하루 1 번, 그룹 정지 `vega`, 낙폭 30% 정지 |
+| Vega (2026-10-19 ~ 업비트로 되돌림) | 업비트 원화 (`scripts/vega_upbit.py`, 예약 `AutoTrading_Vega` 09:05) | `UPBIT_TRADING_ENABLED=true` | 지정가 IOC 만, 하루 1 번, 그룹 정지 `vega`, 낙폭 30% 정지 · BTC 추세 꺼짐 → 켜짐이면 스스로 풀림(바이낸스판과 같게). 업비트 원화 계좌 전체가 Vega 현금 |
+| ~~Vega 바이낸스~~ (10-15 ~ 10-19, 정리) | 바이낸스 현물 USDT | `BINANCE_LIVE_TRADING_ENABLED=true` | 10-19 전부 정리(Vega 만) · 예약을 업비트로 돌림. 코드 · 장부는 기록으로 남김 |
 | Vega 남는 USDT → 유동형 | 바이낸스 Simple Earn(USDT001) 예치 · 상환 | 위 + 설정 `vega.earn`(2026-10-17 켬) | 현금 = 현물 + 유동형으로 장부 · 입금 판단. 살 때 · Altair 로 나눌 때 먼저 꺼냄(현물 20 USDT 남김), 꺼냄이 1 분 안에 잔고에 안 잡히면 그 실행 멈춤. Altair 선물 증거금은 건드리지 않음 |
 | Vega → Altair 자동 분배 | 바이낸스 현물 → 선물 이체 | 위(Altair 실거래 꺼져 있어도 — 2026-10-16 사용자 '80 : 10 : 10') | 입금 안에서만 · 500 USDT 미만 안 옮김. 선물 계정이 다중 자산 모드(2026-10-16)라 USDT 가 USDC 계약 증거금으로 쓰임 |
-| Altair 실거래 | 바이낸스 USDⓈ-M USDC | `BINANCE_FUTURES_LIVE_TRADING_ENABLED=true` + 설정 `live.altair`(기본 꺼짐) | 지정가 IOC · 시장가 막음, 단위 낙폭 30% 새 노출 금지, 그룹 정지 `altair`, 헤지 모드 거부 · **다중 자산 모드 필수**(장부 = 선물 지갑 전체 증거금) |
+| ~~Altair 실거래~~ (2026-10-19 정리 · 설정 `live.altair` 끔 · 예약 `AutoTrading_Altair` 끔 · `HALT_altair`) | 바이낸스 USDⓈ-M USDC | `BINANCE_FUTURES_LIVE_TRADING_ENABLED=true` + 설정 `live.altair`(기본 꺼짐) | 지정가 IOC · 시장가 막음, 단위 낙폭 30% 새 노출 금지, 그룹 정지 `altair`, 헤지 모드 거부 · **다중 자산 모드 필수**(장부 = 선물 지갑 전체 증거금) |
 | 💹 개별주 | 토스 | `TOSS_TRADING_ENABLED` + 설정 `stock.orders` + **텔레그램 버튼** | 손절 한 번 계획 손실 기준 돈의 0.3% → 한 종목 10%(2026-10-17, 처음 1% · 25%) · 현금, 정규장 시작 직후 지정가, 손절 −3%, 그룹 정지 `stock` |
 | 💹 PEAD (2026-10-17) | 토스 | 위 + 설정 `stock.pead` + **알림 카드의 버튼** | 갭 +10% 이상 신호만(PEAD Paper 21:40), 약 $100(1 주 $150 까지), 반응일 다음 정규장 시작 직후 지정가 · 추격 방지 없음, **손절 없음** · 20 번째 정규장 마감 5 ~ 2 분 전 지정가 매도, 그 장 지나면 버튼 무효, 그룹 정지 `stock` |
 | 💹 월간 미장 주도주 추천 (2026-10-17) | 토스 | 위 + 설정 `stock.reco` + **카드의 버튼** | 월말 종가 기준 113 고르기(S&P 500 + 나스닥 100), S&P500 200 일선 아래면 추천 없음, 매수는 💹 예약 그대로(그때 다시 확인 · 10% · −3% 손절). 매도 신호(추세 꺾임 · 고점 −35%, 추세 확인 뒤)는 버튼을 눌러야 `selling` → 지정가 매도. 버튼 5 일 유효 |
@@ -406,3 +407,17 @@ Phase 0 자료 감사·정보 도구 기능 검증이지 Phase 4 PASS·새 OOS·
   '네' 면 TQQQ 를 팔아 SCHD · IAUM 중 새 목표보다 더 모자란 쪽 하나를 산다(나머지는 매달 맞추기가 새 돈으로).
 - **입금 안내 브레이크 한 줄** (사용자 '2번 진행'): 매수일 아침 입금 안내 끝에 브레이크 1 · 2 단계면
   '🛑 Deneb 브레이크 n단계 … 이번 달 돈은 SCHD · 금으로 …' 를 붙인다(`deneb_guard.brake_ask_line`).
+
+## 2026-10-19 Altair 정리 · Vega 업비트로 · Deneb : Vega = 90 : 10 (사용자 요청)
+
+- 사용자: "altair는 정리하고 vega를 업비트로 옮기도록 하자 비율은 deneb:vega = 90:10 … 텔레그램 메뉴에 입금 …
+  주석쳐서 메뉴에서 지워줘 … 바이낸스에 지금 vega와 altair를 지금 당장 정리해주고 vega를 업비트로 변경해줘.
+  바이낸스에 있는 돈은 내가 업비트로 돌려 놓을게".
+- 바이낸스 Vega 전부 정리(BTC · ETH · SOL 지정가 IOC 매도 ≈ 232.5 USDT) · Altair 정리(포지션 없음) → `HALT_vega` · `HALT_altair`.
+  설정 `live.altair` 끔, 예약 `AutoTrading_Altair` 끔, `AutoTrading_Vega` → `scripts.vega_upbit run`(09:05).
+- 업비트 실행기: 10-15 의 `CRUISE_UPBIT` 잠금 뺌, 낙폭 정지 자동 해제(BTC 꺼짐 → 켜짐)를 바이낸스판과 같게 넣음.
+- 입금 비율 `deposit_split.MIX` = Deneb 0.9 · Vega 0.1 (Altair 빠짐). 입금 안내 · Deneb 계획 알림 한 줄은
+  '🌌 업비트(Vega)엔 N원 — Deneb : Vega = 90 : 10'. 텔레그램 '/deposit'(바이낸스 입금 확인) 메뉴 · 10 분 자동 확인 주석 처리.
+- 실거래 홈은 업비트 Vega 장부를 보임(`live_home.VEGA_ON_UPBIT`). 바이낸스 Vega · Altair 코드 · 장부 · 분배 코드는 기록으로 남김.
+- **아직 남은 사용자 결정**: 업비트 원화 계좌 전체가 Vega 현금이라 그 금액 확인 → `HALT_vega` 풀기 · `UPBIT_TRADING_ENABLED` 켜기.
+

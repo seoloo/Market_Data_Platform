@@ -2558,3 +2558,10 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 
 - 사용자 질문을 거래일마다 1달러 매수라는 가정으로 설명. 월 약 20~22달러·연 약 250달러 납입 규모이며 수익 예측 아님. TSLA는 자동차·에너지·AI 등 전체 기업에 대한 투자이고 순수 Optimus 지분 아님. [2026년 2분기 공시](https://www.sec.gov/Archives/edgar/data/1318605/000162828026049270/tsla-20260630.htm)와 [공식 업데이트](https://ir.tesla.com/_flysystem/s3/sec/000162828026049213/tsla-20260722-gen.pdf)의 기존 사업·유동성 및 Optimus 생산 준비/초기 학습용 제작을 확인, 로봇 대량 유상 판매·수익성으로 해석하지 않음.
 - 소액으로 손실 금액을 제한하는 선택과 현재 가격의 매수 적정성을 분리. 최소 주문·수수료·환전 비용·단일 종목 집중을 확인하기 전 자동 적립 변경 없음. Phase 0 정보 검토·운영 상태 불변, 타 세션 변경 보존. 문서 범위·기존 기록 보존 검증만 수행, 코드 시험 미실행.
+
+## 2026-10-19~20 — Altair 정리 · Vega 업비트로 · 입금 90 : 10 (Claude)
+
+- 사용자 요청대로 바이낸스 Vega(BTC 0.0012 · ETH 0.029 · SOL 0.62 → 약 232.5 USDT) · Altair(포지션 없음) 정리, `HALT_vega` · `HALT_altair`. 확인 중 `HALT_altair` 가 없고 `live.altair` 켜짐이었음 → 다시 정지 · 설정 끔 · 예약 끔.
+- `AutoTrading_Vega` → `vega_upbit run`. 업비트 실행기 잠금(`CRUISE_UPBIT`) 뺌 · 자동 해제 이식. `deposit_split.MIX` 90 : 10, 알림 한 줄 업비트 원화, 텔레그램 '/deposit' 메뉴 · 바이낸스 입금 자동 확인 주석. 실거래 홈 업비트 Vega. 주간 요약 예약(`AutoTrading_Upbit_T2_Weekly`)은 관리자 권한이라 못 바꿈(꺼짐).
+- 바이낸스 남은 돈(10-19 23:4x): 현물 USDT 252.31 · 유동형 Earn 599.00 · 선물 지갑 843.38(USDT 852.77 · USDC −8.21) — 사용자가 업비트로 옮김.
+- 업비트 원화 2,272,507 원이 이미 있음 — 업비트 원화 전체가 Vega 현금이라 확인 전까지 `HALT_vega` 유지, `UPBIT_TRADING_ENABLED` 꺼짐 그대로.

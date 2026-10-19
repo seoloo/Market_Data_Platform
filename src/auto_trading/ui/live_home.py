@@ -23,9 +23,12 @@ __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_
 
 VEGA_COINS = ("BTC", "ETH", "SOL")
 BINANCE_VEGA = Path("data") / "vega" / "state.json"
-SHOW_UPBIT = False
+SHOW_UPBIT = True
 """업비트 Vega 장부를 보일지. 2026-10-15 사용자 "vega를 이제 바이낸스로 변경해줘 업비트는
 지워줘" — 실거래 화면 · '현황' 에서 뺀다(장부 파일은 기록으로 남긴다)."""
+VEGA_ON_UPBIT = True
+"""2026-10-19 사용자 "altair는 정리하고 vega를 업비트로 옮기도록 하자" — 업비트 Vega 장부를 보이고
+바이낸스 Vega · Altair 장부(기록으로 남김)는 화면에서 뺀다. 위 SHOW_UPBIT 도 같은 날 다시 켬."""
 """바이낸스 Vega 장부 (2026-10-15 업비트에서 옮김). 있으면 업비트 장부 대신 보인다."""
 DENEB_TICKERS = ("TQQQ", "SCHD", "IAUM")
 DUST_KRW = 1_000.0
@@ -828,7 +831,7 @@ def needed(root: Path) -> tuple[set[str], set[str]]:
     tickers = set(DENEB_TICKERS) | {
         kr_ticker(d) if d.get("currency") == "KRW" else str(d["symbol"]) for d in _toss_states(root)
     }
-    if (root / BINANCE_VEGA).exists():
+    if (root / BINANCE_VEGA).exists() and not VEGA_ON_UPBIT:
         tickers |= set(VEGA_USD.values())
     sirius = _read(root / SIRIUS)
     if sirius:
@@ -858,7 +861,7 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
             why = halt.read_text(encoding="utf-8", errors="replace").strip()[:60]
             book = replace(book, notes=(f"⏸ 정지 중 — 새 매수 안 함 ({why})", *book.notes))
         out.append(replace(book, updated_ms=_mtime_ms(toss / "DENEB.json")))
-    binance = _read(root / BINANCE_VEGA)
+    binance = {} if VEGA_ON_UPBIT else _read(root / BINANCE_VEGA)
     vega_path = root / "data" / "upbit_t2" / "state.json"
     vega = _read(vega_path) if SHOW_UPBIT else {}
     if vega and not binance:

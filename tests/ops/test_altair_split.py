@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from auto_trading.ops.altair_split import altair_share, move_amount
+
+
+@pytest.fixture(autouse=True)
+def _old_mix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """바이낸스 Vega → Altair 분배 시험은 10-19 전 비율(80 · 10 · 10)로 — 분배 코드는 남겨 둠."""
+    monkeypatch.setattr(
+        "auto_trading.ops.altair_split.MIX", (("Deneb", 0.8), ("Vega", 0.1), ("Altair", 0.1))
+    )
 
 
 def test_share_is_half_for_10_10() -> None:
