@@ -2527,3 +2527,10 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 
 - 사용자 "deneb 입금 알림오면 80:20의 비율로 바이낸스에 얼마 입금해야하는지도 알려줘": `deposit_split.binance_line` — 매수일 아침 입금 안내(기본 금액 기준)와 그날 Deneb 계획 알림(정한 금액 기준)에 '🧭 바이낸스엔 N원 (Vega · Altair) — Deneb : 바이낸스 = 80 : 20' 한 줄. 시험 추가 · 전체 통과.
 - 참고 계산(커밋 안 함): 264 엔진(새 돈만 나눔 · 세전 · 2020-06 ~ 2026-08 · 월 100 만)으로 66 조합. 264 숫자(80·10·10 ×3.13 · 70·20·10 ×2.96) 재현. 금 섞기 Deneb: 100·0·0 ×3.53 · 낙폭 25.5% / 80·10·10 ×3.34 · 26.6% / 90·10·0 ×3.34 · 23.9% / 80·20·0 ×3.14 · 22.7% / Altair 만 ×3.57 · 45.7%. Altair 는 이 기간 수익을 거의 더하지 않고 낙폭만 키움, Vega 는 수익을 줄이고 낙폭을 줄임.
+
+## 2026-10-19 — JOBY · ACHR 자동 적립 후보 기업 비교 (Codex)
+
+- 사용자 요청 공개 자료 분석만 수행. Phase 0 정보 검토이며 전략 연구 판정·운영 단계 변경 없음. 기업·기술 관점에서는 JOBY 우선 검토라는 조건부 의견, 실시간 주가·완전희석 기업가치에 따른 저평가/매수 적정성은 미판정. 두 회사 모두 반복 유상 운항의 수익성이 검증된 성숙 기업으로 취급하지 않음.
+- [JOBY 2026-03-11](https://www.jobyaviation.com/news/joby-s-first-faa-conforming-aircraft-takes-flight)의 FAA 적합 기체 TIA 준비 비행과 [ACHR 2026-09-08](https://www.investors.archer.com/news/news-details/2026/Archers-No-Roads-Tour-Takes-Off-By-Completing-Midnights-Piloted-Roundtrip-Flight-From-Salinas-to-Hollister/default.aspx)의 유인 도시 간 시험비행 확인. 시험비행·인증 계획·제한 시범운항을 완전한 형식증명/정규 유상 서비스와 구분. 두 회사가 제시하는 인증 단계 숫자를 직접 비교하지 않음.
+- 같은 2026-06-30 기준 [JOBY 공시](https://ir.jobyaviation.com/sec-filings/all-sec-filings/content/0001819848-26-000432/joby-8kx20260805xexx99_2.htm)와 [ACHR 실적](https://www.investors.archer.com/news/news-details/2026/Archer-Announces-Second-Quarter-2026-Results-Announces-Deal-with-Boeing-to-Shape-Physical-AI-Future-of-Aerospace-and-Defense/default.aspx)의 유동성·차입·현금 사용·매출 구성 확인. 기존 Blade/공항 매출을 신형 에어택시 수익성으로 해석하지 않음. Resonant 및 Wisk·Insitu·SkyGrid 인수 계약은 완료와 구분, 자율비행 개조 Cessna 실증을 전기 에어택시 성능으로 옮겨 주장하지 않음.
+- 코드·적립 종목·설정·주문·예약·Telegram·관심기업 DB는 변경하지 않음. 별도 전달용 파일 생성 없음. 검증은 원문 대조·금액 산술·기존 기록 보존·문서 diff 범위 검사이며 코드 테스트는 실행하지 않음.
