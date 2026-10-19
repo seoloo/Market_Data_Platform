@@ -866,6 +866,7 @@ def _deneb_preview(now: datetime, *, title: str = "") -> str:
             *([_tax_section(tax)] if tax else []),
         ],
         gold=_deneb_gold(),
+        binance=deposit_split.binance_line(krw) if krw > 0 else "",
     )
     return f"{title}\n{text}" if title else text
 

@@ -156,3 +156,18 @@ def test_step_buy_symbol_picks_more_lacking() -> None:
     assert mod._step_buy_symbol(st, PX, 0.5) == DIV
     st2 = DenebState("2026-10-09", qty={LEV: 10.0, DIV: 8.0, GOLD: 1.0})
     assert mod._step_buy_symbol(st2, PX, 0.5) == GOLD
+
+
+def test_binance_line_in_alerts() -> None:
+    from auto_trading.ops.deposit_split import ask_text, binance_line
+
+    line = binance_line(300_000, 1450.0)
+    assert "바이낸스엔 74,000원" in line and "≈ 51 USDT" in line and "80 : 20" in line
+    assert "바이낸스엔 200,000원" in binance_line(800_000)
+    assert "🧭 바이낸스엔" in ask_text("2026-11-02", 300_000)
+    msg = plan_message(
+        today="2026-11-02", krw=300_000, source="기본", fx_rate=1400, vol=0.15, share=0.6,
+        plan={LEV: 2}, prices=PX, fee=0.001, usd_now=500, need_all=0,
+        binance=binance_line(300_000),
+    )  # fmt: skip
+    assert "🧭 바이낸스엔 74,000원" in msg

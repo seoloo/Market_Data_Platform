@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-__all__ = ["MIX", "ask_text", "default_total", "split", "split_text"]
+__all__ = ["MIX", "ask_text", "binance_line", "default_total", "split", "split_text"]
 
 MIX: tuple[tuple[str, float], ...] = (("Deneb", 0.80), ("Vega", 0.10), ("Altair", 0.10))
 """목표 비율 (사용자 2026-10-15 "80 10 10"). 합 1.
@@ -48,11 +48,26 @@ def default_total(deneb_krw: float) -> float:
     return deneb_krw / _weight("Deneb")
 
 
+def binance_line(deneb_krw: float, usdt_krw: float | None = None) -> str:
+    """Deneb 금액 → 같은 비율로 바이낸스(Vega · Altair)에 넣을 돈 한 줄 (사용자 2026-10-19
+    'deneb 입금 알림오면 80:20의 비율로 바이낸스에 얼마 입금해야하는지도 알려줘')."""
+    parts = split(default_total(deneb_krw))
+    v, a = parts["Vega"], parts["Altair"]
+    usdt = f" ≈ {(v + a) / usdt_krw:,.0f} USDT" if usdt_krw else ""
+    d_w = _weight("Deneb") * 100
+    return (
+        f"🧭 바이낸스엔 {v + a:,.0f}원{usdt} (Vega {v:,.0f} · Altair {a:,.0f})"
+        f" — Deneb : 바이낸스 = {d_w:.0f} : {100 - d_w:.0f}"
+    )
+
+
 def _mix_label() -> str:
     return " · ".join(f"{n} {w * 100:.0f}" for n, w in MIX)
 
 
-def ask_text(today: str, deneb_default_krw: float, extra: str = "") -> str:
+def ask_text(
+    today: str, deneb_default_krw: float, extra: str = "", usdt_krw: float | None = None
+) -> str:
     """매수 당일 아침 — 이번 달 넣을 돈(합계)을 묻는다. ``extra`` = 맨 아래 줄(브레이크 등)."""
     from auto_trading.notify.style import RULE, sub
 
@@ -65,6 +80,7 @@ def ask_text(today: str, deneb_default_krw: float, extra: str = "") -> str:
             sub("예시 답: 100만  (0 = 이번 달 쉬기)"),
             sub(f"답이 없으면 합계 {total:,.0f}원 기준"),
             sub(f"그때는 Deneb {deneb_default_krw:,.0f}원만 삽니다"),
+            sub(binance_line(deneb_default_krw, usdt_krw)),
             sub(f"🌟 Deneb 은 오늘({today}) 밤 그 몫으로 매수해요"),
             *(["", extra] if extra else []),
         ]

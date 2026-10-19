@@ -186,6 +186,7 @@ def plan_message(
     need_all: float,
     sections: Sequence[Sequence[str]] = (),
     gold: float = 0.0,
+    binance: str = "",
 ) -> str:
     """텔레그램 답장: 오늘 밤 M3 매수 계획 + 덧붙일 구역(보유 · 배당) (순수).
 
@@ -195,6 +196,8 @@ def plan_message(
     lines = [f"🌟 Deneb · 오늘({today}) 밤 매수 예정", RULE]
     if krw > 0:
         lines.append(f"이번 달 납입 {krw:,.0f}원 ({source}) ≈ ${krw / fx_rate:,.2f}")
+        if binance:
+            lines.append(sub(binance))
     else:
         lines.append("이번 달 납입 0원 — 이월 현금 · 배당만으로")
     lines.append(f"비율 {ratio_text(share, gold)}")
