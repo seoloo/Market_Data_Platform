@@ -2577,3 +2577,9 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 
 - 한국만 가능하다는 결론은 아님. [Yangzijiang 공식 소개](https://www.yzjship.com/en/index.html)의 중국 조선 기반·싱가포르 BS6 상장, [Kawasaki 선박해양 사업](https://www.khi.co.jp/corporate/division/ship/index.html)의 가스선·잠수함 등 건조 사업 확인. 사업 노출과 국내 투자자의 접근성을 기준으로 국내 조선 3사가 직접적인 후보라는 설명이지 중국·일본 조선사 부재나 한국 주식 저평가를 뜻하지 않음. 현재 주가·증권사별 거래 가능 여부는 미확인.
 - Phase 0 정보 검토·운영 상태 불변. PROGRESS 추가만 원문·기존 기록 보존·diff 범위 검증, 코드·주문·설정 변경 및 코드 시험 없음.
+
+## 2026-10-20 — Codex 모바일 연결 절차 확인 (Codex)
+
+- 사용자 목적은 오르빗 대시보드가 아니라 이 Codex 대화·코딩 작업 이어가기. [OpenAI 공식 원격 연결 안내](https://learn.chatgpt.com/docs/remote-connections)의 Windows 호스트 지원, 데스크톱 앱 Settings → Connections → Control this PC에서 설정·QR 연결, 휴대폰 동일 계정·워크스페이스 인증 및 기존 대화 접근 절차 확인. SSH 프로젝트 연결과 휴대폰 연결은 구분.
+- 설치 CLI `0.162.0-alpha.17.2`의 버전·도움말만 조회. 별도 원격 서버·페어링 코드 생성·포트 개방·인증 설정 변경 없음. 실제 연결 활성화·휴대폰 승인 여부는 미확인으로 유지하며 사용자 기기의 연결 설정 화면 확인이 다음 단계.
+- Phase 0 정보 검토·운영 상태 불변. PROGRESS 추가와 Git 밖 자기 상황판만 갱신, 기존 기록 보존·diff 범위 검사. 코드·주문·계좌·예약 변경 및 코드 시험 없음.
