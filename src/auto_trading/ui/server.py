@@ -22,6 +22,10 @@
   인라인 스크립트 · 외부 스크립트는 여전히 막는다(CSP ``script-src 'self'``, 다른 화면은 그대로).
 * 실거래 홈 쿠키 셋: ``dashboard_amounts`` (금액 숨기기) · ``dashboard_onboard`` (첫 안내 봄) ·
   ``dashboard_detail`` (세 카드 보유 상세 펼침).
+
+언제 실행: ``AutoTrading_Dashboard`` (로그인하면 켜져 계속) — ``scripts/dashboard.py`` 가 띄운다.
+읽고 쓰는 것: Paper DB(읽기만) · 실거래 장부(읽기만) · 공개 시세 → 화면. 쓰는 곳은 위 예외들뿐
+              (설정 ``data/settings/`` · 정지 파일 · 정리 실행기 띄우기 · 놓친 작업 다시 시작).
 """
 
 from __future__ import annotations
@@ -178,6 +182,8 @@ class DashboardServer(ThreadingHTTPServer):
         return name in ALLOWED_HOSTS or (name.endswith(_TS_SUFFIX) and len(name) > len(_TS_SUFFIX))
 
     def same_origin(self, origin: str | None, host: str | None) -> bool:
+        """[쓰임] 이 PC 의 같은 서버 주소에서 온 요청인가 (Host · Origin 둘 다).
+        [이유] 다른 사이트가 몰래 버튼을 누르게 하는 공격(CSRF)을 막으려고."""
         port = self.server_address[1]
         allowed = {f"{h}:{port}" for h in ALLOWED_HOSTS}
         return host in allowed and origin in {f"http://{a}" for a in allowed}
@@ -198,6 +204,7 @@ class _Handler(BaseHTTPRequestHandler):
         )
 
     def do_GET(self) -> None:
+        """[쓰임] 화면 요청 — 주소마다 HTML · 파일을 돌려준다 (이 PC · Tailscale 이름만)."""
         path = self.path.split("?", 1)[0]
         if not self.server.host_ok(self.headers.get("Host")):
             self._send(403, "<!doctype html><meta charset='utf-8'><p>이 주소로는 열 수 없어요</p>")
@@ -317,6 +324,7 @@ class _Handler(BaseHTTPRequestHandler):
         )
 
     def _theme(self) -> str:
+        """[쓰임] 화면 밝기 — 쿠키(테마 버튼) → 설정 ``screen.theme`` → 밝게."""
         cookie = SimpleCookie()
         try:
             cookie.load(self.headers.get("Cookie", ""))
@@ -530,6 +538,7 @@ class _Handler(BaseHTTPRequestHandler):
         self._redirect(f"/settings?saved={len(changes)}")
 
     def _redirect(self, location: str) -> None:
+        """[쓰임] 303 으로 다른 주소로 보내기 (저장 뒤 새로 고침에 다시 보내지지 않게)."""
         self.send_response(303)
         self.send_header("Location", location)
         self.send_header("Content-Length", "0")
@@ -588,6 +597,7 @@ class _Handler(BaseHTTPRequestHandler):
         cookies: list[str] | None = None,
         csp: str | None = None,
     ) -> None:
+        """[쓰임] HTML 응답 (글자 → UTF-8 바이트)."""
         self._send_bytes(
             status,
             html.encode("utf-8"),
@@ -607,6 +617,7 @@ class _Handler(BaseHTTPRequestHandler):
         cookies: list[str] | None = None,
         csp: str | None = None,
     ) -> None:
+        """[쓰임] 응답 보내기 — 보안 머리글(CSP 등) · 테마 · 쿠키를 붙인다."""
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -625,12 +636,14 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format: str, *args: object) -> None:
+        """[쓰임] 접속 기록을 남기지 않는다 (콘솔 잡음)."""
         return  # 접속 기록을 남기지 않는다 (콘솔 잡음)
 
 
 def _liq_panel(root: Path, token: str) -> tuple[str, str]:
+    """[쓰임] 설정 '비상 정지' 쪽 전부 정리 칸 (그룹 정지 상태 · 마지막 정리 작업)."""
     halt = root / "data" / "HALT"
-    halts = {g: group_halted(halt, g) for g in GROUPS}
+    halts = {group: group_halted(halt, group) for group in GROUPS}
     jobs = Store(root / "data" / "liquidate").jobs()
     return liquidate_panel(token, halts, job_text(jobs[-1]) if jobs else "")
 
@@ -638,8 +651,8 @@ def _liq_panel(root: Path, token: str) -> tuple[str, str]:
 def _spawn(args: list[str], root: Path | None = None) -> None:
     """정리 실행기를 창 없이 따로 띄운다 (이 서버가 죽어도 이어 돈다). 출력은 reports/liquidate/."""
     repo = root or Path(__file__).resolve().parents[3]
-    py = repo / ".venv" / "Scripts" / "python.exe"
-    exe = str(py) if py.exists() else sys.executable
+    python = repo / ".venv" / "Scripts" / "python.exe"
+    exe = str(python) if python.exists() else sys.executable
     out = repo / "reports" / "liquidate"
     out.mkdir(parents=True, exist_ok=True)
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
@@ -659,8 +672,8 @@ def _spawn(args: list[str], root: Path | None = None) -> None:
 def _conn_test(root: Path, service: str) -> tuple[bool, str]:
     """설정 '연결 시험' — 거래소 코드를 이 서버에 들이지 않도록 따로 띄운다(import-linter 계약)."""
     repo = Path(__file__).resolve().parents[3]
-    py = repo / ".venv" / "Scripts" / "python.exe"
-    exe = str(py) if py.exists() else sys.executable
+    python = repo / ".venv" / "Scripts" / "python.exe"
+    exe = str(python) if python.exists() else sys.executable
     try:
         done = subprocess.run(
             [exe, "-m", "auto_trading.ops.conn_test", str(root), service],
@@ -682,6 +695,7 @@ def _conn_test(root: Path, service: str) -> tuple[bool, str]:
 
 
 def _halt_note(root: Path) -> str:
+    """[쓰임] 전체 정지 파일(``data/HALT``)의 사유 첫 120 자 (없으면 빈 글)."""
     try:
         return (root / "data" / "HALT").read_text(encoding="utf-8").strip()[:120]
     except OSError:
@@ -709,17 +723,17 @@ def _default_groups(
     keys: dict[str, dict[str, str | bool]], states: dict[str, task_setup.TaskState] | None
 ) -> list[str]:
     """자동 실행에서 처음 체크해 둘 묶음 — 이 PC 에 이미 켜진 예약이 있거나, 필요한 키가 있으면."""
-    have = {n for n, st in (states or {}).items() if st.state != "Disabled"}
+    have = {count for count, task_state in (states or {}).items() if task_state.state != "Disabled"}
     out = []
-    for g, _, _ in task_setup.GROUPS:
-        names = {t.name for t in task_setup.TASKS if t.group == g}
+    for group_key, _, _ in task_setup.GROUPS:
+        names = {task.name for task in task_setup.TASKS if task.group == group_key}
         need = {
             "deneb": ("TOSS_CLIENT_ID",),
             "toss": ("TOSS_CLIENT_ID",),
             "vega": ("UPBIT_API_KEY",),
             "common": ("TELEGRAM_BOT_TOKEN",),
             "info": ("TELEGRAM_INFO_BOT_TOKEN",),
-        }.get(g, ())
-        if names & have or (need and all(keys.get(n, {}).get("set") for n in need)):
-            out.append(g)
+        }.get(group_key, ())
+        if names & have or (need and all(keys.get(count, {}).get("set") for count in need)):
+            out.append(group_key)
     return out

@@ -12,6 +12,10 @@
 * PEAD 장부(``kind == "pead"``)는 손절이 없다. 보유 중 지나간 정규장을 세어 ``PEAD_HOLD`` 번째 장의
   마감 무렵(매수 창이 닫힌 뒤 · 매도 창 안 — 미국 마감 5 ~ 2 분 전)에 같은 지정가 매도로 판다.
   그 창에 다 못 팔면 다음 장에 이어서 판다.
+
+언제 쓰나: 텔레그램 봇이 2 분마다 부르는 ``scripts/size_guard.tick``.
+읽고 쓰는 것: 없음 — 받은 장부(:class:`~auto_trading.ops.size_order.Ticket`)를 고치고,
+              주문은 넣어 준 창구(``TraderLike``)로만.
 """
 
 from __future__ import annotations
@@ -36,12 +40,14 @@ __all__ = [
 MAX_SELL_ORDERS = 12
 
 
-def _px(v: float, kr: bool) -> str:
-    return f"{v:,.0f}원" if kr else f"${v:,.2f}"
+def _px(value: float, kr: bool) -> str:
+    """[쓰임] 가격 글 — 국내 '67,900원' · 미국 '$175.13'."""
+    return f"{value:,.0f}원" if kr else f"${value:,.2f}"
 
 
-def _won(v: float) -> str:
-    return f"{v / 10_000:,.1f}만 원" if abs(v) >= 10_000 else f"{v:,.0f}원"
+def _won(value: float) -> str:
+    """[쓰임] 원화 금액 글 — 1 만 원 넘으면 '4.5만 원'."""
+    return f"{value / 10_000:,.1f}만 원" if abs(value) >= 10_000 else f"{value:,.0f}원"
 
 
 def _money(pnl: float, kr: bool, fx: float) -> str:
@@ -60,7 +66,7 @@ def _loss_line(pnl: float, pct: float, kr: bool, fx: float, *, done: bool) -> st
 
 def register_app(tid: str, symbol: str, name: str, qty: float, avg: float, now_ms: int) -> Ticket:
     """앱에서 산 종목에 손절만 건다 — 토스 평균 단가 기준."""
-    t = Ticket(
+    ticket = Ticket(
         tid,
         symbol,
         name,
@@ -71,35 +77,41 @@ def register_app(tid: str, symbol: str, name: str, qty: float, avg: float, now_m
         status="holding",
         source="app",
     )
-    t.filled, t.avg = float(int(qty)), avg
-    t.stop = stop_price(avg, t.kr)
-    return t
+    ticket.filled, ticket.avg = float(int(qty)), avg
+    ticket.stop = stop_price(avg, ticket.kr)
+    return ticket
 
 
-def check_stop(t: Ticket, last: float | None) -> list[str]:
+def check_stop(ticket: Ticket, last: float | None) -> list[str]:
     """보유 중이고 지금 가격이 손절가 이하면 ``selling`` 으로. PEAD 장부는 손절 없음."""
-    if t.kind == PEAD or t.status != "holding" or last is None or last <= 0 or last > t.stop:
+    if (
+        ticket.kind == PEAD
+        or ticket.status != "holding"
+        or last is None
+        or last <= 0
+        or last > ticket.stop
+    ):
         return []
-    t.status = "selling"
-    t.note = f"손절 — {_px(last, t.kr)} ≤ {_px(t.stop, t.kr)}"
+    ticket.status = "selling"
+    ticket.note = f"손절 — {_px(last, ticket.kr)} ≤ {_px(ticket.stop, ticket.kr)}"
     return []
 
 
-def check_hold_exit(t: Ticket, session: str, *, sell_live: bool, closing: bool) -> list[str]:
+def check_hold_exit(ticket: Ticket, session: str, *, sell_live: bool, closing: bool) -> list[str]:
     """PEAD 보유 중 정규장(``sell_live``)이면 그 장을 세고, ``PEAD_HOLD`` 번째 장의 마감 무렵
     (``closing``)이면 ``selling`` 으로."""
-    if t.kind != PEAD or t.status != "holding" or not sell_live:
+    if ticket.kind != PEAD or ticket.status != "holding" or not sell_live:
         return []
-    if session not in t.hold_days:
-        t.hold_days.append(session)
-    if len(t.hold_days) >= PEAD_HOLD and closing:
-        t.status = "selling"
-        t.note = f"PEAD {PEAD_HOLD} 거래일 보유 끝"
+    if session not in ticket.hold_days:
+        ticket.hold_days.append(session)
+    if len(ticket.hold_days) >= PEAD_HOLD and closing:
+        ticket.status = "selling"
+        ticket.note = f"PEAD {PEAD_HOLD} 거래일 보유 끝"
     return []
 
 
 def step_sell(
-    t: Ticket,
+    ticket: Ticket,
     trader: TraderLike,
     now_ms: int,
     *,
@@ -108,91 +120,107 @@ def step_sell(
     fx: float = 1.0,
 ) -> list[str]:
     """한 번 확인 (``selling`` 만). ``live`` = 팔 수 있는 시간, ``sellable`` = 판매 가능 수량."""
-    if t.status != "selling":
+    if ticket.status != "selling":
         return []
-    refresh(t.sells, trader, now_ms, live=live)
-    rem = int(t.filled - t.sold)
+    refresh(ticket.sells, trader, now_ms, live=live)
+    rem = int(ticket.filled - ticket.sold)
     if rem <= 0:
-        return _done(t, now_ms, fx)
-    if any(not o.closed for o in t.sells) or not live:
+        return _done(ticket, now_ms, fx)
+    if any(not sell_order.closed for sell_order in ticket.sells) or not live:
         return []
-    if len(t.sells) >= MAX_SELL_ORDERS:
-        t.status = "failed"
-        t.note = f"{MAX_SELL_ORDERS} 번 내도 다 못 팖 — 토스 앱에서 확인"
-        return [f"⚠️ {t.name} 손절 매도 {t.note} (남은 {rem}주)"]
+    if len(ticket.sells) >= MAX_SELL_ORDERS:
+        ticket.status = "failed"
+        ticket.note = f"{MAX_SELL_ORDERS} 번 내도 다 못 팖 — 토스 앱에서 확인"
+        return [f"⚠️ {ticket.name} 손절 매도 {ticket.note} (남은 {rem}주)"]
     qty = min(rem, int(sellable))
     if qty <= 0:
-        t.note = "팔 수 있는 수량 0 — 앱에서 판 것 아닌지 확인"
+        ticket.note = "팔 수 있는 수량 0 — 앱에서 판 것 아닌지 확인"
         return []
     price = choose_price(
-        [(Decimal(str(p)), Decimal(str(v))) for p, v in trader.bids(t.symbol)], Decimal(qty)
+        [
+            (Decimal(str(price_level)), Decimal(str(volume)))
+            for price_level, volume in trader.bids(ticket.symbol)
+        ],
+        Decimal(qty),
     )
     if price is None:
-        t.note = "매수 호가 없음 — 다음 확인 때 다시"
+        ticket.note = "매수 호가 없음 — 다음 확인 때 다시"
         return []
-    limit = round_price(float(price), t.kr, up=False)
-    cid = f"sz-{t.id}-s{len(t.sells)}"[:36]
-    first = not t.sells
+    limit = round_price(float(price), ticket.kr, up=False)
+    cid = f"sz-{ticket.id}-s{len(ticket.sells)}"[:36]
+    first = not ticket.sells
     try:
         res = trader.order(
-            t.symbol, "SELL", qty, Decimal(str(limit)), client_order_id=cid, time_in_force="DAY"
+            ticket.symbol,
+            "SELL",
+            qty,
+            Decimal(str(limit)),
+            client_order_id=cid,
+            time_in_force="DAY",
         )
     except OrderStateUnknownError as exc:
-        t.sells.append(Order("", cid, "SELL", qty, limit, now_ms, closed=True, status="UNKNOWN"))
-        t.status, t.note = "failed", f"손절 매도 결과 모름 — 토스 앱에서 확인 ({exc})"
-        return [f"⚠️ {t.name} {t.note}"]
+        ticket.sells.append(
+            Order("", cid, "SELL", qty, limit, now_ms, closed=True, status="UNKNOWN")
+        )
+        ticket.status, ticket.note = "failed", f"손절 매도 결과 모름 — 토스 앱에서 확인 ({exc})"
+        return [f"⚠️ {ticket.name} {ticket.note}"]
     except AutoTradingError as exc:
-        t.status, t.note = "failed", f"손절 매도 막힘: {exc}"
-        return [f"⚠️ {t.name} {t.note}"]
+        ticket.status, ticket.note = "failed", f"손절 매도 막힘: {exc}"
+        return [f"⚠️ {ticket.name} {ticket.note}"]
     if not res.accepted:
-        t.sells.append(Order("", cid, "SELL", qty, limit, now_ms, closed=True, status=res.code))
-        t.note = f"매도 거절 {res.code} {res.message[:60]} — 다음 확인 때 다시"
-        return [f"⚠️ {t.name} {t.note}"] if first else []
-    t.sells.append(Order(res.code, cid, "SELL", qty, limit, now_ms))
-    if first and t.note.startswith("매도 신호"):  # 월간 추천의 매도 신호 버튼 (stock_reco)
-        est = (limit - t.avg) * rem
+        ticket.sells.append(
+            Order("", cid, "SELL", qty, limit, now_ms, closed=True, status=res.code)
+        )
+        ticket.note = f"매도 거절 {res.code} {res.message[:60]} — 다음 확인 때 다시"
+        return [f"⚠️ {ticket.name} {ticket.note}"] if first else []
+    ticket.sells.append(Order(res.code, cid, "SELL", qty, limit, now_ms))
+    if first and ticket.note.startswith("매도 신호"):  # 월간 추천의 매도 신호 버튼 (stock_reco)
+        est = (limit - ticket.avg) * rem
         return [
-            f"🧹 {t.name} {t.note} — {qty}주 지정가 {_px(limit, t.kr)} 매도 주문\n"
-            + _loss_line(est, limit / t.avg - 1, t.kr, fx, done=False).replace(
+            f"🧹 {ticket.name} {ticket.note} — {qty}주 지정가 {_px(limit, ticket.kr)} 매도 주문\n"
+            + _loss_line(est, limit / ticket.avg - 1, ticket.kr, fx, done=False).replace(
                 "예상 손해 약", "예상 손익"
             )
-            + f" ({rem}주, 평균 {_px(t.avg, t.kr)} 기준, 수수료 전)"
+            + f" ({rem}주, 평균 {_px(ticket.avg, ticket.kr)} 기준, 수수료 전)"
         ]
-    if first and t.kind == PEAD:
-        est = (limit - t.avg) * rem
+    if first and ticket.kind == PEAD:
+        est = (limit - ticket.avg) * rem
         return [
-            f"📅 {t.name} {t.note} — {qty}주 지정가 {_px(limit, t.kr)} 매도 주문\n"
-            + _loss_line(est, limit / t.avg - 1, t.kr, fx, done=False).replace(
+            f"📅 {ticket.name} {ticket.note} — {qty}주 지정가 {_px(limit, ticket.kr)} 매도 주문\n"
+            + _loss_line(est, limit / ticket.avg - 1, ticket.kr, fx, done=False).replace(
                 "예상 손해 약", "예상 손익"
             )
-            + f" ({rem}주, 평균 {_px(t.avg, t.kr)} 기준, 수수료 전)"
+            + f" ({rem}주, 평균 {_px(ticket.avg, ticket.kr)} 기준, 수수료 전)"
         ]
     if first:
-        est = (limit - t.avg) * rem
+        est = (limit - ticket.avg) * rem
         return [
-            f"🛑 {t.name} 손절 시작 — {t.note}\n{qty}주 지정가 {_px(limit, t.kr)} 매도 주문\n"
-            + _loss_line(est, limit / t.avg - 1, t.kr, fx, done=False)
-            + f" ({rem}주, 평균 {_px(t.avg, t.kr)} 기준, 수수료 전)"
+            f"🛑 {ticket.name} 손절 시작 — {ticket.note}\n"
+            f"{qty}주 지정가 {_px(limit, ticket.kr)} 매도 주문\n"
+            + _loss_line(est, limit / ticket.avg - 1, ticket.kr, fx, done=False)
+            + f" ({rem}주, 평균 {_px(ticket.avg, ticket.kr)} 기준, 수수료 전)"
         ]
     return []
 
 
-def _done(t: Ticket, now_ms: int, fx: float) -> list[str]:
-    t.status, t.closed_ms = "closed", now_ms
-    sold = t.sold
-    avg = t.sold_amount / sold if sold > 0 else 0.0
-    pnl = t.sold_amount - t.avg * sold
-    pct = pnl / (t.avg * sold) if sold > 0 and t.avg > 0 else 0.0
+def _done(ticket: Ticket, now_ms: int, fx: float) -> list[str]:
+    """[쓰임] 다 팔았다 — 장부를 ``closed`` 로, 평균 매도가 · 손익 알림 한 통.
+    [이유] 손절 · 매도 신호 · PEAD 보유 끝마다 머리말만 다르고 손익 셈은 같다."""
+    ticket.status, ticket.closed_ms = "closed", now_ms
+    sold = ticket.sold
+    avg = ticket.sold_amount / sold if sold > 0 else 0.0
+    pnl = ticket.sold_amount - ticket.avg * sold
+    pct = pnl / (ticket.avg * sold) if sold > 0 and ticket.avg > 0 else 0.0
     head = (
-        f"📅 {t.name} PEAD 매도 끝"
-        if t.kind == PEAD
-        else f"🧹 {t.name} 매도 신호 매도 끝"
-        if t.note.startswith("매도 신호")
-        else f"🛑 {t.name} 손절 매도 끝"
+        f"📅 {ticket.name} PEAD 매도 끝"
+        if ticket.kind == PEAD
+        else f"🧹 {ticket.name} 매도 신호 매도 끝"
+        if ticket.note.startswith("매도 신호")
+        else f"🛑 {ticket.name} 손절 매도 끝"
     )
     return [
-        f"{head} · {sold:g}주 · 평균 {_px(avg, t.kr)} "
-        f"({avg / t.avg - 1:+.1%})\n" + _loss_line(pnl, pct, t.kr, fx, done=True)
+        f"{head} · {sold:g}주 · 평균 {_px(avg, ticket.kr)} "
+        f"({avg / ticket.avg - 1:+.1%})\n" + _loss_line(pnl, pct, ticket.kr, fx, done=True)
     ]
 
 
@@ -200,30 +228,32 @@ def status_lines(tickets: Sequence[Ticket], last: dict[str, float]) -> list[str]
     """'📋 지금 포지션' 에 붙일 손절 현황 한 줄씩."""
     word = {"reserved": "⏳ 장 시작에 매수", "buying": "🔄 매수 중", "selling": "🛑 손절 매도 중"}
     out = []
-    for t in tickets:
-        if not t.active:
+    for ticket in tickets:
+        if not ticket.active:
             continue
-        if t.status == "holding" and t.kind == PEAD:
-            px = last.get(t.symbol)
-            now = f" · 지금 {px / t.avg - 1:+.1%}" if px and t.avg else ""
+        if ticket.status == "holding" and ticket.kind == PEAD:
+            last_price = last.get(ticket.symbol)
+            now = f" · 지금 {last_price / ticket.avg - 1:+.1%}" if last_price and ticket.avg else ""
             out.append(
-                f"📅 {t.name} {t.filled:g}주 · 평균 {_px(t.avg, t.kr)}{now}"
-                f" · PEAD {len(t.hold_days)}/{PEAD_HOLD} 거래일 (손절 없음)"
+                f"📅 {ticket.name} {ticket.filled:g}주 · 평균 {_px(ticket.avg, ticket.kr)}{now}"
+                f" · PEAD {len(ticket.hold_days)}/{PEAD_HOLD} 거래일 (손절 없음)"
             )
-        elif t.kind == PEAD and t.status == "selling":
-            out.append(f"📅 PEAD {PEAD_HOLD}일 매도 중 {t.name} {t.qty}주")
-        elif t.status == "holding":
-            px = last.get(t.symbol)
-            if px:
+        elif ticket.kind == PEAD and ticket.status == "selling":
+            out.append(f"📅 PEAD {PEAD_HOLD}일 매도 중 {ticket.name} {ticket.qty}주")
+        elif ticket.status == "holding":
+            last_price = last.get(ticket.symbol)
+            if last_price:
                 out.append(
-                    f"🛡 {t.name} {t.filled:g}주 · 평균 {_px(t.avg, t.kr)}"
-                    f" · 지금 {px / t.avg - 1:+.1%}"
-                    f" · 손절 {_px(t.stop, t.kr)}까지 {t.stop / px - 1:+.1%}"
+                    f"🛡 {ticket.name} {ticket.filled:g}주 · 평균 {_px(ticket.avg, ticket.kr)}"
+                    f" · 지금 {last_price / ticket.avg - 1:+.1%}"
+                    f" · 손절 {_px(ticket.stop, ticket.kr)}까지 {ticket.stop / last_price - 1:+.1%}"
                 )
             else:
-                out.append(f"🛡 {t.name} {t.filled:g}주 · 손절 {_px(t.stop, t.kr)}")
+                out.append(
+                    f"🛡 {ticket.name} {ticket.filled:g}주 · 손절 {_px(ticket.stop, ticket.kr)}"
+                )
         else:
-            out.append(f"{word.get(t.status, t.status)} {t.name} {t.qty}주")
+            out.append(f"{word.get(ticket.status, ticket.status)} {ticket.name} {ticket.qty}주")
     if out:
         out.append(f"(손절 = 산 값 −{STOP:.0%}, 정규장에서 2분마다 확인)")
     return out

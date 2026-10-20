@@ -7,6 +7,10 @@
 
 * 평가는 대시보드 실거래 홈과 같은 장부 + 공개 시세. 주문 · 계좌 조회 없음.
 * 지난 보고 값은 ``data/fire/state.json`` 에 남겨 다음 달 '지난 보고보다' 줄에 쓴다.
+
+언제 실행: 매달 1 일 09:15 ``AutoTrading_Fire_Report``.
+읽고 쓰는 것: 실거래 장부(입금 날짜 · 평가) · 공개 시세 · 설정 ``fire.*`` → 투자 봇 텔레그램 ·
+              ``data/fire/state.json``.
 """
 
 from __future__ import annotations
@@ -32,11 +36,12 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def _read(path: Path) -> dict[str, Any]:
+    """[쓰임] 장부 JSON 하나 (없거나 깨졌으면 빈 dict)."""
     try:
-        d = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return d if isinstance(d, dict) else {}
+    return data if isinstance(data, dict) else {}
 
 
 def _fx_now() -> float:
@@ -68,21 +73,23 @@ def dated_deposits(root: Path) -> list[tuple[str, float]]:
     for path in sorted((root / "data" / "toss").glob("*.json")):
         if path.stem in ("M3", "QS_SWITCH"):
             continue
-        for b in _read(path).get("buys") or []:
-            if isinstance(b, dict):
-                if "cost_krw" in b:  # 국내 적립 장부 (KR_<코드>.json)
-                    out.append((str(b.get("date")), float(b["cost_krw"])))
+        for buy in _read(path).get("buys") or []:
+            if isinstance(buy, dict):
+                if "cost_krw" in buy:  # 국내 적립 장부 (KR_<코드>.json)
+                    out.append((str(buy.get("date")), float(buy["cost_krw"])))
                     continue
-                cost = float(b.get("cost_usd") or 0) * float(b.get("fx_rate") or 0)
-                out.append((str(b.get("date")), cost))
+                cost = float(buy.get("cost_usd") or 0) * float(buy.get("fx_rate") or 0)
+                out.append((str(buy.get("date")), cost))
     return out
 
 
 def build(root: Path, today: date) -> tuple[str, Snapshot]:
+    """[쓰임] 파이어 보고 글 + 지금 값 (평가 · 넣은 돈) — 실거래 홈과 같은 장부 + 공개 시세.
+    [이유] 목표 · 연수익 세 가지는 설정 화면 값(``fire.*``)."""
     coins, tickers = needed(root)
-    q = fetch_quotes(coins, tickers)
-    books = build_books(root, q)
-    now = Snapshot(sum(b.deposits_krw for b in books), sum(b.value_krw for b in books))
+    quotes = fetch_quotes(coins, tickers)
+    books = build_books(root, quotes)
+    now = Snapshot(sum(book.deposits_krw for book in books), sum(book.value_krw for book in books))
     last_raw = _read(root / "data" / "fire" / "state.json")
     last = (
         Snapshot(float(last_raw["deposits"]), float(last_raw["value"]))
@@ -103,16 +110,18 @@ def build(root: Path, today: date) -> tuple[str, Snapshot]:
         target=float(prefs["fire.target_krw"]),
         scenarios=scenarios,
     )
-    if q.errors:
-        text += "\n⚠ 시세 일부 실패 — 원가로 셈: " + " · ".join(q.errors)
+    if quotes.errors:
+        text += "\n⚠ 시세 일부 실패 — 원가로 셈: " + " · ".join(quotes.errors)
     return text, now
 
 
 def _today() -> date:
+    """[쓰임] 오늘 날짜 (한국 시각) — 시험이 바꿔 끼운다."""
     return (datetime.now(UTC) + timedelta(hours=9)).date()
 
 
 def run(root: Path = REPO) -> int:
+    """[쓰임] 보고 한 번 — 계산 → 텔레그램 → 지난 보고 값 저장 (설정에서 끄면 안 함)."""
     if not user_settings.get(root, "fire.report_on"):
         print("파이어 보고 꺼짐 (설정)")
         return 0
@@ -146,6 +155,7 @@ def run(root: Path = REPO) -> int:
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (예약은 ``run``)."""
     if argv == ["run"]:
         return run()
     if argv == ["show"]:

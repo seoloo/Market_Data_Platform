@@ -13,6 +13,12 @@
   버튼으로 산 종목. 손절 없이 20 거래일 보유 뒤 장 마감 무렵 판다
   (:func:`stop_guard.check_hold_exit`).
   반응일 다음 정규장 시가에 사는 규칙이라 '추천 때보다 3% 넘게 오름' 추격 방지는 쓰지 않는다.
+
+언제 쓰나: 텔레그램 봇이 2 분마다 부르는 ``scripts/size_guard.tick`` · 예약 직후.
+읽고 쓰는 것: 없음 — 장부 모양(:class:`Ticket`, 파일 ``data/size_guard/state.json``)과 계산만.
+              주문은 넣어 준 창구(:class:`TraderLike`, 실제는 ``exchange/toss.TossTrader``)로만.
+
+디자인 패턴: 창구 모양(``Protocol``)을 밖에서 넣는 **의존성 주입** — 시험은 가짜 토스를 넣는다.
 """
 
 from __future__ import annotations
@@ -64,6 +70,8 @@ _OPEN = {"PENDING", "PENDING_CANCEL", "PENDING_REPLACE", "PARTIAL_FILLED", ""}
 
 
 class _Result(Protocol):
+    """주문 · 취소 결과 모양 (받았나 · 주문 번호 또는 오류 코드 · 메시지)."""
+
     @property
     def accepted(self) -> bool: ...
     @property
@@ -73,6 +81,8 @@ class _Result(Protocol):
 
 
 class _Status(Protocol):
+    """주문 상태 모양 (상태 · 체결 수량 · 평균가 · 체결 금액 · 수수료)."""
+
     @property
     def status(self) -> str: ...
     @property
@@ -86,6 +96,8 @@ class _Status(Protocol):
 
 
 class TraderLike(Protocol):
+    """주문 창구 모양 — 호가 · 주문 · 상태 조회 · 취소 (``exchange/toss.TossTrader`` 가 맞는다)."""
+
     def asks(self, symbol: str) -> list[tuple[Any, Any]]: ...
     def bids(self, symbol: str) -> list[tuple[Any, Any]]: ...
     def order(
@@ -104,6 +116,9 @@ class TraderLike(Protocol):
 
 @dataclass(slots=True)
 class Order:
+    """장부의 주문 한 줄 — 칸 이름은 파일에 저장돼 바꾸지 않는다.
+    ``cid`` = 우리가 붙인 주문 번호, ``order_id`` = 토스 주문 번호."""
+
     order_id: str
     cid: str
     side: str
@@ -117,8 +132,9 @@ class Order:
     fee: float = 0.0
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> Order:
-        return cls(**{k: d[k] for k in cls.__slots__ if k in d})
+    def from_dict(cls, data: dict[str, Any]) -> Order:
+        """[쓰임] 장부 JSON 한 줄 → 주문 (모르는 칸은 버린다)."""
+        return cls(**{key: data[key] for key in cls.__slots__ if key in data})
 
 
 @dataclass(slots=True)
@@ -161,38 +177,54 @@ class Ticket:
 
     @property
     def kr(self) -> bool:
+        """[쓰임] 국내 종목인가."""
         return is_kr(self.symbol)
 
     @property
     def sold(self) -> float:
-        return sum(o.filled for o in self.sells)
+        """[쓰임] 지금까지 판 수량."""
+        return sum(order.filled for order in self.sells)
 
     @property
     def sold_amount(self) -> float:
-        return sum(o.amount - o.fee for o in self.sells)
+        """[쓰임] 판 금액 합 (수수료 뺌)."""
+        return sum(order.amount - order.fee for order in self.sells)
 
     @property
     def active(self) -> bool:
+        """[쓰임] 아직 할 일이 남았나 (예약 · 매수 중 · 보유 · 매도 중)."""
         return self.status in ACTIVE
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 JSON 으로 (칸 이름은 파일에 저장돼 바꾸지 않는다)."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> Ticket:
+    def from_dict(cls, data: dict[str, Any]) -> Ticket:
+        """[쓰임] 장부 JSON → 장부 (옛 파일에 없는 칸은 기본값)."""
         base = {
-            k: d[k] for k in cls.__slots__ if k in d and k not in ("buys", "sells", "hold_days")
+            key: data[key]
+            for key in cls.__slots__
+            if key in data and key not in ("buys", "sells", "hold_days")
         }
-        t = cls(**base)
-        t.hold_days = [str(x) for x in d.get("hold_days") or []]
-        t.buys = [Order.from_dict(o) for o in d.get("buys") or []]
-        t.sells = [Order.from_dict(o) for o in d.get("sells") or []]
-        return t
+        ticket = cls(**base)
+        ticket.hold_days = [str(day) for day in data.get("hold_days") or []]
+        ticket.buys = [Order.from_dict(order) for order in data.get("buys") or []]
+        ticket.sells = [Order.from_dict(order) for order in data.get("sells") or []]
+        return ticket
 
 
-def new_ticket(a: Advice, now_ms: int, tid: str) -> Ticket:
+def new_ticket(advice: Advice, now_ms: int, tid: str) -> Ticket:
+    """[쓰임] 추천 → 예약 장부 하나 (추천 때 가격 · 수량 · 들어갈 정규장)."""
     return Ticket(
-        tid, a.symbol, a.name, a.currency, a.qty, a.price, now_ms, session=a.entry_session
+        tid,
+        advice.symbol,
+        advice.name,
+        advice.currency,
+        advice.qty,
+        advice.price,
+        now_ms,
+        session=advice.entry_session,
     )
 
 
@@ -202,7 +234,7 @@ def merge_into(parent: Ticket, add: Ticket, now_ms: int) -> list[str]:
     매수 기록(``buys``)은 추가 매수 장부에 남겨 월간 복기에서 따로 센다."""
     got = add.filled
     held = parent.filled - parent.sold
-    cost = held * parent.avg + sum(o.amount + o.fee for o in add.buys)
+    cost = held * parent.avg + sum(order.amount + order.fee for order in add.buys)
     old = parent.stop
     parent.filled += got
     parent.qty += int(got)
@@ -218,84 +250,95 @@ def merge_into(parent: Ticket, add: Ticket, now_ms: int) -> list[str]:
     ]
 
 
-def _f(x: Any) -> float:
-    return float(x) if x is not None else 0.0
+def _to_float(value: Any) -> float:
+    """[쓰임] 토스 값(Decimal · None) → float (None 이면 0)."""
+    return float(value) if value is not None else 0.0
 
 
 def refresh(orders: Sequence[Order], trader: TraderLike, now_ms: int, *, live: bool) -> None:
     """주문 상태 갱신, 2 분 넘게 덜 찬 주문은 취소(장이 열려 있을 때만)."""
-    for o in orders:
-        if o.closed or not o.order_id:
+    for order in orders:
+        if order.closed or not order.order_id:
             continue
-        st = trader.order_status(o.order_id)
-        if st.status not in _OPEN | {"FILLED", "CANCELED", "REJECTED", "EXPIRED"} or not st.status:
+        reply = trader.order_status(order.order_id)
+        if (
+            reply.status not in _OPEN | {"FILLED", "CANCELED", "REJECTED", "EXPIRED"}
+            or not reply.status
+        ):
             raise OrderStateUnknownError("주문 상태 미확인 — 신규 주문 금지")
-        o.status = st.status
-        o.filled = _f(st.filled_qty)
-        o.amount = _f(st.filled_amount) or o.filled * _f(st.avg_price)
-        o.fee = _f(st.commission)
-        if st.status not in _OPEN:
-            o.closed = True
-        elif live and now_ms - o.placed_ms >= REPRICE_MS and o.filled < o.qty:
-            trader.cancel(o.order_id)
+        order.status = reply.status
+        order.filled = _to_float(reply.filled_qty)
+        order.amount = _to_float(reply.filled_amount) or order.filled * _to_float(reply.avg_price)
+        order.fee = _to_float(reply.commission)
+        if reply.status not in _OPEN:
+            order.closed = True
+        elif live and now_ms - order.placed_ms >= REPRICE_MS and order.filled < order.qty:
+            trader.cancel(order.order_id)
 
 
-def _px(v: float, kr: bool) -> str:
-    return f"{v:,.0f}원" if kr else f"${v:,.2f}"
+def _px(value: float, kr: bool) -> str:
+    """[쓰임] 가격 글 — 국내 '70,000원' · 미국 '$100.30'."""
+    return f"{value:,.0f}원" if kr else f"${value:,.2f}"
 
 
-def _buy_limit(t: Ticket, ask: float) -> float:
-    cap = round_price(t.open_px * (1 + OPEN_CAP), t.kr, up=False)
-    return min(round_price(ask * (1 + CHASE), t.kr, up=True), cap)
+def _buy_limit(ticket: Ticket, ask: float) -> float:
+    """[쓰임] 매수 지정가 = min(매도 1 호가 + 0.3%, 정규장 시가 + 1%).
+    [이유] 바로 체결되게 조금 얹되, 시가보다 많이 비싸게는 사지 않게."""
+    cap = round_price(ticket.open_px * (1 + OPEN_CAP), ticket.kr, up=False)
+    return min(round_price(ask * (1 + CHASE), ticket.kr, up=True), cap)
 
 
-def _place(t: Ticket, trader: TraderLike, now_ms: int, qty: int, limit: float) -> list[str]:
-    cid = f"sz-{t.id}-b{len(t.buys)}"[:36]
+def _place(ticket: Ticket, trader: TraderLike, now_ms: int, qty: int, limit: float) -> list[str]:
+    """[쓰임] 매수 주문 하나 내고 장부에 적는다 (당일 지정가).
+    [이유] 결과를 모르면 장부를 ``failed`` 로 두고 다시 내지 않는다 — 두 번 사지 않게."""
+    cid = f"sz-{ticket.id}-b{len(ticket.buys)}"[:36]
     try:
         res = trader.order(
-            t.symbol, "BUY", qty, Decimal(str(limit)), client_order_id=cid, time_in_force="DAY"
+            ticket.symbol, "BUY", qty, Decimal(str(limit)), client_order_id=cid, time_in_force="DAY"
         )
     except OrderStateUnknownError as exc:
-        t.buys.append(Order("", cid, "BUY", qty, limit, now_ms, closed=True, status="UNKNOWN"))
-        t.status, t.note = "failed", f"매수 주문 결과 모름 — 토스 앱에서 확인 ({exc})"
-        return [f"⚠️ {t.name} {t.note}"]
+        ticket.buys.append(Order("", cid, "BUY", qty, limit, now_ms, closed=True, status="UNKNOWN"))
+        ticket.status, ticket.note = "failed", f"매수 주문 결과 모름 — 토스 앱에서 확인 ({exc})"
+        return [f"⚠️ {ticket.name} {ticket.note}"]
     except AutoTradingError as exc:
-        t.status, t.note = "failed", f"매수 주문 막힘: {exc}"
-        return [f"⚠️ {t.name} {t.note}"]
+        ticket.status, ticket.note = "failed", f"매수 주문 막힘: {exc}"
+        return [f"⚠️ {ticket.name} {ticket.note}"]
     if not res.accepted:
-        t.buys.append(Order("", cid, "BUY", qty, limit, now_ms, closed=True, status=res.code))
-        t.note = f"매수 거절 {res.code} {res.message[:60]}"
+        ticket.buys.append(Order("", cid, "BUY", qty, limit, now_ms, closed=True, status=res.code))
+        ticket.note = f"매수 거절 {res.code} {res.message[:60]}"
         return []
-    t.buys.append(Order(res.code, cid, "BUY", qty, limit, now_ms))
+    ticket.buys.append(Order(res.code, cid, "BUY", qty, limit, now_ms))
     return []
 
 
-def _finish(t: Ticket, now_ms: int) -> list[str]:
-    got = sum(o.filled for o in t.buys)
+def _finish(ticket: Ticket, now_ms: int) -> list[str]:
+    """[쓰임] 매수 끝 — 체결 수량 · 평균가를 적고 손절가(평균 −3%)를 잡는다.
+    체결이 없으면 ``canceled``, PEAD 는 손절 없음."""
+    got = sum(order.filled for order in ticket.buys)
     if got <= 0:
-        t.status, t.closed_ms = "canceled", now_ms
-        why = f" ({t.note})" if t.note else ""
-        return [f"❎ {t.name} 매수 안 됨 — 체결 없이 끝{why}"]
-    amount = sum(o.amount + o.fee for o in t.buys)
-    t.filled = got
-    t.avg = amount / got
-    t.status = "holding"
-    part = "" if got >= t.qty else f" (목표 {t.qty}주 중 {got:g}주, 나머지 취소)"
-    if t.kind == PEAD:
-        t.stop = 0.0
+        ticket.status, ticket.closed_ms = "canceled", now_ms
+        why = f" ({ticket.note})" if ticket.note else ""
+        return [f"❎ {ticket.name} 매수 안 됨 — 체결 없이 끝{why}"]
+    amount = sum(order.amount + order.fee for order in ticket.buys)
+    ticket.filled = got
+    ticket.avg = amount / got
+    ticket.status = "holding"
+    part = "" if got >= ticket.qty else f" (목표 {ticket.qty}주 중 {got:g}주, 나머지 취소)"
+    if ticket.kind == PEAD:
+        ticket.stop = 0.0
         return [
-            f"✅ {t.name} {got:g}주 체결 · 평균 {_px(t.avg, t.kr)}{part}\n"
+            f"✅ {ticket.name} {got:g}주 체결 · 평균 {_px(ticket.avg, ticket.kr)}{part}\n"
             f"📅 PEAD — 손절 없이 {PEAD_HOLD} 거래일째 장 마감 무렵 자동 매도"
         ]
-    t.stop = stop_price(t.avg, t.kr)
+    ticket.stop = stop_price(ticket.avg, ticket.kr)
     return [
-        f"✅ {t.name} {got:g}주 체결 · 평균 {_px(t.avg, t.kr)}{part}\n"
-        f"🛡 손절 등록: {_px(t.stop, t.kr)} (−3%) 이하면 자동 매도"
+        f"✅ {ticket.name} {got:g}주 체결 · 평균 {_px(ticket.avg, ticket.kr)}{part}\n"
+        f"🛡 손절 등록: {_px(ticket.stop, ticket.kr)} (−3%) 이하면 자동 매도"
     ]
 
 
 def step_buy(
-    t: Ticket,
+    ticket: Ticket,
     trader: TraderLike,
     now_ms: int,
     *,
@@ -308,68 +351,71 @@ def step_buy(
 
     ``block`` 은 각 매수 전 다시 본 이유. 취소 확인·부분 체결 보호를 먼저 한다.
     ``regular_open`` 은 실제 첫 정규장 1분봉 시가이며 최초 관측 호가로 대체하지 않는다."""
-    if t.status == "reserved":
+    if ticket.status == "reserved":
         if not live:
             return []
-        if t.session and t.session != session:
-            t.status, t.closed_ms, t.note = "canceled", now_ms, "예약한 장이 지남"
-            return [f"❎ {t.name} 예약 만료 — {t.session} 장에 못 샀어요. 다시 추천 받아 주세요"]
-        t.session = session
+        if ticket.session and ticket.session != session:
+            ticket.status, ticket.closed_ms, ticket.note = "canceled", now_ms, "예약한 장이 지남"
+            return [
+                f"❎ {ticket.name} 예약 만료 — {ticket.session} 장에 못 샀어요."
+                " 다시 추천 받아 주세요"
+            ]
+        ticket.session = session
         if block:
-            t.status, t.closed_ms, t.note = "canceled", now_ms, block
-            return [f"❎ {t.name} 예약 취소 — {block}"]
+            ticket.status, ticket.closed_ms, ticket.note = "canceled", now_ms, block
+            return [f"❎ {ticket.name} 예약 취소 — {block}"]
         if regular_open is None or regular_open <= 0:
-            t.note = "정규장 시가 미확인 — 주문하지 않음"
+            ticket.note = "정규장 시가 미확인 — 주문하지 않음"
             return []
-        t.open_px = regular_open
-        asks = trader.asks(t.symbol)
+        ticket.open_px = regular_open
+        asks = trader.asks(ticket.symbol)
         if not asks:
-            t.note = "매도 호가 없음 — 다음 확인 때 다시"
+            ticket.note = "매도 호가 없음 — 다음 확인 때 다시"
             return []
         ask = float(asks[0][0])
-        if t.kind == PEAD:  # 반응일 다음 정규장 시가에 산다 — 추격 방지 없음(240 규칙)
-            t.status = "buying"
-            return _place(t, trader, now_ms, t.qty, _buy_limit(t, ask))
-        if t.open_px > t.ref_price * (1 + GAP_UP_LIMIT):
-            t.status, t.closed_ms = "canceled", now_ms
-            t.note = f"정규장 시가가 추천 때보다 +{t.open_px / t.ref_price - 1:.1%}"
+        if ticket.kind == PEAD:  # 반응일 다음 정규장 시가에 산다 — 추격 방지 없음(240 규칙)
+            ticket.status = "buying"
+            return _place(ticket, trader, now_ms, ticket.qty, _buy_limit(ticket, ask))
+        if ticket.open_px > ticket.ref_price * (1 + GAP_UP_LIMIT):
+            ticket.status, ticket.closed_ms = "canceled", now_ms
+            ticket.note = f"정규장 시가가 추천 때보다 +{ticket.open_px / ticket.ref_price - 1:.1%}"
             return [
-                f"❎ {t.name} 사지 않았어요 — {t.note} "
-                f"({_px(t.ref_price, t.kr)} → {_px(t.open_px, t.kr)}). "
+                f"❎ {ticket.name} 사지 않았어요 — {ticket.note} "
+                f"({_px(ticket.ref_price, ticket.kr)} → {_px(ticket.open_px, ticket.kr)}). "
                 "갭 상승 추격 방지, 다시 추천 받아 주세요"
             ]
-        t.status = "buying"
-        if ask > t.ref_price * (1 + GAP_UP_LIMIT):  # 추천 뒤 이미 3% 넘게 달아남
-            t.status, t.closed_ms = "canceled", now_ms
-            t.note = f"지금 가격이 추천 때보다 +{ask / t.ref_price - 1:.1%}"
+        ticket.status = "buying"
+        if ask > ticket.ref_price * (1 + GAP_UP_LIMIT):  # 추천 뒤 이미 3% 넘게 달아남
+            ticket.status, ticket.closed_ms = "canceled", now_ms
+            ticket.note = f"지금 가격이 추천 때보다 +{ask / ticket.ref_price - 1:.1%}"
             return [
-                f"❎ {t.name} 사지 않았어요 — {t.note} "
-                f"({_px(t.ref_price, t.kr)} → {_px(ask, t.kr)}). "
+                f"❎ {ticket.name} 사지 않았어요 — {ticket.note} "
+                f"({_px(ticket.ref_price, ticket.kr)} → {_px(ask, ticket.kr)}). "
                 "추격 매수 방지, 다시 추천 받아 주세요"
             ]
-        return _place(t, trader, now_ms, t.qty, _buy_limit(t, ask))
-    if t.status != "buying":
+        return _place(ticket, trader, now_ms, ticket.qty, _buy_limit(ticket, ask))
+    if ticket.status != "buying":
         return []
-    if block or t.buy_block:
-        t.buy_block = t.buy_block or block or "신규 매수 보류"
-        t.note = t.buy_block
+    if block or ticket.buy_block:
+        ticket.buy_block = ticket.buy_block or block or "신규 매수 보류"
+        ticket.note = ticket.buy_block
         # 취소 요청 성공을 취소 완료로 간주하지 않는다. 다음 조회로 종결을 확인한다.
-        refresh(t.buys, trader, now_ms, live=False)
-        for order in t.buys:
+        refresh(ticket.buys, trader, now_ms, live=False)
+        for order in ticket.buys:
             if not order.closed and order.order_id:
                 trader.cancel(order.order_id)
-        if any(not order.closed for order in t.buys):
+        if any(not order.closed for order in ticket.buys):
             return []
-        return _finish(t, now_ms)
-    refresh(t.buys, trader, now_ms, live=live and session == t.session)
-    if any(not o.closed for o in t.buys):
+        return _finish(ticket, now_ms)
+    refresh(ticket.buys, trader, now_ms, live=live and session == ticket.session)
+    if any(not buy_order.closed for buy_order in ticket.buys):
         return []
-    rem = t.qty - int(sum(o.filled for o in t.buys))
-    if rem > 0 and live and session == t.session and len(t.buys) < MAX_BUY_ORDERS:
-        asks = trader.asks(t.symbol)
+    rem = ticket.qty - int(sum(buy_order.filled for buy_order in ticket.buys))
+    if rem > 0 and live and session == ticket.session and len(ticket.buys) < MAX_BUY_ORDERS:
+        asks = trader.asks(ticket.symbol)
         if asks:
-            return _place(t, trader, now_ms, rem, _buy_limit(t, float(asks[0][0])))
+            return _place(ticket, trader, now_ms, rem, _buy_limit(ticket, float(asks[0][0])))
         return []
-    if rem > 0 and session == t.session and live:
-        t.note = t.note or f"{MAX_BUY_ORDERS} 번 내도 다 못 삼"
-    return _finish(t, now_ms)
+    if rem > 0 and session == ticket.session and live:
+        ticket.note = ticket.note or f"{MAX_BUY_ORDERS} 번 내도 다 못 삼"
+    return _finish(ticket, now_ms)

@@ -9,6 +9,10 @@
 * 값 = 실거래 홈과 같은 계산(`auto_trading.ui.live_home.build_books`). 시세 · 환율이 하나라도 없으면
   ``priced: false`` 로 남기고 화면 그래프는 그 줄을 쓰지 않는다.
 * 예약 작업으로 하루 한 번(예: 21:30) 돌리면 된다 — 등록은 사용자가 한다.
+
+언제 실행: 매일 23:00 기록 맞추기(``scripts/ledger_sync run``)가 먼저 부른다 · 손으로.
+읽고 쓰는 것: 실거래 장부 · 공개 시세 · (그 순간 계좌로 맞추기 — ``app/live_accounts``) →
+              ``data/live/history.jsonl``.
 """
 
 from __future__ import annotations
@@ -31,49 +35,56 @@ _KST = timedelta(hours=9)
 
 
 def snapshot_row(root: Path, now_ms: int) -> dict[str, Any] | None:
+    """[쓰임] 오늘 실거래 평가 한 줄 (카드마다 평가 · 넣은 돈 · 시세 다 있나).
+    [이유] 실거래 홈과 같은 계산(``build_books``). 장부가 없으면 None — 기록하지 않는다."""
     if not build_books(root, fetch_quotes((), ())):
         return None
     coins, tickers = needed(root)
-    q = fetch_quotes(coins, tickers)
-    books = build_books(root, q)
-    fx_ok = q.fx is not None
+    quotes = fetch_quotes(coins, tickers)
+    books = build_books(root, quotes)
+    fx_ok = quotes.fx is not None
     per = {
-        b.key: {
-            "value": round(b.value_krw),
-            "deposits": round(b.deposits_krw),
-            "priced": b.priced and (b.key == "vega" or fx_ok),
+        book.key: {
+            "value": round(book.value_krw),
+            "deposits": round(book.deposits_krw),
+            "priced": book.priced and (book.key == "vega" or fx_ok),
         }
-        for b in books
+        for book in books
     }
     return {
         "date": (datetime.fromtimestamp(now_ms / 1000, UTC) + _KST).strftime("%Y-%m-%d"),
         "at_ms": now_ms,
-        "value": sum(v["value"] for v in per.values()),
-        "deposits": sum(v["deposits"] for v in per.values()),
-        "priced": all(v["priced"] for v in per.values()),
-        "fx": q.fx,
-        "errors": list(q.errors),
+        "value": sum(book_row["value"] for book_row in per.values()),
+        "deposits": sum(book_row["deposits"] for book_row in per.values()),
+        "priced": all(book_row["priced"] for book_row in per.values()),
+        "fx": quotes.fx,
+        "errors": list(quotes.errors),
         "books": per,
     }
 
 
 def write(root: Path, row: dict[str, Any]) -> Path:
+    """[쓰임] 기록 파일에 오늘 줄을 넣는다 (같은 날은 바꿔 끼움, 날짜 순)."""
     path = root / HISTORY
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows = [r for r in load_history(root) if r["date"] != row["date"]] + [row]
-    rows.sort(key=lambda r: r["date"])
+    rows = [old_row for old_row in load_history(root) if old_row["date"] != row["date"]] + [row]
+    rows.sort(key=lambda old_row: old_row["date"])
     tmp = path.with_suffix(".tmp")
-    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), "utf-8")
+    tmp.write_text(
+        "".join(json.dumps(old_row, ensure_ascii=False) + "\n" for old_row in rows), "utf-8"
+    )
     tmp.replace(path)
     return path
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (``show`` = 남은 기록 보기)."""
     if argv == ["show"]:
-        for r in load_history(REPO):
+        for history_row in load_history(REPO):
             sys.stdout.write(
-                f"{r['date']} 평가 {r.get('value', 0):,} · 기준 {r.get('deposits', 0):,}"
-                f"{'' if r.get('priced') else ' (추정)'}\n"
+                f"{history_row['date']} 평가 {history_row.get('value', 0):,}"
+                f" · 기준 {history_row.get('deposits', 0):,}"
+                f"{'' if history_row.get('priced') else ' (추정)'}\n"
             )
         return 0
     if argv:
