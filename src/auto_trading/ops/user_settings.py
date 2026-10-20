@@ -231,14 +231,17 @@ FIELDS: tuple[Field, ...] = (
 
 
 def _settings_file(root: Path) -> Path:
+    """[쓰임] 설정 파일 경로 ``data/settings/settings.json``."""
     return root / "data" / "settings" / "settings.json"
 
 
 def _change_log_file(root: Path) -> Path:
+    """[쓰임] 바꾼 기록 경로 ``data/settings/changes.jsonl``."""
     return root / "data" / "settings" / "changes.jsonl"
 
 
 def _halt_file(root: Path) -> Path:
+    """[쓰임] 전체 정지 파일 경로 ``data/HALT``."""
     return root / "data" / "HALT"
 
 
@@ -308,6 +311,7 @@ def fields(meta: Sequence[Mapping[str, Any]]) -> list[Field]:
 
 
 def _find_field(meta: Sequence[Mapping[str, Any]], key: str) -> Field | None:
+    """[쓰임] 설정 키 → 칸 설명 (없으면 None)."""
     for setting in fields(meta):
         if setting.key == key:
             return setting
@@ -650,6 +654,7 @@ def diff(current: Mapping[str, Any], new: Mapping[str, Any]) -> list[Change]:
 
 
 def _today_kst(now: datetime) -> str:
+    """[쓰임] 한국 날짜 (YYYY-MM-DD) — '언제부터 적용' 셈에 쓴다."""
     return (now.astimezone(UTC) + _KST).strftime("%Y-%m-%d")
 
 

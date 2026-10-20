@@ -128,6 +128,7 @@ class TossApiError(ExchangeError):
 
 
 def _now_ms() -> int:
+    """[쓰임] 지금 시각(ms) — 토큰 만료 셈 · 시험이 바꿔 끼운다."""
     return int(time.time() * 1000)
 
 

@@ -121,6 +121,7 @@ def _load() -> dict[str, Any]:
 
 
 def _save(state: dict[str, Any]) -> None:
+    """[쓰임] Vega 장부 쓰기 (임시 파일에 쓰고 바꿔 끼움, Decimal 은 글자로)."""
     write_json_atomic(STATE, state, default=str)
 
 

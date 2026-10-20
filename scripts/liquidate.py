@@ -94,6 +94,7 @@ def _now_ms() -> int:
 
 
 def _kst(ms: int) -> datetime:
+    """[쓰임] ms → 한국 시각."""
     return datetime.fromtimestamp(ms / 1000, UTC) + KST
 
 
@@ -182,6 +183,7 @@ def _handover_stock(symbols: set[str], reason: str) -> list[str]:
 
 
 def _reader() -> TossReader:
+    """[쓰임] 토스 조회 창구 (주문 없음)."""
     return TossReader(load_toss_credentials(REPO / ".env"), TossTokenCache(TOKEN))
 
 

@@ -193,22 +193,27 @@ class Item:
 
     @property
     def sold(self) -> Decimal:
+        """[쓰임] 지금까지 판 수량."""
         return sum((order.filled for order in self.orders), ZERO)
 
     @property
     def amount(self) -> Decimal:
+        """[쓰임] 판 금액 합 (그 통화, 수수료 전)."""
         return sum((order.amount for order in self.orders), ZERO)
 
     @property
     def fee(self) -> Decimal:
+        """[쓰임] 수수료 합."""
         return sum((order.fee for order in self.orders), ZERO)
 
     @property
     def remaining(self) -> Decimal:
+        """[쓰임] 남은 수량 (0 아래로 안 감)."""
         return max(ZERO, self.want - self.sold)
 
     @property
     def currency(self) -> str:
+        """[쓰임] 금액 통화 — 업비트 · 국내 KRW, 토스 미국 USD, 바이낸스 USDT (옛 선물 USDC)."""
         if self.venue == "binance":
             return "USDT"
         if self.venue == "binance_fut":
@@ -259,11 +264,13 @@ class Job:
     """마지막으로 알린 진행 내용 — 같은 내용(예: 같은 오류)을 2 분마다 다시 보내지 않는다."""
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 작업 기록 JSON 으로 (Decimal 은 글자로)."""
         result: dict[str, Any] = _plain(asdict(self))
         return result
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Job:
+        """[쓰임] 작업 기록 JSON → 작업 (옛 범위 이름 · 칸 이름도 받는다)."""
         return cls(
             job_id=str(data["job_id"]),
             scope=_OLD_GROUPS.get(str(data["scope"]), str(data["scope"])),
@@ -301,6 +308,7 @@ class Store:
         self.lock = folder / "run.lock"
 
     def _load(self) -> dict[str, Any]:
+        """[쓰임] 작업 기록 파일 읽기 (없거나 깨졌으면 빈 기록)."""
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -308,12 +316,14 @@ class Store:
         return data if isinstance(data, dict) else {"jobs": [], "requests": {}}
 
     def _save(self, data: Mapping[str, Any]) -> None:
+        """[쓰임] 작업 기록 쓰기 (임시 파일에 쓰고 바꿔 끼움)."""
         self.folder.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         temporary.replace(self.path)
 
     def jobs(self) -> list[Job]:
+        """[쓰임] 모든 작업 (오래된 것 먼저)."""
         return [Job.from_dict(job) for job in self._load().get("jobs") or []]
 
     def active(self) -> list[Job]:
@@ -563,6 +573,8 @@ def upbit_level_price(bids: Sequence[Decimal], round_no: int) -> Decimal | None:
 
 
 class UpbitFill(Protocol):
+    """업비트 주문 결과 모양 (상태 · 체결 수량 · 체결 금액 · 수수료)."""
+
     @property
     def state(self) -> str: ...
     @property
@@ -735,6 +747,8 @@ def run_binance_item(
 
 
 class TossStatus(Protocol):
+    """토스 주문 상태 모양 (상태 · 체결 수량 · 체결 금액 · 수수료)."""
+
     @property
     def status(self) -> str: ...
     @property
@@ -746,6 +760,8 @@ class TossStatus(Protocol):
 
 
 class TossResult(Protocol):
+    """토스 주문 · 취소 결과 모양 (받았나 · 주문 번호 또는 오류 코드 · 메시지)."""
+
     @property
     def accepted(self) -> bool: ...
     @property

@@ -294,6 +294,7 @@ MAX_WEIGHT = Decimal("0.5")
 
 
 def _sign(value: Decimal) -> int:
+    """[쓰임] 부호 (+1 · 0 · −1)."""
     if value > 0:
         return 1
     if value < 0:
@@ -323,6 +324,7 @@ def score_text(score: Decimal) -> str:
 
 
 def _arrow(value: Decimal) -> str:
+    """[쓰임] 손익 화살표 (🔺 · 🔻 · ➖)."""
     if value > 0:
         return "🔺"
     if value < 0:

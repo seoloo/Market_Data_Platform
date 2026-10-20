@@ -59,6 +59,7 @@ def _items() -> list[dict[str, Any]]:
 
 
 def _path(symbol: str) -> Path:
+    """[쓰임] 국내 적립 장부 경로 ``data/toss/KR_<코드>.json``."""
     return DATA / f"KR_{symbol}.json"
 
 
@@ -78,6 +79,7 @@ def _load(item: dict[str, Any], today: str) -> KrState:
 
 
 def _save(state: KrState) -> None:
+    """[쓰임] 국내 적립 장부 쓰기 (임시 파일에 쓰고 바꿔 끼움)."""
     write_json_atomic(_path(state.symbol), state.to_dict())
 
 
@@ -251,6 +253,7 @@ def run(*, dry: bool = False) -> int:
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (예약은 ``run``, ``plan`` 은 계획만)."""
     if argv == ["run"]:
         return run()
     if argv == ["plan"]:

@@ -88,6 +88,7 @@ class Brake:
     """접수한 브레이크 · 재매수 주문 {client_id: {kind, dd, prev_stage}} — 체결 확인 뒤 지운다."""
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 ``brake`` 칸 JSON 으로."""
         return asdict(self)
 
     @classmethod
@@ -290,6 +291,7 @@ class Proposal:
     """실행 단계: '' (대기) · selling (판 주문 접수) · buying (되사기 접수) · done."""
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 ``proposals`` 한 줄 JSON 으로."""
         return asdict(self)
 
     @classmethod

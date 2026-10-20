@@ -56,6 +56,7 @@ def _load() -> dict[str, Any]:
 
 
 def _save(record: dict[str, Any]) -> None:
+    """[쓰임] 안전 점검 기록 쓰기 (임시 파일에 쓰고 바꿔 끼움)."""
     write_json_atomic(STATE, record)
 
 
@@ -231,6 +232,7 @@ def run(now: datetime | None = None) -> str | None:
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (``show`` = 조회만 · ``run`` = 할 차례면 점검 · 알림)."""
     if argv == ["show"]:
         findings, failed, _snapshot = check()
         print(sc.report_text(findings, failed) or "🛡️ 매일 안전 점검 — 이상 없음")

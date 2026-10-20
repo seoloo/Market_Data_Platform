@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
 
 
 def _now() -> str:
+    """[쓰임] 지금 UTC 시각 글 (기록 DB 의 '올린 시각')."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 

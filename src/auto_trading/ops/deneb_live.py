@@ -113,6 +113,7 @@ class DenebState:
     """TQQQ 목표 상한 — 배당 단계에서 낮아진다 (처음 60%)."""
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 JSON 으로 (칸 이름은 파일에 저장돼 바꾸지 않는다)."""
         return asdict(self)
 
     @classmethod

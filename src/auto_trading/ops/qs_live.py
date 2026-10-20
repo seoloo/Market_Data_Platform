@@ -91,6 +91,7 @@ class QsLiveState:
 
     @property
     def strategy_qty(self) -> float:
+        """[쓰임] QS 전략이 산 TQQQ 수량 (시작 때 갖고 있던 수량 뺌)."""
         return max(self.last_qty - self.baseline_qty, 0.0)
 
     def net_krw(self) -> float:
@@ -98,10 +99,12 @@ class QsLiveState:
         return sum(t.krw if t.side == "BUY" else -t.krw for t in self.trades)
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 JSON 으로."""
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> QsLiveState:
+        """[쓰임] 장부 JSON → 장부."""
         return cls(
             start_date=str(d["start_date"]),
             baseline_qty=float(d["baseline_qty"]),

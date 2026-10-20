@@ -62,6 +62,7 @@ def _days(start: str, end: str) -> int:
 
 
 def _previous_day(day: str) -> str:
+    """[쓰임] 하루 전 날짜 (YYYY-MM-DD)."""
     from datetime import date, timedelta
 
     return (date.fromisoformat(day) - timedelta(days=1)).isoformat()
@@ -125,12 +126,15 @@ class KrState:
         return sum(float(buy["cost_krw"]) for buy in self.buys)
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 JSON 으로 — ``last_qty`` 를 더한다.
+        [이유] 대시보드 · 보고가 미국 적립 장부와 같은 이름으로 읽게."""
         data = asdict(self)
         data["last_qty"] = self.qty  # 대시보드 · 보고가 읽는 이름 (미국 적립 장부와 같게)
         return data
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> KrState:
+        """[쓰임] 장부 JSON → 장부 (옛 파일에 없는 칸은 기본값)."""
         return cls(
             symbol=str(data["symbol"]),
             name=str(data.get("name") or data["symbol"]),
@@ -217,10 +221,12 @@ class Listed:
 
     @property
     def country(self) -> str:
+        """[쓰임] 국내(KOSPI · KOSDAQ) · 미국."""
         return "KR" if self.market in ("KOSPI", "KOSDAQ") else "US"
 
     @property
     def etf(self) -> bool:
+        """[쓰임] ETF · ETN 인가 (호가 단위가 다르다)."""
         return self.kind in ("ETF", "ETN", "FOREIGN_ETF")
 
 

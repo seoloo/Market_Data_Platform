@@ -353,6 +353,7 @@ def _utc_now() -> datetime:
 
 
 def _path(name: str) -> Path:
+    """[쓰임] ``data/toss/`` 안 장부 파일 경로."""
     return DATA / name
 
 
@@ -366,6 +367,7 @@ def _load_plan_state(plan: Plan) -> State | None:
 
 
 def _save_plan_state(state: State) -> None:
+    """[쓰임] 적립 장부 쓰기 (``data/toss/<기호>.json``, 들여쓰기 1 · 끝 줄바꿈)."""
     DATA.mkdir(parents=True, exist_ok=True)
     _path(f"{state.symbol}.json").write_text(
         json.dumps(state.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8"
@@ -402,6 +404,7 @@ def _live_qs() -> QsLiveState | None:
 
 
 def _save_qs(qs: QsLiveState) -> None:
+    """[쓰임] QS 전략 장부 쓰기 (``data/toss/QS_SWITCH.json``)."""
     DATA.mkdir(parents=True, exist_ok=True)
     _path(QS_FILE).write_text(
         json.dumps(qs.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8"
@@ -471,6 +474,7 @@ def _load_deneb() -> DenebState:
 
 
 def _save_deneb(deneb: DenebState) -> None:
+    """[쓰임] Deneb 장부 쓰기 (``data/toss/DENEB.json``)."""
     DATA.mkdir(parents=True, exist_ok=True)
     _path(DENEB_FILE).write_text(
         json.dumps(deneb.to_dict(), ensure_ascii=False, indent=1) + "\n", "utf-8"

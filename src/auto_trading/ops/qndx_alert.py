@@ -154,10 +154,12 @@ class State:
     orders: list[Order] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 장부 JSON 으로 (칸 이름은 파일에 저장돼 바꾸지 않는다)."""
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> State:
+        """[쓰임] 장부 JSON → 장부 (2026-09-26 첫 판의 ``cost_krw`` 이름도 받는다)."""
         buys = []
         for raw_buy in data.get("buys", []):
             buy = dict(raw_buy)
@@ -202,6 +204,7 @@ class Advice:
     안에서 (BUY 일 때만 1 이상)."""
 
     def to_dict(self) -> dict[str, Any]:
+        """[쓰임] 보고 파일용 JSON."""
         return asdict(self)
 
 
