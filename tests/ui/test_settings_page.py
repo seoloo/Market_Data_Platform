@@ -312,7 +312,8 @@ def test_tasks_route_uses_runner_and_never_overwrites(tmp_path: Path) -> None:
         assert post(base, "/settings/tasks", form)[0] == 303
         reg = [c for c in calls if "Register-ScheduledTask" in c]
         # Vega 묶음 = 매매 + 주간 요약 (2026-10-20)
-        assert len(reg) == 2 and "'AutoTrading_Vega'" in reg[0] and "AutoTrading_Vega_Weekly" in reg[1]
+        assert len(reg) == 2 and "'AutoTrading_Vega'" in reg[0]
+        assert "AutoTrading_Vega_Weekly" in reg[1]
         assert "새로 만든 예약 2개" in server.task_note[0]  # type: ignore[attr-defined]
         made = {"n": "AutoTrading_Vega", "s": "Ready", "nx": "", "lr": "", "res": 0}
         live[0] = json.dumps([row, made])
