@@ -470,6 +470,14 @@ def buy_round(st: PolarisState, r: Round, now: datetime) -> str:
 
 
 def daily() -> int:
+    # Paper(가짜 돈)는 실거래 설정과 상관없이 먼저
+    # (2026-10-20 사용자 "polaris 같은 경우 paper만 작동하도록 하면 돼")
+    try:
+        from scripts import polaris_paper
+
+        polaris_paper.daily()
+    except Exception as exc:  # paper 실패가 실거래 확인을 막지 않게
+        print(f"Polaris Paper 실패: {type(exc).__name__} {exc}")
     if not user_settings.get(REPO, "polaris.on"):
         print("설정 polaris.on 꺼짐")
         return 0
