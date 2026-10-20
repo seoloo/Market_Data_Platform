@@ -1,4 +1,6 @@
-"""토요일 09:30 주간 요약 — Vega · Altair (예약 ``AutoTrading_Weekly_Summary``, 조회만 · 주문 없음).
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-21, retired/README.md).
+
+토요일 09:30 주간 요약 — Vega · Altair (예약 ``AutoTrading_Weekly_Summary``, 조회만 · 주문 없음).
 
 사용 예::
 
