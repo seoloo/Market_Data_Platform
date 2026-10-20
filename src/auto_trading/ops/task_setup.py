@@ -1,6 +1,9 @@
 # ruff: noqa: E501 — 한국어 설명 · PowerShell 한 줄 명령이 길다
 """자동 실행(Windows 예약 작업) 켜기 · 끄기 — 설정 화면 '자동 실행' (2026-10-10 사용자).
 
+언제 쓰나: 설정 화면 '자동 실행' 버튼 · 매일 안전 점검(예약 상태 보기)이 부른다.
+읽고 쓰는 것: 예약 틀 ``deploy/tasks/<이름>.xml`` → Windows 작업 스케줄러 (PowerShell 로 등록 · 켜기 · 끄기).
+
 * 예약 틀은 ``deploy/tasks/<이름>.xml`` — 이 PC 의 예약을 그대로 내보내고(``scripts/tasks_export.py``)
   폴더 경로를 ``{REPO}`` 로, 사용자 ID 는 지웠다. 등록할 때 그 PC 의 저장소 위치를 넣고 지금 Windows
   사용자로 등록한다(관리자 권한 필요 없음).
@@ -37,8 +40,12 @@ TEMPLATE_DIR = Path("deploy") / "tasks"
 
 @dataclass(frozen=True, slots=True)
 class TaskDef:
+    """예약 하나의 정의 — 화면 '자동 실행' 표의 한 줄."""
+
     name: str
+    """Windows 예약 이름 (``AutoTrading_*``) — 바깥에 저장되는 이름이라 바꾸지 않는다."""
     group: str
+    """켜고 끄는 묶음 키 (:data:`GROUPS` 의 첫 칸)."""
     what: str
     when: str
 
@@ -100,42 +107,48 @@ GROUPS: tuple[tuple[str, str, str], ...] = (
     ("info", "정보 봇 (뉴스 · 테마 · 브리핑)", "정보 봇 토큰 · Gemini 키 필요"),
     ("phone", "휴대폰으로 보기 (화면 서버)", "'휴대폰' 메뉴의 Tailscale 연결과 함께 써요"),
 )
+"""(묶음 키, 화면 이름, 필요한 것 설명) — 설정 화면 '자동 실행' 의 묶음 순서."""
 _NEEDS = {"deneb": ("toss",)}
 """Deneb 을 고르면 함께 켜야 하는 묶음 (토스 매수 실행기가 Deneb 월 매수도 한다)."""
 
 
 def expand(groups: Sequence[str]) -> list[str]:
-    out: list[str] = []
-    for g in groups:
-        for x in (g, *_NEEDS.get(g, ())):
-            if x not in out:
-                out.append(x)
-    return out
+    """[쓰임] 고른 묶음 + 함께 켜야 하는 묶음 (순서 유지, 겹치지 않게).
+    [이유] Deneb 만 켜면 실제 주문을 내는 토스 매수 예약이 꺼진 채로 남는 실수를 막는다."""
+    expanded: list[str] = []
+    for group in groups:
+        for needed in (group, *_NEEDS.get(group, ())):
+            if needed not in expanded:
+                expanded.append(needed)
+    return expanded
 
 
 def tasks_for(groups: Sequence[str]) -> list[TaskDef]:
+    """[쓰임] 고른 묶음(함께 켜야 하는 것 포함)에 속한 예약들 (:data:`TASKS` 순서)."""
     picked = set(expand(groups))
-    return [t for t in TASKS if t.group in picked]
+    return [task for task in TASKS if task.group in picked]
 
 
 def _this_user() -> str:
-    dom, user = os.environ.get("USERDOMAIN", ""), os.environ.get("USERNAME", "")
-    return f"{dom}\\{user}" if dom and user else user
+    """[쓰임] 지금 Windows 사용자 (``도메인\\이름``, 도메인이 없으면 이름만)."""
+    domain = os.environ.get("USERDOMAIN", "")
+    user = os.environ.get("USERNAME", "")
+    return f"{domain}\\{user}" if domain and user else user
 
 
 def render_xml(template: str, repo: Path, user: str | None = None) -> str:
-    """틀 → 이 PC 용 XML (순수). ``{REPO}`` 를 저장소 경로로, ``{USER}`` 를 지금 Windows 사용자로
-    (로그인 때 켜는 예약은 '누가 로그인할 때' 가 있어야 관리자 권한 없이 등록된다)."""
+    """[쓰임] 틀 → 이 PC 용 XML (계산만). ``{REPO}`` 를 저장소 경로로, ``{USER}`` 를 지금 Windows 사용자로.
+    [이유] 로그인 때 켜는 예약은 '누가 로그인할 때' 가 있어야 관리자 권한 없이 등록된다."""
     return template.replace("{REPO}", str(repo)).replace(
         "{USER}", escape(user if user is not None else _this_user())
     )
 
 
 def normalize_export(xml: str, repo: Path) -> str:
-    """이 PC 에서 내보낸 XML → 다른 PC 용 틀 (순수).
-
-    경로 → ``{REPO}``, 사용자 ID · 만든 사람 줄 지움. '로그인 안 해도 실행(S4U · 암호)' 은 관리자 권한이
-    있어야 등록돼서 '로그인한 동안 실행(InteractiveToken)' 으로, 배터리일 때 건너뛰지 않게 바꾼다.
+    """[쓰임] 이 PC 에서 내보낸 XML → 다른 PC 용 틀 (계산만).
+    [이유] 경로 → ``{REPO}``, 사용자 ID · 만든 사람 줄 지움. '로그인 안 해도 실행(S4U · 암호)' 은
+           관리자 권한이 있어야 등록돼서 '로그인한 동안 실행(InteractiveToken)' 으로,
+           배터리일 때 건너뛰지 않게 바꾼다.
     """
     xml = xml.replace(str(repo), "{REPO}")
     xml = re.sub(r"\s*<UserId>[^<]*</UserId>", "", xml)
@@ -157,7 +170,8 @@ Runner = Callable[[str], str]
 
 
 def _powershell(script: str) -> str:
-    done = subprocess.run(
+    """[쓰임] PowerShell 명령 하나를 돌리고 출력 글자를 돌려준다. 실패하면 오류(앞 400 자)."""
+    completed = subprocess.run(
         [
             "powershell",
             "-NoProfile",
@@ -174,13 +188,15 @@ def _powershell(script: str) -> str:
         timeout=90,
         check=False,
     )
-    if done.returncode != 0:
-        raise RuntimeError((done.stderr or done.stdout).strip()[:400])
-    return done.stdout
+    if completed.returncode != 0:
+        raise RuntimeError((completed.stderr or completed.stdout).strip()[:400])
+    return completed.stdout
 
 
 @dataclass(frozen=True, slots=True)
 class TaskState:
+    """이 PC 에 등록된 예약 하나의 지금 상태."""
+
     name: str
     state: str
     """Ready · Running · Disabled · 없음."""
@@ -189,7 +205,7 @@ class TaskState:
     last_result: int | None = None
 
 
-_STATUS_PS = (
+_STATUS_PS = (  # AutoTrading_* 예약마다 {n: 이름, s: 상태, nx: 다음 실행, lr: 지난 실행, res: 결과}
     "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
     "$r=@(Get-ScheduledTask -TaskName 'AutoTrading_*' -ErrorAction SilentlyContinue | ForEach-Object {"
     "$i=$_ | Get-ScheduledTaskInfo;"
@@ -202,25 +218,28 @@ _STATUS_PS = (
 
 
 def status(runner: Runner = _powershell) -> dict[str, TaskState]:
-    """이 PC 의 AutoTrading_* 예약 상태 (이름 → 상태)."""
+    """[쓰임] 이 PC 의 AutoTrading_* 예약 상태 {이름: 상태}.
+    [이유] 예약이 하나뿐이면 PowerShell 이 목록 대신 하나짜리 객체를 줘서 목록으로 감싼다."""
     raw = runner(_STATUS_PS).strip() or "[]"
     rows = json.loads(raw)
     if isinstance(rows, dict):
         rows = [rows]
-    out: dict[str, TaskState] = {}
-    for r in rows:
-        out[str(r.get("n"))] = TaskState(
-            str(r.get("n")),
-            str(r.get("s") or ""),
-            str(r.get("nx") or ""),
-            str(r.get("lr") or ""),
-            r.get("res") if isinstance(r.get("res"), int) else None,
+    states: dict[str, TaskState] = {}
+    for row in rows:
+        last_result = row.get("res")
+        states[str(row.get("n"))] = TaskState(
+            str(row.get("n")),
+            str(row.get("s") or ""),
+            str(row.get("nx") or ""),
+            str(row.get("lr") or ""),
+            last_result if isinstance(last_result, int) else None,
         )
-    return out
+    return states
 
 
-def _quote(s: str) -> str:
-    return "'" + s.replace("'", "''") + "'"
+def _quote(text: str) -> str:
+    """[쓰임] PowerShell 작은따옴표 글자 (안의 ``'`` 는 ``''`` 로) — 이름에 따옴표가 있어도 안전하게."""
+    return "'" + text.replace("'", "''") + "'"
 
 
 def register_missing(
@@ -229,58 +248,65 @@ def register_missing(
     existing: Mapping[str, TaskState],
     runner: Runner = _powershell,
 ) -> tuple[list[str], list[str]]:
-    """고른 묶음에서 **없는** 예약만 만들고, 꺼진(Disabled) 것은 켠다. (새로 만든 것, 다시 켠 것)."""
-    made, enabled = [], []
-    for t in tasks_for(groups):
-        cur = existing.get(t.name)
-        if cur is not None:
-            if cur.state == "Disabled":
-                runner(f"Enable-ScheduledTask -TaskName {_quote(t.name)} | Out-Null")
-                enabled.append(t.name)
+    """[쓰임] 고른 묶음에서 **없는** 예약만 만들고, 꺼진(Disabled) 것은 켠다.
+    → (새로 만든 것, 다시 켠 것).
+    [이유] 이미 있는 예약은 사용자가 시각 등을 바꿨을 수 있어 덮어쓰지 않는다."""
+    made: list[str] = []
+    enabled: list[str] = []
+    for task in tasks_for(groups):
+        current = existing.get(task.name)
+        if current is not None:
+            if current.state == "Disabled":
+                runner(f"Enable-ScheduledTask -TaskName {_quote(task.name)} | Out-Null")
+                enabled.append(task.name)
             continue
-        template = (repo / TEMPLATE_DIR / f"{t.name}.xml").read_text(encoding="utf-8")
+        template = (repo / TEMPLATE_DIR / f"{task.name}.xml").read_text(encoding="utf-8")
         # PowerShell 은 XML 을 글자(UTF-16)로 넘긴다 — 'encoding="UTF-8"' 선언이 있으면
         # '인코딩을 전환할 수 없습니다' 로 등록이 거부돼서 선언 줄을 뺀다 (2026-10-11 실제 등록에서 확인)
         xml = re.sub(r"^﻿?<\?xml[^>]*\?>\s*", "", render_xml(template, repo))
-        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-8") as f:
-            f.write(xml)
-            path = f.name
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".xml", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(xml)
+            path = temp_file.name
         try:
             runner(
                 f"$x=Get-Content -Raw -Encoding UTF8 {_quote(path)};"
-                f"Register-ScheduledTask -TaskName {_quote(t.name)} -Xml $x | Out-Null"
+                f"Register-ScheduledTask -TaskName {_quote(task.name)} -Xml $x | Out-Null"
             )
         finally:
             Path(path).unlink(missing_ok=True)
-        made.append(t.name)
+        made.append(task.name)
     return made, enabled
 
 
 def disable(
     groups: Sequence[str], existing: Mapping[str, TaskState], runner: Runner = _powershell
 ) -> list[str]:
-    """고른 묶음의 예약을 '사용 안 함' 으로 (지우지 않음)."""
-    done = []
-    for t in tasks_for(groups):
-        cur = existing.get(t.name)
-        if cur is not None and cur.state != "Disabled":
-            runner(f"Disable-ScheduledTask -TaskName {_quote(t.name)} | Out-Null")
-            done.append(t.name)
-    return done
+    """[쓰임] 고른 묶음의 예약을 '사용 안 함' 으로 바꾸고 바꾼 이름 목록을 돌려준다.
+    [이유] 지우지 않는다 — 다시 켤 때 사용자가 바꾼 설정(시각 등)이 그대로 남게."""
+    disabled = []
+    for task in tasks_for(groups):
+        current = existing.get(task.name)
+        if current is not None and current.state != "Disabled":
+            runner(f"Disable-ScheduledTask -TaskName {_quote(task.name)} | Out-Null")
+            disabled.append(task.name)
+    return disabled
 
 
 def enable(
     groups: Sequence[str], existing: Mapping[str, TaskState], runner: Runner = _powershell
 ) -> list[str]:
-    done = []
-    for t in tasks_for(groups):
-        cur = existing.get(t.name)
-        if cur is not None and cur.state == "Disabled":
-            runner(f"Enable-ScheduledTask -TaskName {_quote(t.name)} | Out-Null")
-            done.append(t.name)
-    return done
+    """[쓰임] 고른 묶음에서 꺼진 예약만 다시 켜고 켠 이름 목록을 돌려준다 (없는 예약은 만들지 않음)."""
+    enabled = []
+    for task in tasks_for(groups):
+        current = existing.get(task.name)
+        if current is not None and current.state == "Disabled":
+            runner(f"Enable-ScheduledTask -TaskName {_quote(task.name)} | Out-Null")
+            enabled.append(task.name)
+    return enabled
 
 
 def start(name: str, runner: Runner = _powershell) -> None:
-    """예약 하나를 지금 실행 (휴대폰 화면 서버처럼 로그인 때 켜지는 것을 바로 켤 때)."""
+    """[쓰임] 예약 하나를 지금 실행 (휴대폰 화면 서버처럼 로그인 때 켜지는 것을 바로 켤 때)."""
     runner(f"Start-ScheduledTask -TaskName {_quote(name)}")

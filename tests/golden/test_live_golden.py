@@ -18,6 +18,7 @@ import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -47,6 +48,11 @@ def _check_golden(name: str, text: str, tmp_path: Path) -> None:
     assert path.exists(), f"기준 파일이 없다: {path} — GOLDEN_UPDATE=1 로 먼저 찍는다"
     expected = path.read_text(encoding="utf-8")
     assert text == expected, f"{name}: 출력이 리팩토링 전과 다르다"
+
+
+def _raw_text(path: Path) -> str:
+    """파일 바이트 그대로 — 줄바꿈 CR 은 ``␍`` 로 보이게 (기준 파일을 읽을 때 사라지지 않게)."""
+    return path.read_bytes().decode("utf-8").replace("\r", "␍")
 
 
 def _json_text(path: Path) -> str:
@@ -221,3 +227,142 @@ def test_golden_telegram_texts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         repr(bot.out),
     ]
     _check_golden("telegram_texts", "\n".join(out), tmp_path)
+
+
+# ------------------------------------------------------------ 5. 사용자 설정 (2 단계에 더함)
+
+
+def test_golden_user_settings_round_trip(tmp_path: Path) -> None:
+    """설정 화면 저장 전 과정 — 기본값 · 폼 검사 · 바뀐 칸 · 저장 파일 · 바꾼 기록 ·
+    종목 추가/빼기 · 정지."""
+    from auto_trading.ops import user_settings as us
+    from auto_trading.ops.kr_accumulate import Listed
+
+    universe = [
+        Listed("005930", "삼성전자", "KOSPI", "STOCK"),
+        Listed("069500", "KODEX 200", "KOSPI", "ETF"),
+        Listed("NVDA", "엔비디아", "NASDAQ", "STOCK"),
+        Listed("NVDL", "엔비디아 2배", "NASDAQ", "ETF"),
+    ]
+    first = datetime(2026, 10, 20, 3, 0, tzinfo=UTC)
+    second = datetime(2026, 10, 21, 3, 0, tzinfo=UTC)
+    out: list[str] = ["## 기본값", repr(sorted(us.load(tmp_path).items()))]
+
+    # 1. 큰 폼: 금액 · 상한 · 체크칸(안 실린 bool 은 꺼짐) · 국내 종목 추가 · 오류 칸
+    current = us.load(tmp_path)
+    form = {
+        "deneb.monthly_krw": "400,000원",
+        "deneb.max_krw": "6000000",
+        "acc.BTQ.usd": "$2.5",
+        "acc.QS.usd": "99",
+        "fire.rate_good": "25",
+        "deneb.ask_on": "on",
+        "screen.theme": "dark",
+        "new.query": "삼성전자",
+        "new.mkt": "KR",
+        "new.daily": "7,000",
+    }
+    new, errors = us.validate(form, current, universe)
+    out += ["## 폼 오류 (QS 99 달러)", repr(sorted(errors.items()))]
+    form["acc.QS.usd"] = "3"
+    new, errors = us.validate(form, current, universe)
+    changes = us.diff(current, new)
+    out += ["## 폼 오류 (고친 뒤)", repr(errors), "## 바뀐 칸", repr(changes)]
+    us.apply(tmp_path, changes, first, new=new)
+
+    # 2. 여러 개 맞는 이름 · 이미 있는 종목 · 텔레그램 추가 · 하루 금액 · 빼기
+    current = us.load(tmp_path)
+    out += ["## 엔비디아 (여럿)", repr(us.add_item(current, "엔비디아", "US", "", universe)[1])]
+    out += ["## 삼성전자 (이미)", repr(us.add_item(current, "005930", "KR", "", universe)[1])]
+    new, errors = us.add_item(current, "NVDA", "US", "", universe)
+    out += ["## NVDA 추가 오류", repr(errors)]
+    us.apply(tmp_path, us.diff(current, new), second, by="텔레그램", new=new)
+    current = us.load(tmp_path)
+    new, errors = us.set_daily(current, "x.KR.005930", "12000")
+    out += [
+        "## 하루 금액 오류",
+        repr(errors),
+        "## 범위 밖",
+        repr(us.set_daily(current, "acc.BTQ", "0.1")[1]),
+    ]
+    new = us.remove_item(new, "acc.WQTM")
+    us.apply(tmp_path, us.diff(current, new), second, by="텔레그램", new=new)
+
+    # 3. 비상 정지 켜기 (파일로)
+    current = us.load(tmp_path)
+    us.apply(tmp_path, us.diff(current, {**current, "safety.halt": True}), second)
+    settings_dir = tmp_path / "data" / "settings"
+    out += [
+        "## 적립 목록",
+        repr(us.acc_items(us.load(tmp_path))),
+        "## 적립 금액 기록 BTQ · 005930 · WQTM",
+        repr([us.acc_history(tmp_path, s) for s in ("BTQ", "005930", "WQTM")]),
+        "## 남은 칸 수",
+        repr(us.active_count(us.load(tmp_path))),
+        "## HALT",
+        (tmp_path / "data" / "HALT").read_text(encoding="utf-8"),
+        "## settings.json (바이트 그대로)",
+        _raw_text(settings_dir / "settings.json"),
+        "## changes.jsonl",
+        _raw_text(settings_dir / "changes.jsonl"),
+        "## read_log",
+        repr(us.read_log(tmp_path, limit=5)),
+        "## 표시",
+        repr([us.show(k, v) for k, v in (("x.KR.1", 5000), ("fire.rate_bad", 4.0), ("a", 3))]),
+    ]
+    # 보안 검사(gitleaks)가 '"key": "x.KR.…"' 을 API 키로 오인해서 칸 이름만 '키' 로 보이게 한다
+    text = "\n".join(out).replace('"key": ', '"키": ').replace("'key': ", "'키': ")
+    _check_golden("user_settings", text, tmp_path)
+
+
+# ------------------------------------------------------------ 6. 실거래 기록 DB (2 단계에 더함)
+
+
+def test_golden_live_ledger_rows_sqlite_supabase(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """장부 → 거래 줄 · 하루 평가 줄 → SQLite 두 번(같은 번호는 바꿔 쓰기) · Supabase 로 보낼 것."""
+    import sqlite3
+
+    from auto_trading.ops.live_ledger import (
+        event_rows,
+        push_supabase,
+        snapshot_rows,
+        write_sqlite,
+    )
+    from auto_trading.ui import live_home
+    from auto_trading.ui.live_home import Quotes, build_books
+    from tests.ops.test_live_ledger import _seed
+
+    monkeypatch.setattr(live_home, "SHOW_UPBIT", True)
+    _seed(tmp_path)
+    events = event_rows(build_books(tmp_path, Quotes()), now="t1")
+    history: list[dict[str, Any]] = [
+        {"date": "2026-10-09", "value": 1.5e6, "deposits": 6e5, "priced": True, "fx": 1344.5,
+         "books": {"deneb": 1e6}, "at_ms": 1760000000000},
+        {"date": "bad", "value": 1},
+        {"date": "2026-10-10", "value": None, "priced": 0, "at_ms": 0},
+    ]  # fmt: skip
+    snapshots = snapshot_rows(history, now="t1")
+    db = tmp_path / "ledger.db"
+    counts = [write_sqlite(db, events, snapshots)]
+    _seed(tmp_path, status="FILLED", filled=3.0)
+    counts.append(write_sqlite(db, event_rows(build_books(tmp_path, Quotes()), now="t2"), []))
+    con = sqlite3.connect(db)
+    try:
+        dumped = [
+            repr(con.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall())
+            for table in ("ledger_events", "daily_snapshots")
+        ]
+    finally:
+        con.close()
+    sent: list[str] = []
+
+    def fake_post(url: str, headers: Any, body: list[dict[str, Any]]) -> int:
+        sent.append(f"{url} {sorted(headers.items())} {body}")
+        return 201
+
+    pushed = push_supabase("https://p.supabase.co/", "eyJx", events, snapshots, fake_post)
+    out = ["## events", repr(events), "## snapshots", repr(snapshots), "## counts", repr(counts)]
+    out += ["## sqlite", *dumped, "## supabase", repr(pushed), *sent]
+    _check_golden("live_ledger", "\n".join(out), tmp_path)

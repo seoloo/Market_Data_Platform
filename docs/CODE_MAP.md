@@ -1,4 +1,4 @@
-# 실거래 코드 지도 (초안 — 리팩토링 0 단계, 2026-10-20)
+# 실거래 코드 지도 (초안 — 리팩토링 0 단계, 2026-10-20 · 2 단계 반영)
 
 > 처음 보는 사람이 "무엇이 · 언제 · 무엇을 읽고 쓰는지" 찾는 지도. 리팩토링 단계마다 고쳐 쓴다
 > ([REFACTOR_PLAN.md](REFACTOR_PLAN.md)). 6 단계에서 용어 사전 · 디자인 패턴 표를 붙여 완성한다.
@@ -23,10 +23,11 @@
 | 토스 주문 · 조회 | `exchange/toss.py` | 토스 Open API, 토큰 `data/toss_token.json` |
 | 업비트 주문 · 조회 | `exchange/upbit.py` | 업비트 API |
 | 긴급 정지 (파일이 있으면 새 주문 멈춤) | `ops/kill_switch.py` | `data/HALT`(전체) · `data/HALT_<그룹>`(deneb · vega · acc …) |
+| 장부 파일 읽기 · 쓰기 (임시 파일에 쓰고 바꿔 끼움, 형식 그대로) | `ops/ledger_file.py` | 부르는 쪽 장부 (지금: 설정 · 안전 점검 기록, 3 · 4 단계에서 실행기 장부도) |
 | 전부 정리 (누를 때만) | `scripts/liquidate.py` · `ops/liquidate.py` · `ui/liquidate_panel.py` | `data/liquidate/` · 보고 `reports/liquidate/` |
 | 사용자 설정 (오르빗 설정 화면 · 텔레그램 '적립') | `ops/user_settings.py` · `ui/settings_page.py` | `data/settings/settings.json` · 바꾼 기록 `changes.jsonl` |
 | 예약 작업 켜기 · 끄기 | `ops/task_setup.py` | Windows 작업 스케줄러 |
-| 매일 안전 점검 | `ops/safety_check.py` | (판단만) |
+| 매일 안전 점검 (09:20 뒤 한 번, 봇이 부름) | `scripts/safety_check.py` (조회) · `ops/safety_check.py` (판단만) | 기록 `data/safety/state.json` · Vega 장부 `data/upbit_t2/state.json` |
 | 입금 나누기 안내 (Deneb · Vega 비율) | `ops/deposit_split.py` | 설정 값 |
 
 ## 3. 알림 · 화면
@@ -62,6 +63,8 @@
 | `deneb_brake_cycle` | 하락 방어 매도 → 보관금 → 추세 꺼짐 · 켜짐 → 되사기 · 보고 파일 |
 | `vega_upbit` | Vega 계획 · 첫 매수 · 입금 감지 · 상태 · 알림 · 장부 |
 | `telegram_texts` | 텔레그램 도움말 · 메뉴 · 적립 메뉴 버튼 |
+| `user_settings` | 설정 폼 검사 · 바뀐 칸 · 저장 파일(줄바꿈까지) · 바꾼 기록 · 종목 추가/빼기 · 비상 정지 (2 단계) |
+| `live_ledger` | 장부 → 거래 줄 · 하루 평가 줄 · SQLite 두 번 쓰기 · Supabase 로 보낼 것 (2 단계) |
 
 작업 브랜치(worktree)에서 돌릴 때는 그 브랜치 코드를 읽도록 `PYTHONPATH=<브랜치>/src;<브랜치>` 를 꼭 준다
 (가상환경이 원래 폴더 `src` 에 연결돼 있어, 안 주면 원래 코드를 시험하게 된다).

@@ -1,0 +1,158 @@
+## 기본값
+[('_extras', []), ('acc.BTQ.on', True), ('acc.BTQ.removed', False), ('acc.BTQ.usd', 1.0), ('acc.QS.on', True), ('acc.QS.removed', False), ('acc.QS.usd', 1.0), ('acc.WQTM.on', True), ('acc.WQTM.removed', False), ('acc.WQTM.usd', 1.0), ('alerts.bot_down', True), ('alerts.brief', True), ('alerts.events', True), ('alerts.fx', True), ('alerts.news', True), ('alerts.paper', True), ('alerts.theme', True), ('alerts.vega_trade', True), ('alerts.vega_weekly', True), ('deneb.ask_on', True), ('deneb.gold_on', False), ('deneb.harvest_on', True), ('deneb.max_krw', 5000000), ('deneb.monthly_krw', 300000), ('fire.rate_bad', 4.0), ('fire.rate_good', 20.0), ('fire.rate_mid', 12.0), ('fire.report_on', True), ('fire.target_krw', 100000000), ('live.sirius', False), ('namu.follow', True), ('polaris.monthly_krw', 1000000), ('polaris.on', True), ('safety.halt', False), ('screen.hide_amounts', False), ('screen.theme', 'system'), ('stock.orders', True), ('stock.pead', True), ('stock.reco', True)]
+## 폼 오류 (QS 99 달러)
+[('acc.QS.usd', '$0.5 ~ $20 사이로 적어 주세요')]
+## 폼 오류 (고친 뒤)
+{}
+## 바뀐 칸
+[Change(key='x.KR.005930.added', label='국내 삼성전자(005930) 추가 · 하루 ₩7,000', before=None, after=True, applies='내일 적립분부터'), Change(key='fire.report_on', label='매달 파이어 보고', before=True, after=False, applies='다음 보고(매달 1일)부터'), Change(key='fire.rate_good', label='도달 예상 · 좋을 때', before=20.0, after=25.0, applies='다음 보고부터'), Change(key='deneb.monthly_krw', label='Deneb 기본 월 납입', before=300000, after=400000, applies='다음 매수 달부터 (텔레그램 질문의 기본값)'), Change(key='deneb.max_krw', label='Deneb 한 달 상한', before=5000000, after=6000000, applies='다음 텔레그램 답부터'), Change(key='deneb.harvest_on', label='12월 양도세 공제 실현', before=True, after=False, applies='올해 12월 공지부터'), Change(key='alerts.vega_trade', label='Vega 매매 알림', before=True, after=False, applies='다음 09:05 실행부터'), Change(key='alerts.vega_weekly', label='Vega 주간 요약', before=True, after=False, applies='다음 토요일부터'), Change(key='alerts.fx', label='환전 알림', before=True, after=False, applies='다음 환전 확인(평일 09 · 12 · 15시)부터'), Change(key='alerts.bot_down', label='봇 멈춤 알림', before=True, after=False, applies='바로'), Change(key='alerts.theme', label='주간 테마', before=True, after=False, applies='다음 토요일부터'), Change(key='alerts.brief', label='시장 브리핑', before=True, after=False, applies='다음 브리핑부터'), Change(key='alerts.news', label='종목 뉴스 답', before=True, after=False, applies='바로'), Change(key='alerts.events', label='경제 일정 · 실적 경고', before=True, after=False, applies='바로'), Change(key='alerts.paper', label='매일 Paper 요약 (21:30)', before=True, after=False, applies='다음 21:30 부터'), Change(key='stock.orders', label='개별주 비중 주문 (텔레그램 💹 개별주 · [이대로 매수] 를 누를 때만)', before=True, after=False, applies='바로'), Change(key='stock.reco', label='💹 월간 미장 주도주 추천 · 매도 신호 (월말 종가, 버튼 누를 때만 주문)', before=True, after=False, applies='다음 07:30 확인부터'), Change(key='stock.pead', label='PEAD 실적 갭 10%+ 매수 알림 (💹 약 $100 · 손절 없이 20 거래일, 버튼 누를 때만)', before=True, after=False, applies='다음 PEAD 실행(화 ~ 토 21:40)부터'), Change(key='polaris.on', label='🧭 Polaris 나무 안정 적립 (매달 버튼 누를 때만 주문)', before=True, after=False, applies='다음 09:00 확인부터'), Change(key='namu.follow', label='나무 모의 — 국장 수급 Paper 따라가기', before=True, after=False, applies='다음 거래일 15:00 부터'), Change(key='screen.theme', label='테마', before='system', after='dark', applies='화면을 새로 열 때부터'), Change(key='acc.BTQ.usd', label='BTQ 하루 금액', before=1.0, after=2.5, applies='내일 적립분부터'), Change(key='acc.QS.usd', label='QS 하루 금액', before=1.0, after=3.0, applies='내일 적립분부터'), Change(key='acc.BTQ.on', label='BTQ 적립', before=True, after=False, applies='내일 적립분부터'), Change(key='acc.WQTM.on', label='WQTM 적립', before=True, after=False, applies='내일 적립분부터'), Change(key='acc.QS.on', label='QS 적립', before=True, after=False, applies='내일 적립분부터')]
+## 엔비디아 (여럿)
+{}
+## 삼성전자 (이미)
+{'new.query': '삼성전자(005930) 는 이미 목록에 있어요'}
+## NVDA 추가 오류
+{}
+## 하루 금액 오류
+{}
+## 범위 밖
+{'amount': '$0.5 ~ $20 사이로 적어 주세요'}
+## 적립 목록
+[{'키': 'acc.BTQ', 'sym': 'BTQ', 'name': 'BTQ', 'mkt': 'US', 'daily': 2.5, 'on': False}, {'키': 'acc.QS', 'sym': 'QS', 'name': 'QS', 'mkt': 'US', 'daily': 3.0, 'on': False}, {'키': 'x.KR.005930', 'sym': '005930', 'name': '삼성전자', 'mkt': 'KR', 'daily': 12000.0, 'on': True}, {'키': 'x.US.NVDA', 'sym': 'NVDA', 'name': '엔비디아', 'mkt': 'US', 'daily': 1.0, 'on': True}]
+## 적립 금액 기록 BTQ · 005930 · WQTM
+[[('2026-10-21', 0.0)], [('2026-10-21', 7000.0), ('2026-10-22', 12000.0)], [('2026-10-21', 0.0), ('2026-10-22', 0.0)]]
+## 남은 칸 수
+4
+## HALT
+설정 화면에서 켬 2026-10-21
+
+## settings.json (바이트 그대로)
+{␍
+ "values": {␍
+  "fire.report_on": false,␍
+  "fire.rate_good": 25.0,␍
+  "deneb.monthly_krw": 400000,␍
+  "deneb.max_krw": 6000000,␍
+  "deneb.harvest_on": false,␍
+  "alerts.vega_trade": false,␍
+  "alerts.vega_weekly": false,␍
+  "alerts.fx": false,␍
+  "alerts.bot_down": false,␍
+  "alerts.theme": false,␍
+  "alerts.brief": false,␍
+  "alerts.news": false,␍
+  "alerts.events": false,␍
+  "alerts.paper": false,␍
+  "stock.orders": false,␍
+  "stock.reco": false,␍
+  "stock.pead": false,␍
+  "polaris.on": false,␍
+  "namu.follow": false,␍
+  "screen.theme": "dark",␍
+  "acc.BTQ.usd": 2.5,␍
+  "acc.QS.usd": 3.0,␍
+  "acc.BTQ.on": false,␍
+  "acc.WQTM.on": false,␍
+  "acc.QS.on": false,␍
+  "x.KR.005930.daily": 12000,␍
+  "x.KR.005930.on": true,␍
+  "x.US.NVDA.daily": 1.0,␍
+  "x.US.NVDA.on": true,␍
+  "acc.WQTM.removed": true␍
+ },␍
+ "acc_history": {␍
+  "BTQ": [␍
+   [␍
+    "2026-10-21",␍
+    0.0␍
+   ]␍
+  ],␍
+  "WQTM": [␍
+   [␍
+    "2026-10-21",␍
+    0.0␍
+   ],␍
+   [␍
+    "2026-10-22",␍
+    0.0␍
+   ]␍
+  ],␍
+  "QS": [␍
+   [␍
+    "2026-10-21",␍
+    0.0␍
+   ]␍
+  ],␍
+  "005930": [␍
+   [␍
+    "2026-10-21",␍
+    7000.0␍
+   ],␍
+   [␍
+    "2026-10-22",␍
+    12000.0␍
+   ]␍
+  ],␍
+  "NVDA": [␍
+   [␍
+    "2026-10-22",␍
+    1.0␍
+   ]␍
+  ]␍
+ },␍
+ "extras": [␍
+  {␍
+   "mkt": "KR",␍
+   "sym": "005930",␍
+   "name": "삼성전자",␍
+   "market": "KOSPI",␍
+   "kind": "STOCK",␍
+   "daily0": 7000,␍
+   "added": "2026-10-21"␍
+  },␍
+  {␍
+   "mkt": "US",␍
+   "sym": "NVDA",␍
+   "name": "엔비디아",␍
+   "market": "NASDAQ",␍
+   "kind": "STOCK",␍
+   "daily0": 1.0,␍
+   "added": "2026-10-22"␍
+  }␍
+ ]␍
+}
+## changes.jsonl
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "x.KR.005930.added", "what": "국내 삼성전자(005930) 추가 · 하루 ₩7,000"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "fire.report_on", "what": "매달 파이어 보고 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "fire.rate_good", "what": "도달 예상 · 좋을 때 연 20% → 연 25%"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "deneb.monthly_krw", "what": "Deneb 기본 월 납입 300,000원 → 400,000원"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "deneb.max_krw", "what": "Deneb 한 달 상한 5,000,000원 → 6,000,000원"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "deneb.harvest_on", "what": "12월 양도세 공제 실현 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.vega_trade", "what": "Vega 매매 알림 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.vega_weekly", "what": "Vega 주간 요약 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.fx", "what": "환전 알림 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.bot_down", "what": "봇 멈춤 알림 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.theme", "what": "주간 테마 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.brief", "what": "시장 브리핑 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.news", "what": "종목 뉴스 답 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.events", "what": "경제 일정 · 실적 경고 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "alerts.paper", "what": "매일 Paper 요약 (21:30) 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "stock.orders", "what": "개별주 비중 주문 (텔레그램 💹 개별주 · [이대로 매수] 를 누를 때만) 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "stock.reco", "what": "💹 월간 미장 주도주 추천 · 매도 신호 (월말 종가, 버튼 누를 때만 주문) 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "stock.pead", "what": "PEAD 실적 갭 10%+ 매수 알림 (💹 약 $100 · 손절 없이 20 거래일, 버튼 누를 때만) 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "polaris.on", "what": "🧭 Polaris 나무 안정 적립 (매달 버튼 누를 때만 주문) 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "namu.follow", "what": "나무 모의 — 국장 수급 Paper 따라가기 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "screen.theme", "what": "테마 시스템 → 다크"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "acc.BTQ.usd", "what": "BTQ 하루 금액 $1 → $2.5"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "acc.QS.usd", "what": "QS 하루 금액 $1 → $3"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "acc.BTQ.on", "what": "BTQ 적립 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "acc.WQTM.on", "what": "WQTM 적립 켜짐 → 꺼짐"}␍
+{"at": "2026-10-20 12:00", "by": "설정 화면", "키": "acc.QS.on", "what": "QS 적립 켜짐 → 꺼짐"}␍
+{"at": "2026-10-21 12:00", "by": "텔레그램", "키": "x.US.NVDA.added", "what": "미국 엔비디아(NVDA) 추가 · 하루 $1"}␍
+{"at": "2026-10-21 12:00", "by": "텔레그램", "키": "acc.WQTM.removed", "what": "WQTM 목록에서 빼기 목록에 있음 → 뺌"}␍
+{"at": "2026-10-21 12:00", "by": "텔레그램", "키": "x.KR.005930.daily", "what": "삼성전자 (005930) 하루 금액 ₩7,000 → ₩12,000"}␍
+{"at": "2026-10-21 12:00", "by": "설정 화면", "키": "safety.halt", "what": "비상 정지 꺼짐 → 켜짐"}␍
+
+## read_log
+[{'at': '2026-10-21 12:00', 'by': '설정 화면', '키': 'safety.halt', 'what': '비상 정지 꺼짐 → 켜짐'}, {'at': '2026-10-21 12:00', 'by': '텔레그램', '키': 'x.KR.005930.daily', 'what': '삼성전자 (005930) 하루 금액 ₩7,000 → ₩12,000'}, {'at': '2026-10-21 12:00', 'by': '텔레그램', '키': 'acc.WQTM.removed', 'what': 'WQTM 목록에서 빼기 목록에 있음 → 뺌'}, {'at': '2026-10-21 12:00', 'by': '텔레그램', '키': 'x.US.NVDA.added', 'what': '미국 엔비디아(NVDA) 추가 · 하루 $1'}, {'at': '2026-10-20 12:00', 'by': '설정 화면', '키': 'acc.QS.on', 'what': 'QS 적립 켜짐 → 꺼짐'}]
+## 표시
+['₩5,000', '연 4%', '3원']
