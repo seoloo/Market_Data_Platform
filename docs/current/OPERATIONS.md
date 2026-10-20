@@ -10,15 +10,15 @@
 - **스위치(.env):** 토스 `TOSS_TRADING_ENABLED` · 바이낸스 현물 `BINANCE_LIVE_TRADING_ENABLED` ·
   바이낸스 선물 `BINANCE_FUTURES_LIVE_TRADING_ENABLED` · 업비트 `UPBIT_TRADING_ENABLED`(기본 꺼짐) ·
   한투 `KIS_TRADING_ENABLED`. 정확히 `true` 일 때만 주문. 환경 변수가 `.env` 보다 앞선다.
-- **설정(오르빗):** `live.altair`(Altair 실거래, 기본 꺼짐) · `stock.orders`(💹 개별주, 기본 켜짐) ·
-  `demo.altair`(Altair 데모).
+- **설정(오르빗):** `stock.orders`(💹 개별주, 기본 켜짐) 등. 옛 `live.altair` · `demo.altair` 는
+  Altair 은퇴로 2026-10-20 설정에서 뺐다.
 - **예약 이름(2026-10-15 이름 변경 뒤):** `AutoTrading_Vega`(매일 09:05) · `AutoTrading_Deneb_Chat` ·
   `AutoTrading_Deneb_Retry` · `AutoTrading_Altair`(5 분마다, 꺼져 있으면 연결도 안 함).
   2026-10-16: `AutoTrading_Vega` 등록 · 옛 `Binance_Cruise` 끔. 옛 `Toss_M3_Chat` · `Toss_M3_Retry` ·
   `Upbit_T2_Live` · `Upbit_T2_Weekly` 는 관리자 권한으로 만들어져 일반 권한으로 못 꺼서, 새
   `Deneb_Chat` · `Deneb_Retry` 는 겹치지 않게 꺼 둠 — 관리자 PowerShell 에서 옛 4 개 끄고 새 2 개 켜기.
 - **정지 · 정리:** 텔레그램 '정리'(범위 버튼) · '정리 NVDA'(한 종목) · '정지풀기'. 그룹: vega · deneb ·
-  acc · altair · stock. `python -m scripts.liquidate preview <범위|sym:종목>` 은 조회만.
+  acc · stock · sirius (Altair 는 2026-10-21 뺌 — 남은 `HALT_altair` 는 읽는 곳 없음). `python -m scripts.liquidate preview <범위|sym:종목>` 은 조회만.
 - **💤 Vega 유동형 예치(2026-10-17):** 설정 `vega.earn` 이 켜져 있으면 Vega 09:05 실행 · 입금 분배 뒤 남는 USDT(현물 20 남김)를 Simple Earn 유동형에 넣고, 살 때 · Altair 로 옮길 때 먼저 꺼낸다. 끄면 새로 넣지 않을 뿐 이미 넣은 돈은 현금으로 계속 세고 살 때 꺼낸다. 전부 꺼내기는 바이낸스 앱 Earn → 유동형 → 상환.
 - **💹 비중 (2026-10-17 사용자 '손절 −12만원이라 좀 큰데'):** 손절 한 번 계획 손실 = 기준 돈의 **0.3%**, 손절 −3% 그대로 → 한 종목 **10%**(상한도 10%, '그래도 매수' 최대도 10%). 상수 `ops/position_size.py` `RISK` · `CAP`. 이미 산 종목은 팔지 않는다.
 - **💹 개별주:** `/stock` → 종목 답장 → 추천 → [N주 매수] · [수량 바꾸기] · [그래도 매수] → 수량 답장 →
@@ -27,11 +27,17 @@
   이미 보유한 종목은 **추가 매수**(`add_to`) — 체결되면 기존 장부에 합치고 손절선을 합친 평균 단가 −3% 로 다시 잡는다(2026-10-16).
 - **💹 PEAD (2026-10-17 사용자 '$100 · 알림 + 버튼 · 20 거래일'):** PEAD Paper(화 ~ 토 21:40)가 새 실적 갭 +10% 이상 신호를 찾으면 투자 봇에 카드 + [🛒 N주 매수] [건너뛰기]. 누르면 반응일 다음 정규장 시작 직후 약 $100 지정가 매수(장부 `kind=pead`), **손절 없이** 20 번째 정규장 마감 무렵(5 ~ 2 분 전) 지정가로 판다. 알림 기록 `data/size_guard/pead_offers.json`, 설정 `stock.pead`(끄면 알림 없음). `python -m scripts.size_guard pead-offers` 는 조회만. 241 Paper 판정(닫힌 거래 100 건)은 그대로 따로 본다.
 - **💹 월간 미장 주도주 추천 (2026-10-17 사용자 '한 달에 한번만 … 월말에'):** 예약 `AutoTrading_Stock_Reco` 매일 07:30 KST — 일봉 갱신(LT Paper 일봉 + 나스닥 100 추가 15 `data/stock_reco/bars`, 한투 조회 전용) → 💹 보유 종목 매도 신호(추세 꺾임 · 고점 −35%, 산 뒤 추세 확인된 것만, 같은 이유 한 번) → 마지막 종가가 그달 마지막 거래일이면 추천 카드(상위 3 [🛒] + [📋 4 ~ 10위] [건너뛰기], 버튼 5 일 유효). 고르기는 연구 113 기본(261 KEEP_BASE), 시총 · 실적은 참고 줄. 설정 `stock.reco`. 상태 `data/stock_reco/state.json` · 버튼 `offers.json`. `python -m scripts.stock_reco preview` 는 글만(안 보냄). **주간으로 바꾸자는 요청엔 단점(손절 누적 · 꼭대기 매수 · 근거 없음)을 먼저 말한다**(사용자 2026-10-17).
-- **🗓 주간 요약 (2026-10-17 사용자 — 앱 평균 원가가 예전 2025 거래와 섞여 −19% 로 보여 헷갈림):** 예약 `AutoTrading_Weekly_Summary` 토요일 09:30 — Vega(평가 · 넣은 돈 · 이번 주/시작부터는 단위 가치 기준 · 코인별 수량 · 평단(장부 체결만, 수수료 포함) → 지금 가격 · 손익 · 현금/유동형 · 매매 수 · 추세) + Altair(장부 · 시작 · 포지션별 진입가 → 표시 가격 · 손익 · 비상 스톱 · 매매 수) + 합계(넣은 돈 대비 손익 금액 · % · 이번 주 금액) + 할 일(30% 멈춤 · 조회 실패). 조회만, 설정 `alerts.vega_weekly`. `python -m scripts.weekly_summary preview` 는 글만.
+- **💰 자동 적립 수량 (2026-10-21 사용자 "그 금액만큼 적립해야지"):** 미국(21:00) · 국내(12:10) 모두
+  쌓인 적립금으로 **살 수 있는 만큼 정수 주**를 한 번에 낸다(그 전엔 하루 1 주 고정이라 하루 금액을 1 주 값보다
+  올리면 돈이 쌓이기만 했다). 남는 돈은 다음 날로, 월 한도 · 한 건 50 주(`MAX_ORDER_QTY`) 안에서, 국내는
+  원화가 모자라면 되는 만큼. 환전 알림 · `python -m scripts.toss_accumulate preview` 의 '오늘 밤 매수' 도 같은 수량.
+- **~~🗓 옛 주간 요약~~ — 2026-10-21 통째로 `retired/` (사용자 "통째로 옮겨줘", 예약 10-20 부터 꺼짐).
+  Vega 주간 요약은 `AutoTrading_Vega_Weekly`(`vega_upbit weekly`). 아래는 옛 설명:**
+  (2026-10-17 사용자 — 앱 평균 원가가 예전 2025 거래와 섞여 −19% 로 보여 헷갈림): 예약 `AutoTrading_Weekly_Summary` 토요일 09:30 — Vega(평가 · 넣은 돈 · 이번 주/시작부터는 단위 가치 기준 · 코인별 수량 · 평단(장부 체결만, 수수료 포함) → 지금 가격 · 손익 · 현금/유동형 · 매매 수 · 추세) + Altair(장부 · 시작 · 포지션별 진입가 → 표시 가격 · 손익 · 비상 스톱 · 매매 수) + 합계(넣은 돈 대비 손익 금액 · % · 이번 주 금액) + 할 일(30% 멈춤 · 조회 실패). 조회만, 설정 `alerts.vega_weekly`. `python -m scripts.weekly_summary preview` 는 글만.
 - **🧭 Polaris 는 Paper 만 (2026-10-20 사용자 "polaris 같은 경우 paper만 작동하도록 하면 돼"):** 설정 `polaris.on` 꺼짐(실거래 버튼 · 주문 없음, `NAMU_TRADING_ENABLED` 도 꺼짐). 같은 예약 `AutoTrading_Polaris` 의 아침(08 시 뒤) 실행이 `scripts/polaris_paper.py` 를 먼저 불러, 토스 종가로 같은 규칙(11 월부터 100 만 원 × 4 회차 · 12 월 맞추기)을 가짜 돈으로 따라간다 — 장부 `data/polaris_paper/state.json`, 회차 · 맞추기 날만 텔레그램 한 통("Polaris Paper (가짜 돈)"). 상태 `python -m scripts.polaris_paper status`.
 - **🧭 Polaris (2026-10-17 사용자 — 나무 '정말 안정적이게' · 토스와 별개 · 400 만 원 4 달 · 11/2 부터):** 예약 `AutoTrading_Polaris` 매일 09:00 · 00:20 · 01:20 KST. 그달(한국 날짜) 첫 평일 09:00 에 투자 봇 카드 [🛒 매수] [이번 달 건너뛰기](그달 끝까지 유효, 건너뛰면 회차를 안 씀). 누른 회차는 미국 정규장(뉴욕 10:00 ~ 15:30, 00:20 · 01:20 확인)에 SPYM · QQQM · IEF · GLDM 을 목표 비율에 모자란 것부터 정수 주 지정가 매수 → 3 분 뒤 안 찬 것 취소 → 다음 확인 때 다시, 3 번이면 그 회차 끝. 원화로 살 수 있는 돈이 회차 남은 돈보다 적으면 안 사고 알림. 장부 `data/polaris/state.json`(`orders` = 체결, `sent` = 낸 주문 · 보내기 전에 기록, `halted`). `python -m scripts.polaris status` 조회만 · `test-buy` = 정규장에 SPYM 1 주 원화 결제 시험(첫 회차 돈에서 뺌). 설정 `polaris.on` · `polaris.monthly_krw`(100 만, 회차 수 4 는 코드 `ROUNDS`). **12 월 맞추기**(사용자 10-17 '4개월 하지' · 12 월마다 확인): 4 회차를 다 채운 뒤 매년 12 월 첫 평일 09:00 카드 [✅ 맞추기] [올해 건너뛰기] — 누르면 정규장에 목표보다 1 주 넘게 많은 종목을 지정가(매수 1 호가 − 0.2%)로 팔고, 판 달러(달러 증거금)로 모자란 종목을 산다(장부 수량 · 판매 가능 수량 안에서만). 실현 이익은 해마다 `realized_usd` · `realized_krw`, 카드에 250 만 원 공제(사람 기준, 토스 매도와 합산) 안내. 그 밖의 자동 매도 · 손절 없음. 주간 요약에 원화 칸(바이낸스 합계와 따로). 실전 주문은 `.env` `NAMU_TRADING_ENABLED=true` 가 있어야 한다.
 - **나무증권 해외주식 (2026-10-17 사용자 '원화 주문 연결'):** `python -m scripts.namu_global check` — 실전 조회만(원화로 살 수 있는 돈 · 미국 보유 · 스위치 상태). `mock-test [종목]` — 모의 계좌 주문 경로 시험(미국 정규장, 모의는 달러 증거금). 실전 주문 스위치 `.env` `NAMU_TRADING_ENABLED`(정확히 `true` 만, 기본 꺼짐). 클라이언트 `exchange/namu_global.py`, 아직 이걸로 주문하는 전략 없음. 1 회 예약 `AutoTrading_Namu_MockTest`(10-19 23:30) 끝나면 지운다.
-- **Altair 실거래:** `python -m scripts.altair_live plan|status|unhalt` — plan · status 는 조회만.
+- **~~Altair 실거래~~:** 2026-10-19 은퇴 — 코드는 `retired/scripts/altair_live.py`(실행하지 않음).
 
 ## 데이터·API·복구
 

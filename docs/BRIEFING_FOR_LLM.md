@@ -6,6 +6,11 @@
 
 > **표시 이름 변경 (2026-10-15, 사용자 결정):** Glide → 🌟 **Deneb** · Cruise → 🌌 **Vega** · Falcon(옛 AG4S2) → ☄️ **Altair** (여름철 대삼각형). 같은 날 내부 이름까지 바꿨다: 파일(`scripts/vega_live.py` · `scripts/altair_demo.py` · `ops/deneb_live.py` · `ops/deneb_guard.py` · `ops/altair_split.py`), 설정 키(`deneb.*` · `alerts.vega_*` · `demo.altair`), 정지 그룹(`HALT_deneb` · `HALT_vega`), 장부(`data/toss/DENEB.json` · `data/vega/` · `data/altair_demo/`), 예약(`AutoTrading_Vega` · `AutoTrading_Deneb_Chat` · `AutoTrading_Deneb_Retry`). 옛 정지 파일 · 옛 설정 키 · 옛 명령(`m3` · `m3-chat`) · 옛 스크립트 경로는 계속 읽는다. 주문 번호 앞머리(`M3TQQQ` · `t2b-`), Paper · 연구 기록, 아래 옛 기록 속 이름은 그대로다.
 
+## 2026-10-21 — 자동 적립 수량 · 실거래 코드 리팩토링 끝 (Claude)
+
+- **토스 자동 적립(미국 · 국내) = 쌓인 적립금으로 살 수 있는 만큼 정수 주(사용자 결정 "그 금액만큼 적립해야지")**: 그 전엔 하루 1 주 고정이라 하루 금액(BTQ $1 → $3)을 1 주 값보다 올리면 돈이 쌓이기만 했다. 남는 돈은 다음 날로, 월 한도 · 한 건 50 주 안.
+- 실거래 코드 리팩토링 0 ~ 6 단계 끝(동작 그대로, `docs/CODE_MAP.md` 에 지도 · 용어 사전 · 디자인 패턴). Altair · 바이낸스 Vega 흔적(정리 범위 · 화면 카드)과 옛 주간 요약은 은퇴(`retired/`). 지금 실거래: 🌟 Deneb(토스) · 🌌 Vega(업비트) · 💰 토스 자동 적립 · 💹 개별주. 🧭 Polaris 는 Paper 만, ✨ Sirius 보류.
+
 ## 2026-10-18 — Altair 30% 정지 자동 풀기 · 연구 265 ~ 268 (Claude)
 
 - **Altair 실거래 낙폭 30% 정지 풀기 = 추세 꺼짐 → 다시 켜짐(사용자 결정)**: 정지 중 BTC 롱 목표가 0 이 된 뒤 다시 0 보다 커지는 날 스스로 풀고 고점을 그때 단위 가치로(`scripts/altair_live.py` `trend_release`). 근거 [266](research/266-altair-live-halt-rule.md): 백테스트 시작 9 곳 모두 정지가 걸렸고, 안 풀면 수익이 거의 사라짐(2020-06 시작 순손익 186k → 1.7k), 30 일 자동 풀기는 더 나쁨, 추세 풀기는 8/9 곳에서 정지 없음 이상. 손으로 `unhalt` 도 그대로. **Vega 도 같은 방식으로 바꿈**(`scripts/vega_live.py` `trend_ready`, 199 §6) — 30 일째 알림은 남김, 손으로 `release-dd` 그대로.
