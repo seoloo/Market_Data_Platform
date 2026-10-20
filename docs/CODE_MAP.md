@@ -7,13 +7,13 @@
 
 | 전략 | 증권사 · 거래소 | 언제 도나 (예약 작업) | 실행 파일 | 계산만 하는 파일 | 장부 |
 |---|---|---|---|---|---|
-| 🌟 **Deneb** — TQQQ + SCHD 매달 적립, 하락 방어 | 토스 (미국) | 평일 21:00 `Toss_Accumulate` · 재시도 23:40 · 03:30 `Deneb_Retry` · 금액 묻기 09:00 `Deneb_Chat` | `scripts/toss_accumulate.py` | `ops/deneb_live.py` (월 계획 · 다음 날 채우기 · 배당) · `ops/deneb_guard.py` (하락 방어 · 배당 단계 · 제안) | `data/toss/DENEB.json` |
+| 🌟 **Deneb** — TQQQ + SCHD (+ 금 IAUM) 매달 적립, 하락 방어 | 토스 (미국) | 평일 21:00 `Toss_Accumulate` · 재시도 23:40 · 03:30 `Deneb_Retry` · 금액 묻기 09:00 `Deneb_Chat` | `scripts/toss_accumulate.py` | `ops/deneb_live.py` (월 계획 `plan_monthly_rebalance` · 다음 날 채우기 `plan_next_day_fill` · 배당) · `ops/deneb_guard.py` (하락 방어 · 배당 단계 · 제안) | `data/toss/DENEB.json` |
 | 💰 **자동 적립 (미국)** — BTQ · WQTM · QS 매일 소액, 1 주 값이 모이면 1 주 | 토스 (미국) | 평일 21:00 `Toss_Accumulate` · 환전 알림 09 · 12 · 15 시 `Toss_FX` | `scripts/toss_accumulate.py` | `ops/qndx_alert.py` (적립 판단) · `ops/qs_live.py` | `data/toss/<기호>.json` |
 | 🇰🇷 **자동 적립 (국내)** | 토스 (국내) | 평일 12:10 `Toss_KR` | `scripts/toss_kr.py` | `ops/kr_accumulate.py` | `data/toss/KR_<코드>.json` |
 | 🌌 **Vega** — BTC · ETH · SOL 원화, 추세 따라 비중 | 업비트 | 매일 09:05 `Vega` · 토 09:30 `Vega_Weekly` | `scripts/vega_upbit.py` | `ops/t2_upbit.py` | `data/upbit_t2/state.json` |
 | 💹 **개별주** — 비중 추천 · −3% 손절 · PEAD 소액 | 토스 (미국) | 텔레그램 봇 안에서 2 분마다 | `scripts/size_guard.py` (봇이 부름) | `ops/size_order.py` · `ops/stop_guard.py` · `ops/position_size.py` | `data/size_guard/state.json` |
 
-대기 · 꺼짐 (이번 리팩토링 범위 밖, 제자리): 🧭 Polaris(나무 · 11 월부터 `Polaris`) · ✨ Sirius(꺼짐).
+대기 · 꺼짐 (이번 리팩토링 범위 밖, 제자리): 🧭 Polaris — 실거래 꺼짐(설정 `polaris.on`), **Paper 만** `scripts/polaris_paper.py` (예약 `Polaris` 아침 실행, 장부 `data/polaris_paper/state.json`, 2026-10-20) · ✨ Sirius(꺼짐).
 은퇴 (`retired/`, 실행하지 않음): 바이낸스 Vega(`vega_live.py` · `live_t2_binance.py`) · ☄️ Altair(`altair_live.py` · `altair_demo.py` · `ops/altair_split.py`) — 2026-10-19 Altair 정리 · Vega 업비트로 되돌림. 자세한 것은 [retired/README.md](../retired/README.md).
 
 ## 2. 함께 쓰는 부품
@@ -65,6 +65,7 @@
 | `telegram_texts` | 텔레그램 도움말 · 메뉴 · 적립 메뉴 버튼 |
 | `user_settings` | 설정 폼 검사 · 바뀐 칸 · 저장 파일(줄바꿈까지) · 바꾼 기록 · 종목 추가/빼기 · 비상 정지 (2 단계) |
 | `live_ledger` | 장부 → 거래 줄 · 하루 평가 줄 · SQLite 두 번 쓰기 · Supabase 로 보낼 것 (2 단계) |
+| `deneb_chat` · `deneb_retry` · `deneb_harvest` · `deneb_dividend_step` · `deneb_gold_dividend` | Deneb 금액 묻기 · 답 · 밤 매수 / 재시도 / 12 월 공제 실현 / 배당 단계 제안 / 금 섞기 · 배당 둘째 달 (`tests/golden/test_deneb_golden.py`, 3 단계) |
 
 작업 브랜치(worktree)에서 돌릴 때는 그 브랜치 코드를 읽도록 `PYTHONPATH=<브랜치>/src;<브랜치>` 를 꼭 준다
 (가상환경이 원래 폴더 `src` 에 연결돼 있어, 안 주면 원래 코드를 시험하게 된다).
