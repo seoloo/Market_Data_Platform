@@ -160,7 +160,7 @@ def _risk(days: int | None = 8, when: str | None = "") -> EntryEvents:
 
 
 def test_golden_position_size(tmp_path: Path) -> None:
-    base = {
+    base: dict[str, Any] = {
         "symbol": "NVDA",
         "name": "엔비디아",
         "price": 180.0,
@@ -202,7 +202,7 @@ def test_golden_position_size(tmp_path: Path) -> None:
     }
     out: list[str] = []
     for title, change in cases.items():
-        values = {**base, "earnings_in_days": 8, "earnings_date": ""}
+        values: dict[str, Any] = {**base, "earnings_in_days": 8, "earnings_date": ""}
         values.update(change)
         risk = values["event_risk"]
         if risk is not None:
@@ -485,7 +485,7 @@ def test_golden_size_guard_flow(guard: dict[str, Any], tmp_path: Path) -> None:
 
     def at(text: str) -> int:
         clock["now"] = _ms(text)
-        return clock["now"]
+        return int(clock["now"])
 
     def state(title: str, result: Any) -> None:
         out.extend([f"## {title}", _dump(result)])
