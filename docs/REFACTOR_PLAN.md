@@ -1,6 +1,6 @@
 # 실거래 코드 리팩토링 계획 (2026-10-20 사용자 승인 · 2026-10-21 끝)
 
-상태: **0 ~ 6 단계 모두 끝 (2026-10-21, 사용자 "6단계 진행해줘")** — 결과 지도 [CODE_MAP.md](CODE_MAP.md) (용어 사전 · 디자인 패턴 · 바뀐 이름 표) — main 합치기는 낮에(계획 규칙) — 작업 브랜치 `refactor/live-code` (worktree `../Auto_Trading_refactor`).
+상태: **0 ~ 7 단계 모두 끝 (2026-10-21, 사용자 "7단계 진행해줘")** — 결과 지도 [CODE_MAP.md](CODE_MAP.md) (용어 사전 · 디자인 패턴 · 바뀐 이름 표) — main 합치기는 낮에(계획 규칙) — 작업 브랜치 `refactor/live-code` (worktree `../Auto_Trading_refactor`).
 
 ## 목적 (사용자 말)
 
@@ -90,3 +90,14 @@
   보관금 · NAV · 정지 파일 · 현황 동기화 · 골든 등 24 개, 코드에서 규칙 확인), **7. 디자인 패턴**(Repository · Facade ·
   의존성 주입 · Adapter · Command + 목록표 · Golden Master, Template Method 는 안 씀) · import 계약 5 개, **8. 바뀐 이름** 표.
   CURRENT_SPEC · OPERATIONS(Altair · 주간 요약 은퇴, 적립 수량) · BRIEFING_FOR_LLM 갱신. 코드 변경 없음.
+- 2026-10-21 7 단계 (처음 범위에서 빠졌던 실거래 코드 — 사용자 "리펙토링 다 한거니?" 에 빠진 곳을 알리고 "7단계 진행해줘"):
+  💹 개별주(`ops/position_size.py` · `ops/size_order.py` · `ops/stop_guard.py` · `scripts/size_guard.py`) — 실제 돈으로
+  돌고 있었는데 0 단계 범위표에 없었다 · 매일 기록 `scripts/live_snapshot.py` · 파이어 보고 `scripts/fire_report.py` ·
+  대시보드 서버 `ui/server.py`. 앞서 전후 비교 기준 5 묶음(`tests/golden/test_stock_golden.py` — 비중 추천 15 경우 ·
+  예약 매수 단계 · 손절 감시 · 개별주 실행기 흐름(가짜 토스 · 고정 시계로 예약 → 장 시작 매수 → 추가 매수 두 번 합치기 →
+  손절 → 끝, 앱 종목 손절, PEAD 알림 · 예약 · 체결) · 매일 기록 · 파이어) → 24 묶음. 머리말 · `[쓰임]` / `[이유]` 59 개 ·
+  한 글자 변수 풀기, `size_guard.tick` 을 3 단계 주석 + 도움 함수 둘로(들여쓰기 7 단 → 4 단, 조건 순서 · 예외 그대로).
+  이어서 앞 단계 범위에 남았던 짧은 함수 설명 45 개 + 창구 모양 클래스 설명. 🧭 Polaris · ✨ Sirius 는 대기라 그대로.
+  **발견(기존 버그, 고치지 않음 — 사용자에게 물음)**: `fire_report.dated_deposits` 는 `data/vega/state.json`(옛 바이낸스
+  장부)이 있으면 업비트 Vega 입금 대신 옛 바이낸스 입금 · Altair 이체를 센다 — 10-19 업비트로 되돌린 뒤에도 파일이
+  남아 있어 파이어 보고의 '월 입금 속도' 가 틀린다(다음 보고 11-01). 기준(`stock_snapshot_fire`)에 지금 동작 그대로 찍힘.

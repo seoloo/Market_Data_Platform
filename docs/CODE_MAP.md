@@ -1,4 +1,4 @@
-# 실거래 코드 지도 (리팩토링 6 단계 완성, 2026-10-21)
+# 실거래 코드 지도 (리팩토링 7 단계까지, 2026-10-21)
 
 > 처음 보는 사람이 "무엇이 · 언제 · 무엇을 읽고 쓰는지" 찾는 지도 ([REFACTOR_PLAN.md](REFACTOR_PLAN.md)).
 > 모르는 말은 **6. 용어 사전**, 코드 짜임새는 **7. 디자인 패턴**, 예전 이름으로 찾을 때는 **8. 바뀐 이름**.
@@ -14,7 +14,7 @@
 | 💰 **자동 적립 (미국)** — 설정에서 고른 종목(지금 BTQ 하루 $3) 매일 적립, 모인 돈으로 살 수 있는 만큼 정수 주 (2026-10-21 부터, 그 전엔 하루 1 주) | 토스 (미국) | 평일 21:00 `Toss_Accumulate` · 환전 알림 09 · 12 · 15 시 `Toss_FX` | `scripts/toss_accumulate.py` | `ops/qndx_alert.py` (적립 판단) · `ops/qs_live.py` | `data/toss/<기호>.json` |
 | 🇰🇷 **자동 적립 (국내)** — 미국과 같은 셈, 평일 낮 당일 지정가 | 토스 (국내) | 평일 12:10 `Toss_KR` | `scripts/toss_kr.py` | `ops/kr_accumulate.py` | `data/toss/KR_<코드>.json` |
 | 🌌 **Vega** — BTC · ETH · SOL 원화, 추세 따라 비중 | 업비트 | 매일 09:05 `Vega` · 토 09:30 `Vega_Weekly` | `scripts/vega_upbit.py` | `ops/t2_upbit.py` | `data/upbit_t2/state.json` |
-| 💹 **개별주** — 비중 추천 · −3% 손절 · PEAD 소액 | 토스 (미국) | 텔레그램 봇 안에서 2 분마다 | `scripts/size_guard.py` (봇이 부름) | `ops/size_order.py` · `ops/stop_guard.py` · `ops/position_size.py` | `data/size_guard/state.json` |
+| 💹 **개별주** — 비중 추천 · 정규장 시작 직후 지정가 매수 · −3% 손절 · PEAD 소액 | 토스 (미국 · 국내) | 텔레그램 봇 안에서 2 분마다 `tick` | `scripts/size_guard.py` (봇이 부름 — ① 보호 매도 ② 매수 직전 다시 보기 → 매수 → 추가 매수 합치기) | `ops/position_size.py` (비중 · 수량 · 막는 이유) · `ops/size_order.py` (예약 → 매수 단계) · `ops/stop_guard.py` (손절 · PEAD 보유 끝 → 매도) | `data/size_guard/state.json` · 추천 기록 `journal.jsonl` · PEAD 알림 `pead_offers.json` |
 
 대기 · 꺼짐 (이번 리팩토링 범위 밖, 제자리): 🧭 Polaris — 실거래 꺼짐(설정 `polaris.on`), **Paper 만** `scripts/polaris_paper.py` (예약 `Polaris` 아침 실행, 장부 `data/polaris_paper/state.json`, 2026-10-20) · ✨ Sirius(꺼짐).
 은퇴 (`retired/`, 실행하지 않음): 바이낸스 Vega(`vega_live.py` · `live_t2_binance.py`) · ☄️ Altair(`altair_live.py` · `altair_demo.py` · `ops/altair_split.py`) — 2026-10-19 Altair 정리 · Vega 업비트로 되돌림 · 🗓 옛 주간 요약(`weekly_summary.py`, 2026-10-21). 자세한 것은 [retired/README.md](../retired/README.md).
@@ -40,6 +40,9 @@
 | 텔레그램 봇 — 받은 명령을 종류별로 나눠(`COMMAND_KINDS`) 처리 → 매번 부가 작업 목록(`BACKGROUND_JOBS`: 정리 이어 하기 · 개별주 감시 · 이벤트 알림 · 나무 따라가기 · 그림자 272 · Paper 요약 · 안전 점검) | `scripts/telegram_bot.py` | 2 분마다 `Telegram_Bot` |
 | 현황을 그 순간 실제 계좌로 맞춘 사본 (Facade) | `ui/live_sync.py` (계산 · 60 초 저장) + `app/live_accounts.py` (업비트 · 토스 조회 창구 — 실행기가 시작 때 `install()`) | 봇 · 화면 · 매일 기록 · 파이어 보고가 부름 |
 | 실거래 홈 · 오르빗 화면 | `ui/live_home.py` · `ui/orbit_home.py` | 대시보드(`Dashboard`, 계속 실행) |
+| 대시보드 서버 — 127.0.0.1 · Tailscale, 읽기 전용 + 예외 몇 개(설정 저장 · 정지 · 정리 띄우기 · 놓친 작업) | `ui/server.py` (`scripts/dashboard.py` 가 띄움) | 로그인하면 켜져 계속 `Dashboard` |
+| 실거래 하루 평가 기록 (그래프용) | `scripts/live_snapshot.py` | 23:00 `Ledger_Sync` 가 먼저 부름 → `data/live/history.jsonl` |
+| 파이어 진행 보고 | `scripts/fire_report.py` · `ops/fire.py` | 매달 1 일 09:15 `Fire_Report` |
 | 보유 종목 위험 뉴스 | `scripts/risk_news.py` | 매시 17 분 `Risk_News` |
 | 실거래 기록 DB 맞추기 (JSON → SQLite → Supabase) | `scripts/ledger_sync.py` · `ops/live_ledger.py` | 23:00 `Ledger_Sync`, DB `data/live_ledger.db` |
 
@@ -72,6 +75,7 @@
 | `deneb_chat` · `deneb_retry` · `deneb_harvest` · `deneb_dividend_step` · `deneb_gold_dividend` | Deneb 금액 묻기 · 답 · 밤 매수 / 재시도 / 12 월 공제 실현 / 배당 단계 제안 / 금 섞기 · 배당 둘째 달 (`tests/golden/test_deneb_golden.py`, 3 단계) |
 | `vega_more` · `toss_kr` · `deposit_split` · `liquidate` | Vega 정지 30 일 · 정지 풀기 · 주간 요약 · 현황 / 국내 적립 실행기 / 입금 나누기 글 / 전부 정리 (`tests/golden/test_vega_kr_golden.py` · `test_liquidate_golden.py`, 4 단계) |
 | `telegram_acc` · `telegram_liquidation` · `live_home` · `settings_page` | 텔레그램 적립 대화 · 정리 · 정지풀기 대화 / 현황 글 · 실거래 홈 HTML / 설정 · 정리 칸 HTML (`tests/golden/test_bot_ui_golden.py`, 5 단계) |
+| `stock_position_size` · `stock_size_order` · `stock_stop_guard` · `stock_size_guard` · `stock_snapshot_fire` | 💹 비중 추천 15 경우 / 예약 매수 단계 / 손절 감시 / 개별주 실행기 흐름(예약 → 매수 → 추가 매수 합치기 → 손절 → 끝, 앱 종목 손절, PEAD) / 매일 기록 · 파이어 보고 (`tests/golden/test_stock_golden.py`, 7 단계) |
 
 작업 브랜치(worktree)에서 돌릴 때는 그 브랜치 코드를 읽도록 `PYTHONPATH=<브랜치>/src;<브랜치>` 를 꼭 준다
 (가상환경이 원래 폴더 `src` 에 연결돼 있어, 안 주면 원래 코드를 시험하게 된다).
@@ -116,7 +120,7 @@
 | **의존성 주입** | 필요한 기능을 안에서 직접 만들지 않고 밖에서 넣어 받는다. | `app/live_accounts.install()` → `ui/live_sync` · `scripts/liquidate.py` → `ops/liquidate.py` (`UpbitLike` · `TossLike` 같은 '창구 모양' `Protocol`) | 화면 · 계산 코드가 거래소를 직접 부르지 않게(import 계약), 시험에서 가짜 거래소를 넣으려고 |
 | **Adapter** | 바깥 API 의 JSON 을 우리 코드가 쓰는 모양으로 바꿔 준다. | `exchange/toss.py` (`TossPosition` 등) · `exchange/upbit.py` (`UpbitOrder` · `Candle`) | 증권사 응답이 바뀌어도 고칠 곳을 한 파일로 |
 | **Command + 목록표** | "이런 명령이면 이 함수" 를 표 하나로. | `scripts/telegram_bot.py` (`COMMAND_KINDS` · `_sort_commands` · `BACKGROUND_JOBS`) | 새 명령 · 부가 작업을 넣을 때 표에 한 줄만 더하면 되게 |
-| **Golden Master 시험** | 바꾸기 전 출력을 찍어 두고 바꾼 뒤와 글자까지 비교. | `tests/golden/` (19 묶음) | 리팩토링이 동작을 안 바꿨다는 증거 |
+| **Golden Master 시험** | 바꾸기 전 출력을 찍어 두고 바꾼 뒤와 글자까지 비교. | `tests/golden/` (24 묶음) | 리팩토링이 동작을 안 바꿨다는 증거 |
 | ~~Template Method~~ | (안 씀) 부모 클래스가 순서를 정하고 자식이 칸을 채우는 상속 구조. | — | 상속은 흐름 따라가기 어려움 → 긴 함수는 `# 1 단계: …` 주석으로 대신 |
 
 import 계약(`lint-imports`, `pyproject.toml`, 5 개 모두 지킴): ① 순수 계산(core)은 I/O 계층을 import 하지 않는다
@@ -138,4 +142,6 @@ import 계약(`lint-imports`, `pyproject.toml`, 5 개 모두 지킴): ① 순수
 | `ui/live_sync.py` | `Sync` · `apply_vega` · `apply_deneb` · `apply_plan` · `sent_ids` · `CACHE_S` · `_f` | `LiveAccountSnapshot` · `sync_vega_ledger_to_upbit` · `sync_deneb_ledger_to_toss` · `sync_accumulate_ledger_to_toss` · `pending_toss_order_ids` · `CACHE_SECONDS` · `to_float` |
 | `ui/live_home.py` | `_f` · 함수 안 `d` · `o` · `q` · `b` · `h` | `_to_float` · `row` · `order` · `quotes` · `book` · `holding` |
 | `scripts/telegram_bot.py` | `import … as sg` · `as liq` | `size_guard` · `liquidate` (별칭 없음) |
+| `ops/size_order.py` · `ops/stop_guard.py` · `ops/position_size.py` | `_f` · 함수 안 `t` · `a` · `o` · `inp` | `_to_float` · `ticket` · `advice` · `order` · `inputs` |
+| `scripts/size_guard.py` | `tick` 한 덩어리 (들여쓰기 7 단) | 3 단계 주석 + `_recheck_before_buy`(매수 직전 다시 보기) · `_opening_price`(기준 시가) |
 | 새 파일 | — | `ops/ledger_file.py` (2 단계) · `app/live_accounts.py` (5 단계) |
