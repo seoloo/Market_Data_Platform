@@ -27,7 +27,7 @@ from auto_trading.exchange.toss import TossReader, TossTokenCache
 from auto_trading.ops import deneb_shadow as core
 from auto_trading.ops import user_settings
 from auto_trading.ops.deneb_guard import Brake
-from auto_trading.ops.deneb_live import DIV, LEV, DenebState
+from auto_trading.ops.deneb_live import DIVIDEND_ETF, LEVERAGED_ETF, DenebState
 from auto_trading.ops.qs_paper import trend_on
 from auto_trading.ops.us_daily_bars import last_settled_day
 
@@ -37,7 +37,7 @@ STATE = ROOT / "state.json"
 REPORTS = REPO / "reports" / "deneb_shadow"
 REAL = REPO / "data" / "toss" / "DENEB.json"
 TOKEN = REPO / "data" / "toss_token.json"
-SYMS = (LEV, DIV, "QQQ")
+SYMS = (LEVERAGED_ETF, DIVIDEND_ETF, "QQQ")
 
 
 def _since(a: str, b: str) -> int:

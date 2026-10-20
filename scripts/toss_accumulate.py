@@ -90,26 +90,26 @@ from auto_trading.ops.deneb_guard import (
     typed,
 )
 from auto_trading.ops.deneb_live import (
-    DIV,
-    GOLD,
+    DIVIDEND_ETF,
+    GOLD_ETF,
     GOLD_MIX,
-    LEV,
+    LEVERAGED_ETF,
     DenebOrder,
     DenebState,
     amount_target,
     apply_fill,
-    choose,
     cost_basis,
     credit_dividends,
     deposit,
     deposited,
     dividend_lines,
     due,
-    fill,
     holdings_lines,
     lev_share,
     limit_price,
     plan_message,
+    plan_monthly_rebalance,
+    plan_next_day_fill,
     ratio_text,
     targets,
 )
@@ -182,7 +182,7 @@ DENEB_START = "2026-10-09"
 DENEB_MONTHLY_KRW = 300_000.0
 """2026-10-09 사용자 "첫 거래일로 하고 당분간은 월 30만원으로만 매수해줘" (문서 182 M3, 토스)."""
 DENEB_FILE = "DENEB.json"
-DENEB_MAX_QTY = {DIV: 40, GOLD: 40}
+DENEB_MAX_QTY = {DIVIDEND_ETF: 40, GOLD_ETF: 40}
 """한 번에 SCHD · IAUM 최대 40 주(TQQQ 는 QS 와 같은 상한 MAX_TQQQ_QTY)."""
 DENEB_RETRY = frozenset({"insufficient-buying-power", "order-hours-closed"})
 DENEB_BRAKE = True
@@ -387,7 +387,7 @@ def _trader() -> TossTrader:
         TossTokenCache(TOKEN),
         allowed_symbols=frozenset(symbols),
         max_qty={TQQQ: MAX_TQQQ_QTY, **DENEB_MAX_QTY},
-        sell_symbols=frozenset({TQQQ, DIV, GOLD}),
+        sell_symbols=frozenset({TQQQ, DIVIDEND_ETF, GOLD_ETF}),
         max_limit_usd=Decimal(str(limit)),
     )
 
@@ -533,7 +533,7 @@ def _deneb_send(
     qty: int,
     limit: float,
     kind: str,
-    symbol: str = LEV,
+    symbol: str = LEVERAGED_ETF,
 ) -> tuple[DenebOrder, str]:
     """브레이크 · 재매수 · 공제 실현 · 배당 단계 주문 (장 마감 지정가). 보내기 전에 저장한다."""
     cid = _client_id(f"M3{symbol}", day.today, len(deneb.orders) + 1)
@@ -563,7 +563,11 @@ def _deneb_brake(
     b = _brake_of(deneb)
     report = _deneb_book(deneb, b)
     first = min(
-        (o.date for o in deneb.orders if o.symbol == LEV and o.side == "BUY" and o.filled_qty > 0),
+        (
+            o.date
+            for o in deneb.orders
+            if o.symbol == LEVERAGED_ETF and o.side == "BUY" and o.filled_qty > 0
+        ),
         default=None,
     )
     if first is None:
@@ -574,7 +578,7 @@ def _deneb_brake(
     settled = last_settled_day(day.at)
     closes = [
         (d, float(px))
-        for d, px in day.reader.daily_closes(LEV, 40)
+        for d, px in day.reader.daily_closes(LEVERAGED_ETF, 40)
         if d < day.today and d <= settled
     ]
     for d, px in closes:
@@ -598,10 +602,10 @@ def _deneb_brake(
         why = "TOSS_TRADING_ENABLED 꺼짐" if not enabled else f"정지: {halted}"
         return alerts, [*report, f"브레이크 주문 안 함 — {why}"]
     prev = b.stage
-    n = brake_sell(b, dd, deneb.qty.get(LEV, 0.0))
+    n = brake_sell(b, dd, deneb.qty.get(LEVERAGED_ETF, 0.0))
     if n > 0:
         o, line = _deneb_send(
-            day, trader, deneb, "SELL", n, limit_price(day.prices[LEV], "SELL"), "brake"
+            day, trader, deneb, "SELL", n, limit_price(day.prices[LEVERAGED_ETF], "SELL"), "brake"
         )
         if o.status == "REJECTED":
             b.stage, o.booked = prev, True
@@ -617,7 +621,7 @@ def _deneb_brake(
         except AutoTradingError as exc:
             alerts.append(f"⚠ Deneb 브레이크 추세 확인 실패: {exc}")
         if rebuy_due(b, on):
-            limit = limit_price(day.prices[LEV], "BUY")
+            limit = limit_price(day.prices[LEVERAGED_ETF], "BUY")
             qty = math.floor(b.reserve_usd / (limit * (1 + day.fee)))
             if qty >= 1:
                 o, line = _deneb_send(day, trader, deneb, "BUY", qty, limit, "rebuy")
@@ -677,7 +681,7 @@ def _deneb_plan(
         notes.append("이번 달 납입 0원(텔레그램 답) — 이월 현금 · 배당만으로")
     last = {s: day.prices[s] for s in DENEB_SYMBOLS}
     qty, cash = _deneb_today(day, deneb)
-    return choose(qty, cash, last, share, day.fee, _deneb_gold()), vol, share, notes
+    return plan_monthly_rebalance(qty, cash, last, share, day.fee, _deneb_gold()), vol, share, notes
 
 
 def _deneb_fill(
@@ -694,8 +698,14 @@ def _deneb_fill(
     _, share = _deneb_share(day, deneb)
     qty, cash = _deneb_today(day, deneb)
     last = {s: day.prices[s] for s in DENEB_SYMBOLS}
-    plan = fill(
-        qty, cash, last, share, day.fee, {LEV: MAX_TQQQ_QTY, **DENEB_MAX_QTY}, _deneb_gold()
+    plan = plan_next_day_fill(
+        qty,
+        cash,
+        last,
+        share,
+        day.fee,
+        {LEVERAGED_ETF: MAX_TQQQ_QTY, **DENEB_MAX_QTY},
+        _deneb_gold(),
     )
     lines: list[str] = []
     for sym, n in sorted(plan.items()):
@@ -974,8 +984,8 @@ def _deneb_run(
     else:
         deneb.done_month = day.today[:7]
     lines.append(
-        f"전략 현금 ${deneb.cash_usd:,.2f} (체결 뒤 정산) · 보유 TQQQ {deneb.qty.get(LEV, 0):g}"
-        f" · SCHD {deneb.qty.get(DIV, 0):g} · IAUM {deneb.qty.get(GOLD, 0):g}"
+        f"전략 현금 ${deneb.cash_usd:,.2f} (체결 뒤 정산) · 보유 TQQQ {deneb.qty.get(LEVERAGED_ETF, 0):g}"
+        f" · SCHD {deneb.qty.get(DIVIDEND_ETF, 0):g} · IAUM {deneb.qty.get(GOLD_ETF, 0):g}"
     )
     _save_deneb(deneb)
     return [head, *notes, *lines, *alerts]
@@ -1105,7 +1115,7 @@ def _new_harvest(
             f"세금 없이 더 실현할 수 있는 이익 {room:,.0f}원 · Deneb 보유에 이익 난 종목이 없음"
         )
         return Proposal(
-            f"h{year}", "harvest", today, deadline, LEV, 0, {"text": text}, "expired"
+            f"h{year}", "harvest", today, deadline, LEVERAGED_ETF, 0, {"text": text}, "expired"
         ), text
     sym, n, gain = pick
     text = harvest_message(year=year, room_krw=room, picks=[pick], deadline=deadline)
@@ -1136,8 +1146,10 @@ def _new_div_step(
         return None, None
     cap = deneb.lev_cap
     new_cap = max(cap - STEP_CUT, 0.0)
-    buy_sym = _step_buy_symbol(deneb, prices, new_cap) if gold else DIV
-    sell, buy = shift_plan(deneb.qty.get(LEV, 0.0), prices[LEV], prices[buy_sym], total, new_cap)
+    buy_sym = _step_buy_symbol(deneb, prices, new_cap) if gold else DIVIDEND_ETF
+    sell, buy = shift_plan(
+        deneb.qty.get(LEVERAGED_ETF, 0.0), prices[LEVERAGED_ETF], prices[buy_sym], total, new_cap
+    )
     steps = ACCOUNT_STEPS_KRW if account is not None else DIV_STEPS_KRW
     step_krw = steps[k]
     if sell < 1:
@@ -1152,14 +1164,14 @@ def _new_div_step(
             f"TQQQ 비중이 이미 낮아 팔 것이 없어요. 앞으로 TQQQ 목표를 {new_cap:.0%}로 낮춰 둘게요."
         )
     since = (datetime.fromisoformat(today) - timedelta(days=365)).date().isoformat()
-    dps = sum(a for ex, sym, a in events if sym == DIV and ex >= since)
+    dps = sum(a for ex, sym, a in events if sym == DIVIDEND_ETF and ex >= since)
     text = div_step_message(
         monthly_krw=monthly,
         step_krw=step_krw,
         cap=cap,
         new_cap=new_cap,
         sell=sell,
-        lev_px=prices[LEV],
+        lev_px=prices[LEVERAGED_ETF],
         buy=buy,
         fx=fx_rate,
         added_krw=added_monthly_krw(buy, dps, fx_rate),
@@ -1176,21 +1188,21 @@ def _new_div_step(
         "new_cap": new_cap,
         "step": k,
         "next_step_krw": nxt,
-        "lev_px": prices[LEV],
-        "div_px": prices[DIV],
+        "lev_px": prices[LEVERAGED_ETF],
+        "div_px": prices[DIVIDEND_ETF],
     }
-    return Proposal(f"d{k}-{today}", "div_step", today, deadline, LEV, sell, plan), text
+    return Proposal(f"d{k}-{today}", "div_step", today, deadline, LEVERAGED_ETF, sell, plan), text
 
 
 def _step_buy_symbol(deneb: DenebState, prices: Mapping[str, float], cap: float) -> str:
     """금 섞기 켜짐: 단계 매도 돈으로 살 종목 — SCHD · IAUM 중 새 목표보다 더 모자란 쪽.
 
     나머지 차이는 매달 맞추기 · 다음 날 채우기가 새 돈으로 메운다(팔지 않고)."""
-    syms = (LEV, DIV, GOLD)
+    syms = (LEVERAGED_ETF, DIVIDEND_ETF, GOLD_ETF)
     total = deneb.cash_usd + sum(deneb.qty.get(s, 0.0) * prices[s] for s in syms)
     tgt = targets(total, cap, GOLD_MIX)
-    gap = {s: tgt[s] - deneb.qty.get(s, 0.0) * prices[s] for s in (DIV, GOLD)}
-    return GOLD if gap[GOLD] > gap[DIV] else DIV
+    gap = {s: tgt[s] - deneb.qty.get(s, 0.0) * prices[s] for s in (DIVIDEND_ETF, GOLD_ETF)}
+    return GOLD_ETF if gap[GOLD_ETF] > gap[DIVIDEND_ETF] else DIVIDEND_ETF
 
 
 def _deneb_morning(now: datetime, telegram: bool) -> None:
@@ -1321,7 +1333,11 @@ def _deneb_actions(
             if x.kind == "harvest":
                 sym, n = x.symbol, math.floor(sold_o.filled_qty)
             else:
-                sym = _step_buy_symbol(deneb, day.prices, deneb.lev_cap) if _deneb_gold() else DIV
+                sym = (
+                    _step_buy_symbol(deneb, day.prices, deneb.lev_cap)
+                    if _deneb_gold()
+                    else DIVIDEND_ETF
+                )
                 net = min(sold_o.filled_usd - sold_o.commission, deneb.cash_usd)
                 n = math.floor(net / (limit_price(day.prices[sym], "BUY") * (1 + day.fee)))
             if n < 1:
@@ -1393,7 +1409,9 @@ class Day:
         self.holdings: dict[str, TossPosition] = reader.holdings()
         self.prices = {
             k: float(v)
-            for k, v in reader.prices([p.symbol for p in _plans()] + [TQQQ, DIV, GOLD]).items()
+            for k, v in reader.prices(
+                [p.symbol for p in _plans()] + [TQQQ, DIVIDEND_ETF, GOLD_ETF]
+            ).items()
         }
         self.fx = float(reader.usd_krw())
         fee = reader.us_commission()
@@ -1918,8 +1936,8 @@ def status() -> int:
         deneb = _load_deneb()
         print(
             f"Deneb(M3): 시작 {deneb.start} · 이번 달 끝 {deneb.done_month or '아직'}"
-            f" · 전략 현금 ${deneb.cash_usd:,.2f} · TQQQ {deneb.qty.get(LEV, 0):g}"
-            f" · SCHD {deneb.qty.get(DIV, 0):g} · IAUM {deneb.qty.get(GOLD, 0):g}"
+            f" · 전략 현금 ${deneb.cash_usd:,.2f} · TQQQ {deneb.qty.get(LEVERAGED_ETF, 0):g}"
+            f" · SCHD {deneb.qty.get(DIVIDEND_ETF, 0):g} · IAUM {deneb.qty.get(GOLD_ETF, 0):g}"
             f" · 금 섞기 {'켜짐' if _deneb_gold() else '꺼짐'} · 월 {_deneb_monthly():,.0f}원"
         )
         b = _brake_of(deneb)

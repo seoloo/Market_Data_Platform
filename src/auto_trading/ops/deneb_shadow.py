@@ -1,7 +1,7 @@
 """🌟 Deneb 그림자 기록 (문서 280) — 실거래 Deneb 규칙을 정지와 상관없이 매일 따라 한다. 주문 없음.
 
 실거래 ``scripts/toss_accumulate.py`` 의 Deneb 판단과 **같은 순수 함수**를 쓴다:
-월 비율(``deneb_live.lev_share`` · ``choose``) · T 브레이크
+월 비율(``deneb_live.lev_share`` · ``plan_monthly_rebalance``) · T 브레이크
 (``deneb_guard.brake_sell`` · ``rebuy_due``) · 배당 재투자(``credit_dividends``).
 주문 대신 실거래와 같은 장 마감 지정가(LOC)를 그날 종가로 체결한 것으로 본다
 — 지정가(전날 종가 ±3%) 밖이면 미체결.
@@ -27,21 +27,21 @@ from auto_trading.ops.deneb_guard import (
     sold,
 )
 from auto_trading.ops.deneb_live import (
-    DIV,
-    LEV,
+    DIVIDEND_ETF,
+    LEVERAGED_ETF,
     DenebOrder,
     DenebState,
     apply_fill,
-    choose,
     credit_dividends,
     deposit,
     due,
     lev_share,
     limit_price,
+    plan_monthly_rebalance,
 )
 from auto_trading.ops.mf_paper import LEV_MAX
 
-SYMBOLS = (LEV, DIV)
+SYMBOLS = (LEVERAGED_ETF, DIVIDEND_ETF)
 """그림자는 금 없이 두 종목."""
 Closes = Mapping[str, Sequence[tuple[str, float]]]
 """종목 → (미국 날짜, 수정 종가) 오래된 것 먼저."""
@@ -99,14 +99,14 @@ def step(
 ) -> list[str]:
     """미국 거래일 ``day`` 하루 (그날 종가가 있어야 함). 실거래 21:00 판단 → 그날 LOC 체결 순서."""
     lines: list[str] = []
-    lev_close, prev = _close_on(closes, LEV, day), _prev_close(closes, LEV, day)
+    lev_close, prev = _close_on(closes, LEVERAGED_ETF, day), _prev_close(closes, LEVERAGED_ETF, day)
     if lev_close is None or prev is None:
         return [f"{day} TQQQ 종가 없음 — 건너뜀"]
     # 1) T 브레이크 (TQQQ 를 산 뒤부터)
-    first = min((o.date for o in state.orders if o.symbol == LEV and o.side == "BUY"
+    first = min((o.date for o in state.orders if o.symbol == LEVERAGED_ETF and o.side == "BUY"
                  and o.filled_qty > 0), default=None)  # fmt: skip
     if first is not None:
-        for d, px in closes[LEV]:
+        for d, px in closes[LEVERAGED_ETF]:
             if (
                 d < day
                 and d >= max(first, brake.last_day)
@@ -116,12 +116,12 @@ def step(
                 brake.last_day = d
         dd = drawdown(brake, prev[1])
         stage_before = brake.stage
-        n = brake_sell(brake, dd, state.qty.get(LEV, 0.0))
+        n = brake_sell(brake, dd, state.qty.get(LEVERAGED_ETF, 0.0))
         if n > 0:
-            o = _fill(state, day, LEV, "SELL", n, limit_price(prev[1], "SELL"), lev_close, fee,
-                      "brake")  # fmt: skip
+            o = _fill(state, day, LEVERAGED_ETF, "SELL", n, limit_price(prev[1], "SELL"),
+                      lev_close, fee, "brake")  # fmt: skip
             if o.status == "FILLED":
-                state.qty[LEV] = state.qty.get(LEV, 0.0) - n
+                state.qty[LEVERAGED_ETF] = state.qty.get(LEVERAGED_ETF, 0.0) - n
                 sold(brake, day, dd or 0.0, n, o.filled_usd - o.commission)
                 lines.append(f"🛑 브레이크 −{(dd or 0):.1%} → TQQQ {n}주 매도 ${o.filled_usd:,.2f}")
             else:
@@ -133,9 +133,9 @@ def step(
                 limit = limit_price(prev[1], "BUY")
                 q = math.floor(brake.reserve_usd / (limit * (1 + fee)))
                 if q >= 1:
-                    o = _fill(state, day, LEV, "BUY", q, limit, lev_close, fee, "rebuy")
+                    o = _fill(state, day, LEVERAGED_ETF, "BUY", q, limit, lev_close, fee, "rebuy")
                     if o.status == "FILLED":
-                        state.qty[LEV] = state.qty.get(LEV, 0.0) + q
+                        state.qty[LEVERAGED_ETF] = state.qty.get(LEVERAGED_ETF, 0.0) + q
                         state.cash_usd += brake.reserve_usd - o.filled_usd - o.commission
                         rebought(brake, day, 0.0, lev_close)
                         lines.append(f"↩ 추세 회복 → TQQQ {q}주 되삼 ${o.filled_usd:,.2f}")
@@ -155,7 +155,7 @@ def step(
         last = {s: _prev_close(closes, s, day) for s in SYMBOLS}
         if all(v is not None for v in last.values()):
             last_px = {s: v[1] for s, v in last.items() if v is not None}
-            plan = choose(dict(state.qty), state.cash_usd, last_px, share, fee)
+            plan = plan_monthly_rebalance(dict(state.qty), state.cash_usd, last_px, share, fee)
             for sym, n in sorted(plan.items(), key=lambda kv: kv[1]):  # 파는 것 먼저
                 side = "BUY" if n > 0 else "SELL"
                 close = _close_on(closes, sym, day)
@@ -179,4 +179,4 @@ def step(
 
 
 def holdings(state: DenebState) -> dict[str, float]:
-    return {s: state.qty.get(s, 0.0) for s in (LEV, DIV)}
+    return {s: state.qty.get(s, 0.0) for s in (LEVERAGED_ETF, DIVIDEND_ETF)}
