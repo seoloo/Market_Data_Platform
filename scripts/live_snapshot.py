@@ -20,7 +20,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from auto_trading.app import live_accounts
 from auto_trading.ui.live_home import HISTORY, build_books, fetch_quotes, load_history, needed
+
+# 현황을 그 순간 실제 계좌로 맞출 조회 창구 (ui 는 거래소를 직접 부르지 않는다, 2026-10-21)
+live_accounts.install()
 
 REPO = Path(__file__).resolve().parent.parent
 _KST = timedelta(hours=9)

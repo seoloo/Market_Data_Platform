@@ -24,10 +24,14 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from auto_trading.app import live_accounts
 from auto_trading.ui.data import load_dashboard
 from auto_trading.ui.orbit_icons import ICON_ASSETS, ICON_NOTICES
 from auto_trading.ui.render import ASSET_DIR, PAGES, render_page
 from auto_trading.ui.server import make_server
+
+# 현황을 그 순간 실제 계좌로 맞출 조회 창구 (ui 는 거래소를 직접 부르지 않는다, 2026-10-21)
+live_accounts.install()
 
 for _stream in (sys.stdout, sys.stderr):
     _reconfigure = getattr(_stream, "reconfigure", None)

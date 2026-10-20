@@ -899,9 +899,11 @@ def build_books(root: Path, q: Quotes, *, sync: bool = True) -> list[Book]:
     s = live_sync.load(root, deneb, plans) if sync else None
     sync_note = tuple(f"⚠ {n}" for n in (s.notes if s else []))
     if s is not None and deneb:
-        deneb = live_sync.apply_deneb(deneb, s.toss)
+        deneb = live_sync.sync_deneb_ledger_to_toss(deneb, s.toss)
     if s is not None:
-        plans = [live_sync.apply_plan(p, s.toss, q.fx, s.toss_qty) for p in plans]
+        plans = [
+            live_sync.sync_accumulate_ledger_to_toss(p, s.toss, q.fx, s.toss_qty) for p in plans
+        ]
     if deneb:
         book = deneb_book(deneb, q)
         halt = root / "data" / "HALT_deneb"
@@ -915,7 +917,7 @@ def build_books(root: Path, q: Quotes, *, sync: bool = True) -> list[Book]:
     if vega and not binance:
         synced = s is not None and s.upbit is not None
         if synced and s is not None and s.upbit is not None:
-            vega = live_sync.apply_vega(vega, s.upbit)
+            vega = live_sync.sync_vega_ledger_to_upbit(vega, s.upbit)
         book = vega_book(vega, q)
         if synced:
             book = replace(book, notes=(*book.notes, "업비트 실제 잔고 · 평균가 기준"))

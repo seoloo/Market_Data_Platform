@@ -18,11 +18,15 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from auto_trading.app import live_accounts
 from auto_trading.config.secrets import load_telegram_credentials
 from auto_trading.notify.channels import NotifyError, TelegramNotifier
 from auto_trading.ops import user_settings
 from auto_trading.ops.fire import Snapshot, monthly_rate, report_text
 from auto_trading.ui.live_home import build_books, fetch_quotes, needed
+
+# 현황을 그 순간 실제 계좌로 맞출 조회 창구 (ui 는 거래소를 직접 부르지 않는다, 2026-10-21)
+live_accounts.install()
 
 REPO = Path(__file__).resolve().parent.parent
 

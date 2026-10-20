@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from auto_trading.ui import live_sync
 from auto_trading.ui.live_home import Quotes, build_books, vega_book
@@ -12,7 +15,7 @@ from auto_trading.ui.live_home import Quotes, build_books, vega_book
 def test_apply_vega_uses_upbit_balance_and_avg_price() -> None:
     st = {"expected": {"KRW": "296482", "BTC": "0"}, "orders": [], "deposits": [["d", "471507"]]}
     up = {"KRW": (300_458.0, 0.0), "BTC": (0.00063573, 110_076_000.0), "ETH": (0.0178, 3_234_000.0)}
-    out = live_sync.apply_vega(st, up)
+    out = live_sync.sync_vega_ledger_to_upbit(st, up)
     assert out["expected"]["KRW"] == "300458.0" and float(out["expected"]["BTC"]) == 0.00063573
     assert abs(out["live_costs"]["BTC"] - 0.00063573 * 110_076_000.0) < 1e-6
     assert st["expected"]["KRW"] == "296482"  # 원래 장부는 그대로
@@ -46,7 +49,7 @@ def test_apply_deneb_fills_cash_qty_and_reserve() -> None:
         "c": {"status": "FILLED", "filled_qty": 1, "filled_amount": 70.0, "commission": 0.05},
         "d": {"status": "PENDING", "filled_qty": 0, "filled_amount": 0, "commission": 0},
     }
-    out = live_sync.apply_deneb(_deneb(), toss)
+    out = live_sync.sync_deneb_ledger_to_toss(_deneb(), toss)
     assert out["qty"] == {"TQQQ": 1.0, "SCHD": 0.0}  # +2 매수 −1 브레이크 매도
     assert abs(out["cash_usd"] - (220.39 - 141.1)) < 1e-9
     assert abs(out["brake"]["reserve_usd"] - (10.0 + 70.0 - 0.05)) < 1e-9
@@ -60,16 +63,21 @@ def test_apply_plan_adds_buy_and_qty() -> None:
         "orders": [{"date": "2026-10-19", "status": "SENT", "code": "z", "message": "BUY"}],
     }  # fmt: skip
     toss = {"z": {"status": "FILLED", "filled_qty": 1, "filled_amount": 2.3, "commission": 0.01}}
-    out = live_sync.apply_plan(st, toss, 1333.0)
+    out = live_sync.sync_accumulate_ledger_to_toss(st, toss, 1333.0)
     assert out["last_qty"] == 6.0 and out["buys"][-1]["cost_usd"] == 2.3
     assert out["orders"][0]["status"] == "FILLED" and st["last_qty"] == 5.0
-    assert live_sync.apply_plan({**st, "currency": "KRW"}, toss, 1333.0)["last_qty"] == 5.0
+    assert (
+        live_sync.sync_accumulate_ledger_to_toss({**st, "currency": "KRW"}, toss, 1333.0)[
+            "last_qty"
+        ]
+        == 5.0
+    )
 
 
 def test_sent_ids_newest_first_and_capped() -> None:
     deneb = {"orders": [{"status": "SENT", "order_id": f"o{i}", "date": f"2026-10-{i:02d}"}
                         for i in range(1, 30)]}  # fmt: skip
-    ids = live_sync.sent_ids(deneb, [])
+    ids = live_sync.pending_toss_order_ids(deneb, [])
     assert len(ids) == live_sync.MAX_ORDERS and ids[0] == "o29"
 
 
@@ -112,6 +120,41 @@ def test_accumulate_excludes_liquidated_symbols() -> None:
 
 def test_live_holdings_override_ledger_qty() -> None:
     st = _acc("BTQ", 5.0, [(5.0, 10.0)])
-    assert live_sync.apply_plan(st, {}, 1400.0, {"BTQ": 0.0})["last_qty"] == 0.0
-    assert live_sync.apply_plan(st, {}, 1400.0, {})["last_qty"] == 0.0  # 계좌에 없으면 0
-    assert live_sync.apply_plan(st, {}, 1400.0, None)["last_qty"] == 5.0  # 조회 안 함 → 장부
+    assert live_sync.sync_accumulate_ledger_to_toss(st, {}, 1400.0, {"BTQ": 0.0})["last_qty"] == 0.0
+    assert (
+        live_sync.sync_accumulate_ledger_to_toss(st, {}, 1400.0, {})["last_qty"] == 0.0
+    )  # 계좌에 없으면 0
+    assert (
+        live_sync.sync_accumulate_ledger_to_toss(st, {}, 1400.0, None)["last_qty"] == 5.0
+    )  # 조회 안 함 → 장부
+
+
+def test_load_uses_installed_reader_and_caches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """조회는 넣어 준 창구로만 (ui 는 거래소를 직접 부르지 않는다, 2026-10-21) · 60 초 저장."""
+    (tmp_path / ".env").write_text("UPBIT_API_KEY=k\n", encoding="utf-8")
+    calls: list[tuple[list[str], bool]] = []
+
+    def reader(root: Path, env: Any, ids: Any, want: bool) -> live_sync.LiveAccountSnapshot:
+        calls.append((list(ids), want))
+        return live_sync.LiveAccountSnapshot(upbit={"KRW": (1.0, 0.0)})
+
+    monkeypatch.setattr(live_sync, "_account_reader", None)
+    monkeypatch.setattr(live_sync, "_CACHE", {})
+    assert live_sync.load(tmp_path, None, []) is None  # 창구가 없으면 장부 그대로
+    live_sync.install_account_reader(reader)
+    plans = [{"symbol": "BTQ", "orders": [{"status": "SENT", "code": "c1", "date": "d"}]}]
+    first = live_sync.load(tmp_path, None, plans)
+    assert first is not None and first.upbit == {"KRW": (1.0, 0.0)} and first.at > 0
+    assert live_sync.load(tmp_path, None, plans) is first and calls == [(["c1"], True)]
+
+
+def test_status_entrypoints_install_the_reader() -> None:
+    """현황을 보여 주는 실행기는 시작할 때 조회 창구를 넣는다."""
+    import importlib
+
+    for name in ("scripts.telegram_bot", "scripts.fire_report", "scripts.live_snapshot"):
+        live_sync.install_account_reader(None)
+        importlib.reload(importlib.import_module(name))
+        assert live_sync._account_reader is not None, name
