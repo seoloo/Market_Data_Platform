@@ -434,6 +434,7 @@ Phase 0 자료 감사·정보 도구 기능 검증이지 Phase 4 PASS·새 OOS·
 - 자동 적립 카드 (같은 날 사용자 "정리한 종목이 있다면 그 종목에 대한 수익과 수익률은 빼줘"): 토스 실제 보유 수량으로
   맞춘 뒤, 적립으로 산 수량보다 적게 들고 있으면 판 몫의 원가 · 손익을 이동평균으로 빼고(다 팔면 카드에서 빠짐,
   국내 적립도 같게), '정리한 종목 … — 판 몫의 원가 · 수익은 뺌' 안내.
+- 10-20 밤 (사용자 "옛 바이낸스용 예약을 꺼줘 · polaris 같은 경우 paper만"): 예약 `AutoTrading_Weekly_Summary`(옛 바이낸스 Vega · Altair · Polaris 주간 요약) 꺼짐 — Vega 주간 요약은 `AutoTrading_Vega_Weekly`. 설정 `polaris.on` 꺼짐, 🧭 Polaris Paper(`scripts/polaris_paper.py`, 가짜 돈) 시작.
 - 10-20 보완 (사용자 '보완부분 변경해줘 · polaris는 아직'): `.env` 바이낸스 주문 스위치 두 개(`BINANCE_LIVE_TRADING_ENABLED` ·
   `BINANCE_FUTURES_LIVE_TRADING_ENABLED`) 끔 — 10-19 정리 때 빠뜨림. 위험 뉴스 거래소 감시 바이낸스 → 업비트.
   업비트 Vega 주간 요약 새 예약 `AutoTrading_Vega_Weekly`(토 09:30, `vega_upbit weekly`, 일반 권한 — 옛
