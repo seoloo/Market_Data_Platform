@@ -7,8 +7,11 @@
 
 * 종목마다 시작일부터 **달력으로 매일 정해진 금액**이 가상으로 쌓인다
   (QNDX 1 만 원·월 30 만 원 · BTQ 1 달러·월 31 달러, :data:`PLANS`).
-* 쌓인 금액 ≥ 1 주 가격(+ 수수료)이면 "오늘 1 주 살 차례".
-  자동 매수가 켜져 있으면 그날 밤 **예약 매수 1 주**(:func:`should_order`), 아니면 알림만.
+* 쌓인 금액 ≥ 1 주 가격(+ 수수료)이면 "오늘 살 차례" — **쌓인 금액으로 살 수 있는 만큼(정수 주)**
+  산다(사용자 2026-10-21 "그 금액만큼 적립해야지" — 그 전엔 하루 1 주로 고정돼 있어, 하루 금액을
+  1 주 값보다 크게 올리면 돈이 쌓이기만 했다). 지정가 주문은 정수 주만 되니 남는 돈은 다음 날로
+  이어진다. 월 한도 · :data:`MAX_ORDER_QTY` 를 넘지 않는다.
+  자동 매수가 켜져 있으면 그날 밤 **예약 매수**(:func:`should_order`), 아니면 알림만.
 * 체결은 다음 실행에서 잔고 수량이 늘어난 것으로 확인하고 실제 매입 금액만큼 적립금에서 뺀다.
   예약주문은 당일만 유효하므로, 다음 날까지 수량이 늘지 않았으면 그 주문은 만료로 본다.
   시작할 때 이미 가진 수량은 적립에 넣지 않는다(기준 수량).
@@ -25,6 +28,7 @@ from auto_trading.notify.style import SUB, sub
 
 __all__ = [
     "FEE",
+    "MAX_ORDER_QTY",
     "ORDER_WINDOW",
     "PLANS",
     "Advice",
@@ -45,6 +49,9 @@ FEE = 0.0025
 LIMIT_BUFFER = 0.03
 """지정가 = 현재가 × (1 + 3%) — 장 시작 때 체결되게 여유를 둔다(매수 지정가가 시장가보다 높으면
 실제 체결은 시장 가격). 밤사이 3% 넘게 오르면 체결되지 않고 다음 날 다시 한다."""
+MAX_ORDER_QTY = 50
+"""적립 주문 한 건 수량 상한 — 토스 주문 창구(``exchange/toss.py``)의 마지막 문과 같은 값.
+[이유] 설정 실수 · 계산 버그로 큰 수량이 나가지 않게. 넘는 만큼은 다음 날로 이어진다."""
 OPEN_ORDER = frozenset({"SENT", "UNKNOWN"})
 """체결·만료가 아직 확인되지 않은 주문 상태."""
 ORDER_WINDOW = ("10:00", "22:20")
@@ -190,6 +197,9 @@ class Advice:
     """KST 토·일 밤 — 미국 장이 열리지 않는다."""
     bought_qty: float
     """시작 뒤 적립으로 산 수량 합."""
+    qty: int = 0
+    """오늘 살 주수 — 쌓인 금액 ÷ 1 주 가격(+ 수수료)의 정수 부분, 월 한도 · :data:`MAX_ORDER_QTY`
+    안에서 (BUY 일 때만 1 이상)."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -267,7 +277,8 @@ def should_order(
     kst_hhmm: str | None = None,
 ) -> tuple[bool, str]:
     """[쓰임] (오늘 자동 매수를 낼까, 이유).
-    [이유] 하루 1 건, 확인 안 된 주문이 있으면 내지 않는다 — 같은 1 주를 두 번 사지 않게.
+    [이유] 하루 1 건(수량은 :attr:`Advice.qty`), 확인 안 된 주문이 있으면 내지 않는다
+           — 같은 적립금으로 두 번 사지 않게.
 
     ``kst_hhmm`` (지금 KST "HH:MM") 을 주면 :data:`ORDER_WINDOW` 밖에서는 내지 않는다.
     (안내 문구의 ``KIS_TRADING_ENABLED`` 는 한국투자 때 이름 — 문구는 바꾸지 않았다.)"""
@@ -295,7 +306,7 @@ def should_order(
         return False, "오늘은 이미 주문했다"
     if any(order.status in OPEN_ORDER for order in state.orders):
         return False, "확인되지 않은 주문이 있다 — 다음 날 잔고로 확인한 뒤"
-    return True, "예약 매수 1주"
+    return True, f"예약 매수 {advice.qty}주"
 
 
 def advise(
@@ -310,8 +321,8 @@ def advise(
     paused: bool = False,
     fee: float = FEE,
 ) -> Advice:
-    """[쓰임] 오늘 판단 — 쌓인 적립금(쓴 돈 뺌)이 1 주 값(+ 수수료)이면 BUY, 월 한도면 CAP,
-    QS 멈춤이면 PAUSE, 아니면 WAIT.
+    """[쓰임] 오늘 판단 — 쌓인 적립금(쓴 돈 뺌)이 1 주 값(+ 수수료) 이상이면 BUY(살 수 있는 만큼
+    ``qty`` 주), 월 한도면 CAP, QS 멈춤이면 PAUSE, 아니면 WAIT.
 
     ``weekday`` 는 KST 오늘의 요일 (월 0 … 일 6).
     문서 118 QS: ``extra_spent`` = TQQQ 에 쓴 돈 − TQQQ 에서 돌아온 돈 (적립금에서 더 뺀다,
@@ -328,6 +339,11 @@ def advise(
         status = "BUY"
     else:
         status = "WAIT"
+    qty = 0
+    if status == "BUY":
+        affordable = math.floor(accrued / price + 1e-9)
+        cap_room = math.floor((plan.monthly_cap - month_spent) / price + 1e-9)
+        qty = max(1, min(affordable, cap_room, MAX_ORDER_QTY))
     short = max(price - accrued, 0.0)
     return Advice(
         symbol=plan.symbol,
@@ -344,6 +360,7 @@ def advise(
         monthly_cap=plan.monthly_cap,
         weekend=weekday >= 5,
         bought_qty=sum(buy.qty for buy in state.buys),
+        qty=qty,
     )
 
 
@@ -353,7 +370,7 @@ def message(advice: Advice, notes: list[str], *, order_line: str | None = None) 
     ``order_line`` 이 있으면 자동 매수 결과 줄, 없으면 앱에서 직접 사는 안내."""
     currency = advice.currency
     head = {
-        "BUY": f"🟢 {advice.symbol}  오늘 1주 살 차례",
+        "BUY": f"🟢 {advice.symbol}  오늘 {advice.qty}주 살 차례",
         "WAIT": f"⏳ {advice.symbol}  적립 중 · 약 {advice.days_to_go}일 뒤 1주",
         "CAP": (
             f"⏸ {advice.symbol}  이번 달 한도({money(advice.monthly_cap, currency)}) · 다음 달에"
@@ -376,7 +393,7 @@ def message(advice: Advice, notes: list[str], *, order_line: str | None = None) 
         else:
             if advice.weekend:
                 lines.append(f"{SUB}주말이라 오늘 밤 미국 장이 없다 — 월요일 밤에 사면 된다")
-            lines.append(f"{SUB}📱 앱: 해외주식 → {advice.symbol} → 매수 1주")
+            lines.append(f"{SUB}📱 앱: 해외주식 → {advice.symbol} → 매수 {advice.qty}주")
             lines.append(sub(f"지정가 {advice.limit_usd:.2f} USD 이하 (장 전이면 예약주문)"))
     lines += [SUB + note for note in notes]
     return "\n".join(lines)

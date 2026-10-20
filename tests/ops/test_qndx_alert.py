@@ -343,3 +343,28 @@ def test_plan_rate_change_keeps_accrued() -> None:
     assert p.accrual("2026-10-04", "2026-10-09") == 24.0
     assert p.accrual("2026-10-04", "2026-10-12") == 27.0
     assert p.rate_on("2026-10-09") == 4.0 and p.rate_on("2026-10-10") == 1.0
+
+
+def test_buys_as_many_shares_as_the_accrued_money_covers() -> None:
+    """사용자 2026-10-21 "그 금액만큼 적립해야지" — BTQ 하루 $1 → $3 (10-21 부터), 1 주 약 $2.26.
+
+    예전에는 하루 1 주로 고정돼 쌓인 $5.13 중 1 주만 샀다. 이제 살 수 있는 만큼(정수 주)."""
+    from dataclasses import replace
+
+    from auto_trading.ops.qndx_alert import Buy
+
+    plan = replace(BTQ, changes=(("2026-10-21", 3.0),), monthly_cap=93.0)
+    s = _state("BTQ")
+    s.start_date = "2026-10-04"
+    s.buys.append(Buy("2026-10-20", 6.0, 14.87, 1_330.0, 14.87))
+    a = advise(s, plan, "2026-10-21", 2.26, FX, weekday=2, fee=0.001)
+    assert round(a.accrued, 2) == 5.13  # 10-04 ~ 10-20 $1 × 17 + 10-21 $3 − 쓴 돈 14.87
+    assert a.status == "BUY" and a.qty == 2  # 5.13 ÷ 2.2623 = 2.27 → 2 주 (남는 돈은 이어짐)
+    assert should_order(s, a, trading_enabled=True, halted=None) == (True, "예약 매수 2주")
+    assert "오늘 2주 살 차례" in message(a, [])
+    # 월 한도 안에서만 — 이번 달 $28 를 썼으면 한도 $31 에 1 주만 더
+    s.buys.append(Buy("2026-10-21", 6.0, 13.13, 1_330.0, 13.13))  # 이번 달 합 $28
+    capped = advise(
+        s, replace(plan, monthly_cap=31.0), "2026-10-31", 2.26, FX, weekday=4, fee=0.001
+    )
+    assert capped.status == "BUY" and capped.qty == 1

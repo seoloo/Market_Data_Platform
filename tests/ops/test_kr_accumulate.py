@@ -59,3 +59,12 @@ def test_find() -> None:
     assert [x.symbol for x in find("005935", u, "KR")] == ["005935"]
     assert [x.symbol for x in find("nvda", u, "US")] == ["NVDA"]
     assert len(find("삼성", u, "KR")) == 2 and find("NVDA", u, "KR") == []
+
+
+def test_buys_as_many_shares_as_the_accrued_money_covers() -> None:
+    """사용자 2026-10-21 "그 금액만큼 적립해야지" — 쌓인 돈으로 살 수 있는 만큼(정수 주)."""
+    st = KrState("069500", "KODEX 200", True, "2026-10-10")
+    adv = advise(st, [("2026-10-11", 30_000.0)], "2026-10-12", 25_000)  # 2 일 60,000원
+    assert adv.status == "BUY" and adv.qty == 2  # 1 주 25,163원(지정가 + 비용 여유) → 2 주
+    one = advise(st, [("2026-10-11", 10_000.0)], "2026-10-13", 25_000)  # 30,000원
+    assert one.status == "BUY" and one.qty == 1

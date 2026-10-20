@@ -3,8 +3,9 @@
 언제 쓰나: 평일 12:10 ``AutoTrading_Toss_KR`` (``scripts/toss_kr.py``) · 설정 화면 '종목 추가'.
 읽고 쓰는 것: 계산만 — :func:`read_universe` 만 종목 목록 ``data/toss/universe.json`` 을 읽는다.
 
-* 하루 금액(원)이 달력 날마다 쌓이고, 쌓인 돈이 1 주 값(+ 비용)이 되면 1 주를 산다.
-  미국 적립과 같은 셈.
+* 하루 금액(원)이 달력 날마다 쌓이고, 쌓인 돈이 1 주 값(+ 비용)이 되면 **살 수 있는 만큼(정수 주)**
+  산다 — 미국 적립과 같은 셈(사용자 2026-10-21 "그 금액만큼 적립해야지", 그 전엔 하루 1 주 고정).
+  남는 돈은 다음 날로 이어지고, 한 번에 :data:`MAX_ORDER_QTY` 주까지.
 * 토스 API 는 국내 장 마감 지정가(CLS)가 없다 → **평일 낮 당일(DAY) 지정가**, 현재가 +0.5% 를
   호가 단위로 올림(바로 체결될 만큼 — 2026-10-05 당시 사용자 규칙 '시장가 금지',
   규칙은 10-18 에 지워졌지만 이 코드는 그대로).
@@ -21,6 +22,8 @@ from typing import Any
 
 BUFFER = 0.005
 """지정가 = 현재가 × (1 + 0.5%) 를 호가 단위로 올림."""
+MAX_ORDER_QTY = 50
+"""국내 적립 주문 한 건 수량 상한 — 토스 주문 창구의 마지막 문과 같은 값 (넘는 만큼은 다음 날로)."""
 COST = 0.0015
 """수수료 · 세금 여유 (매수는 세금 없음, 토스 수수료 약 0.015% 보다 넉넉히)."""
 
@@ -149,12 +152,15 @@ class KrAdvice:
     limit: int
     need: float
     """1 주 + 비용 여유."""
+    qty: int = 0
+    """오늘 살 주수 (BUY 일 때만 1 이상) — 쌓인 돈 ÷ :attr:`need` 의 정수 부분."""
 
 
 def advise(
     state: KrState, history: Sequence[tuple[str, float]], today: str, price: float
 ) -> KrAdvice:
-    """[쓰임] 오늘 살 차례인가 — 쌓인 돈(쓴 돈 뺌)이 1 주 지정가 + 비용 여유 이상이면 BUY.
+    """[쓰임] 오늘 살 차례인가 — 쌓인 돈(쓴 돈 뺌)이 1 주 지정가 + 비용 여유 이상이면 BUY
+    (살 수 있는 만큼 ``qty`` 주).
     [이유] 확인 전 주문이 있으면(OPEN) · 꺼졌으면(OFF) · 오늘 이미 냈으면(WAIT) 사지 않는다
            — 하루 한 건."""
     accrued = accrual(history, state.start_date, today) - state.spent
@@ -166,7 +172,10 @@ def advise(
         return KrAdvice("OFF", accrued, limit, need)
     if any(order.date == today for order in state.orders):
         return KrAdvice("WAIT", accrued, limit, need)  # 하루 한 건
-    return KrAdvice("BUY" if accrued >= need else "WAIT", accrued, limit, need)
+    if accrued < need:
+        return KrAdvice("WAIT", accrued, limit, need)
+    qty = max(1, min(math.floor(accrued / need + 1e-9), MAX_ORDER_QTY))
+    return KrAdvice("BUY", accrued, limit, need, qty)
 
 
 def settle(

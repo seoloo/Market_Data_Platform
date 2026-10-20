@@ -133,6 +133,7 @@ from auto_trading.ops.kill_switch import halted_for
 from auto_trading.ops.mf_paper import LEV_MAX
 from auto_trading.ops.qndx_alert import (
     LIMIT_BUFFER,
+    MAX_ORDER_QTY,
     OPEN_ORDER,
     Advice,
     Order,
@@ -433,7 +434,11 @@ def _trader() -> TossTrader:
         load_toss_credentials(REPO / ".env"),
         TossTokenCache(TOKEN),
         allowed_symbols=frozenset(symbols),
-        max_qty={TQQQ: MAX_TQQQ_QTY, **DENEB_MAX_QTY},
+        max_qty={
+            **dict.fromkeys((plan.symbol for plan in plans), MAX_ORDER_QTY),
+            TQQQ: MAX_TQQQ_QTY,
+            **DENEB_MAX_QTY,
+        },
         sell_symbols=frozenset({TQQQ, DIVIDEND_ETF, GOLD_ETF}),
         max_limit_usd=Decimal(str(limit)),
     )
@@ -1645,7 +1650,7 @@ class Day:
         return result
 
     def plan_advice(self, plan: Plan, state: State, qs: QsLiveState | None) -> Advice:
-        """[쓰임] 적립 종목 하나의 오늘 판단 (장부를 실제 보유와 맞춘 뒤, 1 주 살 만큼 모였나)."""
+        """[쓰임] 적립 종목 하나의 오늘 판단 (장부를 실제 보유와 맞춘 뒤, 몇 주 살 만큼 모였나)."""
         qty, avg = self.qty_avg(plan.symbol)
         self.notes += reconcile(state, plan, self.today, qty, avg, self.fx, fee=self.fee)
         paused = qs is not None and plan.symbol == "QNDX" and qndx_paused(qs)
@@ -1702,7 +1707,7 @@ def _needs(day: Day, states: dict[str, State], qs: QsLiveState | None) -> list[d
         if plan.symbol == "QNDX":
             accrued_qndx = advice.accrued
         if advice.status == "BUY":
-            needs.append({"symbol": plan.symbol, "qty": 1, "limit": advice.limit_usd})
+            needs.append({"symbol": plan.symbol, "qty": advice.qty, "limit": advice.limit_usd})
     if qs is not None:
         order = plan_tqqq_order(
             qs,
@@ -1914,7 +1919,7 @@ def run(telegram: bool = True) -> int:
         halted = halted_for(HALT, "acc")  # 적립 · QS: 전체 정지 또는 토스 적립 정지
         halted_deneb = halted_for(HALT, "deneb")  # Deneb: 전체 정지 또는 Deneb 정지
         accrued_qndx = 0.0
-        # 1 단계: 자동 적립 — 종목마다 지난 주문 정리 → 1 주 살 만큼 모였으면 1 주
+        # 1 단계: 자동 적립 — 종목마다 지난 주문 정리 → 모인 돈으로 살 수 있는 만큼(정수 주)
         for plan in _plans():
             state = states.get(plan.symbol)
             if state is None:  # 새로 추가된 종목 — 오늘 시작, 지금 보유는 적립 밖
@@ -1948,7 +1953,7 @@ def run(telegram: bool = True) -> int:
                     state.orders,
                     plan.symbol,
                     "BUY",
-                    1,
+                    advice.qty,
                     advice.limit_usd,
                     today,
                     lambda saved=state: _save_plan_state(saved),

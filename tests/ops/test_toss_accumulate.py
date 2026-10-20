@@ -128,10 +128,10 @@ def test_run_buys_qndx_with_loc_when_accrued(
 ) -> None:
     fake = FakeToss()
     mod = _mod(monkeypatch, tmp_path, fake)
-    _seed(mod)  # 9-26 부터 11 일 = 11 만 원 → 1 주 살 차례
+    _seed(mod)  # 9-26 부터 11 일 = 11 만 원 → 1 주 34,324원 → 3 주 (10-21 부터 되는 만큼)
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     assert mod.run(telegram=False) == 0
-    assert [(s, side, q) for s, side, q, _, _ in fake.sent] == [("QNDX", "BUY", 1)]
+    assert [(s, side, q) for s, side, q, _, _ in fake.sent] == [("QNDX", "BUY", 3)]
     assert fake.sent[0][3] == Decimal("26.16")  # 25.4 × 1.03 내림
     saved = json.loads((tmp_path / "data" / "QNDX.json").read_text(encoding="utf-8"))
     assert saved["orders"][-1]["status"] == "SENT" and saved["orders"][-1]["code"] == "OID-1"
@@ -204,8 +204,8 @@ def test_fx_reminder_amount(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setattr(mod, "datetime", _FixedDT)
     _seed(mod)
     assert mod.fx(telegram=False) == 0
-    assert sent and "QNDX 1주" in sent[0] and "환전" in sent[0]
-    need = 26.16 * 1.001 * 1.02 - 2.05
+    assert sent and "QNDX 3주" in sent[0] and "환전" in sent[0]  # 11 만 원 → 3 주 (10-21 부터)
+    need = 3 * 26.16 * 1.001 * 1.02 - 2.05
     assert f"${int(need) + 1:,}" in sent[0]
     assert fake.sent == []  # 알림은 주문하지 않는다
     assert json.loads((tmp_path / "data" / "QNDX.json").read_text(encoding="utf-8"))["orders"] == []

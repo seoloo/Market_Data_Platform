@@ -32,7 +32,7 @@ from auto_trading.notify.channels import NotifyError, OutboxNotifier, TelegramNo
 from auto_trading.notify.style import RULE, sub
 from auto_trading.ops import user_settings
 from auto_trading.ops.kill_switch import halted_for
-from auto_trading.ops.kr_accumulate import KrOrder, KrState, advise, settle
+from auto_trading.ops.kr_accumulate import MAX_ORDER_QTY, KrOrder, KrState, advise, settle
 from auto_trading.ops.ledger_file import write_json_atomic
 
 REPO = Path(__file__).resolve().parent.parent
@@ -82,12 +82,13 @@ def _save(state: KrState) -> None:
 
 
 def _trader(symbols: set[str]) -> TossTrader:
-    """[쓰임] 토스 주문 창구 — 켜진 국내 종목만, 1 주씩, 사기만, 지정가 200 만 원 상한."""
+    """[쓰임] 토스 주문 창구 — 켜진 국내 종목만, 한 번 :data:`MAX_ORDER_QTY` 주까지, 사기만,
+    지정가 200 만 원 상한."""
     return TossTrader(
         load_toss_credentials(REPO / ".env"),
         TossTokenCache(TOKEN),
         allowed_symbols=frozenset(symbols),
-        max_qty=dict.fromkeys(symbols, 1),
+        max_qty=dict.fromkeys(symbols, MAX_ORDER_QTY),
         sell_symbols=frozenset(),
         max_limit_krw=MAX_LIMIT_KRW,
     )
@@ -147,7 +148,8 @@ def _settle_past_orders(
 
 
 def run(*, dry: bool = False) -> int:
-    """[쓰임] 하루치 — 지난 주문 정리 → (장 시간 · 개장일이면) 살 차례인 종목마다 1 주 당일 지정가.
+    """[쓰임] 하루치 — 지난 주문 정리 → (장 시간 · 개장일이면) 살 차례인 종목마다
+    모인 돈만큼(정수 주) 당일 지정가.
     [이유] 원화가 모자라면 주문하지 않고 알린다 (거절보다 먼저 알아채게). ``dry`` 면 계획만 출력."""
     now = _kst_now()
     today = now.strftime("%Y-%m-%d")
@@ -171,7 +173,7 @@ def run(*, dry: bool = False) -> int:
                 _notify("\n".join([f"{TAG} · {today}", RULE, *lines]))
             print("\n".join(lines) or "주문 시간 밖 · 휴장 · 켜진 종목 없음 중 하나")
             return 0
-        # 3 단계: 종목마다 살 차례면 1 주
+        # 3 단계: 종목마다 살 차례면 모인 돈으로 살 수 있는 만큼(정수 주)
         prices = {symbol: float(price) for symbol, price in trader.prices(sorted(active)).items()}
         buying_power = float(trader.buying_power("KRW"))
         enabled = trader.credentials.trading_enabled
@@ -194,7 +196,8 @@ def run(*, dry: bool = False) -> int:
                     f"⏸ {state.name} 살 차례지만 주문 안 함 — {halted or '자동 주문 꺼짐'}"
                 )
                 continue
-            if buying_power < advice.need:
+            qty = min(advice.qty, int(buying_power // advice.need))  # 원화가 모자라면 되는 만큼
+            if qty < 1:
                 lines.append(
                     f"💸 {state.name} 살 차례인데 원화가 모자라요 — "
                     f"필요 {advice.need:,.0f}원 · 있음 {buying_power:,.0f}원"
@@ -208,7 +211,7 @@ def run(*, dry: bool = False) -> int:
                 result = trader.order(
                     symbol,
                     "BUY",
-                    1,
+                    qty,
                     Decimal(advice.limit),
                     client_order_id=client_id,
                     time_in_force="DAY",
@@ -221,9 +224,9 @@ def run(*, dry: bool = False) -> int:
                 continue
             if result.accepted:
                 order.order_id = result.code  # 성공이면 주문 ID
-                buying_power -= advice.need
+                buying_power -= advice.need * qty
                 lines.append(
-                    f"🛒 {state.name} 1주 지정가 {advice.limit:,}원 (오늘 장중 체결 기다림)"
+                    f"🛒 {state.name} {qty}주 지정가 {advice.limit:,}원 (오늘 장중 체결 기다림)"
                 )
             else:
                 order.status = "REJECTED"
