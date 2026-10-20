@@ -1,0 +1,65 @@
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 5, "currency": "USD", "filled": 3.0, "hold_days": [], "id": "1016000000", "kind": "", "name": "엔비디아", "note": "", "open_px": 0.0, "override": false, "qty": 3, "ref_price": 180.0, "sells": [], "session": "", "source": "app", "status": "holding", "stop": 174.6, "symbol": "NVDA"}
+가격 None → holding 
+가격 0.0 → holding 
+가격 175.0 → holding 
+가격 174.6 → selling 손절 — $174.60 ≤ $174.60
+가격 170.0 → selling 손절 — $170.00 ≤ $174.60
+## 손절 미국
+["🛑 엔비디아 손절 시작 — 손절 — $174.00 ≤ $174.60\n4주 지정가 $174.00 매도 주문\n💸 예상 손해 약: -$30.00 (약 -4.2만 원) · -3.3% (5주, 평균 $180.00 기준, 수수료 전)", "🛑 엔비디아 손절 매도 끝 · 5주 · 평균 $173.70 (-3.5%)\n💸 손해: -$31.50 (약 -4.4만 원) · -3.5%"]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 120003, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "2", "kind": "", "name": "엔비디아", "note": "손절 — $174.00 ≤ $174.60", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [{"amount": 348.0, "cid": "sz-2-s0", "closed": true, "fee": 0.0, "filled": 2.0, "order_id": "o0", "placed_ms": 1, "price": 174.0, "qty": 4, "side": "SELL", "status": "CANCELED"}, {"amount": 520.5, "cid": "sz-2-s1", "closed": true, "fee": 0.0, "filled": 3.0, "order_id": "o1", "placed_ms": 120002, "price": 174.0, "qty": 3, "side": "SELL", "status": "FILLED"}], "session": "", "source": "app", "status": "closed", "stop": 174.6, "symbol": "NVDA"}
+[{"client_order_id": "sz-2-s0", "id": "o0", "limit": "174.0", "qty": 4, "side": "SELL", "symbol": "NVDA", "time_in_force": "DAY"}, {"client_order_id": "sz-2-s1", "id": "o1", "limit": "174.0", "qty": 3, "side": "SELL", "symbol": "NVDA", "time_in_force": "DAY"}]
+## 손절 국내
+["🛑 삼성전자 손절 시작 — 손절 — 67,800원 ≤ 67,900원\n10주 지정가 67,800원 매도 주문\n💸 예상 손해 약: -2.2만 원 · -3.1% (10주, 평균 70,000원 기준, 수수료 전)", "🛑 삼성전자 손절 매도 끝 · 10주 · 평균 67,800원 (-3.1%)\n💸 손해: -2.2만 원 · -3.1%"]
+{"add_to": "", "avg": 70000.0, "buy_block": "", "buys": [], "closed_ms": 2, "created_ms": 0, "currency": "KRW", "filled": 10.0, "hold_days": [], "id": "3", "kind": "", "name": "삼성전자", "note": "손절 — 67,800원 ≤ 67,900원", "open_px": 0.0, "override": false, "qty": 10, "ref_price": 70000.0, "sells": [{"amount": 678000.0, "cid": "sz-3-s0", "closed": true, "fee": 0.0, "filled": 10.0, "order_id": "o0", "placed_ms": 1, "price": 67800.0, "qty": 10, "side": "SELL", "status": "FILLED"}], "session": "", "source": "app", "status": "closed", "stop": 67900.0, "symbol": "005930"}
+[{"client_order_id": "sz-3-s0", "id": "o0", "limit": "67800.0", "qty": 10, "side": "SELL", "symbol": "005930", "time_in_force": "DAY"}]
+## 매도 신호
+["🧹 마이크론 매도 신호 — 추세 꺾임 — 4주 지정가 $120.00 매도 주문\n💸 예상 손익: +$80.00 (약 11.2만 원) · +20.0% (4주, 평균 $100.00 기준, 수수료 전)", "🧹 마이크론 매도 신호 매도 끝 · 4주 · 평균 $120.00 (+20.0%)\n💰 손익: +$80.00 (약 11.2만 원) · +20.0%"]
+{"add_to": "", "avg": 100.0, "buy_block": "", "buys": [], "closed_ms": 2, "created_ms": 0, "currency": "USD", "filled": 4.0, "hold_days": [], "id": "4", "kind": "", "name": "마이크론", "note": "매도 신호 — 추세 꺾임", "open_px": 0.0, "override": false, "qty": 4, "ref_price": 100.0, "sells": [{"amount": 480.0, "cid": "sz-4-s0", "closed": true, "fee": 0.0, "filled": 4.0, "order_id": "o0", "placed_ms": 1, "price": 120.0, "qty": 4, "side": "SELL", "status": "FILLED"}], "session": "", "source": "app", "status": "closed", "stop": 97.0, "symbol": "MU"}
+[{"client_order_id": "sz-4-s0", "id": "o0", "limit": "120.0", "qty": 4, "side": "SELL", "symbol": "MU", "time_in_force": "DAY"}]
+PEAD 보유 21 · selling · PEAD 20 거래일 보유 끝
+## PEAD 매도
+["📅 에이 PEAD 20 거래일 보유 끝 — 6주 지정가 $16.20 매도 주문\n💸 예상 손익: +$7.20 (약 1.0만 원) · +8.0% (6주, 평균 $15.00 기준, 수수료 전)", "📅 에이 PEAD 매도 끝 · 6주 · 평균 $16.20 (+8.0%)\n💰 손익: +$7.20 (약 1.0만 원) · +8.0%"]
+{"add_to": "", "avg": 15.0, "buy_block": "", "buys": [], "closed_ms": 2, "created_ms": 0, "currency": "USD", "filled": 6.0, "hold_days": ["US:0", "US:1", "US:2", "US:3", "US:4", "US:5", "US:6", "US:7", "US:8", "US:9", "US:10", "US:11", "US:12", "US:13", "US:14", "US:15", "US:16", "US:17", "US:18", "US:19", "US:last"], "id": "5", "kind": "pead", "name": "에이", "note": "PEAD 20 거래일 보유 끝", "open_px": 0.0, "override": false, "qty": 6, "ref_price": 15.0, "sells": [{"amount": 97.19999999999999, "cid": "sz-5-s0", "closed": true, "fee": 0.0, "filled": 6.0, "order_id": "o0", "placed_ms": 1, "price": 16.2, "qty": 6, "side": "SELL", "status": "FILLED"}], "session": "", "source": "app", "status": "closed", "stop": 14.55, "symbol": "AAA"}
+[{"client_order_id": "sz-5-s0", "id": "o0", "limit": "16.2", "qty": 6, "side": "SELL", "symbol": "AAA", "time_in_force": "DAY"}]
+## 장 닫힘
+[]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [], "session": "", "source": "app", "status": "selling", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 팔 수량 0
+[]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "팔 수 있는 수량 0 — 앱에서 판 것 아닌지 확인", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [], "session": "", "source": "app", "status": "selling", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 호가 없음
+[]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "매수 호가 없음 — 다음 확인 때 다시", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [], "session": "", "source": "app", "status": "selling", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 12 번 실패
+["⚠️ 엔비디아 손절 매도 12 번 내도 다 못 팖 — 토스 앱에서 확인 (남은 5주)"]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "12 번 내도 다 못 팖 — 토스 앱에서 확인", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [{"amount": 0.0, "cid": "c0", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c1", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c2", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c3", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c4", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c5", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c6", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c7", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c8", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c9", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c10", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}, {"amount": 0.0, "cid": "c11", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 0, "price": 170.0, "qty": 1, "side": "SELL", "status": "E"}], "session": "", "source": "app", "status": "failed", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 결과 모름
+["⚠️ 엔비디아 손절 매도 결과 모름 — 토스 앱에서 확인 (시간 초과)"]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "손절 매도 결과 모름 — 토스 앱에서 확인 (시간 초과)", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [{"amount": 0.0, "cid": "sz-6-s0", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 9, "price": 170.0, "qty": 5, "side": "SELL", "status": "UNKNOWN"}], "session": "", "source": "app", "status": "failed", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 주문 막힘
+["⚠️ 엔비디아 손절 매도 막힘: 꺼짐"]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "손절 매도 막힘: 꺼짐", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [], "session": "", "source": "app", "status": "failed", "stop": 174.6, "symbol": "NVDA"}
+[]
+## 거절
+["⚠️ 엔비디아 매도 거절 E9 거절 사유 시험 — 다음 확인 때 다시"]
+{"add_to": "", "avg": 180.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 5.0, "hold_days": [], "id": "6", "kind": "", "name": "엔비디아", "note": "매도 거절 E9 거절 사유 시험 — 다음 확인 때 다시", "open_px": 0.0, "override": false, "qty": 5, "ref_price": 180.0, "sells": [{"amount": 0.0, "cid": "sz-6-s0", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 9, "price": 170.0, "qty": 5, "side": "SELL", "status": "E9"}], "session": "", "source": "app", "status": "selling", "stop": 174.6, "symbol": "NVDA"}
+[]
+⏳ 장 시작에 매수 AMD 3주
+🔄 매수 중 테슬라 2주
+🛡 엔비디아 5주 · 평균 $180.00 · 지금 +2.8% · 손절 $174.60까지 -5.6%
+🛑 손절 매도 중 삼성전자 10주
+📅 에이 6주 · 평균 $15.00 · 지금 +6.7% · PEAD 2/20 거래일 (손절 없음)
+📅 PEAD 20일 매도 중 비 3주
+(손절 = 산 값 −3%, 정규장에서 2분마다 확인)
+⏳ 장 시작에 매수 AMD 3주
+🔄 매수 중 테슬라 2주
+🛡 엔비디아 5주 · 손절 $174.60
+🛑 손절 매도 중 삼성전자 10주
+📅 에이 6주 · 평균 $15.00 · PEAD 2/20 거래일 (손절 없음)
+📅 PEAD 20일 매도 중 비 3주
+(손절 = 산 값 −3%, 정규장에서 2분마다 확인)

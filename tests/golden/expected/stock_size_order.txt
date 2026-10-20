@@ -1,0 +1,73 @@
+## 정상 체결
+["✅ 엔비디아 10주 체결 · 평균 $100.20\n🛡 손절 등록: $97.19 (−3%) 이하면 자동 매도"]
+{"add_to": "", "avg": 100.2, "buy_block": "", "buys": [{"amount": 1002.0, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 10.0, "order_id": "o0", "placed_ms": 2, "price": 100.3, "qty": 10, "side": "BUY", "status": "FILLED"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 10.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "US:2026-10-15", "source": "bot", "status": "holding", "stop": 97.19, "symbol": "NVDA"}
+[{"client_order_id": "sz-1015220000-b0", "id": "o0", "limit": "100.3", "qty": 10, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}]
+[]
+## 시가 갭 +4%
+["❎ 엔비디아 사지 않았어요 — 정규장 시가가 추천 때보다 +4.0% ($100.00 → $104.00). 갭 상승 추격 방지, 다시 추천 받아 주세요"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 2, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "정규장 시가가 추천 때보다 +4.0%", "open_px": 104.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "canceled", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 호가 달아남
+["❎ 엔비디아 사지 않았어요 — 지금 가격이 추천 때보다 +3.5% ($100.00 → $103.50). 추격 매수 방지, 다시 추천 받아 주세요"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 2, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "지금 가격이 추천 때보다 +3.5%", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "canceled", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 시가 미확인
+[]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "정규장 시가 미확인 — 주문하지 않음", "open_px": 0.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "reserved", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 호가 없음
+[]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "매도 호가 없음 — 다음 확인 때 다시", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "reserved", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 세 번 뒤 부분 체결
+["✅ 엔비디아 6주 체결 · 평균 $100.10 (목표 10주 중 6주, 나머지 취소)\n🛡 손절 등록: $97.09 (−3%) 이하면 자동 매도"]
+{"add_to": "", "avg": 100.09999999999998, "buy_block": "", "buys": [{"amount": 200.2, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 2.0, "order_id": "o0", "placed_ms": 0, "price": 100.3, "qty": 10, "side": "BUY", "status": "CANCELED"}, {"amount": 200.2, "cid": "sz-1015220000-b1", "closed": true, "fee": 0.0, "filled": 2.0, "order_id": "o1", "placed_ms": 120001, "price": 100.3, "qty": 8, "side": "BUY", "status": "CANCELED"}, {"amount": 200.2, "cid": "sz-1015220000-b2", "closed": true, "fee": 0.0, "filled": 2.0, "order_id": "o2", "placed_ms": 240001, "price": 100.3, "qty": 6, "side": "BUY", "status": "CANCELED"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 6.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "3 번 내도 다 못 삼", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "holding", "stop": 97.09, "symbol": "NVDA"}
+[{"client_order_id": "sz-1015220000-b0", "id": "o0", "limit": "100.3", "qty": 10, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}, {"client_order_id": "sz-1015220000-b1", "id": "o1", "limit": "100.3", "qty": 8, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}, {"client_order_id": "sz-1015220000-b2", "id": "o2", "limit": "100.3", "qty": 6, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}]
+["o0"]
+## 만료
+["❎ 엔비디아 예약 만료 — US:2026-10-14 장에 못 샀어요. 다시 추천 받아 주세요"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 5, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "예약한 장이 지남", "open_px": 0.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "US:2026-10-14", "source": "bot", "status": "canceled", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 막힘
+["❎ 엔비디아 예약 취소 — 실적 발표 2 거래일 뒤"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 5, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "실적 발표 2 거래일 뒤", "open_px": 0.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "canceled", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 결과 모름
+["⚠️ 엔비디아 매수 주문 결과 모름 — 토스 앱에서 확인 (시간 초과)"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [{"amount": 0.0, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 5, "price": 100.3, "qty": 10, "side": "BUY", "status": "UNKNOWN"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "매수 주문 결과 모름 — 토스 앱에서 확인 (시간 초과)", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "failed", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 주문 막힘
+["⚠️ 엔비디아 매수 주문 막힘: 토스 주문 꺼짐"]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "매수 주문 막힘: 토스 주문 꺼짐", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "failed", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 거절
+[]
+{"add_to": "", "avg": 0.0, "buy_block": "", "buys": [{"amount": 0.0, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 0.0, "order_id": "", "placed_ms": 5, "price": 100.3, "qty": 10, "side": "BUY", "status": "E123"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 0.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "매수 거절 E123 거절 사유 시험", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "buying", "stop": 0.0, "symbol": "NVDA"}
+[]
+[]
+## 매수 중 막힘
+["✅ 엔비디아 4주 체결 · 평균 $100.10 (목표 10주 중 4주, 나머지 취소)\n🛡 손절 등록: $97.09 (−3%) 이하면 자동 매도"]
+{"add_to": "", "avg": 100.1, "buy_block": "일정 바뀜", "buys": [{"amount": 400.4, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 4.0, "order_id": "o0", "placed_ms": 0, "price": 100.3, "qty": 10, "side": "BUY", "status": "CANCELED"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 4.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "엔비디아", "note": "일정 바뀜", "open_px": 100.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "holding", "stop": 97.09, "symbol": "NVDA"}
+[{"client_order_id": "sz-1015220000-b0", "id": "o0", "limit": "100.3", "qty": 10, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}]
+["o0"]
+상태 모름: 주문 상태 미확인 — 신규 주문 금지
+## PEAD
+["✅ 엔비디아 10주 체결 · 평균 $109.50\n📅 PEAD — 손절 없이 20 거래일째 장 마감 무렵 자동 매도"]
+{"add_to": "", "avg": 109.5, "buy_block": "", "buys": [{"amount": 1095.0, "cid": "sz-1015220000-b0", "closed": true, "fee": 0.0, "filled": 10.0, "order_id": "o0", "placed_ms": 0, "price": 110.09, "qty": 10, "side": "BUY", "status": "FILLED"}], "closed_ms": 0, "created_ms": 0, "currency": "USD", "filled": 10.0, "hold_days": [], "id": "1015220000", "kind": "pead", "name": "엔비디아", "note": "", "open_px": 109.0, "override": false, "qty": 10, "ref_price": 100.0, "sells": [], "session": "S", "source": "bot", "status": "holding", "stop": 0.0, "symbol": "NVDA"}
+[{"client_order_id": "sz-1015220000-b0", "id": "o0", "limit": "110.09", "qty": 10, "side": "BUY", "symbol": "NVDA", "time_in_force": "DAY"}]
+[]
+## 국내 추가 매수
+["✅ 삼성전자 3주 체결 · 평균 72,050원 (목표 4주 중 3주, 나머지 취소)\n🛡 손절 등록: 69,800원 (−3%) 이하면 자동 매도", "✅ 삼성전자 3주 추가 체결 · 평균 72,050원 (목표 4주 중 3주, 나머지 취소)\n📦 합계 8주 · 평균 70,769원\n🛡 손절선 바꿈: 67,900원 → 68,600원 (평균 −3%)"]
+{"add_to": "1015220000", "avg": 72050.0, "buy_block": "", "buys": [{"amount": 216150.0, "cid": "sz-1016100000-b0", "closed": true, "fee": 0.0, "filled": 3.0, "order_id": "o0", "placed_ms": 0, "price": 72400.0, "qty": 4, "side": "BUY", "status": "FILLED"}], "closed_ms": 20, "created_ms": 0, "currency": "KRW", "filled": 3.0, "hold_days": [], "id": "1016100000", "kind": "", "name": "삼성전자", "note": "1015220000 에 합침", "open_px": 72000.0, "override": false, "qty": 4, "ref_price": 72000.0, "sells": [], "session": "KR", "source": "bot", "status": "merged", "stop": 69800.0, "symbol": "005930"}
+[{"client_order_id": "sz-1016100000-b0", "id": "o0", "limit": "72400.0", "qty": 4, "side": "BUY", "symbol": "005930", "time_in_force": "DAY"}]
+[]
+{"add_to": "", "avg": 70768.75, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "KRW", "filled": 8.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "삼성전자", "note": "", "open_px": 0.0, "override": false, "qty": 8, "ref_price": 70000.0, "sells": [], "session": "", "source": "bot", "status": "holding", "stop": 68600.0, "symbol": "005930"}
+{"add_to": "", "avg": 70768.75, "buy_block": "", "buys": [], "closed_ms": 0, "created_ms": 0, "currency": "KRW", "filled": 8.0, "hold_days": [], "id": "1015220000", "kind": "", "name": "삼성전자", "note": "", "open_px": 0.0, "override": false, "qty": 8, "ref_price": 70000.0, "sells": [], "session": "", "source": "bot", "status": "holding", "stop": 68600.0, "symbol": "005930"}
