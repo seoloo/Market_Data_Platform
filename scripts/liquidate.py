@@ -717,6 +717,20 @@ def step(job: Job) -> list[str]:
     return log
 
 
+def _unique_job_id(base: str) -> str:
+    """[쓰임] 작업 번호 — 보통은 시작 시각 ``YYYYMMDDTHHMMSS``,
+    같은 번호가 이미 있으면 ``-2`` · ``-3`` …
+    [이유] 같은 초에 두 범위를 시작하면 번호가 같아져 뒤 작업이 앞 작업 기록을 덮어썼다
+           (앞 작업 매도가 이어지지 않음, 2026-10-21 발견 · 사용자 '고쳐줘')."""
+    taken = {job.job_id for job in STORE.jobs()}
+    candidate = base
+    number = 2
+    while candidate in taken:
+        candidate = f"{base}-{number}"
+        number += 1
+    return candidate
+
+
 def start(scope: str, source: str) -> str:
     """[쓰임] 정리 시작 — 그룹 정지 → 계획 → (Sirius · 적립 한 종목 · 개별주 넘기기) → 작업 기록 →
     첫 진행 → 알림. 작업 요약 글을 돌려준다.
@@ -727,7 +741,7 @@ def start(scope: str, source: str) -> str:
         if not ok:
             return "다른 정리가 실행 중이에요 — 잠시 뒤 결과를 확인해 주세요"
         now = _now_ms()
-        job_id = _kst(now).strftime("%Y%m%dT%H%M%S")
+        job_id = _unique_job_id(_kst(now).strftime("%Y%m%dT%H%M%S"))
         reason = f"전부 정리({scope_label(scope)}) {_kst(now):%Y-%m-%d %H:%M} · {source}"
         # 1 단계: 새 매수부터 막는다
         set_group_halts(HALT, groups_of(scope), reason)

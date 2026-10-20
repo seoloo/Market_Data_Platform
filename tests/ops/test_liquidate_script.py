@@ -218,3 +218,15 @@ def test_second_start_while_running_is_refused(env: dict[str, Any]) -> None:
         assert ok
         assert "다른 정리가 실행 중" in liq.start("all", "텔레그램")
     assert not FakeUpbit.sent
+
+
+def test_two_starts_in_the_same_second_keep_both_jobs(
+    env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """같은 초에 두 범위를 시작해도 작업 기록이 둘 다 남는다 (2026-10-21 — 예전엔 덮어씀)."""
+    monkeypatch.setattr(liq, "_now_ms", lambda: 1_792_000_000_000)
+    liq.start("vega", "텔레그램")
+    liq.start("acc", "텔레그램")
+    jobs = liq.STORE.jobs()
+    assert [job.scope for job in jobs] == ["vega", "acc"]
+    assert jobs[1].job_id == jobs[0].job_id + "-2"
