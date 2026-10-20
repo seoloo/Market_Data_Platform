@@ -177,9 +177,3 @@ def test_vega_line_in_alerts() -> None:
         binance=vega_line(300_000),
     )  # fmt: skip
     assert "🌌 업비트(Vega)엔 33,000원" in msg
-
-
-def test_altair_share_zero_without_altair() -> None:
-    from auto_trading.ops.altair_split import altair_share
-
-    assert altair_share() == 0

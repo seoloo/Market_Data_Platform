@@ -14,7 +14,7 @@
 | 💹 **개별주** — 비중 추천 · −3% 손절 · PEAD 소액 | 토스 (미국) | 텔레그램 봇 안에서 2 분마다 | `scripts/size_guard.py` (봇이 부름) | `ops/size_order.py` · `ops/stop_guard.py` · `ops/position_size.py` | `data/size_guard/state.json` |
 
 대기 · 꺼짐 (이번 리팩토링 범위 밖, 제자리): 🧭 Polaris(나무 · 11 월부터 `Polaris`) · ✨ Sirius(꺼짐).
-은퇴 예정 (1 단계에서 `retired/` 로): 바이낸스 Vega(`vega_live.py` · `live_t2_binance.py`) · ☄️ Altair(`altair_live.py` · `altair_demo.py` · `ops/altair_split.py`) — 2026-10-19 Altair 정리 · Vega 업비트로 되돌림.
+은퇴 (`retired/`, 실행하지 않음): 바이낸스 Vega(`vega_live.py` · `live_t2_binance.py`) · ☄️ Altair(`altair_live.py` · `altair_demo.py` · `ops/altair_split.py`) — 2026-10-19 Altair 정리 · Vega 업비트로 되돌림. 자세한 것은 [retired/README.md](../retired/README.md).
 
 ## 2. 함께 쓰는 부품
 

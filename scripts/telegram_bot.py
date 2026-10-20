@@ -932,11 +932,9 @@ def run(root: Path = REPO) -> int:
     _size_guard(root)
     _event_alert(root)
     _namu_follow(root)
-    _altair_demo(root)
     _shadow_272()
     _paper_daily(root)
     _safety_daily()
-    # _deposit_watch(root)  # 2026-10-19 멈춤 — 바이낸스 Vega · Altair 정리, Vega 는 업비트로
     if not cmds:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
@@ -982,37 +980,6 @@ def _paper_daily(root: Path) -> None:
     print("Paper 요약 보냄")
 
 
-DEPOSIT_EVERY_MS = 10 * 60_000
-
-
-def _deposit_watch(root: Path, *, force: bool = False) -> None:
-    """바이낸스 입금을 10 분마다(또는 '입금확인' 때 바로) 보고 Vega · Altair 로 나눈다."""
-    state = root / "data" / "vega" / "deposit_watch.json"
-    now = int(time.time() * 1000)
-    try:
-        last = int(json.loads(state.read_text(encoding="utf-8")).get("at", 0))
-    except (OSError, ValueError):
-        last = 0
-    if not force and now - last < DEPOSIT_EVERY_MS:
-        return
-    try:
-        from scripts import vega_live
-
-        out = vega_live.deposit_check(now, force=force)
-        if force and out and not out[0].startswith("💰"):
-            creds = load_telegram_credentials(root / ".env")
-            if creds is not None:
-                bot = TelegramNotifier(creds)
-                try:
-                    bot.send("💰 " + " · ".join(out))
-                finally:
-                    bot.close()
-    except Exception as exc:  # 입금 확인 문제로 봇을 멈추지 않는다
-        print(f"입금 확인 건너뜀: {type(exc).__name__}: {exc}")
-    state.parent.mkdir(parents=True, exist_ok=True)
-    state.write_text(json.dumps({"at": now}), encoding="utf-8")
-
-
 def _safety_daily() -> None:
     """매일 안전 점검 (09:20 KST 뒤 한 번, 이상 · 바뀐 것 있을 때만 알림). 실패해도 봇은 끝난다."""
     try:
@@ -1037,20 +1004,6 @@ def _namu_follow(root: Path) -> None:
             print(f"나무 모의 따라가기: 주문 {len(out['orders'])} 건, 평가 {out['equity']:,}원")
     except Exception as exc:  # 모의 따라가기 문제로 봇을 멈추지 않는다
         print(f"나무 모의 따라가기 건너뜀: {type(exc).__name__}: {exc}")
-
-
-def _altair_demo(root: Path) -> None:
-    """Altair(옛 AG4S2) 선물 데모(가짜 돈) — 하루 한 번 롱 맞추기 · 4 시간봉마다 숏 점검."""
-    if not user_settings.get(root, "demo.altair"):
-        return
-    try:
-        from scripts import altair_demo
-
-        done = altair_demo.tick()
-        if done:
-            print(f"Altair 데모: {len(done)} 줄")
-    except Exception as exc:  # 데모 문제로 봇을 멈추지 않는다
-        print(f"Altair 데모 건너뜀: {type(exc).__name__}: {exc}")
 
 
 def _shadow_272() -> None:

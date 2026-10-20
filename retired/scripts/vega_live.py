@@ -1,4 +1,6 @@
-"""Vega — T/v2 바이낸스 **실거래** (BTC · ETH · SOL, USDT). 하루 1 회.
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+Vega — T/v2 바이낸스 **실거래** (BTC · ETH · SOL, USDT). 하루 1 회.
 
     python -m scripts.vega_live plan     # 계획만 — 주문 · 기록 · 알림 없음 (첫날 확인)
     python -m scripts.vega_live run      # 실행 (예약 매일 09:05 KST, 일봉 마감 5 분 뒤)

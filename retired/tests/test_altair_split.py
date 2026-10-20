@@ -1,4 +1,6 @@
-"""Altair 자동 분배 — 선물 몫 최소 · 새 돈 안에서만 · 첫 분배 · 되돌리지 않음."""
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+Altair 자동 분배 — 선물 몫 최소 · 새 돈 안에서만 · 첫 분배 · 되돌리지 않음."""
 
 from __future__ import annotations
 

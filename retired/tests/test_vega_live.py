@@ -1,4 +1,6 @@
-"""Vega 바이낸스 실행기 — 가짜 거래소 (실제 호출 없음)."""
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+Vega 바이낸스 실행기 — 가짜 거래소 (실제 호출 없음)."""
 
 from __future__ import annotations
 

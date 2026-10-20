@@ -186,10 +186,42 @@ def h1_real(c: httpx.Client, trades: list[dict[str, Any]]) -> list[dict[str, Any
 
 # ------------------------------------------------------------------ 펀딩비 끄기
 
+SIGNAL = {"BTC": "BTCUSDT", "ETH": "ETHUSDT"}
+"""롱 목표를 잴 신호 종목 (은퇴한 scripts/altair_demo.SIGNAL 과 같음)."""
+
+
+def _long_targets(now_ms: int) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    """[쓰임] 마지막으로 끝난 일봉 기준 T/v2 롱 목표 비중과 근거.
+    [이유] Altair 은퇴(2026-10-19)로 scripts/altair_demo 를 retired/ 로 옮기면서, 이 그림자 기록이
+           쓰던 함수만 여기로 그대로 옮겼다 (계산 같음)."""
+    from auto_trading.config.schema import SpotTrendConfig
+    from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
+    from auto_trading.features.tsmom import realized_vol_annual
+    from auto_trading.strategy.spot_trend import spot_trend_targets
+
+    as_of = now_ms - now_ms % DAY - 1
+    spot = BinanceSpotReadOnly(None)
+    try:
+        daily = {SIGNAL[c]: spot.closed_daily(SIGNAL[c], as_of) for c in SIGNAL}
+    finally:
+        spot.close()
+    tg = spot_trend_targets(daily, as_of_ms=as_of, cfg=SpotTrendConfig())
+    info: dict[str, dict[str, Any]] = {}
+    for c, sym in SIGNAL.items():
+        closes = [float(x.close) for x in daily[sym]]
+        if len(closes) < 121:
+            continue
+        vol = float(realized_vol_annual([x.close for x in daily[sym]], 60) or 0)
+        info[c] = {
+            "parts": [closes[-1] / closes[-1 - k] - 1 for k in (20, 60, 120)],
+            "vol": vol,
+            "cap": min(0.15 / vol, 0.5) if vol > 0 else 0.0,
+        }
+    return {c: float(tg[SIGNAL[c]].weight or 0) for c in SIGNAL}, info
+
 
 def funding_rows(c: httpx.Client, now_ms: int, done: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """끝난 날마다 한 줄. ``done`` 에 이미 있는 날은 다시 계산하지 않는다(그날 값은 바뀌지 않음)."""
-    from scripts import altair_demo as core
 
     last_day = now_ms - now_ms % DAY - DAY  # 끝난 날까지
     if last_day < START:
@@ -206,7 +238,7 @@ def funding_rows(c: httpx.Client, now_ms: int, done: list[dict[str, Any]]) -> li
     for d in range(START, last_day + 1, DAY):
         if datetime.fromtimestamp(d / 1000, UTC).strftime("%Y-%m-%d") in have:
             continue
-        w, _info = core.long_targets(d + 5 * 60_000)
+        w, _info = _long_targets(d + 5 * 60_000)
         diff = 0.0
         per: dict[str, Any] = {}
         for k in F_COINS:

@@ -1,4 +1,6 @@
-"""Altair(옛 AG4S2) 바이낸스 선물 **데모(가짜 돈)** 실행 — AG-CR4 롱 + 232 숏 2 배를 실제 주문으로.
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+Altair(옛 AG4S2) 바이낸스 선물 **데모(가짜 돈)** 실행 — AG-CR4 롱 + 232 숏 2 배를 실제 주문으로.
 
     python -m scripts.altair_demo plan     # 지금 낼 주문 미리 보기 (주문 없음)
     python -m scripts.altair_demo tick     # 할 차례면 실행 (현황 봇이 2 분마다 부른다)

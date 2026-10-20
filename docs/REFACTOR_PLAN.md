@@ -1,6 +1,6 @@
 # 실거래 코드 리팩토링 계획 (2026-10-20 사용자 승인 방향 · 착수 전)
 
-상태: **0 단계 끝 (2026-10-20, 사용자 "그 작업 확인해보고 진행해줘")** — 작업 브랜치 `refactor/live-code` (worktree `../Auto_Trading_refactor`).
+상태: **0 · 1 단계 끝 (2026-10-20, 사용자 "그 작업 확인해보고 진행해줘")** — main 합치기는 낮에(계획 규칙) — 작업 브랜치 `refactor/live-code` (worktree `../Auto_Trading_refactor`).
 
 ## 목적 (사용자 말)
 
@@ -73,3 +73,6 @@
 
 - 2026-10-20: 계획 · 방향 확정(위). 코드 변경 없음.
 - 2026-10-20 0 단계: 전후 비교 기준 `tests/golden/test_live_golden.py` (4 묶음 — Deneb 첫 달 · 채우기 · 미리 보기 · 상태 / 하락 방어 주기 / Vega 업비트 / 텔레그램 문구, 기준 `tests/golden/expected/`, 같은 코드로 두 번 돌려 같음 확인 — 버튼 무작위 번호 · 보고 시각 · 임시 경로만 가림) · `docs/CODE_MAP.md` 초안. 주의: worktree 에서 시험할 때 `PYTHONPATH=<브랜치>/src;<브랜치>` 필수(가상환경이 원래 폴더 src 에 연결). worktree 에서는 `test_desktop_app.py` 3 개가 환경 차이로 실패(원래 폴더에서는 통과) — 합칠 때 원래 폴더에서 확인.
+- 2026-10-20 1 단계: 은퇴 5 파일(`vega_live` · `live_t2_binance` · `altair_live` · `altair_demo` · `ops/altair_split`)과 시험 5 개를 `retired/` 로, `retired/README.md`, 파일마다 '⚠️ 은퇴' 표시. 먼저 뗀 것: 텔레그램 봇의 죽은 바이낸스 입금 확인 · 꺼진 Altair 데모 호출(지움), 주간 요약의 Altair 접속 함수(자체로), 그림자 272 의 롱 목표 함수(그대로 옮김), Deneb 금 시험의 altair_split 시험 1 개. ruff 가 `retired/` 제외. 전후 비교 4 묶음 같음 · 전체 pytest(worktree 환경 차이 desktop_app 3 개만 실패, 원래와 같음) · leakage · mypy(기존 10 건만) · ruff(연구 스크립트 기존 건만).
+- 남은 Altair 흔적(정리 그룹 · 정지 그룹 · 안전 점검 바이낸스 선물 · 설정 `live.altair` · `demo.altair` · 예약 정의 · 실거래 홈 `altair_book` · 주간 요약 Altair 칸 · paper 요약)은 해당 파일 단계(2 · 4 · 5)에서 정리.
+- 발견(기존, 다른 세션 10-20 커밋 `ee617f7` · `30f56b9`): lint-imports 'UI 는 매매 로직을 import 하지 않는다' 깨짐 — `ui/live_sync` 가 `exchange.toss` · `exchange.upbit` 를 직접 씀. 5 단계(현황 동기화 Facade)에서 고침.

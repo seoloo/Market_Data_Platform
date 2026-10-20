@@ -1,4 +1,6 @@
-"""Altair 실거래 실행기 — 스위치 · 입금 단위 · 낙폭 정지 (거래소 호출 없음)."""
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+Altair 실거래 실행기 — 스위치 · 입금 단위 · 낙폭 정지 (거래소 호출 없음)."""
 
 from __future__ import annotations
 

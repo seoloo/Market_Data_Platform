@@ -114,12 +114,14 @@ def vega_block(week_start: str) -> dict[str, Any] | None:
 
 
 def altair_block(week_start: str) -> dict[str, Any] | None:
-    from scripts.altair_live import _client
+    from auto_trading.exchange.binance_usdm_live import BinanceUsdmLive, load_live_futures
+
+    creds, enabled = load_live_futures(REPO / ".env")  # 옛 altair_live._client 와 같음
 
     st = _read(ALTAIR)
     if not st or not st.get("live"):
         return None
-    c = _client()
+    c = BinanceUsdmLive(creds, trading_enabled=enabled)
     try:
         acct = c.account()
         legs: list[Leg] = []

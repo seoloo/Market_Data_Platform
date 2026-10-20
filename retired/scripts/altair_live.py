@@ -1,4 +1,6 @@
-"""☄️ Altair **실거래** — 바이낸스 USDⓈ-M 선물(USDC), 데모와 같은 규칙 · 같은 주문 코드.
+"""⚠️ 은퇴 — 실행하지 않음 (2026-10-19, retired/README.md).
+
+☄️ Altair **실거래** — 바이낸스 USDⓈ-M 선물(USDC), 데모와 같은 규칙 · 같은 주문 코드.
 
     python -m scripts.altair_live plan     # 지금 낼 주문 미리 보기 (주문 없음, 키만 있으면 됨)
     python -m scripts.altair_live tick     # 할 차례면 실행 (예약 AutoTrading_Altair 가 5 분마다)
