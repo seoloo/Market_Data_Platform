@@ -1,0 +1,258 @@
+## 21:00 거절
+종목 목록: KOSPI 0 · KOSDAQ 0 · NYSE 0 · NASDAQ 0 · AMEX 0
+💰 토스 적립 · 2026-10-06
+━━━━━━━━━━━━
+📌 WQTM 적립 시작 (매일 $4.00)
+📌 QS 적립 시작 (매일 $1.00)
+
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+이번 달 납입 300,000원(기본) = $222.22 (환율 1,350.0)
+❌ Deneb TQQQ 매수 거절 insufficient-buying-power: 거절
+❌ Deneb SCHD 매수 거절 insufficient-buying-power: 거절
+↻ 달러 부족 · 장 시간 문제 — 오늘 23:40 · 03:30 에 다시, 안 되면 다음 거래일 밤
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+
+━━━━━━━━━━━━
+📊 QS  QQQ 추세 🟢 켜짐
+   └ 2026-10-05 종가 · 20일 +3.2% · 60일 +10.2% · 120일 +22.7%
+   TQQQ 0주 · 순지출 0원 · 할 일 NONE
+
+━━━━━━━━━━━━
+🟢 QNDX  오늘 1주 살 차례
+   적립 110,000원 / 1주 34,324원
+   └ 25.40 USD × 1,350.00원 · 수수료 포함
+   이번 달 0원 · 적립 매수 누적 0주
+   ❌ QNDX 매수 거절 insufficient-buying-power: 거절 — 달러가 모자란다. 환전 뒤 내일 다시
+
+⏳ BTQ  적립 중 · 약 3일 뒤 1주
+   적립 $1.00 / 1주 $3.17
+   └ 3.17 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+
+⏳ WQTM  적립 중 · 약 8일 뒤 1주
+   적립 $4.00 / 1주 $32.53
+   └ 32.50 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+
+⏳ QS  적립 중 · 약 4일 뒤 1주
+   적립 $1.00 / 1주 $4.57
+   └ 4.57 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+
+💰 토스 적립 · 2026-10-06
+━━━━━━━━━━━━
+📌 WQTM 적립 시작 (매일 $4.00)
+📌 QS 적립 시작 (매일 $1.00)
+
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+이번 달 납입 300,000원(기본) = $222.22 (환율 1,350.0)
+❌ Deneb TQQQ 매수 거절 insufficient-buying-power: 거절
+❌ Deneb SCHD 매수 거절 insufficient-buying-power: 거절
+↻ 달러 부족 · 장 시간 문제 — 오늘 23:40 · 03:30 에 다시, 안 되면 다음 거래일 밤
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+
+━━━━━━━━━━━━
+📊 QS  QQQ 추세 🟢 켜짐
+   └ 2026-10-05 종가 · 20일 +3.2% · 60일 +10.2% · 120일 +22.7%
+   TQQQ 0주 · 순지출 0원 · 할 일 NONE
+
+━━━━━━━━━━━━
+🟢 QNDX  오늘 1주 살 차례
+   적립 110,000원 / 1주 34,324원
+   └ 25.40 USD × 1,350.00원 · 수수료 포함
+   이번 달 0원 · 적립 매수 누적 0주
+   ❌ QNDX 매수 거절 insufficient-buying-power: 거절 — 달러가 모자란다. 환전 뒤 내일 다시
+
+⏳ BTQ  적립 중 · 약 3일 뒤 1주
+   적립 $1.00 / 1주 $3.17
+   └ 3.17 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+
+⏳ WQTM  적립 중 · 약 8일 뒤 1주
+   적립 $4.00 / 1주 $32.53
+   └ 32.50 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+
+⏳ QS  적립 중 · 약 4일 뒤 1주
+   적립 $1.00 / 1주 $4.57
+   └ 4.57 USD · 수수료 포함
+   이번 달 $0.00 · 적립 매수 누적 0주
+[('QNDX', 'BUY', 1, Decimal('26.16'), 'QNDX-2026-10-06-1'), ('TQQQ', 'BUY', 1, Decimal('83.50'), 'M3TQQQ-2026-10-06-1'), ('SCHD', 'BUY', 3, Decimal('34.14'), 'M3SCHD-2026-10-06-2')]
+## 23:40 또 거절
+🌟 Deneb 재시도 · 2026-10-06 23:40
+━━━━━━━━━━━━
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+❌ Deneb TQQQ 매수 거절 insufficient-buying-power: 거절
+❌ Deneb SCHD 매수 거절 insufficient-buying-power: 거절
+↻ 달러 부족 · 장 시간 문제 — 오늘 23:40 · 03:30 에 다시, 안 되면 다음 거래일 밤
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+
+🌟 Deneb 재시도 · 2026-10-06 23:40
+━━━━━━━━━━━━
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+❌ Deneb TQQQ 매수 거절 insufficient-buying-power: 거절
+❌ Deneb SCHD 매수 거절 insufficient-buying-power: 거절
+↻ 달러 부족 · 장 시간 문제 — 오늘 23:40 · 03:30 에 다시, 안 되면 다음 거래일 밤
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+## 03:30 접수 · 한 번 더
+🌟 Deneb 재시도 · 2026-10-06 03:30
+━━━━━━━━━━━━
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+🛒 Deneb TQQQ 1주 장 마감 지정가 매수 접수 — 83.50 USD
+🛒 Deneb SCHD 3주 장 마감 지정가 매수 접수 — 34.14 USD
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+Deneb: 할 일 없음
+
+🌟 Deneb 재시도 · 2026-10-06 03:30
+━━━━━━━━━━━━
+🌟 Deneb · 2026-10 TQQQ 60% : SCHD 40% (QQQ 20일 변동성 0.0%)
+🛒 Deneb TQQQ 1주 장 마감 지정가 매수 접수 — 83.50 USD
+🛒 Deneb SCHD 3주 장 마감 지정가 매수 접수 — 34.14 USD
+전략 현금 $222.22 (체결 뒤 정산) · 보유 TQQQ 0 · SCHD 0 · IAUM 0
+[('QNDX', 'BUY', 1, Decimal('26.16'), 'QNDX-2026-10-06-1'), ('TQQQ', 'BUY', 1, Decimal('83.50'), 'M3TQQQ-2026-10-06-1'), ('SCHD', 'BUY', 3, Decimal('34.14'), 'M3SCHD-2026-10-06-2'), ('TQQQ', 'BUY', 1, Decimal('83.50'), 'M3TQQQ-2026-10-06-3'), ('SCHD', 'BUY', 3, Decimal('34.14'), 'M3SCHD-2026-10-06-4'), ('TQQQ', 'BUY', 1, Decimal('83.50'), 'M3TQQQ-2026-10-06-5'), ('SCHD', 'BUY', 3, Decimal('34.14'), 'M3SCHD-2026-10-06-6')]
+## DENEB.json
+{
+ "amounts": {},
+ "ask_month": "",
+ "ask_ts": 0,
+ "brake": {
+  "last_day": "",
+  "lev_peak": 0.0,
+  "navs": [],
+  "off_seen": false,
+  "paid_usd": 0.0,
+  "pending": {},
+  "ref": "T",
+  "reserve_usd": 0.0,
+  "sales": [],
+  "sold_total_usd": 0.0,
+  "stage": 0,
+  "units": 0.0
+ },
+ "cash_usd": 222.22222222222223,
+ "deposits": [
+  [
+   "2026-10-06",
+   300000.0,
+   222.2222,
+   1350.0
+  ]
+ ],
+ "div_steps": 0,
+ "dividends": [],
+ "done_month": "2026-10",
+ "lev_cap": 0.6,
+ "months": [
+  [
+   "2026-10",
+   0.00022812963249621768,
+   0.6,
+   0.0
+  ]
+ ],
+ "orders": [
+  {
+   "booked": false,
+   "client_id": "M3TQQQ-2026-10-06-1",
+   "code": "insufficient-buying-power",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 83.5,
+   "order_id": "",
+   "qty": 1,
+   "side": "BUY",
+   "status": "REJECTED",
+   "symbol": "TQQQ"
+  },
+  {
+   "booked": false,
+   "client_id": "M3SCHD-2026-10-06-2",
+   "code": "insufficient-buying-power",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 34.14,
+   "order_id": "",
+   "qty": 3,
+   "side": "BUY",
+   "status": "REJECTED",
+   "symbol": "SCHD"
+  },
+  {
+   "booked": false,
+   "client_id": "M3TQQQ-2026-10-06-3",
+   "code": "insufficient-buying-power",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 83.5,
+   "order_id": "",
+   "qty": 1,
+   "side": "BUY",
+   "status": "REJECTED",
+   "symbol": "TQQQ"
+  },
+  {
+   "booked": false,
+   "client_id": "M3SCHD-2026-10-06-4",
+   "code": "insufficient-buying-power",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 34.14,
+   "order_id": "",
+   "qty": 3,
+   "side": "BUY",
+   "status": "REJECTED",
+   "symbol": "SCHD"
+  },
+  {
+   "booked": false,
+   "client_id": "M3TQQQ-2026-10-06-5",
+   "code": "",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 83.5,
+   "order_id": "OID-6",
+   "qty": 1,
+   "side": "BUY",
+   "status": "SENT",
+   "symbol": "TQQQ"
+  },
+  {
+   "booked": false,
+   "client_id": "M3SCHD-2026-10-06-6",
+   "code": "",
+   "commission": 0.0,
+   "date": "2026-10-06",
+   "filled_qty": 0.0,
+   "filled_usd": 0.0,
+   "kind": "",
+   "limit": 34.14,
+   "order_id": "OID-7",
+   "qty": 3,
+   "side": "BUY",
+   "status": "SENT",
+   "symbol": "SCHD"
+  }
+ ],
+ "proposals": [],
+ "qty": {
+  "SCHD": 0.0,
+  "TQQQ": 0.0
+ },
+ "start": "2026-10-06",
+ "tg_offset": 0
+}
