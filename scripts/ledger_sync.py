@@ -33,7 +33,9 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def _rows() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    books = build_books(REPO, Quotes())  # 거래 · 입금은 시세가 필요 없다
+    books = build_books(
+        REPO, Quotes(), sync=False
+    )  # 거래 · 입금은 장부 그대로(시세 · 계좌 조회 없이)
     return event_rows(books), snapshot_rows(load_history(REPO))
 
 

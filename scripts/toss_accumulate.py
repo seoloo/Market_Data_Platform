@@ -831,6 +831,13 @@ def _deneb_preview(now: datetime, *, title: str = "") -> str:
     try:
         day = Day(trader, now, dry=True)
         before = _load_deneb()
+        # 밤사이 체결된 주문을 복사본에 먼저 반영 — 보유 · 현금이 그 순간 계좌와 맞게
+        # (사용자 2026-10-20 '항시 모든 현황 알림은 동기화'). 장부 파일은 그대로.
+        try:
+            _deneb_resolve(day, before := copy.deepcopy(before))
+        except (AutoTradingError, TossApiError) as exc:
+            print(f"Deneb 미리 보기: 주문 상태 조회 실패 — 장부 기준 ({exc})")
+            before = _load_deneb()
         deneb = copy.deepcopy(before)
         events = _dividend_events()
         plan, vol, share, _ = _deneb_plan(day, deneb, events)

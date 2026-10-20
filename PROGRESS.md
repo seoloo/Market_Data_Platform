@@ -2583,3 +2583,8 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 - 사용자 목적은 오르빗 대시보드가 아니라 이 Codex 대화·코딩 작업 이어가기. [OpenAI 공식 원격 연결 안내](https://learn.chatgpt.com/docs/remote-connections)의 Windows 호스트 지원, 데스크톱 앱 Settings → Connections → Control this PC에서 설정·QR 연결, 휴대폰 동일 계정·워크스페이스 인증 및 기존 대화 접근 절차 확인. SSH 프로젝트 연결과 휴대폰 연결은 구분.
 - 설치 CLI `0.162.0-alpha.17.2`의 버전·도움말만 조회. 별도 원격 서버·페어링 코드 생성·포트 개방·인증 설정 변경 없음. 실제 연결 활성화·휴대폰 승인 여부는 미확인으로 유지하며 사용자 기기의 연결 설정 화면 확인이 다음 단계.
 - Phase 0 정보 검토·운영 상태 불변. PROGRESS 추가와 Git 밖 자기 상황판만 갱신, 기존 기록 보존·diff 범위 검사. 코드·주문·계좌·예약 변경 및 코드 시험 없음.
+
+## 2026-10-20 — Vega 손익 업비트와 맞춤 · 모든 현황 동기화 (Claude)
+
+- 사용자 "vega 알림에 오는 수익이 업비트에 있는 것과 다른데 … 동기화" · "항시 모든 현황 알림은 동기화". 원인: ① Vega 코인 원가가 실행기 주문 기록만으로 계산돼 10-13 정리 매도가 빠짐(BTC 원가 110,792 → −36.9%), ② 총 입금에 10-08 ~ 14 옛 기록, ③ 현황이 장부(매일 09:05 · 21:00 갱신) 그대로, ④ Deneb 카드 원가에 매도 금액이 더해짐.
+- 고침: `UpbitClient.accounts`(잔고 · 평균가), Vega `pnl_lines` 평균가 원가, Vega 장부 재시작 기준(471,507 원, 옛 입금 `deposits_archive`, 백업 `state.json.bak-20261020`), `ui/live_sync.py` + `build_books(sync=True)`, Deneb 카드 이동평균 원가, Deneb 미리 보기 체결 반영. 확인: 현황 Vega BTC · ETH · SOL −0.5% (업비트와 같음), Deneb TQQQ · SCHD −1.5%, 자동 적립 BTQ 밤사이 체결 반영. 시험 추가 · 전체 통과.

@@ -211,6 +211,7 @@ def deneb_book(state: Mapping[str, Any], q: Quotes) -> Book:
     qty = state.get("qty") or {}
     spent: dict[str, float] = {}
     spent_usd: dict[str, float] = {}
+    held_qty: dict[str, float] = {}
     pending: list[str] = []
     activity: list[tuple[str, str]] = [(str(d[0]), f"💵 입금 {_f(d[1]):,.0f} 원") for d in deposits]
     trades: list[Trade] = [
@@ -252,9 +253,20 @@ def deneb_book(state: Mapping[str, Any], q: Quotes) -> Book:
                 + str(o.get("client_id") or o.get("order_id") or f"{o.get('date')}-{sym}-{oi}"),
             )
         )
-        if filled > 0:
+        if filled > 0 and str(o.get("side")).upper() == "SELL":
+            # 판 것은 이동평균 원가로 뺀다 (2026-10-20: 정리 매도 금액이 원가에 더해져
+            # TQQQ −53% 처럼 보이던 문제 — deneb_live.cost_basis 와 같은 규칙)
+            held = held_qty.get(sym, 0.0)
+            sold = min(filled, held)
+            if held > 0:
+                spent[sym] = spent.get(sym, 0.0) * (held - sold) / held
+                spent_usd[sym] = spent_usd.get(sym, 0.0) * (held - sold) / held
+            held_qty[sym] = held - sold
+            activity.append((str(o.get("date")), f"↩ {sym} {filled:g}주 매도 체결"))
+        elif filled > 0:
             spent[sym] = spent.get(sym, 0.0) + _f(o.get("filled_usd")) + _f(o.get("commission"))
             spent_usd[sym] = spent_usd.get(sym, 0.0) + _f(o.get("filled_usd"))
+            held_qty[sym] = held_qty.get(sym, 0.0) + filled
             activity.append((str(o.get("date")), f"🛒 {sym} {filled:g}주 체결"))
         if o.get("status") == "SENT" and filled <= 0:
             pending.append(f"{sym} {_f(o.get('qty')):g}주 · 지정가 ${_f(o.get('limit')):,.2f}")
@@ -351,7 +363,12 @@ def _stored_coin_costs(orders: Iterable[Mapping[str, object]]) -> dict[str, Deci
 
 def vega_book(state: Mapping[str, Any], q: Quotes) -> Book:
     exp = state.get("expected") or {}
-    costs = _stored_coin_costs(state.get("orders") or [])
+    live = state.get("live_costs")  # live_sync: 업비트 앱 평균가 × 보유 (2026-10-20)
+    costs = (
+        {k: Decimal(str(v)) for k, v in live.items()}
+        if isinstance(live, dict)
+        else _stored_coin_costs(state.get("orders") or [])
+    )
     sig = state.get("last_trade_signals") or {}
     holdings = []
     for coin in VEGA_COINS:
@@ -849,10 +866,22 @@ def _mtime_ms(*paths: Path) -> int:
     return best
 
 
-def build_books(root: Path, q: Quotes) -> list[Book]:
+def build_books(root: Path, q: Quotes, *, sync: bool = True) -> list[Book]:
+    """장부 → 카드. ``sync`` 면 그 순간의 실제 계좌로 맞춘 사본을 쓴다(:mod:`live_sync`,
+    사용자 2026-10-20 '항시 모든 현황 알림은 동기화'). 장부 파일은 고치지 않는다."""
+    from auto_trading.ui import live_sync
+
     out = []
     toss = root / "data" / "toss"
     deneb = _read(toss / "DENEB.json")
+    plans = _toss_states(root)
+    vega_path = root / "data" / "upbit_t2" / "state.json"
+    s = live_sync.load(root, deneb, plans) if sync else None
+    sync_note = tuple(f"⚠ {n}" for n in (s.notes if s else []))
+    if s is not None and deneb:
+        deneb = live_sync.apply_deneb(deneb, s.toss)
+    if s is not None:
+        plans = [live_sync.apply_plan(p, s.toss, q.fx) for p in plans]
     if deneb:
         book = deneb_book(deneb, q)
         halt = root / "data" / "HALT_deneb"
@@ -862,10 +891,16 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
             book = replace(book, notes=(f"⏸ 정지 중 — 새 매수 안 함 ({why})", *book.notes))
         out.append(replace(book, updated_ms=_mtime_ms(toss / "DENEB.json")))
     binance = {} if VEGA_ON_UPBIT else _read(root / BINANCE_VEGA)
-    vega_path = root / "data" / "upbit_t2" / "state.json"
     vega = _read(vega_path) if SHOW_UPBIT else {}
     if vega and not binance:
-        out.append(replace(vega_book(vega, q), updated_ms=_mtime_ms(vega_path)))
+        synced = s is not None and s.upbit is not None
+        if synced and s is not None and s.upbit is not None:
+            vega = live_sync.apply_vega(vega, s.upbit)
+        book = vega_book(vega, q)
+        if synced:
+            book = replace(book, notes=(*book.notes, "업비트 실제 잔고 · 평균가 기준"))
+        stamp = int(s.at * 1000) if synced and s is not None else _mtime_ms(vega_path)
+        out.append(replace(book, updated_ms=stamp))
     if binance:
         out.append(
             replace(vega_binance_book(binance, q), updated_ms=_mtime_ms(root / BINANCE_VEGA))
@@ -880,10 +915,12 @@ def build_books(root: Path, q: Quotes) -> list[Book]:
         if (root / "data" / "HALT_sirius").exists():
             book = replace(book, notes=("⏸ 정지 중 — 새 주문 안 함", *book.notes))
         out.append(replace(book, updated_ms=_mtime_ms(root / SIRIUS)))
-    acc = _toss_states(root)
+    acc = plans
     if acc:
         files = [p for p in toss.glob("*.json") if p.stem not in _SKIP and p.stem != "M3"]
         out.append(replace(accumulate_book(acc, q), updated_ms=_mtime_ms(*files)))
+    if sync_note and out:
+        out[0] = replace(out[0], notes=(*sync_note, *out[0].notes))
     return out
 
 

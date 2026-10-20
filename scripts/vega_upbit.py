@@ -362,7 +362,7 @@ def run_cmd() -> int:
             *(["", "📋 오늘 비중 조절", *adjust] if adjust else []),
             *(["", "🛒 체결", *[sub(x) for x in fill_lines]] if fill_lines else []),
             "",
-            *pnl_lines(st, krw, hold, prices, eq, ns.dd),
+            *pnl_lines(st, krw, hold, prices, eq, ns.dd, avg_prices(c)),
         ]
     )
     print(text)
@@ -438,6 +438,18 @@ def adjust_lines(
     return out
 
 
+def avg_prices(c: Any) -> dict[str, Decimal] | None:
+    """업비트 앱의 코인별 매수 평균가. 조회 못 하면 None (그때는 주문 기록 원가)."""
+    get = getattr(c, "accounts", None)
+    if get is None:
+        return None
+    try:
+        acc = get()
+    except (AutoTradingError, httpx.HTTPError):
+        return None
+    return {k: acc[k][1] for k in COINS if k in acc}
+
+
 def pnl_lines(
     st: dict[str, Any],
     krw: Decimal,
@@ -445,19 +457,23 @@ def pnl_lines(
     prices: dict[str, Decimal],
     eq: Decimal,
     dd: Decimal,
+    avg: dict[str, Decimal] | None = None,
 ) -> list[str]:
-    """총 입금 · 코인별 평가 손익 · 총 손익 (2026-10-09 사용자 요청)."""
+    """총 입금 · 코인별 평가 손익 · 총 손익 (2026-10-09 사용자 요청).
+
+    ``avg`` (업비트 매수 평균가)가 있으면 코인별 원가 = 보유 × 평균가 — 업비트 앱과 같은 숫자
+    (2026-10-20: 정리 기능으로 판 매도가 주문 기록에 없어 옛 원가가 남던 문제)."""
     paid = sum((Decimal(str(d[1])) for d in st.get("deposits", [])), Decimal(0))
     bk = books(st.get("orders", []))
     out = []
     for k in COINS:
         value = hold[k] * prices[k]
-        b = bk[k]
-        if value <= 0 and b.cost <= 0:
-            continue
-        gain = value - b.cost
-        pct = f" ({gain / b.cost:+.1%})" if b.cost > 0 else ""
-        out.append(f"{k} {value:,.0f} 원 · 원가 {b.cost:,.0f} · {gain:+,.0f}{pct}")
+        cost = hold[k] * avg[k] if avg and avg.get(k) else bk[k].cost
+        if value <= 0 and (cost <= 0 or avg is not None):
+            continue  # 업비트 평균가를 쓰면 보유가 없을 때 원가도 없다
+        gain = value - cost
+        pct = f" ({gain / cost:+.1%})" if cost > 0 else ""
+        out.append(f"{k} {value:,.0f} 원 · 원가 {cost:,.0f} · {gain:+,.0f}{pct}")
     total = eq - paid
     pct = f" ({total / paid:+.1%})" if paid > 0 else ""
     return [
@@ -478,6 +494,7 @@ def weekly_cmd() -> int:
         dms, day = _decision(now_ms)
         krw, hold, prices = _snapshot(c)
         sig = signals({k: c.closed_daily(MARKETS[k], dms) for k in COINS}, dms)
+        avg = avg_prices(c)
     finally:
         c.close()
     eq = equity(krw, hold, prices)
@@ -535,7 +552,7 @@ def weekly_cmd() -> int:
             "코인별 (주간 가격 · 추세 20·60·120일 · 목표 · 보유)",
             *rows,
             "",
-            *pnl_lines(st, krw, hold, prices, eq, dd),
+            *pnl_lines(st, krw, hold, prices, eq, dd, avg),
         ]
     )
     print(text)
@@ -557,13 +574,14 @@ def status_cmd() -> int:
     c = _client()
     try:
         krw, hold, prices = _snapshot(c)
+        avg = avg_prices(c)
     finally:
         c.close()
     eq = equity(krw, hold, prices)
     peak = Decimal(str(st.get("peak") or "0"))
     units = Decimal(str(st.get("units") or "0"))
     dd = 1 - (eq / units) / peak if units > 0 and peak > 0 else Decimal(0)
-    print("\n".join(pnl_lines(st, krw, hold, prices, eq, max(dd, Decimal(0)))))
+    print("\n".join(pnl_lines(st, krw, hold, prices, eq, max(dd, Decimal(0)), avg)))
     return 0
 
 

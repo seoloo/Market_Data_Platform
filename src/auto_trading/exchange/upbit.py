@@ -140,6 +140,20 @@ class UpbitClient:
         rows = self._get("/accounts", auth=True)
         return {r["currency"]: Decimal(str(r["balance"])) + Decimal(str(r["locked"])) for r in rows}
 
+    def accounts(self) -> dict[str, tuple[Decimal, Decimal]]:
+        """통화 → (잔고 · 주문에 묶인 것 포함, 업비트 앱의 매수 평균가). 원화는 평균가 0.
+
+        2026-10-20 사용자 'vega 알림에 오는 수익이 업비트에 있는 것과 다른데 … 동기화' — 코인별
+        원가를 업비트가 보여 주는 평균가로 맞추려고."""
+        rows = self._get("/accounts", auth=True)
+        return {
+            r["currency"]: (
+                Decimal(str(r["balance"])) + Decimal(str(r["locked"])),
+                Decimal(str(r.get("avg_buy_price") or "0")),
+            )
+            for r in rows
+        }
+
     def get_order(self, identifier: str) -> UpbitOrder | None:
         """``identifier`` 로 조회. 없으면 None (주문이 들어가지 않았다)."""
         data = self._get("/order", {"identifier": identifier}, auth=True)
