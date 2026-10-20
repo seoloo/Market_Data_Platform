@@ -2588,3 +2588,4 @@ READY_FOR_APPROVED_EXPLANATORY_PILOT/정식UNVERIFIED, 코드/입력동결 후36
 
 - 사용자 "vega 알림에 오는 수익이 업비트에 있는 것과 다른데 … 동기화" · "항시 모든 현황 알림은 동기화". 원인: ① Vega 코인 원가가 실행기 주문 기록만으로 계산돼 10-13 정리 매도가 빠짐(BTC 원가 110,792 → −36.9%), ② 총 입금에 10-08 ~ 14 옛 기록, ③ 현황이 장부(매일 09:05 · 21:00 갱신) 그대로, ④ Deneb 카드 원가에 매도 금액이 더해짐.
 - 고침: `UpbitClient.accounts`(잔고 · 평균가), Vega `pnl_lines` 평균가 원가, Vega 장부 재시작 기준(471,507 원, 옛 입금 `deposits_archive`, 백업 `state.json.bak-20261020`), `ui/live_sync.py` + `build_books(sync=True)`, Deneb 카드 이동평균 원가, Deneb 미리 보기 체결 반영. 확인: 현황 Vega BTC · ETH · SOL −0.5% (업비트와 같음), Deneb TQQQ · SCHD −1.5%, 자동 적립 BTQ 밤사이 체결 반영. 시험 추가 · 전체 통과.
+- 10-20 사용자 "자동 적립 같은 경우는 만약 정리한 종목이 있다면 그 종목에 대한 수익과 수익률은 빼줘": `live_sync` 가 토스 실제 보유 수량을 가져와 적립 장부 사본 last_qty 로, `accumulate_book` 은 판 몫 원가 · 손익을 이동평균으로 뺌(다 팔면 카드에서 뺌, 국내 적립 포함). 확인: 사용자가 10-20 0 시쯤 QS 2 · WQTM 1 을 직접 팔아 현황 자동 적립 = BTQ 6 주만(19,931 → 17,678원, −11.3%).

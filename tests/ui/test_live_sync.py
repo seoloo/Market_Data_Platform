@@ -80,3 +80,38 @@ def test_no_env_means_no_sync(tmp_path: Path) -> None:
     (up / "state.json").write_text(json.dumps({"expected": {"KRW": "1000"}}), encoding="utf-8")
     books = build_books(tmp_path, Quotes())
     assert books and not any("실제 잔고" in n for b in books for n in b.notes)
+
+
+def _acc(
+    sym: str, qty: float, buys: list[tuple[float, float]], base: float = 0.0
+) -> dict[str, object]:
+    return {
+        "symbol": sym, "last_qty": qty, "baseline_qty": base,
+        "buys": [{"date": f"2026-10-1{i}", "qty": n, "cost_usd": c, "fx_rate": 1400.0}
+                 for i, (n, c) in enumerate(buys)],
+    }  # fmt: skip
+
+
+def test_accumulate_excludes_liquidated_symbols() -> None:
+    """2026-10-20 사용자 '정리한 종목이 있다면 그 종목에 대한 수익과 수익률은 빼줘'."""
+    from auto_trading.ui.live_home import accumulate_book
+
+    q = Quotes(fx=1400.0, usd={"BTQ": 3.0, "QS": 5.0, "OLD": 9.0})
+    book = accumulate_book(
+        [
+            _acc("BTQ", 5.0, [(5.0, 10.0)]),  # 그대로: 원가 $10 → 평가 $15
+            _acc("OLD", 0.0, [(2.0, 20.0)]),  # 다 정리: 원가 · 수익 다 뺌
+            _acc("QS", 1.0, [(2.0, 8.0)]),  # 절반 정리: 원가 반만
+        ],
+        q,
+    )
+    assert [h.name for h in book.holdings] == ["BTQ", "QS"]
+    assert abs(book.deposits_krw - (10.0 + 4.0) * 1400.0) < 1e-6
+    assert any("정리한 종목 OLD, QS(일부)" in n for n in book.notes)
+
+
+def test_live_holdings_override_ledger_qty() -> None:
+    st = _acc("BTQ", 5.0, [(5.0, 10.0)])
+    assert live_sync.apply_plan(st, {}, 1400.0, {"BTQ": 0.0})["last_qty"] == 0.0
+    assert live_sync.apply_plan(st, {}, 1400.0, {})["last_qty"] == 0.0  # 계좌에 없으면 0
+    assert live_sync.apply_plan(st, {}, 1400.0, None)["last_qty"] == 5.0  # 조회 안 함 → 장부

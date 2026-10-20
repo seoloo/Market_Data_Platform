@@ -37,6 +37,8 @@ class Sync:
     """통화 → (잔고, 매수 평균가). None = 조회 안 함 · 실패."""
     toss: dict[str, dict[str, float | str]] = field(default_factory=dict)
     """토스 주문 번호 → {status, filled_qty, filled_amount, commission}."""
+    toss_qty: dict[str, float] | None = None
+    """토스 미국 보유 수량 (적립 장부 last_qty 와 같은 뜻 — 계좌 전체). None = 조회 안 함."""
     notes: list[str] = field(default_factory=list)
     at: float = 0.0
 
@@ -114,9 +116,13 @@ def apply_deneb(
 
 
 def apply_plan(
-    state: Mapping[str, Any], toss: Mapping[str, Mapping[str, float | str]], fx: float | None
+    state: Mapping[str, Any],
+    toss: Mapping[str, Mapping[str, float | str]],
+    fx: float | None,
+    holdings: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
-    """토스 미국 적립 장부 사본: 접수(매수) 주문 중 체결된 것을 산 것 · 보유로 반영."""
+    """토스 미국 적립 장부 사본: 접수(매수) 주문 중 체결된 것을 산 것으로 반영하고, ``holdings``
+    (실제 보유)가 있으면 보유 수량을 그것으로 — 정리 · 직접 매도가 다음 적립 실행 전에도 보이게."""
     out = copy.deepcopy(dict(state))
     if out.get("currency") == "KRW":
         return out  # 국내 적립은 장부 형식이 달라 그대로
@@ -144,6 +150,8 @@ def apply_plan(
         out["last_qty"] = _f(out.get("last_qty")) + n
         o["status"] = "FILLED"
     out["buys"] = buys
+    if holdings is not None:
+        out["last_qty"] = float(holdings.get(str(out.get("symbol") or "").upper(), 0.0))
     return out
 
 
@@ -193,7 +201,8 @@ def load(
         except Exception as exc:  # 조회 실패로 현황을 막지 않는다
             out.notes.append(f"업비트 조회 실패 — 장부 기준 ({type(exc).__name__})")
     ids = sent_ids(deneb, plans)
-    if ids:
+    want_qty = any(p.get("currency") != "KRW" and p.get("symbol") for p in plans)
+    if ids or want_qty:
         try:
             from auto_trading.config.secrets import load_toss_credentials
             from auto_trading.exchange.toss import TossReader, TossTokenCache
@@ -202,6 +211,8 @@ def load(
                 load_toss_credentials(env_path), TossTokenCache(root / "data" / "toss_token.json")
             )
             try:
+                if want_qty:
+                    out.toss_qty = {k: float(v.qty) for k, v in r.holdings().items()}
                 for oid in ids:
                     st = r.order_status(oid)
                     out.toss[oid] = {

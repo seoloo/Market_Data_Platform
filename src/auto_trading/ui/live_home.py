@@ -729,6 +729,13 @@ def sirius_book(state: Mapping[str, Any], q: Quotes) -> Book:
     )
 
 
+def _kept_cost(cost: float, held: float, bought: float) -> float:
+    """남은 몫의 원가 — 산 수량보다 적게 들고 있으면 이동평균으로 판 몫을 뺀다(다 팔면 0)."""
+    if bought <= 0 or held >= bought - 1e-9:
+        return cost
+    return cost * max(held, 0.0) / bought
+
+
 def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
     holdings = []
     activity: list[tuple[str, str]] = []
@@ -763,9 +770,14 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
                     )
                 )
             n = _f(st.get("last_qty"))
+            bought_k = sum(_f(b.get("qty")) for b in buys)
+            kept = _kept_cost(k_cost, n, bought_k)
+            if kept < k_cost:  # 정리(다 · 일부 판) — 판 몫의 원가 · 손익을 뺀다 (2026-10-20)
+                total_cost -= k_cost - kept
+                sold.append(name if n <= 0 else f"{name}(일부)")
             if n > 0:
                 px = q.usd.get(kr_ticker(st))
-                holdings.append(Holding(name, n, k_cost, None if px is None else n * px))
+                holdings.append(Holding(name, n, kept, None if px is None else n * px))
             continue
         # 'cost' 칸은 장부마다 단위가 달라(원 · 달러) 쓰지 않는다 — 달러 원가 × 그날 환율.
         cost = sum(_f(b.get("cost_usd")) * _f(b.get("fx_rate")) for b in buys)
@@ -790,14 +802,18 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
                 )
             )
         n = _f(st.get("last_qty"))
-        if n <= 0:
-            # 다 팔린 장부 — 산 원가를 '넣은 돈' 에서 빼 가짜 손실이 안 보이게 (2026-10-16)
-            if buys:
-                total_cost -= cost
-                sold.append(sym)
-            continue
-        price = q.usd.get(sym)
         bought = sum(_f(b.get("qty")) for b in buys)
+        mine = max(n - _f(st.get("baseline_qty")), 0.0)  # 적립으로 산 몫 (기존 보유 빼고)
+        kept = _kept_cost(cost, mine, bought)
+        if kept < cost:
+            # 정리한 종목(다 · 일부 판) — 판 몫의 원가 · 손익을 뺀다: '넣은 돈' 에서 빼 가짜 손실 ·
+            # 이익이 안 보이게 (2026-10-16 다 판 장부, 2026-10-20 사용자 '정리한 종목 수익 빼줘')
+            total_cost -= cost - kept
+            sold.append(sym if mine <= 0 else f"{sym}(일부)")
+            cost = kept
+        if n <= 0 or (mine <= 0 and buys):
+            continue  # 적립 몫을 다 정리 — 남은 것은 기존 보유(장부 밖)라 카드에서 뺀다
+        price = q.usd.get(sym)
         usd = sum(_f(b.get("cost_usd")) for b in buys)
         holdings.append(
             Holding(
@@ -818,7 +834,11 @@ def accumulate_book(states: Iterable[Mapping[str, Any]], q: Quotes) -> Book:
         tuple(holdings),
         (
             "입금 = 산 원가 (적립은 따로 입금 기록이 없다)",
-            *([f"다 판 종목 {', '.join(sold)} — 원가에서 뺌 (판 돈은 토스 현금)"] if sold else []),
+            *(
+                [f"정리한 종목 {', '.join(sold)} — 판 몫의 원가 · 수익은 뺌 (판 돈은 토스 현금)"]
+                if sold
+                else []
+            ),
         ),
         (),
         tuple(activity),
@@ -881,7 +901,7 @@ def build_books(root: Path, q: Quotes, *, sync: bool = True) -> list[Book]:
     if s is not None and deneb:
         deneb = live_sync.apply_deneb(deneb, s.toss)
     if s is not None:
-        plans = [live_sync.apply_plan(p, s.toss, q.fx) for p in plans]
+        plans = [live_sync.apply_plan(p, s.toss, q.fx, s.toss_qty) for p in plans]
     if deneb:
         book = deneb_book(deneb, q)
         halt = root / "data" / "HALT_deneb"
