@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from auto_trading.ops.fire import Snapshot, monthly_rate, months_to_target, report_text
 
@@ -34,3 +35,31 @@ def test_report_text() -> None:
     assert "⚪ 보통(연 12%)" in text and "년" in text
     empty = report_text(date(2026, 11, 1), Snapshot(0.0, 0.0), 0.0, None)
     assert "계산하지 못했어요" in empty
+
+
+def test_vega_deposits_come_from_upbit_ledger_even_if_old_binance_ledger_remains(
+    tmp_path: Path,
+) -> None:
+    """2026-10-21 사용자 "그렇게 고쳐줘" — Vega 입금은 업비트 장부만.
+    옛 바이낸스 장부 · Altair 이체는 세지 않는다(이중 셈 방지)."""
+    import json
+
+    from scripts.fire_report import dated_deposits
+
+    def write(rel: str, data: object) -> None:
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    write(
+        "data/upbit_t2/state.json",
+        {
+            "deposits": [["2026-10-19", "471507"]],
+            "deposits_archive": {"deposits": [["2026-10-08", "300000"]]},
+        },
+    )
+    write(
+        "data/vega/state.json",
+        {"deposits": [["2026-10-15", "160"]], "altair": {"transfers": [["2026-10-16", "50"]]}},
+    )
+    assert dated_deposits(tmp_path) == [("2026-10-19", 471507.0)]
