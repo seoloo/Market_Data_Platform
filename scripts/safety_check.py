@@ -75,7 +75,7 @@ def check() -> tuple[list[sc.Finding], list[str], dict[str, Any]]:
     findings += sc.state_changes(prev.get("switches") or {}, switches, "스위치")
     findings += sc.state_changes(prev.get("halts") or {}, halts, "정지")
 
-    # 바이낸스 — 키 권한 · 현물(Vega 장부) · 선물
+    # 바이낸스 — 키 권한 · 선물 (Vega 는 2026-10-19 업비트로 — 바이낸스 Vega 장부는 은퇴)
     try:
         from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
 
@@ -85,13 +85,26 @@ def check() -> tuple[list[sc.Finding], list[str], dict[str, Any]]:
             findings += sc.key_issues(
                 spot._request("/sapi/v1/account/apiRestrictions", {}, signed=True)
             )
-            vega = json.loads((REPO / "data" / "vega" / "state.json").read_text(encoding="utf-8"))
-            if vega.get("expected"):
-                findings += sc.vega_issues(vega["expected"], spot.balances())
         finally:
             spot.close()
     except Exception as exc:
-        failed.append(f"바이낸스 현물 · 키 ({type(exc).__name__})")
+        failed.append(f"바이낸스 키 ({type(exc).__name__})")
+    # 업비트 — Vega 장부('있어야 할' 코인)보다 실제 코인이 적은지 (조회만, 주문 꺼짐)
+    try:
+        from auto_trading.exchange.upbit import UpbitClient
+
+        env = read_env_file(REPO / ".env")
+        upbit = UpbitClient(env["UPBIT_API_KEY"], env["UPBIT_AOU_SECRET"], trading_enabled=False)
+        try:
+            vega = json.loads(
+                (REPO / "data" / "upbit_t2" / "state.json").read_text(encoding="utf-8")
+            )
+            if vega.get("expected"):
+                findings += sc.vega_issues(vega["expected"], upbit.balances())
+        finally:
+            upbit.close()
+    except Exception as exc:
+        failed.append(f"업비트 Vega 장부 ({type(exc).__name__})")
     try:
         from auto_trading.exchange.binance_usdm_live import BinanceUsdmLive, load_live_futures
 

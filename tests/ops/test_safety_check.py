@@ -51,8 +51,8 @@ def test_tasks_duplicates_and_required() -> None:
 
 
 def test_vega_sold_outside_ledger_and_holdings() -> None:
-    exp = {"USDT": "159", "BTC": "0.00030375", "ETH": "0.00732129"}
-    got = {"USDT": D("218"), "BTC": D("0.00000375"), "ETH": D("0.00732")}  # ETH 수수료만큼은 괜찮음
+    exp = {"KRW": "300000", "BTC": "0.00030375", "ETH": "0.00732129"}
+    got = {"KRW": D("1000"), "BTC": D("0.00000375"), "ETH": D("0.00732")}  # ETH 수수료만큼은 괜찮음
     texts = [f.text for f in m.vega_issues(exp, got)]
     assert len(texts) == 1 and "Vega BTC" in texts[0]
     assert m.holding_issues("Deneb", {"TQQQ": D(0)}, {}) == []

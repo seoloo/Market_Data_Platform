@@ -8,7 +8,7 @@
 * 바이낸스 키 권한 — 출금이 켜졌거나 IP 제한이 풀렸으면 경고.
 * 바이낸스 선물 — 다중 자산 모드 꺼짐 · 헤지 모드 · Altair 꺼져 있는데 포지션 있음.
 * 예약 — 같은 일을 하는 옛 · 새 예약이 함께 켜짐, 꼭 필요한 예약이 꺼짐.
-* 장부 vs 실제 잔고 — Vega 코인이 장부보다 적음(장부 밖 매도),
+* 장부 vs 실제 잔고 — Vega(업비트, 2026-10-19 부터) 코인이 장부보다 적음(장부 밖 매도),
   Deneb · 💹 개별주 장부가 토스 보유보다 많음.
 * 그룹 정지 — 어제와 달라졌을 때만 알림(일부러 멈춘 Deneb 을 매일 말하지 않게).
 """
@@ -108,7 +108,7 @@ def vega_issues(expected: Mapping[str, str], actual: Mapping[str, Decimal]) -> l
     """Vega 장부(마지막 실행 뒤 '있어야 할' 잔고)보다 코인이 적으면 장부 밖 매도."""
     out = []
     for coin, exp in expected.items():
-        if coin == "USDT":
+        if coin in ("USDT", "KRW"):  # 현금은 입출금으로 늘고 줄어 비교하지 않는다
             continue
         want, got = Decimal(str(exp)), actual.get(coin, Decimal(0))
         if want > 0 and got < want * (1 - COIN_TOLERANCE):
