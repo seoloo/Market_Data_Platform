@@ -1,9 +1,13 @@
-"""국내 주식 매일 적립 — 순수 계산 (사용자 2026-10-10 "국내 주식도 포함").
+"""🇰🇷 국내 주식 매일 적립 계산 (사용자 2026-10-10 "국내 주식도 포함") · 토스 종목 찾기.
+
+언제 쓰나: 평일 12:10 ``AutoTrading_Toss_KR`` (``scripts/toss_kr.py``) · 설정 화면 '종목 추가'.
+읽고 쓰는 것: 계산만 — :func:`read_universe` 만 종목 목록 ``data/toss/universe.json`` 을 읽는다.
 
 * 하루 금액(원)이 달력 날마다 쌓이고, 쌓인 돈이 1 주 값(+ 비용)이 되면 1 주를 산다.
   미국 적립과 같은 셈.
 * 토스 API 는 국내 장 마감 지정가(CLS)가 없다 → **평일 낮 당일(DAY) 지정가**, 현재가 +0.5% 를
-  호가 단위로 올림(바로 체결될 만큼, 시장가는 쓰지 않는다 — 사용자 규칙 2026-10-05).
+  호가 단위로 올림(바로 체결될 만큼 — 2026-10-05 당시 사용자 규칙 '시장가 금지',
+  규칙은 10-18 에 지워졌지만 이 코드는 그대로).
 * 체결은 다음 실행에서 주문 상세로 확인한다(당일 지정가는 장 마감에 남은 수량이 저절로 취소).
 """
 
@@ -22,10 +26,12 @@ COST = 0.0015
 
 
 def tick(price: float, etf: bool) -> int:
-    """유가증권 · 코스닥 호가 단위 (2023-01 개편). ETF · ETN 은 2,000 원 미만 1 원, 그 위 5 원."""
+    """[쓰임] 그 가격의 호가 단위 (원) — 유가증권 · 코스닥 (2023-01 개편).
+    [이유] 호가 단위에 안 맞는 가격은 주문이 거절된다.
+           ETF · ETN 은 2,000 원 미만 1 원, 그 위 5 원."""
     if etf:
         return 1 if price < 2_000 else 5
-    for top, step in (
+    for upper_price, step in (
         (2_000, 1),
         (5_000, 5),
         (20_000, 10),
@@ -33,47 +39,51 @@ def tick(price: float, etf: bool) -> int:
         (200_000, 100),
         (500_000, 500),
     ):
-        if price < top:
+        if price < upper_price:
             return step
     return 1_000
 
 
 def limit_for(price: float, etf: bool) -> int:
-    """현재가 +0.5% 를 그 가격대 호가 단위로 올린 지정가."""
-    want = price * (1 + BUFFER)
-    step = tick(want, etf)
-    return int(math.ceil(want / step) * step)
+    """[쓰임] 현재가 +0.5% 를 그 가격대 호가 단위로 올린 지정가 (원)."""
+    wanted = price * (1 + BUFFER)
+    step = tick(wanted, etf)
+    return int(math.ceil(wanted / step) * step)
 
 
-def _days(a: str, b: str) -> int:
+def _days(start: str, end: str) -> int:
+    """[쓰임] 두 날짜 사이 날수 — 양 끝 포함."""
     from datetime import date
 
-    return (date.fromisoformat(b) - date.fromisoformat(a)).days + 1
+    return (date.fromisoformat(end) - date.fromisoformat(start)).days + 1
 
 
-def accrual(history: Sequence[tuple[str, float]], start: str, today: str) -> float:
-    """(그날부터, 하루 금액) 기록 → ``start`` ~ ``today`` (양 끝 포함) 쌓인 돈. 끈 기간은 0."""
-    if today < start:
-        return 0.0
-    rows = sorted(history)
-    total = 0.0
-    for i, (day, rate) in enumerate(rows):
-        seg_from = max(day, start)
-        seg_to = rows[i + 1][0] if i + 1 < len(rows) else None
-        last = today if seg_to is None else min(today, _prev(seg_to))
-        if seg_from <= last:
-            total += rate * _days(seg_from, last)
-    return total
-
-
-def _prev(day: str) -> str:
+def _previous_day(day: str) -> str:
     from datetime import date, timedelta
 
     return (date.fromisoformat(day) - timedelta(days=1)).isoformat()
 
 
+def accrual(history: Sequence[tuple[str, float]], start: str, today: str) -> float:
+    """[쓰임] (그날부터, 하루 금액) 기록 → ``start`` ~ ``today`` (양 끝 포함) 쌓인 돈. 끈 기간은 0.
+    [이유] 하루 금액을 바꿔도 지난 날은 그때 금액으로 센다 (설정 화면 '내일부터')."""
+    if today < start:
+        return 0.0
+    rows = sorted(history)
+    total = 0.0
+    for index, (day, rate) in enumerate(rows):
+        segment_start = max(day, start)
+        next_change = rows[index + 1][0] if index + 1 < len(rows) else None
+        segment_end = today if next_change is None else min(today, _previous_day(next_change))
+        if segment_start <= segment_end:
+            total += rate * _days(segment_start, segment_end)
+    return total
+
+
 @dataclass(slots=True)
 class KrOrder:
+    """국내 적립 주문 하나 (장부 ``orders`` 한 줄 — 키 이름은 파일에 저장돼 바꾸지 않는다)."""
+
     date: str
     limit: int
     client_id: str
@@ -88,6 +98,8 @@ class KrOrder:
 
 @dataclass(slots=True)
 class KrState:
+    """국내 적립 종목 장부 (``data/toss/KR_<코드>.json``)."""
+
     symbol: str
     name: str
     etf: bool
@@ -101,32 +113,36 @@ class KrState:
 
     @property
     def qty(self) -> float:
-        return sum(float(b["qty"]) for b in self.buys)
+        """[쓰임] 적립으로 산 수량 합."""
+        return sum(float(buy["qty"]) for buy in self.buys)
 
     @property
     def spent(self) -> float:
-        return sum(float(b["cost_krw"]) for b in self.buys)
+        """[쓰임] 적립으로 쓴 돈 합 (수수료 포함, 원)."""
+        return sum(float(buy["cost_krw"]) for buy in self.buys)
 
     def to_dict(self) -> dict[str, Any]:
-        d = asdict(self)
-        d["last_qty"] = self.qty  # 대시보드 · 보고가 읽는 이름 (미국 적립 장부와 같게)
-        return d
+        data = asdict(self)
+        data["last_qty"] = self.qty  # 대시보드 · 보고가 읽는 이름 (미국 적립 장부와 같게)
+        return data
 
     @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> KrState:
+    def from_dict(cls, data: Mapping[str, Any]) -> KrState:
         return cls(
-            symbol=str(d["symbol"]),
-            name=str(d.get("name") or d["symbol"]),
-            etf=bool(d.get("etf")),
-            start_date=str(d["start_date"]),
-            buys=[dict(b) for b in d.get("buys") or []],
-            orders=[KrOrder(**o) for o in d.get("orders") or []],
-            market=str(d.get("market") or ""),
+            symbol=str(data["symbol"]),
+            name=str(data.get("name") or data["symbol"]),
+            etf=bool(data.get("etf")),
+            start_date=str(data["start_date"]),
+            buys=[dict(buy) for buy in data.get("buys") or []],
+            orders=[KrOrder(**order) for order in data.get("orders") or []],
+            market=str(data.get("market") or ""),
         )
 
 
 @dataclass(frozen=True, slots=True)
 class KrAdvice:
+    """오늘 판단."""
+
     status: str
     """BUY · WAIT · OPEN(어제 주문 확인 전) · OFF."""
     accrued: float
@@ -138,14 +154,17 @@ class KrAdvice:
 def advise(
     state: KrState, history: Sequence[tuple[str, float]], today: str, price: float
 ) -> KrAdvice:
+    """[쓰임] 오늘 살 차례인가 — 쌓인 돈(쓴 돈 뺌)이 1 주 지정가 + 비용 여유 이상이면 BUY.
+    [이유] 확인 전 주문이 있으면(OPEN) · 꺼졌으면(OFF) · 오늘 이미 냈으면(WAIT) 사지 않는다
+           — 하루 한 건."""
     accrued = accrual(history, state.start_date, today) - state.spent
     limit = limit_for(price, state.etf)
     need = limit * (1 + COST)
-    if any(o.status in ("SENT", "UNKNOWN") for o in state.orders):
+    if any(order.status in ("SENT", "UNKNOWN") for order in state.orders):
         return KrAdvice("OPEN", accrued, limit, need)
     if not history or sorted(history)[-1][1] <= 0:
         return KrAdvice("OFF", accrued, limit, need)
-    if any(o.date == today for o in state.orders):
+    if any(order.date == today for order in state.orders):
         return KrAdvice("WAIT", accrued, limit, need)  # 하루 한 건
     return KrAdvice("BUY" if accrued >= need else "WAIT", accrued, limit, need)
 
@@ -153,10 +172,14 @@ def advise(
 def settle(
     order: KrOrder, status: str, filled_qty: float, filled_krw: float, commission: float
 ) -> dict[str, Any] | None:
-    """주문 상세 → 주문 상태를 고치고, 체결이 있으면 장부에 넣을 매수 한 줄."""
+    """[쓰임] 주문 상세 → 주문 상태를 고치고, 체결이 있으면 장부에 넣을 매수 한 줄.
+
+    아직 장중(대기 · 부분 체결)이면 None 을 돌려주고 주문은 그대로 둔다."""
     if status in ("PENDING", "PENDING_CANCEL", "PENDING_REPLACE", "PARTIAL_FILLED"):
         return None  # 아직 장중
-    order.filled_qty, order.filled_krw, order.commission = filled_qty, filled_krw, commission
+    order.filled_qty = filled_qty
+    order.filled_krw = filled_krw
+    order.commission = commission
     if filled_qty > 0:
         order.status = "FILLED"
         return {"date": order.date, "qty": filled_qty, "cost_krw": filled_krw + commission}
@@ -167,12 +190,15 @@ def settle(
 # ---------------------------------------------------------------- 종목 찾기
 
 
-def _norm(text: str) -> str:
+def _normalize(text: str) -> str:
+    """[쓰임] 찾기용 글자 — 띄어쓰기 · 점 · 괄호 · 하이픈을 지우고 대소문자를 무시."""
     return re.sub(r"[\s·\-_.()]+", "", text).casefold()
 
 
 @dataclass(frozen=True, slots=True)
 class Listed:
+    """토스 거래 가능 종목 하나."""
+
     symbol: str
     name: str
     market: str
@@ -190,36 +216,45 @@ class Listed:
 
 
 def universe_rows(by_market: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[Listed]:
-    out = []
+    """[쓰임] 토스 종목 목록 {시장: [행]} → :class:`Listed` 목록 (기호 · 이름이 빈 줄은 뺀다)."""
+    listed = []
     for market, rows in by_market.items():
-        for r in rows:
-            sym, name = str(r.get("symbol") or ""), str(r.get("name") or "")
-            if sym and name:
-                out.append(Listed(sym.upper(), name, market, str(r.get("securityType") or "")))
-    return out
+        for row in rows:
+            symbol = str(row.get("symbol") or "")
+            name = str(row.get("name") or "")
+            if symbol and name:
+                listed.append(
+                    Listed(symbol.upper(), name, market, str(row.get("securityType") or ""))
+                )
+    return listed
 
 
 def find(query: str, universe: Sequence[Listed], country: str) -> list[Listed]:
-    """기호 · 코드 · 한글 이름(띄어쓰기 무시)으로 찾는다.
-
-    정확히 맞는 것 하나, 없으면 이름에 포함된 것 5 개."""
-    q = query.strip()
-    pool = [x for x in universe if x.country == country]
-    exact = [x for x in pool if x.symbol == q.upper() or _norm(x.name) == _norm(q)]
+    """[쓰임] 기호 · 코드 · 한글 이름(띄어쓰기 무시)으로 찾는다.
+    [이유] 정확히 맞는 것이 있으면 그 하나만, 없으면 이름에 포함된 것 5 개 (고르기 쉽게)."""
+    query = query.strip()
+    pool = [item for item in universe if item.country == country]
+    exact = [
+        item
+        for item in pool
+        if item.symbol == query.upper() or _normalize(item.name) == _normalize(query)
+    ]
     if exact:
         return exact[:1]
-    key = _norm(q)
-    return [x for x in pool if key and key in _norm(x.name)][:5]
+    key = _normalize(query)
+    return [item for item in pool if key and key in _normalize(item.name)][:5]
 
 
 def read_universe(path: Any) -> list[Listed]:
-    """``data/toss/universe.json`` ({"markets": {시장: [행]}}) → 목록. 없거나 깨지면 빈 목록."""
+    """[쓰임] ``data/toss/universe.json`` ({"markets": {시장: [행]}}) → 목록.
+
+    없거나 깨지면 빈 목록."""
     import json
     from pathlib import Path
 
     try:
-        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    markets = d.get("markets") if isinstance(d, dict) else None
+    markets = data.get("markets") if isinstance(data, dict) else None
     return universe_rows(markets) if isinstance(markets, dict) else []

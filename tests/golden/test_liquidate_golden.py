@@ -9,10 +9,13 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 from decimal import Decimal
 from typing import Any
+
+import pytest
 
 from scripts import liquidate as liq
 from tests.golden.test_live_golden import _check_golden, _json_text
@@ -28,8 +31,12 @@ def _jobs_text() -> str:
     return "\n".join(rows)
 
 
-def test_golden_liquidate_flows(env: dict[str, Any]) -> None:
+def test_golden_liquidate_flows(env: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     tmp = env["tmp"]
+    # 시계 고정 — 부를 때마다 61 초씩 간다. 작업 번호가 '시작한 초' 라 실제 시계로는 같은 초에
+    # 시작한 두 작업이 겹쳐(앞 작업 기록을 덮어씀) 돌릴 때마다 결과가 달라졌다 (2026-10-21 발견).
+    ticks = itertools.count()
+    monkeypatch.setattr(liq, "_now_ms", lambda: 1_792_000_000_000 + next(ticks) * 61_000)
     out: list[str] = ["## Deneb 만 (장 닫힘)", liq.start("deneb", "텔레그램")]
     FakeToss.open_session = True
     try:
