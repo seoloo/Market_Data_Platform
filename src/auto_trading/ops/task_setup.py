@@ -58,7 +58,6 @@ TASKS: tuple[TaskDef, ...] = (
     TaskDef("AutoTrading_Toss_KR", "toss_kr", "국내 주식 적립", "평일 12:10"),
     TaskDef("AutoTrading_Vega", "vega", "Vega 매매 (업비트, 2026-10-19 ~)", "매일 09:05"),
     TaskDef("AutoTrading_Vega_Weekly", "vega", "Vega 주간 요약 (업비트)", "토요일 09:30"),
-    TaskDef("AutoTrading_Altair", "altair", "Altair 실거래 (바이낸스 선물, 2026-10-19 정리)", "5분마다"),
     TaskDef(
         "AutoTrading_Sirius",
         "sirius",
@@ -88,13 +87,8 @@ GROUPS: tuple[tuple[str, str, str], ...] = (
     ("toss_kr", "토스 국내 적립", "국내 주식 적립을 쓸 때만"),
     (
         "vega",
-        "Vega (바이낸스 코인)",
-        "바이낸스 거래 키(BINANCE_LIVE_*) 필요 — 2026-10-15 업비트에서 옮김",
-    ),
-    (
-        "altair",
-        "Altair (바이낸스 선물)",
-        "선물 거래 키 · .env 주문 허용 · 설정 'Altair 실거래' 를 켜야 주문 — 꺼져 있으면 아무것도 안 함",
+        "Vega (업비트 코인)",
+        "업비트 키(UPBIT_*) · .env 주문 허용 필요 — 2026-10-19 바이낸스에서 업비트로 되돌림",
     ),
     (
         "sirius",

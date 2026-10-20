@@ -117,7 +117,6 @@ FIELDS: tuple[Field, ...] = (
     Field("alerts.news", "종목 뉴스 답", "bool", True, "바로"),
     Field("alerts.events", "경제 일정 · 실적 경고", "bool", True, "바로"),
     Field("alerts.paper", "매일 Paper 요약 (21:30)", "bool", True, "다음 21:30 부터"),
-    Field("demo.altair", "Altair 선물 데모 (가짜 돈, 옛 AG4S2)", "bool", True, "다음 4 시간봉부터"),
     Field(
         "stock.orders",
         "개별주 비중 주문 (텔레그램 💹 개별주 · [이대로 매수] 를 누를 때만)",
@@ -138,20 +137,6 @@ FIELDS: tuple[Field, ...] = (
         "bool",
         True,
         "다음 PEAD 실행(화 ~ 토 21:40)부터",
-    ),
-    Field(
-        "vega.earn",
-        "Vega 남는 USDT 를 바이낸스 유동형(Simple Earn)에 — 살 때 먼저 꺼냄",
-        "bool",
-        False,
-        "다음 Vega 실행 · 입금 확인부터",
-    ),
-    Field(
-        "live.altair",
-        "Altair 실거래 (바이낸스 선물 USDC) — .env 주문 허용도 켜야 주문",
-        "bool",
-        False,
-        "다음 4 시간봉부터",
     ),
     Field(
         "live.sirius",
@@ -277,7 +262,6 @@ _OLD_KEYS = {
     "deneb.harvest_on": "glide.harvest_on",
     "alerts.vega_trade": "alerts.cruise_trade",
     "alerts.vega_weekly": "alerts.cruise_weekly",
-    "demo.altair": "demo.ag4s2",
 }
 """2026-10-15 이름 변경 전 키 — 저장된 옛 값이 있으면 그대로 쓴다."""
 

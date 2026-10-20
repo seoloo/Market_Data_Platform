@@ -28,11 +28,10 @@ def test_key_permissions() -> None:
     assert any("출금" in t for t in texts) and any("IP" in t for t in texts)
 
 
-def test_futures_mode_and_stray_positions() -> None:
-    assert m.futures_issues(True, False, {}, False) == []
-    texts = [f.text for f in m.futures_issues(False, True, {"BTCUSDC": D("0.01")}, False)]
-    assert len(texts) == 3 and "단일 자산" in texts[0] and "BTCUSDC 0.01" in texts[2]
-    assert m.futures_issues(True, False, {"BTCUSDC": D("0.01")}, True) == []  # Altair 켜짐
+def test_stray_futures_positions() -> None:
+    assert m.futures_issues({}) == []
+    texts = [f.text for f in m.futures_issues({"BTCUSDC": D("0.01")})]
+    assert len(texts) == 1 and "BTCUSDC 0.01" in texts[0]
 
 
 def test_tasks_duplicates_and_required() -> None:

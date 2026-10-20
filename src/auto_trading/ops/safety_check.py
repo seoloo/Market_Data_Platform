@@ -6,7 +6,7 @@
 
 * 주문 스위치(.env) — 어제와 달라졌으면 알림.
 * 바이낸스 키 권한 — 출금이 켜졌거나 IP 제한이 풀렸으면 경고.
-* 바이낸스 선물 — 다중 자산 모드 꺼짐 · 헤지 모드 · Altair 꺼져 있는데 포지션 있음.
+* 바이낸스 선물 — 포지션이 있음 (Altair 는 2026-10-19 은퇴 — 선물을 쓰는 실행기가 없다).
 * 예약 — 같은 일을 하는 옛 · 새 예약이 함께 켜짐, 꼭 필요한 예약이 꺼짐.
 * 장부 vs 실제 잔고 — Vega(업비트, 2026-10-19 부터) 코인이 장부보다 적음(장부 밖 매도),
   Deneb · 💹 개별주 장부가 토스 보유보다 많음.
@@ -75,19 +75,11 @@ def key_issues(r: Mapping[str, object]) -> list[Finding]:
     return out
 
 
-def futures_issues(
-    multi: bool, hedge: bool, positions: Mapping[str, Decimal], altair_on: bool
-) -> list[Finding]:
+def futures_issues(positions: Mapping[str, Decimal]) -> list[Finding]:
     out = []
-    if not multi:
-        out.append(
-            Finding("warn", "바이낸스 선물이 단일 자산 모드예요 — Altair 는 다중 자산 모드 필수")
-        )
-    if hedge:
-        out.append(Finding("warn", "바이낸스 선물이 헤지 모드예요 — 이 시스템은 one-way 만"))
-    if positions and not altair_on:
+    if positions:
         held = ", ".join(f"{s} {q}" for s, q in sorted(positions.items()))
-        out.append(Finding("warn", f"Altair 가 꺼져 있는데 선물 포지션이 있어요: {held}"))
+        out.append(Finding("warn", f"Altair 은퇴 뒤인데 바이낸스 선물 포지션이 있어요: {held}"))
     return out
 
 

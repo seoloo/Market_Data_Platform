@@ -36,7 +36,7 @@ FLAGS = (
     "UPBIT_TRADING_ENABLED",
     "KIS_TRADING_ENABLED",
 )
-SETTINGS = ("live.altair", "stock.orders", "demo.altair")
+SETTINGS = ("stock.orders",)
 
 
 def _load() -> dict[str, Any]:
@@ -112,10 +112,7 @@ def check() -> tuple[list[sc.Finding], list[str], dict[str, Any]]:
         fut = BinanceUsdmLive(fcreds, trading_enabled=False)
         try:
             findings += sc.futures_issues(
-                fut.multi_assets_margin(),
-                fut.dual_side_position(),
-                {s: p.quantity for s, p in fut.account().positions.items()},
-                bool(user_settings.get(REPO, "live.altair")),
+                {s: p.quantity for s, p in fut.account().positions.items()}
             )
         finally:
             fut.close()
