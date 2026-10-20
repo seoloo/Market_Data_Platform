@@ -434,3 +434,7 @@ Phase 0 자료 감사·정보 도구 기능 검증이지 Phase 4 PASS·새 OOS·
 - 자동 적립 카드 (같은 날 사용자 "정리한 종목이 있다면 그 종목에 대한 수익과 수익률은 빼줘"): 토스 실제 보유 수량으로
   맞춘 뒤, 적립으로 산 수량보다 적게 들고 있으면 판 몫의 원가 · 손익을 이동평균으로 빼고(다 팔면 카드에서 빠짐,
   국내 적립도 같게), '정리한 종목 … — 판 몫의 원가 · 수익은 뺌' 안내.
+- 10-20 보완 (사용자 '보완부분 변경해줘 · polaris는 아직'): `.env` 바이낸스 주문 스위치 두 개(`BINANCE_LIVE_TRADING_ENABLED` ·
+  `BINANCE_FUTURES_LIVE_TRADING_ENABLED`) 끔 — 10-19 정리 때 빠뜨림. 위험 뉴스 거래소 감시 바이낸스 → 업비트.
+  업비트 Vega 주간 요약 새 예약 `AutoTrading_Vega_Weekly`(토 09:30, `vega_upbit weekly`, 일반 권한 — 옛
+  `AutoTrading_Upbit_T2_Weekly` 는 관리자 권한이라 꺼진 채). Polaris(`NAMU_TRADING_ENABLED`)는 그대로 꺼짐.

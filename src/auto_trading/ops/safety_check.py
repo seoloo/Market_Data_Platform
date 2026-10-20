@@ -35,6 +35,7 @@ __all__ = [
 DUPLICATE_TASKS = (
     ("AutoTrading_Binance_Cruise", "AutoTrading_Vega"),
     ("AutoTrading_Upbit_T2_Live", "AutoTrading_Vega"),  # 10-19 Vega 가 다시 업비트 — 옛 업비트 예약
+    ("AutoTrading_Upbit_T2_Weekly", "AutoTrading_Vega_Weekly"),
     ("AutoTrading_Toss_M3_Chat", "AutoTrading_Deneb_Chat"),
     ("AutoTrading_Toss_M3_Retry", "AutoTrading_Deneb_Retry"),
 )

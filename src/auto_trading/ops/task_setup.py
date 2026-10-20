@@ -57,6 +57,7 @@ TASKS: tuple[TaskDef, ...] = (
     TaskDef("AutoTrading_Deneb_Retry", "deneb", "Deneb 체결 확인 · 재시도", "평일 23:40 · 03:30"),
     TaskDef("AutoTrading_Toss_KR", "toss_kr", "국내 주식 적립", "평일 12:10"),
     TaskDef("AutoTrading_Vega", "vega", "Vega 매매 (업비트, 2026-10-19 ~)", "매일 09:05"),
+    TaskDef("AutoTrading_Vega_Weekly", "vega", "Vega 주간 요약 (업비트)", "토요일 09:30"),
     TaskDef("AutoTrading_Altair", "altair", "Altair 실거래 (바이낸스 선물, 2026-10-19 정리)", "5분마다"),
     TaskDef(
         "AutoTrading_Sirius",
