@@ -341,8 +341,8 @@ def test_liquidate_panel_buttons_confirm_and_routes(tmp_path: Path) -> None:
         token = re.search(r'name="token" value="([^"]+)"', page)
         assert token and 'id="set-liquidate"' in page and "그룹 정지 없음" in page
         assert (
-            page.count('action="/settings/liquidate"') == 7
-        )  # 전부 · Vega · Deneb · 적립 · 개별주 · Altair · Sirius
+            page.count('action="/settings/liquidate"') == 6
+        )  # 전부 · Vega · Deneb · 적립 · 개별주 · Sirius
         assert "정말 Vega(업비트 BTC · ETH · SOL)를 정리할까요?" in page
         post = TestServer._post
         tok = token.group(1)

@@ -36,7 +36,6 @@ from auto_trading.config.secrets import (
 )
 from auto_trading.core.errors import AutoTradingError, ConfigError
 from auto_trading.exchange.binance_spot_live import BinanceSpotLive, load_live_spot
-from auto_trading.exchange.binance_usdm_live import BinanceUsdmLive, load_live_futures
 from auto_trading.exchange.toss import (
     TossPosition,
     TossReader,
@@ -68,7 +67,6 @@ from auto_trading.ops.liquidate import (
     groups_of,
     job_text,
     run_binance_item,
-    run_futures_item,
     run_toss_item,
     run_upbit_item,
     scope_label,
@@ -118,45 +116,6 @@ def _binance() -> BinanceSpotLive | None:
     except ConfigError:
         return None
     return BinanceSpotLive(credentials, trading_enabled=enabled)
-
-
-ALTAIR_STATE = REPO / "data" / "altair_live" / "state.json"
-ALTAIR_SYMBOLS = {"BTC": "BTCUSDC", "ETH": "ETHUSDC"}
-"""옛 Altair 실거래 종목 (은퇴한 retired/scripts/altair_live 와 같음)."""
-
-
-def _futures() -> BinanceUsdmLive | None:
-    """[쓰임] 옛 Altair 선물 키. 없으면 None — Altair 몫은 없다고 본다."""
-    try:
-        credentials, enabled = load_live_futures(REPO / ".env")
-    except ConfigError:
-        return None
-    return BinanceUsdmLive(credentials, trading_enabled=enabled)
-
-
-def _altair_positions(client: BinanceUsdmLive) -> dict[str, Decimal]:
-    """[쓰임] 바이낸스 선물 포지션 {코인: 부호 수량} (0 인 것은 뺀다)."""
-    account = client.account()
-    positions = {}
-    for coin, symbol in ALTAIR_SYMBOLS.items():
-        if symbol in account.positions and account.positions[symbol].quantity != 0:
-            positions[coin] = account.positions[symbol].quantity
-    return positions
-
-
-def _altair_forget(coin: str) -> None:
-    """[쓰임] 정리한 코인의 Altair 숏 · 스톱 · 메이커 기록을 지운다.
-    [이유] Altair 실행기가 사라진 포지션을 '스톱 발동' 으로 잘못 읽지 않게 (지금은 은퇴)."""
-    try:
-        state = json.loads(ALTAIR_STATE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
-    state.get("shorts", {}).pop(coin, None)
-    state.get("stops", {}).pop(coin, None)
-    state.get("maker", {}).pop(coin, None)  # 걸어 둔 메이커 주문 기록 (문서 269)
-    if state.get("maker") == {}:
-        state.pop("maker")
-    write_json_atomic(ALTAIR_STATE, state)
 
 
 SIZE_STATE = REPO / "data" / "size_guard" / "state.json"
@@ -358,20 +317,7 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
     binance_min: dict[str, Decimal] = {}
     if "vega" in groups:
         binance_balances, binance_prices, binance_min = _binance_balances(notes)
-    # 2 단계: 옛 Altair 선물
-    futures_positions: dict[str, Decimal] = {}
-    if "altair" in groups:
-        futures = _futures()
-        if futures is None:
-            notes.append("Altair 선물 키 없음 — 바이낸스 선물 포지션은 확인 못 함")
-        else:
-            try:
-                futures_positions = _altair_positions(futures)
-            except AutoTradingError as exc:
-                notes.append(f"바이낸스 선물 조회 실패: {exc}")
-            finally:
-                futures.close()
-    # 3 단계: 토스 보유 · 팔 수 있는 수량
+    # 2 단계: 토스 보유 · 팔 수 있는 수량
     holdings: dict[str, Decimal] = {}
     sellable: dict[str, Decimal] = {}
     only_symbol = symbol_of(scope)
@@ -401,7 +347,6 @@ def plan(scope: str) -> tuple[list[Item], list[str]]:
         binance_balances=binance_balances,
         binance_prices=binance_prices,
         binance_min=binance_min,
-        altair_positions=futures_positions,
         stock_qty=_stock_qty(),
         only_symbol=only_symbol,
         only_acc=only_acc,
@@ -549,58 +494,6 @@ def _cancel_buys(trader: TossTrader, job: Job) -> list[str]:
     return log
 
 
-def _step_futures(job: Job, futures_items: list[Item]) -> list[str]:
-    """[쓰임] 옛 Altair 선물 포지션 닫기 → 닫히면 그 종목 비상 스톱 지우기 · 장부 기록 정리."""
-    log: list[str] = []
-    client = _futures()
-    if client is None:
-        return ["Altair 선물 키 없음 — 바이낸스 앱에서 선물 포지션을 직접 닫아 주세요"]
-    if not client.trading_enabled:
-        client.close()
-        return [
-            "BINANCE_FUTURES_LIVE_TRADING_ENABLED 꺼짐 — 선물 포지션은 바이낸스 앱에서 직접"
-            " 닫아 주세요 (또는 .env 에서 켜면 다음 확인 때 닫아요)"
-        ]
-    try:
-        held = _altair_positions(client)
-        for item in futures_items:
-            symbol = ALTAIR_SYMBOLS[item.symbol]
-            try:
-                # 걸어 둔 메이커 주문(문서 269)이 정리 뒤 체결돼 다시 사지 않게 먼저 취소
-                for open_order in client.open_orders(symbol):
-                    client.cancel_order(symbol, open_order.client_order_id)
-                    log.append(
-                        f"{item.symbol} 걸어 둔 주문 취소"
-                        f" ({open_order.side} {open_order.orig_qty:g})"
-                    )
-                filters = client.filters(symbol)
-                log += run_futures_item(
-                    item,
-                    client,
-                    job.job_id,
-                    _now_ms,
-                    time.sleep,
-                    held=abs(held.get(item.symbol, Decimal(0))),
-                    step=filters.step_size,
-                    tick=filters.tick_size,
-                )
-            except AutoTradingError as exc:
-                item.status = "working"  # 코인은 24 시간 — 다음 확인 때 다시
-                log.append(f"{item.symbol} 바이낸스 선물 오류: {exc} — 다음 확인 때 다시")
-                continue
-            if item.status == "done":
-                for stop in client.open_stops(symbol):
-                    try:
-                        client.cancel_stop(symbol, stop.client_order_id)
-                    except AutoTradingError as exc:
-                        log.append(f"{item.symbol} 스톱 취소 실패: {exc}")
-                _altair_forget(item.symbol)
-                log.append(f"{item.symbol} 선물 비상 스톱 지움")
-    finally:
-        client.close()
-    return log
-
-
 def _open_items(job: Job, venues: tuple[str, ...]) -> list[Item]:
     """[쓰임] 그곳(들)에서 아직 안 끝난 팔 것."""
     return [item for item in job.items if item.venue in venues and item.status not in FINISHED]
@@ -696,9 +589,6 @@ def step(job: Job) -> list[str]:
     binance_items = _open_items(job, ("binance",))
     if binance_items:
         log += _step_binance(job, binance_items)
-    futures_items = _open_items(job, ("binance_fut",))
-    if futures_items:
-        log += _step_futures(job, futures_items)
     toss_items = _open_items(job, ("toss_us", "toss_kr"))
     groups = groups_of(job.scope)
     # 팔 것이 없어도 첫 번에는 매수 취소를 한 번 한다

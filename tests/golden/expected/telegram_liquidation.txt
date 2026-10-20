@@ -1,12 +1,12 @@
 ## 돌려준 값
 [True, False, False, True, False, False, True, False]
 ## 봇
-('buttons', ('🧯 미리 보기\n\n범위를 누르면 바로 시작해요 (5 분 안, 한 번만)', [[{'text': '🧯 전부 정리', 'callback_data': 'liq:<NONCE>:all'}], [{'text': 'Vega 만', 'callback_data': 'liq:<NONCE>:vega'}, {'text': 'Deneb 만', 'callback_data': 'liq:<NONCE>:deneb'}], [{'text': '자동 적립 (종목 고르기)', 'callback_data': 'liq:<NONCE>:accmenu'}, {'text': '개별주만', 'callback_data': 'liq:<NONCE>:stock'}], [{'text': 'Altair 만', 'callback_data': 'liq:<NONCE>:altair'}, {'text': 'Sirius 만', 'callback_data': 'liq:<NONCE>:sirius'}], [{'text': '취소', 'callback_data': 'liq:<NONCE>:cancel'}]]))
+('buttons', ('🧯 미리 보기\n\n범위를 누르면 바로 시작해요 (5 분 안, 한 번만)', [[{'text': '🧯 전부 정리', 'callback_data': 'liq:<NONCE>:all'}], [{'text': 'Vega 만', 'callback_data': 'liq:<NONCE>:vega'}, {'text': 'Deneb 만', 'callback_data': 'liq:<NONCE>:deneb'}], [{'text': '자동 적립 (종목 고르기)', 'callback_data': 'liq:<NONCE>:accmenu'}, {'text': '개별주만', 'callback_data': 'liq:<NONCE>:stock'}], [{'text': 'Sirius 만', 'callback_data': 'liq:<NONCE>:sirius'}], [{'text': '취소', 'callback_data': 'liq:<NONCE>:cancel'}]]))
 ('answer', '접수했어요')
 ('edit', '🧯 Deneb 만 정리 시작 — 결과를 곧 보내요')
 ('answer', '접수했어요')
 ('send', '⌛ 지난 버튼이에요 (5 분 지남 · 이미 누름) — 다시 보내 주세요')
-('buttons', ('🧯 미리 보기\n\n범위를 누르면 바로 시작해요 (5 분 안, 한 번만)', [[{'text': '🧯 전부 정리', 'callback_data': 'liq:<NONCE>:all'}], [{'text': 'Vega 만', 'callback_data': 'liq:<NONCE>:vega'}, {'text': 'Deneb 만', 'callback_data': 'liq:<NONCE>:deneb'}], [{'text': '자동 적립 (종목 고르기)', 'callback_data': 'liq:<NONCE>:accmenu'}, {'text': '개별주만', 'callback_data': 'liq:<NONCE>:stock'}], [{'text': 'Altair 만', 'callback_data': 'liq:<NONCE>:altair'}, {'text': 'Sirius 만', 'callback_data': 'liq:<NONCE>:sirius'}], [{'text': '취소', 'callback_data': 'liq:<NONCE>:cancel'}]]))
+('buttons', ('🧯 미리 보기\n\n범위를 누르면 바로 시작해요 (5 분 안, 한 번만)', [[{'text': '🧯 전부 정리', 'callback_data': 'liq:<NONCE>:all'}], [{'text': 'Vega 만', 'callback_data': 'liq:<NONCE>:vega'}, {'text': 'Deneb 만', 'callback_data': 'liq:<NONCE>:deneb'}], [{'text': '자동 적립 (종목 고르기)', 'callback_data': 'liq:<NONCE>:accmenu'}, {'text': '개별주만', 'callback_data': 'liq:<NONCE>:stock'}], [{'text': 'Sirius 만', 'callback_data': 'liq:<NONCE>:sirius'}], [{'text': '취소', 'callback_data': 'liq:<NONCE>:cancel'}]]))
 ('answer', '접수했어요')
 ('edit', '취소했어요 — 아무것도 바꾸지 않았어요')
 ('answer', '접수했어요')

@@ -12,9 +12,9 @@
   업비트는 매수 호가 몇 칸 아래 지정가 IOC 를 여러 번, 토스는 매수 호가를 따라 당일(DAY) 지정가를
   내고 10 분마다 미체결분을 취소 · 다시 낸다. 어느 쪽도 최우선 매수 호가의 1% 아래로는 내지 않는다.
 * 토스 장이 닫혀 있으면 **다음 정규장 시작 뒤** 판다(그때까지 '대기').
-* 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만 · 개별주만 · Altair 만 · Sirius 만.
-  Altair(은퇴 2026-10-19, 4 · 5 단계에서 뺄 예정)는 바이낸스 USDⓈ-M(USDC) 포지션을 reduce-only
-  지정가 IOC 로 닫는다.
+* 범위: 전부 · Vega 만 · Deneb 만 · 자동 적립만 · 개별주만 · Sirius 만.
+  옛 'Altair 만'(바이낸스 선물, 2026-10-19 은퇴)은 리팩토링 5 단계(2026-10-21)에서 뺐다 —
+  옛 작업 기록은 :data:`RETIRED_SCOPES` 로 읽기만 한다.
 * 개별주(2026-10-16 사용자 "개별주도 자동 정리할 수 있도록"): 💹 개별주 장부(scripts/size_guard)가
   산 몫. '개별주만' · '전부' 에 들어간다.
 * 한 종목(``sym:NVDA``, 사용자 "정리 nvda 이런식으로"): 그 종목의 토스 보유 중 Deneb · 적립 장부
@@ -38,7 +38,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from decimal import ROUND_DOWN, ROUND_UP, Decimal
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -58,7 +58,6 @@ __all__ = [
     "groups_of",
     "job_text",
     "run_binance_item",
-    "run_futures_item",
     "run_toss_item",
     "run_upbit_item",
     "scope_label",
@@ -74,10 +73,12 @@ SCOPES: dict[str, str] = {
     "deneb": "Deneb 만",
     "acc": "자동 적립만",
     "stock": "개별주만",
-    "altair": "Altair 만",
     "sirius": "Sirius 만",
 }
 """정리 범위 키(저장 · 버튼 값) → 보이는 이름."""
+RETIRED_SCOPES: dict[str, str] = {"altair": "Altair 만 (은퇴)"}
+"""은퇴한 전략의 정리 범위 — 옛 작업 기록(``data/liquidate/jobs.json``)을 보일 때만 쓴다.
+[이유] 기록에 남은 범위 키를 모른다고 멈추면 '정리 상태' 답이 깨진다. 새 정리는 시작할 수 없다."""
 SYMBOL_SCOPE = "sym:"
 """한 종목 정리 범위 머리 (``sym:NVDA``)."""
 FLOOR_PCT = D("0.01")
@@ -90,12 +91,9 @@ VENUE_NAMES = {
     "toss_kr": "토스 국내",
     "binance_fut": "바이낸스 선물",
 }
-"""파는 곳 키 → 보이는 이름."""
+"""파는 곳 키 → 보이는 이름. ``binance_fut`` 은 옛 Altair 작업 기록을 보일 때만."""
 UPBIT_ROUNDS = 8
 """업비트 · 바이낸스 현물: 한 번 확인에 IOC 를 몇 번까지 낼지."""
-FUT_ROUNDS = 5
-FUT_PAD = D("0.002")
-"""선물 정리: 표시 가격에서 회차마다 0.2% 씩 더 불리하게 (5 회 = 1% 까지)."""
 TOSS_REPLACE_MS = 10 * 60_000
 """토스: 이만큼(10 분) 덜 찬 주문은 취소하고 지금 호가로 다시 낸다."""
 TOSS_MAX_ORDERS = 12
@@ -128,12 +126,14 @@ def scope_label(scope: str) -> str:
     acc_symbol = acc_symbol_of(scope)
     if acc_symbol:
         return f"자동 적립 {acc_symbol}"
-    return f"{symbol} 한 종목" if symbol else SCOPES.get(scope, scope)
+    if symbol:
+        return f"{symbol} 한 종목"
+    return SCOPES.get(scope) or RETIRED_SCOPES.get(scope, scope)
 
 
 def groups_of(scope: str) -> tuple[str, ...]:
-    """[쓰임] 범위 → 정지할 그룹. 한 종목 정리는 그룹을 멈추지 않는다(빈 값)."""
-    if symbol_of(scope) or acc_symbol_of(scope):
+    """[쓰임] 범위 → 정지할 그룹. 한 종목 정리 · 은퇴한 범위(옛 기록)는 빈 값."""
+    if symbol_of(scope) or acc_symbol_of(scope) or scope in RETIRED_SCOPES:
         return ()
     scope = _OLD_GROUPS.get(scope, scope)
     if scope == "all":
@@ -175,7 +175,7 @@ class Item:
     """팔 것 하나 (곳 · 종목 · 수량)."""
 
     venue: str
-    """upbit · binance · toss_us · toss_kr · binance_fut."""
+    """upbit · binance · toss_us · toss_kr (· binance_fut — 옛 Altair 기록)."""
     symbol: str
     groups: list[str]
     want: Decimal
@@ -189,7 +189,7 @@ class Item:
     note: str = ""
     orders: list[Order] = field(default_factory=list)
     side: str = ""
-    """binance_fut 만: 닫는 방향 (롱이면 SELL, 숏이면 BUY)."""
+    """binance_fut 만(옛 Altair 기록): 닫는 방향 (롱이면 SELL, 숏이면 BUY)."""
 
     @property
     def sold(self) -> Decimal:
@@ -416,7 +416,6 @@ def build_items(
     binance_balances: Mapping[str, Decimal] | None = None,
     binance_prices: Mapping[str, Decimal] | None = None,
     binance_min: Mapping[str, Decimal] | None = None,
-    altair_positions: Mapping[str, Decimal] | None = None,
     stock_qty: Mapping[str, Decimal] | None = None,
     only_symbol: str | None = None,
     only_acc: str | None = None,
@@ -429,17 +428,10 @@ def build_items(
     * Deneb = 토스 TQQQ · SCHD · IAUM 중 Deneb 장부 수량.
     * 토스 적립 = 적립 장부가 산 몫(``acc_qty``) — 장부 밖 보유(사람이 직접 산 종목 · 적립 시작 전
       수량)는 **수동 보유로 남긴다**.
-    * 토스 지정가는 정수 주만 — 소수점은 남기고 알린다(소수점 매도는 시장가만 된다).
-    * Altair = 바이낸스 선물 BTCUSDC · ETHUSDC 포지션 전부(코인 → 부호 수량, 롱 · 숏 모두)."""
+    * 토스 지정가는 정수 주만 — 소수점은 남기고 알린다(소수점 매도는 시장가만 된다)."""
     items: list[Item] = []
     notes: list[str] = []
-    # 1 단계: Altair (바이낸스 선물)
-    if "altair" in groups:
-        for coin, qty in sorted((altair_positions or {}).items()):
-            if qty != 0:
-                side = "SELL" if qty > 0 else "BUY"
-                items.append(Item("binance_fut", coin, ["altair"], abs(qty), side=side))
-    # 2 단계: Vega (업비트 · 바이낸스 현물 코인)
+    # 1 단계: Vega (업비트 · 바이낸스 현물 코인)
     if "vega" in groups:
         for coin in vega_coins:
             qty = upbit_balances.get(coin, ZERO)
@@ -460,7 +452,7 @@ def build_items(
                 notes.append(f"{coin} {_n(qty)} — 바이낸스 최소 주문 {least} USDT 아래 (남김)")
                 continue
             items.append(Item("binance", coin, ["vega"], qty))
-    # 3 단계: 토스 — 종목마다 Deneb · 적립 · 개별주 · 수동 몫으로 나누기
+    # 2 단계: 토스 — 종목마다 Deneb · 적립 · 개별주 · 수동 몫으로 나누기
     manual: list[str] = []
     stocks = stock_qty or {}
     toss_groups = {"deneb", "acc", "stock"} & set(groups)
@@ -513,7 +505,7 @@ def build_items(
                 parts.append("stock")
         if want <= 0:
             continue
-        # 4 단계: 팔 수 있는 수량 (다른 매도에 묶인 것 · 소수점은 남김)
+        # 3 단계: 팔 수 있는 수량 (다른 매도에 묶인 것 · 소수점은 남김)
         sellable = min(want, toss_sellable.get(symbol, held))
         whole = sellable.to_integral_value(rounding=ROUND_DOWN)
         if sellable < want:
@@ -738,84 +730,6 @@ def run_binance_item(
     log.append(
         f"{item.symbol} {_n(item.sold)} 팜 · {item.amount:,.2f} USDT"
         + (f" · 남음 {_n(rest)}" if item.status != "done" else "")
-    )
-    return log
-
-
-class FuturesLike(Protocol):
-    """바이낸스 선물 창구 모양 (옛 Altair)."""
-
-    def mark_price(self, symbol: str) -> Decimal: ...
-    def place_limit_ioc(
-        self,
-        symbol: str,
-        side: str,
-        quantity: Decimal,
-        price: Decimal,
-        client_order_id: str,
-        *,
-        reduce_only: bool,
-    ) -> Any: ...
-    def get_order(self, symbol: str, client_order_id: str) -> Any: ...
-
-
-def run_futures_item(
-    item: Item,
-    client: FuturesLike,
-    job_id: str,
-    now_ms: Callable[[], int],
-    sleep: Callable[[float], None],
-    *,
-    held: Decimal,
-    step: Decimal,
-    tick: Decimal,
-    rounds: int = FUT_ROUNDS,
-) -> list[str]:
-    """[쓰임] 바이낸스 선물(옛 Altair) 포지션 닫기 — reduce-only 지정가 IOC,
-    표시 가격 ± 0.2% × 회차(1% 까지).
-    [이유] ``held`` = 지금 거래소의 그 포지션 절대 수량 — 남은 수량은 장부가 아니라 이것으로 정한다
-           (비상 스톱이 먼저 닫았으면 0). reduce-only 라 포지션보다 많이 닫히지 않는다."""
-    log: list[str] = []
-    symbol = f"{item.symbol}USDC"
-    if held <= 0:
-        item.status = "done"
-        item.note = item.note or "포지션 없음"
-        log.append(f"{item.symbol} 선물 포지션 없음 — 끝")
-        return log
-    remaining = held
-    start = len(item.orders)
-    for round_no in range(rounds):
-        qty = (remaining / step).to_integral_value(rounding=ROUND_DOWN) * step
-        if qty <= 0:
-            break
-        mark = client.mark_price(symbol)
-        pad = FUT_PAD * (round_no + 1)
-        if item.side == "SELL":
-            price = (mark * (1 - pad) / tick).to_integral_value(rounding=ROUND_DOWN) * tick
-        else:
-            price = (mark * (1 + pad) / tick).to_integral_value(rounding=ROUND_UP) * tick
-        identifier = f"liq-{job_id}-{item.symbol}-f{start + round_no}"[:36]
-        try:
-            result = client.place_limit_ioc(
-                symbol, item.side, qty, price, identifier, reduce_only=True
-            )
-        except OrderStateUnknownError:
-            result = client.get_order(symbol, identifier)
-        order = Order(identifier, identifier, qty, price, now_ms(), closed=True, status="IOC")
-        if result is not None:
-            order.filled = result.executed_qty
-            order.amount = result.executed_qty * (result.avg_price or price)
-            order.fee = getattr(result, "fee", ZERO) or ZERO
-        item.orders.append(order)
-        remaining -= order.filled
-        if remaining <= 0:
-            break
-        sleep(1.0)
-    item.status = "done" if remaining < step else "working"
-    log.append(
-        f"{item.symbol} 선물 {'롱' if item.side == 'SELL' else '숏'} {_n(item.sold)} 닫음"
-        f" · {item.amount:,.2f} USDC"
-        + (f" · 남음 {_n(remaining)}" if item.status != "done" else "")
     )
     return log
 

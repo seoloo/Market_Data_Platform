@@ -67,7 +67,6 @@ def test_liquidate_needs_button_and_runs_once(fake: dict[str, list[Any]]) -> Non
         "deneb",
         "accmenu",
         "stock",
-        "altair",
         "sirius",
         "cancel",
     ]

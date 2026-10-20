@@ -126,7 +126,7 @@ HELP = """📌 투자 봇 사용법 — 이렇게 보내 보세요
 🧯 정리 (또는 /liquidate · 청산 · 전부매도)
   보유를 지정가로 팔기 — 미리 보기 뒤 버튼:
   [전부 정리] [Vega 만] [Deneb 만] [자동 적립 (종목 고르기)] [개별주만]
-  [Altair 만] [Sirius 만] [취소]
+  [Sirius 만] [취소]
   자동 적립은 종목을 골라 그 종목 적립 몫만 팔고, 그 종목 적립도 멈춰요
   버튼은 5분 안에 한 번만. 수동 보유(APH 등)는 안 팔아요.
   정리 NVDA (또는 정리 삼성전자) — 그 종목 하나만 (Deneb · 적립 몫 빼고 전부)
@@ -207,7 +207,7 @@ def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
         [button("🧯 전부 정리", "all")],
         [button("Vega 만", "vega"), button("Deneb 만", "deneb")],
         [button("자동 적립 (종목 고르기)", "accmenu"), button("개별주만", "stock")],
-        [button("Altair 만", "altair"), button("Sirius 만", "sirius")],
+        [button("Sirius 만", "sirius")],
         [button("취소", "cancel")],
     ]
 

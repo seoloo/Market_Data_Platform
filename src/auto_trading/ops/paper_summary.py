@@ -158,13 +158,7 @@ def paper_text(root: Path, coins: CoinReader | None = None) -> str:
         lines.append(f"• 고르게 들기 {_won(paper.get('equal_weight_krw'))}")
         above = (kr or {}).get("kospi_above_200d")
         lines.append(f"  KOSPI 200 일선 {'위 — 살 수 있음' if above else '아래 — 새로 안 삼'}")
-    demo = _read(root / "data" / "altair_demo" / "state.json")
-    dh = (demo or {}).get("history") or []
-    if dh:
-        v, base = float(dh[-1][1]), float((demo or {}).get("alloc") or 1000)
-        lines.append(
-            f"• Altair 선물 데모(가짜 돈, 시작 {base:,.0f}) {v:,.0f} USDC ({_pct(v / base - 1)})"
-        )
+    # 옛 Altair 선물 데모(data/altair_demo)는 2026-10-19 은퇴 — 멈춘 장부라 줄을 뺐다 (2026-10-21)
     namu = _read(root / "data" / "namu_follow" / "ledger.json")
     hist = (namu or {}).get("history") or []
     if hist:
