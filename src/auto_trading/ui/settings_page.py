@@ -3,6 +3,10 @@
 흐름: ``GET /settings`` → [저장…] ``POST /settings/review`` (확인 창: 이전 → 이후 · 적용 시점)
 → [저장] ``POST /settings/save`` → ``/settings?saved=N``. 값 검사는 두 번(확인 · 저장) 한다.
 매매 규칙(연구로 정한 값)은 잠금으로 보이기만 한다. '준비 중' 칸은 아직 실행기에 연결 전이다.
+
+언제 쓰나: 대시보드 서버(``ui/server.py``)가 설정 화면 · 확인 창을 그릴 때.
+읽고 쓰는 것: 받은 설정 값으로 HTML 만 만든다 — 파일 · 계좌를 읽거나 쓰지 않는다
+              (저장은 서버가 ``ops/user_settings`` 로).
 """
 
 from __future__ import annotations
@@ -137,11 +141,16 @@ def _tab_css() -> str:
 
     화면을 다시 불러오지 않으니 다른 쪽에서 고치던 값이 그대로 남는다.
     """
-    keys = [k for k, _ in SECTIONS]
+    keys = [section_key for section_key, _ in SECTIONS]
     first = keys[0]
-    active = ",".join(f'.set-row:has(#set-{k}:target) .set-menu a[href="#set-{k}"]' for k in keys)
+    active = ",".join(
+        f'.set-row:has(#set-{section_key}:target) .set-menu a[href="#set-{section_key}"]'
+        for section_key in keys
+    )
     no_bar = ",".join(
-        f".set-body:has(#set-{k}:target) .set-bar" for k in keys if k not in FORM_TABS
+        f".set-body:has(#set-{section_key}:target) .set-bar"
+        for section_key in keys
+        if section_key not in FORM_TABS
     )
     # 쪽을 바꿔도 맨 위(설정 제목)부터 보이게 (scroll-margin 100vh)
     return (
@@ -169,6 +178,7 @@ _ACC_NOTE = {
 
 
 def _num(key: str, label: str, value: Any, unit: str, help_: str, errors: Mapping[str, str]) -> str:
+    """[쓰임] 숫자 칸 하나 (이름 · 입력칸 · 단위 · 도움말 · 오류 문구)."""
     err = errors.get(key)
     shown = f"{value:,.0f}" if isinstance(value, int) else f"{value:g}"
     return (
@@ -184,6 +194,7 @@ def _num(key: str, label: str, value: Any, unit: str, help_: str, errors: Mappin
 
 
 def _switch(key: str, on: bool, *, danger: bool = False, disabled: bool = False) -> str:
+    """[쓰임] 켜기/끄기 스위치 입력 하나 (체크칸)."""
     return (
         f'<input type="checkbox" class="set-switch{" danger" if danger else ""}" name="{key}" '
         f'id="{key}" value="on"{" checked" if on else ""}{" disabled" if disabled else ""} '
@@ -192,6 +203,7 @@ def _switch(key: str, on: bool, *, danger: bool = False, disabled: bool = False)
 
 
 def _toggle(key: str, label: str, sub: str, on: bool, **kw: Any) -> str:
+    """[쓰임] 이름 · 설명 · 스위치가 한 줄인 칸."""
     return (
         f'<div class="set-toggle"><label for="{key}"><b>{escape(label)}</b>'
         f"<small>{escape(sub)}</small></label>{_switch(key, on, **kw)}</div>"
@@ -199,6 +211,7 @@ def _toggle(key: str, label: str, sub: str, on: bool, **kw: Any) -> str:
 
 
 def _soon(label: str, sub: str, on: bool = True) -> str:
+    """[쓰임] '준비 중' 칸 — 아직 실행기에 연결 전이라 눌리지 않는 스위치."""
     return (
         f'<div class="set-toggle"><div><b>{escape(label)}<span class="set-soon">준비 중</span></b>'
         f"<small>{escape(sub)}</small></div>"
@@ -208,7 +221,10 @@ def _soon(label: str, sub: str, on: bool = True) -> str:
 
 
 def _locked(title: str, rows: Sequence[tuple[str, str]], note: str) -> str:
-    body = "".join(f"<div><span>{escape(k)}</span><b>{escape(v)}</b></div>" for k, v in rows)
+    """[쓰임] 🔒 잠금 칸 — 연구로 정한 매매 규칙을 보이기만 한다(바꿀 수 없음)."""
+    body = "".join(
+        f"<div><span>{escape(label)}</span><b>{escape(value)}</b></div>" for label, value in rows
+    )
     return (
         f'<div class="set-lock"><h3>🔒 {escape(title)}</h3>{body}'
         f'<p class="set-help">{escape(note)}</p></div>'
@@ -216,7 +232,7 @@ def _locked(title: str, rows: Sequence[tuple[str, str]], note: str) -> str:
 
 
 def render_settings(
-    v: Mapping[str, Any],
+    settings: Mapping[str, Any],
     *,
     token: str,
     errors: Mapping[str, str] | None = None,
@@ -236,7 +252,7 @@ def render_settings(
     errors = errors or {}
     extra_tabs = extra_tabs or {}
     holdings = holdings or {}
-    menu = "".join(f'<a href="#set-{k}">{escape(t)}</a>' for k, t in SECTIONS)
+    menu = "".join(f'<a href="#set-{item_key}">{escape(label)}</a>' for item_key, label in SECTIONS)
     note = ""
     if notice:
         note = f'<div class="set-note ok" role="status">{escape(notice)}</div>'
@@ -249,7 +265,7 @@ def render_settings(
         '<section class="set-card" id="set-goal"><h2>목표 · 보고</h2>'
         "<p class=\"set-sub\">매달 진행 보고와 텔레그램 '현황' 끝 줄이 이 목표로 계산돼요.</p>"
         '<div class="set-grid">'
-        + _num("fire.target_krw", "파이어 목표", v["fire.target_krw"], "원", "", errors)
+        + _num("fire.target_krw", "파이어 목표", settings["fire.target_krw"], "원", "", errors)
         + '<div class="set-field"><span class="set-label">진행 보고 시각'
         '<span class="set-soon">준비 중</span></span>'
         '<div class="set-input">'
@@ -257,15 +273,15 @@ def render_settings(
         '<p class="set-help">PC가 꺼져 있었으면 켜질 때 보내요</p></div></div>'
         '<div class="set-grid" '
         'style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px">'
-        + _num("fire.rate_good", "좋을 때", v["fire.rate_good"], "%", "", errors)
-        + _num("fire.rate_mid", "보통", v["fire.rate_mid"], "%", "", errors)
-        + _num("fire.rate_bad", "나쁠 때", v["fire.rate_bad"], "%", "", errors)
+        + _num("fire.rate_good", "좋을 때", settings["fire.rate_good"], "%", "", errors)
+        + _num("fire.rate_mid", "보통", settings["fire.rate_mid"], "%", "", errors)
+        + _num("fire.rate_bad", "나쁠 때", settings["fire.rate_bad"], "%", "", errors)
         + '</div><p class="set-help">도달 예상에 쓰는 연수익 가정이에요 (예측 아님)</p>'
         + _toggle(
             "fire.report_on",
             "매달 파이어 진행 보고",
             "투자 봇 · 지난 보고 대비 · 도달 예상",
-            v["fire.report_on"],
+            settings["fire.report_on"],
         )
         + "</section>"
     )
@@ -275,7 +291,7 @@ def render_settings(
         + _num(
             "deneb.monthly_krw",
             "기본 월 납입",
-            v["deneb.monthly_krw"],
+            settings["deneb.monthly_krw"],
             "원",
             "텔레그램 답이 없을 때 쓰는 금액 · 답하면 그 달만 바뀌어요",
             errors,
@@ -283,7 +299,7 @@ def render_settings(
         + _num(
             "deneb.max_krw",
             "한 달 상한",
-            v["deneb.max_krw"],
+            settings["deneb.max_krw"],
             "원",
             "이보다 큰 답은 잘못 친 걸로 보고 다시 물어요",
             errors,
@@ -293,13 +309,13 @@ def render_settings(
             "deneb.ask_on",
             "매수 전날 금액 묻기",
             "끄면 기본 월 납입으로 바로 사요",
-            v["deneb.ask_on"],
+            settings["deneb.ask_on"],
         )
         + _toggle(
             "deneb.harvest_on",
             "12월 양도세 공제 실현",
             "12월 공지 · 버튼으로 진행",
-            v["deneb.harvest_on"],
+            settings["deneb.harvest_on"],
         )
         + '<div class="set-toggle"><div><b>매수 · 체결 알림</b><small>실거래라 항상 켜져 있어요'
         '</small></div><input type="checkbox" class="set-switch" checked disabled '
@@ -330,13 +346,13 @@ def render_settings(
             "alerts.vega_trade",
             "매매한 날 알림",
             "비중 바뀐 이유 · 코인별 손익",
-            v["alerts.vega_trade"],
+            settings["alerts.vega_trade"],
         )
         + _toggle(
             "alerts.vega_weekly",
             "토요일 주간 요약",
             "토 09:30 · 김프 한 줄",
-            v["alerts.vega_weekly"],
+            settings["alerts.vega_weekly"],
         )
         + "</section>"
         + _locked(
@@ -353,12 +369,14 @@ def render_settings(
     rows = []
     del_forms: list[str] = []
 
-    def acc_row(key: str, mkt: str, sym: str, note: str, amount: float, on: bool, rm: bool) -> str:
+    def acc_row(
+        key: str, mkt: str, sym: str, note: str, amount: float, on: bool, removed: bool
+    ) -> str:
         """한 줄 + [삭제] → '정말 삭제하시겠습니까?' 창(팝오버, 스크립트 없음) → 따로 둔 작은 폼."""
-        kr = mkt == "KR"
+        is_kr = mkt == "KR"
         err = errors.get(f"{key}.{'daily' if key.startswith('x.') else 'usd'}")
         name = f"{key}.daily" if key.startswith("x.") else f"{key}.usd"
-        shown = f"{amount:,.0f}" if kr else f"{amount:g}"
+        shown = f"{amount:,.0f}" if is_kr else f"{amount:g}"
         pid = "del-" + key.replace(".", "-")
         del_forms.append(
             f'<form id="{pid}-f" method="post" action="/settings/delete">'
@@ -366,11 +384,11 @@ def render_settings(
             f'<input type="hidden" name="key" value="{escape(key)}"></form>'
         )
         return (
-            f'<div class="set-acc"><span class="set-badge{" kr" if kr else ""}">'
-            f"{'국내' if kr else '미국'}</span><b>{escape(sym)}</b><small>{escape(note)}"
+            f'<div class="set-acc"><span class="set-badge{" kr" if is_kr else ""}">'
+            f"{'국내' if is_kr else '미국'}</span><b>{escape(sym)}</b><small>{escape(note)}"
             f"{' · ' + escape(holdings[sym]) if sym in holdings else ''}</small>"
             f'<div class="set-input{" set-err-input" if err else ""}"><span>하루 '
-            f"{'₩' if kr else '$'}</span>"
+            f"{'₩' if is_kr else '$'}</span>"
             f'<input name="{name}" value="{shown}" inputmode="decimal" '
             f'aria-label="{escape(sym)} 하루 금액"></div>'
             f"{_switch(f'{key}.on', on)}"
@@ -386,32 +404,32 @@ def render_settings(
             + "</div>"
         )
 
-    for s in ACC_SYMBOLS:
-        if v.get(f"acc.{s}.removed"):
+    for symbol in ACC_SYMBOLS:
+        if settings.get(f"acc.{symbol}.removed"):
             continue
         rows.append(
             acc_row(
-                f"acc.{s}",
+                f"acc.{symbol}",
                 "US",
-                s,
-                _ACC_NOTE[s],
-                float(v[f"acc.{s}.usd"]),
-                bool(v[f"acc.{s}.on"]),
+                symbol,
+                _ACC_NOTE[symbol],
+                float(settings[f"acc.{symbol}.usd"]),
+                bool(settings[f"acc.{symbol}.on"]),
                 False,
             )
         )
-    for x in v.get("_extras") or []:
-        if x.get("removed"):
+    for extra in settings.get("_extras") or []:
+        if extra.get("removed"):
             continue
-        k = f"x.{x['mkt']}.{x['sym']}"
+        item_key = f"x.{extra['mkt']}.{extra['sym']}"
         rows.append(
             acc_row(
-                k,
-                str(x["mkt"]),
-                str(x["sym"]),
-                f"{x.get('name') or x['sym']} · {x.get('market') or ''}",
-                float(v.get(f"{k}.daily") or 0),
-                bool(v.get(f"{k}.on")),
+                item_key,
+                str(extra["mkt"]),
+                str(extra["sym"]),
+                f"{extra.get('name') or extra['sym']} · {extra.get('market') or ''}",
+                float(settings.get(f"{item_key}.daily") or 0),
+                bool(settings.get(f"{item_key}.on")),
                 False,
             )
         )
@@ -446,7 +464,10 @@ def render_settings(
         + "".join(rows)
         + add
         + _toggle(
-            "alerts.fx", "환전 알림", "평일 09 · 12 · 15시, 달러가 모자랄 때만", v["alerts.fx"]
+            "alerts.fx",
+            "환전 알림",
+            "평일 09 · 12 · 15시, 달러가 모자랄 때만",
+            settings["alerts.fx"],
         )
         + "</section>"
     )
@@ -457,25 +478,29 @@ def render_settings(
             "alerts.bot_down",
             "투자 봇 · 봇 멈춤",
             "현황 · 정보 봇이 15분 넘게 조용할 때",
-            v["alerts.bot_down"],
+            settings["alerts.bot_down"],
         )
         + _toggle(
-            "alerts.theme", "정보 봇 · 주간 테마", "토 09:00 · 한국 · 미국", v["alerts.theme"]
+            "alerts.theme",
+            "정보 봇 · 주간 테마",
+            "토 09:00 · 한국 · 미국",
+            settings["alerts.theme"],
         )
-        + _toggle("alerts.brief", "정보 봇 · 시장 브리핑", "장 마감 뒤", v["alerts.brief"])
+        + _toggle("alerts.brief", "정보 봇 · 시장 브리핑", "장 마감 뒤", settings["alerts.brief"])
         + _toggle(
             "alerts.news",
             "정보 봇 · 종목 뉴스 답",
             "종목 이름을 보내면 최근 7일 요약",
-            v["alerts.news"],
+            settings["alerts.news"],
         )
         + _soon("조용한 시간 23:00 ~ 07:00", "위험 알림은 이때도 와요", on=False)
         + '<p class="set-help">Deneb · Vega 매매, 환전, 파이어 보고 알림은 각 메뉴에서 바꿔요. '
         "정지 · 실패 같은 위험 알림은 끌 수 없어요.</p></section>"
     )
     theme_opts = "".join(
-        f'<option value="{k}"{" selected" if v["screen.theme"] == k else ""}>{t}</option>'
-        for k, t in (("system", "시스템"), ("light", "라이트"), ("dark", "다크"))
+        f'<option value="{theme}"{" selected" if settings["screen.theme"] == theme else ""}>'
+        f"{label}</option>"
+        for theme, label in (("system", "시스템"), ("light", "라이트"), ("dark", "다크"))
     )
     screen = (
         '<section class="set-card" id="set-screen"><h2>화면</h2><div class="set-grid">'
@@ -492,19 +517,20 @@ def render_settings(
             "screen.hide_amounts",
             "금액 가리고 시작",
             "열 때마다 금액을 ●●● 로",
-            v["screen.hide_amounts"],
+            settings["screen.hide_amounts"],
         )
         + '<p class="set-help"><a href="/live?onboard=again">처음 안내 다시 보기</a></p></section>'
     )
     log_rows = (
         "".join(
-            f"<div><time>{escape(r.get('at', ''))}</time><span>{escape(r.get('what', ''))}</span>"
-            f"<em>{escape(r.get('by', ''))}</em></div>"
-            for r in log
+            f"<div><time>{escape(row.get('at', ''))}</time>"
+            f"<span>{escape(row.get('what', ''))}</span>"
+            f"<em>{escape(row.get('by', ''))}</em></div>"
+            for row in log
         )
         or '<p class="set-help">아직 바꾼 기록이 없어요</p>'
     )
-    halted = bool(v["safety.halt"])
+    halted = bool(settings["safety.halt"])
     if halted:
         state = (
             '<p class="set-note bad" role="status">⛔ 비상 정지 중 — 새 주문이 나가지 않아요'
@@ -544,14 +570,14 @@ def render_settings(
         "alerts": alerts,
         "screen": screen,
         "safety": safety,
-        **{k: v[0] for k, v in extra_tabs.items()},
+        **{item_key: tab[0] for item_key, tab in extra_tabs.items()},
     }
     tabs = "".join(
-        f'<div class="set-tab" id="set-{k}">'
-        + parts.get(k, "").replace(f' id="set-{k}"', "", 1)
+        f'<div class="set-tab" id="set-{item_key}">'
+        + parts.get(item_key, "").replace(f' id="set-{item_key}"', "", 1)
         + "</div>"
-        for k, _ in SECTIONS
-        if k in parts
+        for item_key, _ in SECTIONS
+        if item_key in parts
     )
     return (
         f"<style>{_CSS}{EXTRA_CSS}{_tab_css()}</style>"
@@ -569,7 +595,7 @@ def render_settings(
         '<button type="submit">저장…</button></div></div>'
         "</div></div></form>"
         + "".join(del_forms)  # 삭제 폼은 큰 폼 밖에 (폼 안에 폼을 둘 수 없다)
-        + "".join(v[1] for v in extra_tabs.values())
+        + "".join(settings[1] for settings in extra_tabs.values())
         + '<form id="halt-f" method="post" action="/settings/halt">'
         f'<input type="hidden" name="token" value="{escape(token)}">'
         f'<input type="hidden" name="action" value="{"off" if halted else "on"}"></form>'
@@ -579,6 +605,8 @@ def render_settings(
 
 
 def render_review(changes: Sequence[Change], form: Mapping[str, str], *, token: str) -> str:
+    """[쓰임] 확인 창 — 바뀐 칸마다 이전 → 이후 · 언제부터 적용 + [저장].
+    값은 숨은 칸으로 다시 보낸다(저장 때 한 번 더 검사)."""
     if not changes:
         return (
             f"<style>{_CSS}</style>"
@@ -586,18 +614,18 @@ def render_review(changes: Sequence[Change], form: Mapping[str, str], *, token: 
             '<p><a href="/settings">설정으로 돌아가기</a></p></div></div>'
         )
     hidden = "".join(
-        f'<input type="hidden" name="{escape(k)}" value="{escape(val)}">'
-        for k, val in form.items()
-        if k != "token"
+        f'<input type="hidden" name="{escape(field)}" value="{escape(val)}">'
+        for field, val in form.items()
+        if field != "token"
     )
     items = "".join(
-        f'<div class="set-ch"><b>{escape(c.label)}</b><div>'
-        f'<span class="set-was">{escape(show(c.key, c.before))}</span> → '
-        f'<span class="set-now">{escape(show(c.key, c.after))}</span></div>'
-        f"<small>적용: {escape(c.applies)}</small></div>"
-        for c in changes
+        f'<div class="set-ch"><b>{escape(change.label)}</b><div>'
+        f'<span class="set-was">{escape(show(change.key, change.before))}</span> → '
+        f'<span class="set-now">{escape(show(change.key, change.after))}</span></div>'
+        f"<small>적용: {escape(change.applies)}</small></div>"
+        for change in changes
     )
-    halt = any(c.key == "safety.halt" and c.after for c in changes)
+    halt = any(change.key == "safety.halt" and change.after for change in changes)
     warn = (
         '<div class="set-note bad">비상 정지를 켜면 data/HALT 를 만들어 모든 새 주문을 멈춰요</div>'
         if halt

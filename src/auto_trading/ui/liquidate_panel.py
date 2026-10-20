@@ -4,6 +4,9 @@
 (``python -m scripts.liquidate start <범위> 오르빗``)를 따로 띄울 뿐 — 이 화면 · 서버는 키를 읽거나
 주문하지 않는다. 그룹 정지 풀기(``POST /settings/unhalt``)는 정지 파일만 지운다.
 휴대폰(Tailscale)에서는 설정이 보기 전용이라 텔레그램 '정리' 를 쓴다.
+
+언제 쓰나: 설정 화면(``ui/settings_page``)의 '비상 정지' 쪽을 그릴 때.
+읽고 쓰는 것: 받은 정지 상태로 HTML 만 만든다 (정지 그룹 · 정리 범위 이름은 ops 표에서).
 """
 
 from __future__ import annotations
@@ -56,10 +59,10 @@ def liquidate_panel(
             f'<input type="hidden" name="scope" value="{scope}"></form>'
         )
     rows = []
-    for g, name in GROUPS.items():
-        reason = halts.get(g)
+    for group, name in GROUPS.items():
+        reason = halts.get(group)
         if reason:
-            fid = f"unh-f-{g}"
+            fid = f"unh-f-{group}"
             rows.append(
                 f'<p class="set-note bad">⛔ {escape(name)} 정지 중 — {escape(reason)} '
                 f'<button type="submit" form="{fid}" class="set-del">풀기</button></p>'
@@ -67,7 +70,7 @@ def liquidate_panel(
             forms.append(
                 f'<form id="{fid}" method="post" action="/settings/unhalt">'
                 f'<input type="hidden" name="token" value="{escape(token)}">'
-                f'<input type="hidden" name="group" value="{g}"></form>'
+                f'<input type="hidden" name="group" value="{group}"></form>'
             )
     state = "".join(rows) or '<p class="set-note ok">그룹 정지 없음</p>'
     last = (

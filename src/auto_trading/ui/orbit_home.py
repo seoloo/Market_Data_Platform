@@ -3,6 +3,9 @@
 2026-10-10 보완 (Codex 제안 · 사용자 "일단 작업해봐"):
 금액 숨기기 · 장부/시세 갱신 시각과 '추정' 표시 · 부분 새로고침(`data-live` 칸만) · 하루 평가
 기록 그래프 · 종목 상세 · 거래 내역 필터 · 연결 계좌 상태 · 처음 쓰는 사람 안내.
+
+언제 쓰나: ``ui/live_home.render_live`` 가 대시보드 '실거래' 쪽을 그릴 때.
+읽고 쓰는 것: 받은 카드(``Book``) · 시세 · 기록 줄로 HTML 만 만든다. 파일은 ``orbit.css`` 만 읽는다.
 """
 
 from __future__ import annotations
@@ -64,6 +67,7 @@ _FACE_DARK = "#071a52"
 
 
 def _star(x: int, y: int, r: int) -> str:
+    """[쓰임] 반짝이 별 SVG 경로."""
     return (
         f"M{x} {y - r}Q{x} {y} {x + r} {y}Q{x} {y} {x} {y + r}"
         f"Q{x} {y} {x - r} {y}Q{x} {y} {x} {y - r}Z"
@@ -123,21 +127,25 @@ HERO_FX = (
 )
 
 
-def _won(x: float, hide: bool = False) -> str:
-    return _HIDDEN if hide else f"{x:,.0f}"
+def _won(amount: float, hide: bool = False) -> str:
+    """[쓰임] 원화 금액 글 (숨기기 켜짐이면 가린 글)."""
+    return _HIDDEN if hide else f"{amount:,.0f}"
 
 
 def _kst(ms: int) -> str:
+    """[쓰임] ms → 한국 시각 'MM/DD HH:MM'."""
     return (datetime.fromtimestamp(ms / 1000, UTC) + _KST).strftime("%m/%d %H:%M")
 
 
 def _stale(book: Book, now_ms: int) -> bool:
+    """[쓰임] 장부가 오래됐나 (카드마다 기준 시간 :data:`STALE_HOURS`)."""
     if not book.updated_ms:
         return False
     return now_ms - book.updated_ms > STALE_HOURS.get(book.key, 30) * 3_600_000
 
 
 def _popup(target: str, title: str, content: str) -> str:
+    """[쓰임] 팝업 칸 하나 (고정 머리 · 닫기 버튼)."""
     return (
         f'<section popover="auto" class="orbit-popover" id="{target}" role="dialog" '
         f'aria-labelledby="{target}-title"><header><h2 id="{target}-title">{title}</h2>'
@@ -148,6 +156,7 @@ def _popup(target: str, title: str, content: str) -> str:
 
 
 def _guide() -> str:
+    """[쓰임] '화면 읽는 법' 버튼 + 안내 팝업."""
     return (
         '<button type="button" class="orbit-guide" popovertarget="orbit-guide" '
         'aria-label="화면 읽는 법">'
@@ -244,6 +253,7 @@ def layout(body: str, theme: str, active: str = "live") -> str:
 
 
 def _change(value: float, base: float, hide: bool = False) -> str:
+    """[쓰임] 손익 칸 (금액 · %, 숨기기 반영)."""
     diff = value - base
     if hide:
         return f'<span class="mute"><b>{_HIDDEN}원</b><small>{_HIDDEN}</small></span>'
@@ -253,6 +263,7 @@ def _change(value: float, base: float, hide: bool = False) -> str:
 
 
 def _est(on: bool) -> str:
+    """[쓰임] '추정' 표시 (시세 · 환율이 없어 원가로 셈)."""
     return '<em class="orbit-est" title="시세·환율이 없어 원가로 셈">추정</em>' if on else ""
 
 
@@ -265,18 +276,18 @@ def _nav_points(
     """기록 → (날짜, 평가액, 기준 금액, 투자 성과 지수 1.0 시작). 입금 · 출금은 수익에서 뺀다."""
     out: list[tuple[str, float, float, float]] = []
     nav, prev_v, prev_d = 1.0, 0.0, 0.0
-    for r in rows:
-        src = r if key is None else (r.get("books") or {}).get(key)
+    for row in rows:
+        src = row if key is None else (row.get("books") or {}).get(key)
         if not isinstance(src, Mapping) or src.get("priced") is False:
             continue  # 시세 없이 원가로 셈한 날(추정)은 그래프에 쓰지 않는다
         try:
-            v, dep = float(src["value"]), float(src["deposits"])
+            value, dep = float(src["value"]), float(src["deposits"])
         except (KeyError, TypeError, ValueError):
             continue
         if out and prev_v > 0:
-            nav *= (v - (dep - prev_d)) / prev_v
-        out.append((str(r["date"]), v, dep, nav))
-        prev_v, prev_d = v, dep
+            nav *= (value - (dep - prev_d)) / prev_v
+        out.append((str(row["date"]), value, dep, nav))
+        prev_v, prev_d = value, dep
     return out
 
 
@@ -288,42 +299,45 @@ def _svg_line(
     fmt: str,
     hide_axis: bool,
 ) -> str:
-    w, h, left, right, top, bottom = 620, 170, 62, 14, 12, 26
-    vals = [v for _, v in points] + list(base or [])
+    """[쓰임] 기록 그래프 선 SVG (가로 = 날짜 순서, 세로 = 값)."""
+    width, height, left, right, top, bottom = 620, 170, 62, 14, 12, 26
+    vals = [value for _, value in points] + list(base or [])
     lo, hi = min(vals), max(vals)
     pad = (hi - lo) * 0.12 or abs(hi) * 0.02 or 1.0
     lo, hi = lo - pad, hi + pad
-    n = len(points)
+    count = len(points)
 
-    def px(i: int) -> float:
-        return left + (i / (n - 1)) * (w - left - right)
+    def px(index: int) -> float:
+        """[쓰임] 점 순서 → 가로 좌표."""
+        return left + (index / (count - 1)) * (width - left - right)
 
-    def py(v: float) -> float:
-        return top + (hi - v) / (hi - lo) * (h - top - bottom)
+    def py(value: float) -> float:
+        """[쓰임] 값 → 세로 좌표."""
+        return top + (hi - value) / (hi - lo) * (height - top - bottom)
 
     parts = [
-        f'<svg class="orbit-plot-svg" viewBox="0 0 {w} {h}" role="img" '
+        f'<svg class="orbit-plot-svg" viewBox="0 0 {width} {height}" role="img" '
         f'aria-label="{escape(label)}">'
     ]
-    for k in range(3):
-        v = lo + (hi - lo) * k / 2
-        y = py(v)
-        txt = "•••" if hide_axis else fmt.format(v)
+    for step in range(3):
+        value = lo + (hi - lo) * step / 2
+        y = py(value)
+        txt = "•••" if hide_axis else fmt.format(value)
         parts.append(
-            f'<line x1="{left}" x2="{w - right}" y1="{y:.1f}" y2="{y:.1f}" class="grid"/>'
+            f'<line x1="{left}" x2="{width - right}" y1="{y:.1f}" y2="{y:.1f}" class="grid"/>'
             f'<text x="{left - 6}" y="{y + 4:.1f}" class="axis" text-anchor="end">{txt}</text>'
         )
-    for i, anchor in ((0, "start"), (n - 1, "end")):
+    for index, anchor in ((0, "start"), (count - 1, "end")):
         parts.append(
-            f'<text x="{px(i):.1f}" y="{h - 7}" class="axis" text-anchor="{anchor}">'
-            f"{escape(points[i][0][5:].replace('-', '/'))}</text>"
+            f'<text x="{px(index):.1f}" y="{height - 7}" class="axis" text-anchor="{anchor}">'
+            f"{escape(points[index][0][5:].replace('-', '/'))}</text>"
         )
     if base:
-        pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(base))
+        pts = " ".join(f"{px(index):.1f},{py(value):.1f}" for index, value in enumerate(base))
         parts.append(
             f'<polyline points="{pts}" class="orbit-plot-base"><title>기준 금액</title></polyline>'
         )
-    pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, (_, v) in enumerate(points))
+    pts = " ".join(f"{px(index):.1f},{py(value):.1f}" for index, (_, value) in enumerate(points))
     parts.append(
         f'<polyline points="{pts}" class="orbit-plot-line">'
         f"<title>{escape(label)}</title></polyline>"
@@ -333,6 +347,7 @@ def _svg_line(
 
 
 def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
+    """[쓰임] '자산 변화 · 투자 성과' 그래프 칸 (매일 기록에서, 입금은 뺀 성과)."""
     pts = _nav_points(history)
     views = (("asset", "자산 변화"), ("perf", "투자 성과"))
     head = (
@@ -340,9 +355,9 @@ def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
         f"<h2>{icon('chart')}자산 변화</h2>"
         '<div class="orbit-views" role="group" aria-label="그래프 종류">'
         + "".join(
-            f'<label><input type="radio" name="orbit-view" value="{k}" '
-            f"{'checked' if k == 'asset' else ''}><span>{t}</span></label>"
-            for k, t in views
+            f'<label><input type="radio" name="orbit-view" value="{view_code}" '
+            f"{'checked' if view_code == 'asset' else ''}><span>{view_title}</span></label>"
+            for view_code, view_title in views
         )
         + '</div><div class="orbit-periods" role="group" aria-label="자산 변화 표시 기간">'
         + "".join(
@@ -363,7 +378,11 @@ def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
         last = date.fromisoformat(pts[-1][0])
         plots = []
         for code, word, days in PERIODS:
-            sub = [p for p in pts if date.fromisoformat(p[0]) >= last - timedelta(days=days)]
+            sub = [
+                point
+                for point in pts
+                if date.fromisoformat(point[0]) >= last - timedelta(days=days)
+            ]
             for view, title in views:
                 cls = f"orbit-plot p-{code} v-{view}"
                 if len(sub) < 2:
@@ -374,8 +393,8 @@ def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
                     continue
                 if view == "asset":
                     svg = _svg_line(
-                        [(d, v) for d, v, _, _ in sub],
-                        base=[b for _, _, b, _ in sub],
+                        [(day, value) for day, value, _, _ in sub],
+                        base=[base_value for _, _, base_value, _ in sub],
                         label=f"{word} {title}",
                         fmt="{:,.0f}",
                         hide_axis=hide,
@@ -386,7 +405,7 @@ def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
                     )
                 else:
                     start = sub[0][3]
-                    perf = [(d, (n / start - 1) * 100) for d, _, _, n in sub]
+                    perf = [(day, (nav / start - 1) * 100) for day, _, _, nav in sub]
                     svg = _svg_line(perf, label=f"{word} {title}", fmt="{:+.1f}%", hide_axis=False)
                     cap = f"입출금 뺀 수익률 {perf[-1][1]:+.2f}%"
                 plots.append(f'<div class="{cls}">{svg}<p class="orbit-plot-cap">{cap}</p></div>')
@@ -402,15 +421,16 @@ def _history_panel(history: Sequence[Mapping[str, Any]], hide: bool) -> str:
 
 
 def _spark(history: Sequence[Mapping[str, Any]], key: str) -> str:
+    """[쓰임] 카드 안 작은 그래프 (최근 30 개 기록, 2 개 미만이면 '기록 대기')."""
     pts = _nav_points(history, key)[-30:]
     if len(pts) < 2:
         return '<div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div>'
-    perf = [n for _, _, _, n in pts]
+    perf = [nav for _, _, _, nav in pts]
     lo, hi = min(perf), max(perf)
     span = (hi - lo) or 1.0
     xy = " ".join(
-        f"{i / (len(perf) - 1) * 90 + 1:.1f},{32 - (v - lo) / span * 28:.1f}"
-        for i, v in enumerate(perf)
+        f"{index / (len(perf) - 1) * 90 + 1:.1f},{32 - (value - lo) / span * 28:.1f}"
+        for index, value in enumerate(perf)
     )
     cls = "pos" if perf[-1] >= perf[0] else "neg"
     return (
@@ -422,34 +442,35 @@ def _spark(history: Sequence[Mapping[str, Any]], key: str) -> str:
 # ---------------------------------------------------------------- 카드 · 종목 상세
 
 
-def _holding_popup(book: Book, j: int, quotes: Quotes, hide: bool) -> tuple[str, str]:
-    h = book.holdings[j]
-    pid = f"orbit-h-{book.key}-{j}"
+def _holding_popup(book: Book, holding_index: int, quotes: Quotes, hide: bool) -> tuple[str, str]:
+    """[쓰임] 종목 하나의 상세 팝업 (보유 · 원가 · 평가 · 손익) → (버튼, 팝업)."""
+    holding = book.holdings[holding_index]
+    pid = f"orbit-h-{book.key}-{holding_index}"
     unit = "주" if book.key != "vega" else ""
-    avg = h.cost_krw / h.qty if h.qty > 0 else 0.0
+    avg = holding.cost_krw / holding.qty if holding.qty > 0 else 0.0
     rows = [
-        ("보유 수량", _HIDDEN if hide else f"{h.qty:,.8g}{unit}"),
+        ("보유 수량", _HIDDEN if hide else f"{holding.qty:,.8g}{unit}"),
         ("평균 매입단가", f"{avg:,.0f}원" if avg else "—"),
     ]
-    if h.value_krw is not None and h.qty > 0:
-        rows.append(("현재 가격", f"{h.value_krw / h.qty:,.0f}원"))
-        usd = quotes.usd.get(h.name)
+    if holding.value_krw is not None and holding.qty > 0:
+        rows.append(("현재 가격", f"{holding.value_krw / holding.qty:,.0f}원"))
+        usd = quotes.usd.get(holding.name)
         if usd is not None:
             rows.append(("현재 가격 (달러)", f"${usd:,.2f}"))
-        rows.append(("평가금액", f"{_won(h.value_krw, hide)}원"))
-        rows.append(("평가손익", _change(h.value_krw, h.cost_krw, hide)))
+        rows.append(("평가금액", f"{_won(holding.value_krw, hide)}원"))
+        rows.append(("평가손익", _change(holding.value_krw, holding.cost_krw, hide)))
     else:
         rows.append(("현재 가격", "시세 미확인"))
-        rows.append(("평가금액", f"{_won(h.cost_krw, hide)}원 {_est(True)}"))
+        rows.append(("평가금액", f"{_won(holding.cost_krw, hide)}원 {_est(True)}"))
     rows.append(("가격 기준", _kst(quotes.at_ms) if quotes.at_ms else "시세 없음"))
-    if h.note:
-        rows.append(("메모", escape(h.note)))
-    table = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in rows)
+    if holding.note:
+        rows.append(("메모", escape(holding.note)))
+    table = "".join(f"<dt>{label}</dt><dd>{value}</dd>" for label, value in rows)
     body = (
         f'<dl class="orbit-detail-list" data-live="{pid}">{table}</dl>'
         "<p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p>"
     )
-    return pid, _popup(pid, f"{escape(h.name)} 보유 상세", body)
+    return pid, _popup(pid, f"{escape(holding.name)} 보유 상세", body)
 
 
 def _card(
@@ -465,6 +486,7 @@ def _card(
     head_extra: str = "",
     pad_rows: int = 0,
 ) -> str:
+    """[쓰임] 전략 카드 하나 (평가 · 손익 · 종목 · 접수 주문 · 상세 열기)."""
     key = book.key if book.key in {"deneb", "vega", "accumulate"} else "other"
     category, subtitle, glyph = {
         "deneb": ("미국 주식", "Deneb", "chart"),
@@ -488,7 +510,7 @@ def _card(
             f"장부 업데이트 {_kst(book.updated_ms)}{' · 오래된 기록' if old else ''}</p>"
         )
     rows, pops = [], []
-    for j, holding in enumerate(book.holdings):
+    for holding_index, holding in enumerate(book.holdings):
         symbol = escape(holding.name)
         coin_class = holding.name.lower() if holding.name in _NAMES else "other"
         company = escape(_NAMES.get(holding.name, holding.name))
@@ -498,7 +520,7 @@ def _card(
             if holding.value_krw is not None
             else ('<span class="mute">시세 미확인</span>')
         )
-        pid, pop = _holding_popup(book, j, quotes, hide)
+        pid, pop = _holding_popup(book, holding_index, quotes, hide)
         pops.append(pop)
         rows.append(
             f'<li><button type="button" class="orbit-holding-btn" popovertarget="{pid}" '
@@ -548,11 +570,13 @@ _COLORS = {
 _SPARE = ("#D4537E", "#378ADD", "#BA7517", "#5DCAA5", "#7F77DD")
 
 
-def _color(sym: str, i: int) -> str:
-    return _COLORS.get(sym, _SPARE[i % len(_SPARE)])
+def _color(sym: str, index: int) -> str:
+    """[쓰임] 종목 색 (정한 색이 없으면 남는 색을 차례로)."""
+    return _COLORS.get(sym, _SPARE[index % len(_SPARE)])
 
 
 def _tile(label: str, value: str, sub: str = "", cls: str = "") -> str:
+    """[쓰임] 상세의 숫자 칸 하나 (이름 · 값 · 작은 설명)."""
     # '−15%면' 처럼 % 뒤에 붙은 말은 떼지 않는다 (브라우저는 % 뒤를 줄바꿈 자리로 본다)
     sub = sub.replace("%면", "%\u2060면")
     return (
@@ -568,14 +592,16 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
     info = book.info
     cash = f"{_won(book.cash_krw, hide)}원"
     if book.key == "vega":
-        dd = info.get("dd")
+        drawdown = info.get("dd")
         stopped = bool(info.get("stopped"))
         tiles = [
             _tile("현금", cash, "남은 돈"),
             _tile(
                 "사는 중인 코인", f"{info.get('buying', 0)} / {info.get('coins', 0)}개", cls="ok"
             ),
-            _tile("최고점 기준", "—" if dd is None else f"−{dd:.1%}", "−30%면 매수 멈춤"),
+            _tile(
+                "최고점 기준", "—" if drawdown is None else f"−{drawdown:.1%}", "−30%면 매수 멈춤"
+            ),
             _tile("매수", "멈춤" if stopped else "하는 중", cls="warn" if stopped else "ok"),
         ]
         last = str(info.get("last_decision") or "")
@@ -592,8 +618,9 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
         usd = info.get("cash_usd")
         reserve = float(info.get("reserve_usd") or 0.0)
 
-        def dollars(x: float) -> str:
-            return _HIDDEN if hide else f"${x:,.2f}"
+        def dollars(usd_amount: float) -> str:
+            """[쓰임] 달러 글 (숨기기 반영)."""
+            return _HIDDEN if hide else f"${usd_amount:,.2f}"
 
         cash_sub = "" if usd is None else f"남은 달러 {dollars(usd)}"
         if reserve > 0:  # 현금 = 남은 달러 + 브레이크 보관 달러
@@ -613,7 +640,7 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
                 bcls,
             ),
         ]
-        halted = next((n for n in book.notes if n.startswith("⏸ 정지 중")), None)
+        halted = next((note for note in book.notes if note.startswith("⏸ 정지 중")), None)
         if halted:  # 전부 정리 · 텔레그램 정지 — 다음 매수 날짜 대신 정지 이유 (2026-10-16)
             return "".join(tiles), f"{halted} · 다시 사려면 '정지풀기'"
         now = datetime.fromtimestamp(now_ms / 1000, UTC) + _KST
@@ -633,42 +660,52 @@ def _tiles(book: Book, hide: bool, now_ms: int) -> tuple[str, str]:
 def _detail(
     book: Book, quotes: Quotes, *, hide: bool, priced: bool, now_ms: int, pad_rows: int = 0
 ) -> str:
+    """[쓰임] 카드 상세 (숫자 칸 · 비중 막대 · 종목 표)."""
     tiles, chip = _tiles(book, hide, now_ms)
     total = book.value_krw
     parts, legend, rows = [], [], []
-    for i, h in enumerate(book.holdings):
-        value = h.value_krw if h.value_krw is not None else h.cost_krw
-        w = value / total if total > 0 else 0.0
-        color = _color(h.name, i)
-        parts.append(f'<span style="flex:{w:.4f} 0 0;background:{color}"></span>')
+    for index, holding in enumerate(book.holdings):
+        value = holding.value_krw if holding.value_krw is not None else holding.cost_krw
+        weight = value / total if total > 0 else 0.0
+        color = _color(holding.name, index)
+        parts.append(f'<span style="flex:{weight:.4f} 0 0;background:{color}"></span>')
         legend.append(
             f'<span><i class="orbit-dt-dot" style="background:{color}"></i>'
-            f"{escape(h.name)} {w:.0%}</span>"
+            f"{escape(holding.name)} {weight:.0%}</span>"
         )
-        usd_now = quotes.usd.get(h.name)
-        if h.avg_usd is not None or usd_now is not None:
-            avg = "—" if h.avg_usd is None else f"${h.avg_usd:,.2f}"
+        usd_now = quotes.usd.get(holding.name)
+        if holding.avg_usd is not None or usd_now is not None:
+            avg = "—" if holding.avg_usd is None else f"${holding.avg_usd:,.2f}"
             now = "—" if usd_now is None else f"${usd_now:,.2f}"
         else:
-            avg = f"{h.cost_krw / h.qty:,.0f}" if h.qty > 0 and h.cost_krw > 0 else "—"
-            now = f"{h.value_krw / h.qty:,.0f}" if h.qty > 0 and h.value_krw is not None else "—"
+            avg = (
+                f"{holding.cost_krw / holding.qty:,.0f}"
+                if holding.qty > 0 and holding.cost_krw > 0
+                else "—"
+            )
+            now = (
+                f"{holding.value_krw / holding.qty:,.0f}"
+                if holding.qty > 0 and holding.value_krw is not None
+                else "—"
+            )
         unit = "" if book.key == "vega" else "주"
-        qty = _HIDDEN if hide else f"{h.qty:,.8g}{unit}"
-        if h.target is not None:
-            off = abs(w - h.target) >= 0.10
+        qty = _HIDDEN if hide else f"{holding.qty:,.8g}{unit}"
+        if holding.target is not None:
+            off = abs(weight - holding.target) >= 0.10
             gauge = (
-                f'<span class="orbit-dt-gauge"><i style="width:{min(w, 1) * 100:.0f}%;'
-                f'background:{color}"></i><u style="left:{min(h.target, 1) * 100:.0f}%"></u></span>'
+                f'<span class="orbit-dt-gauge"><i style="width:{min(weight, 1) * 100:.0f}%;'
+                f'background:{color}"></i>'
+                f'<u style="left:{min(holding.target, 1) * 100:.0f}%"></u></span>'
                 f"<em{' class=' + chr(34) + 'warn' + chr(34) if off else ''}>"
-                f"{w * 100:.0f} / {h.target * 100:.0f}%</em>"
+                f"{weight * 100:.0f} / {holding.target * 100:.0f}%</em>"
             )
         else:
             gauge = (
-                f'<span class="orbit-dt-gauge"><i style="width:{min(w, 1) * 100:.0f}%;'
-                f'background:{color}"></i></span><em>{w * 100:.0f}%</em>'
+                f'<span class="orbit-dt-gauge"><i style="width:{min(weight, 1) * 100:.0f}%;'
+                f'background:{color}"></i></span><em>{weight * 100:.0f}%</em>'
             )
         rows.append(
-            f"<tr><td>{escape(h.name)}</td><td>{qty}</td><td>{avg}</td><td>{now}</td>"
+            f"<tr><td>{escape(holding.name)}</td><td>{qty}</td><td>{avg}</td><td>{now}</td>"
             f'<td><div class="orbit-dt-wt">{gauge}</div></td></tr>'
         )
     cash_w = book.cash_krw / total if total > 0 else 0.0
@@ -678,7 +715,7 @@ def _detail(
             '<span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>'
             f"현금 {cash_w:.0%}</span>"
         )
-    has_target = any(h.target is not None for h in book.holdings)
+    has_target = any(holding.target is not None for holding in book.holdings)
     table = (
         (
             '<p class="orbit-dt-sec">종목별'
@@ -718,71 +755,80 @@ def _detail(
 
 
 def _trade_rows(trades: Sequence[Trade], hide: bool) -> str:
+    """[쓰임] 거래 내역 줄들 (입금 · 매수 · 매도 · 배당, 숨기기 반영)."""
     out = []
-    for t in trades:
-        sym = t.symbol if t.symbol in _NAMES else ""
+    for trade in trades:
+        sym = trade.symbol if trade.symbol in _NAMES else ""
         cls = sym.lower() if sym else "other"
-        word = _KIND_WORD.get(t.kind, t.kind)
-        usd = t.currency == "USD"
+        word = _KIND_WORD.get(trade.kind, trade.kind)
+        usd = trade.currency == "USD"
         cur, won = ("$", "") if usd else ("", "원")
         digits = 2 if usd else 0
 
-        def money(x: float, d: int, *, cur: str = cur, won: str = won) -> str:
-            return _HIDDEN if hide else f"{cur}{x:,.{d}f}{won}"
+        def money(value: float, places: int, *, cur: str = cur, won: str = won) -> str:
+            """[쓰임] 금액 글 (통화 기호 · 소수 자리 · 숨기기 반영)."""
+            return _HIDDEN if hide else f"{cur}{value:,.{places}f}{won}"
 
-        if t.kind == "deposit":
-            title = f"{word} {money(t.amount, 0)}"
-            info = [t.note] if t.note else []
+        if trade.kind == "deposit":
+            title = f"{word} {money(trade.amount, 0)}"
+            info = [trade.note] if trade.note else []
         else:
-            qty = _HIDDEN if hide else f"{t.qty:,.8g}{'주' if usd else ''}"
-            title = f"{escape(t.symbol)} {word} {qty}"
+            qty = _HIDDEN if hide else f"{trade.qty:,.8g}{'주' if usd else ''}"
+            title = f"{escape(trade.symbol)} {word} {qty}"
             info = []
-            if t.price:
-                head = "체결가" if t.status == "체결" else "가격"
-                info.append(f"{head} {cur}{t.price:,.{digits}f}{won}")
-            if t.amount:
-                info.append(f"금액 {money(t.amount, digits)}")
-            if t.fee:
-                small = not usd and t.fee < 1 and not hide
+            if trade.price:
+                head = "체결가" if trade.status == "체결" else "가격"
+                info.append(f"{head} {cur}{trade.price:,.{digits}f}{won}")
+            if trade.amount:
+                info.append(f"금액 {money(trade.amount, digits)}")
+            if trade.fee:
+                small = not usd and trade.fee < 1 and not hide
                 info.append(
-                    "수수료 1원 미만" if small else f"수수료 {money(t.fee, 2 if usd else 0)}"
+                    "수수료 1원 미만" if small else f"수수료 {money(trade.fee, 2 if usd else 0)}"
                 )
-            if t.note:
-                info.append(t.note)
-        if t.status == "체결":
+            if trade.note:
+                info.append(trade.note)
+        if trade.status == "체결":
             state_cls = "done"
-        elif t.kind == "deposit":
+        elif trade.kind == "deposit":
             state_cls = "deposit"
-        elif "대기" in t.status:
+        elif "대기" in trade.status:
             state_cls = "wait"
         else:
             state_cls = "other"
-        sub = escape(t.date) + (" · " + escape(" · ".join(info)) if info else "")
+        sub = escape(trade.date) + (" · " + escape(" · ".join(info)) if info else "")
         out.append(
-            f'<li class="kind-{escape(t.kind)}">'
+            f'<li class="kind-{escape(trade.kind)}">'
             f'<span class="orbit-coin coin-{cls}">{symbol_icon(sym)}</span>'
             f"<div><b>{title}</b><small>{sub}</small></div>"
-            f'<span class="orbit-trade-state state-{state_cls}">{escape(t.status)}</span></li>'
+            f'<span class="orbit-trade-state state-{state_cls}">{escape(trade.status)}</span></li>'
         )
     return "".join(out)
 
 
 def _trades_panel(trades: Sequence[Trade], hide: bool) -> str:
+    """[쓰임] 거래 내역 칸 (종류 거르기 버튼 + 줄들)."""
     filt = (
         '<div class="orbit-trade-filter" role="group" aria-label="거래 종류">'
         + "".join(
-            f'<label><input type="radio" name="orbit-trade-filter" id="tf-{k}" value="{k}" '
-            f"{'checked' if k == 'all' else ''}><span>{w}</span></label>"
-            for k, w in (("all", "전체"), ("buy", "매수"), ("sell", "매도"), ("deposit", "입금"))
+            '<label><input type="radio" name="orbit-trade-filter" '
+            f'id="tf-{trade_kind}" value="{trade_kind}" '
+            f"{'checked' if trade_kind == 'all' else ''}><span>{word}</span></label>"
+            for trade_kind, word in (
+                ("all", "전체"),
+                ("buy", "매수"),
+                ("sell", "매도"),
+                ("deposit", "입금"),
+            )
         )
         + "</div>"
     )
     rows = _trade_rows(trades, hide) or "<li>아직 거래 기록이 없습니다.</li>"
     # 필터에 해당 기록이 없으면 빈 칸 대신 한 줄 (전체에서는 숨김)
     rows += "".join(
-        f'<li class="kind-{k} orbit-trade-empty">{w} 기록이 아직 없습니다.</li>'
-        for k, w in (("buy", "매수"), ("sell", "매도"), ("deposit", "입금"))
-        if trades and not any(t.kind == k for t in trades)
+        f'<li class="kind-{trade_kind} orbit-trade-empty">{word} 기록이 아직 없습니다.</li>'
+        for trade_kind, word in (("buy", "매수"), ("sell", "매도"), ("deposit", "입금"))
+        if trades and not any(trade.kind == trade_kind for trade in trades)
     )
     recent = _trade_rows(trades[:5], hide) or "<li>아직 거래·입금 기록이 없습니다.</li>"
     return (
@@ -805,22 +851,23 @@ def _trades_panel(trades: Sequence[Trade], hide: bool) -> str:
 
 
 def _accounts(books: Sequence[Book], now_ms: int) -> str:
-    by_key = {b.key: b for b in books}
+    """[쓰임] 연결 계좌 상태 (마지막 조회 성공 · 없음 · 오래됨)."""
+    by_key = {book.key: book for book in books}
     rows = []
     for key, name, venue in (
         ("deneb", "Deneb", "토스증권 · 미국 주식"),
         ("vega", "Vega", "업비트 · 코인"),
         ("accumulate", "자동 적립", "토스증권 · 주식 모으기"),
     ):
-        b = by_key.get(key)
-        if b is None:
+        book = by_key.get(key)
+        if book is None:
             state, cls = "연결 미확인 · 장부 없음", "other"
-        elif not b.updated_ms:
+        elif not book.updated_ms:
             state, cls = "저장 장부만 표시 · 저장 시각 모름", "other"
-        elif _stale(b, now_ms):
-            state, cls = f"오래된 장부 · {_kst(b.updated_ms)} — 매매 프로그램 확인 필요", "wait"
+        elif _stale(book, now_ms):
+            state, cls = f"오래된 장부 · {_kst(book.updated_ms)} — 매매 프로그램 확인 필요", "wait"
         else:
-            state, cls = f"마지막 조회 성공 · {_kst(b.updated_ms)}", "done"
+            state, cls = f"마지막 조회 성공 · {_kst(book.updated_ms)}", "done"
         rows.append(
             f"<li><div><b>{name}</b><small>{venue}</small></div>"
             f'<span class="orbit-trade-state state-{cls}">{escape(state)}</span></li>'
@@ -836,6 +883,7 @@ def _accounts(books: Sequence[Book], now_ms: int) -> str:
 
 
 def _onboard() -> str:
+    """[쓰임] 처음 쓰는 사람 안내 (세 가지만 보면 됨) — 한 번 보면 숨김."""
     return (
         '<section class="orbit-onboard" aria-labelledby="orbit-onboard-title">'
         '<h2 id="orbit-onboard-title">처음 오셨나요? 세 가지만 보면 됩니다</h2><ol>'
@@ -867,22 +915,26 @@ def render_live(
 ) -> str:
     """승인한 화면의 요소만 표시. 예시 수익/이력/연결 상태를 만들어 넣지 않는다."""
     hist = list(history or [])
-    complete = bool(books) and all(_priced(b, quotes) for b in books)
-    value = sum(b.value_krw for b in books)
-    base = sum(b.deposits_krw for b in books)
-    pending_count = sum(len(b.pending) for b in books)
+    complete = bool(books) and all(_priced(book, quotes) for book in books)
+    value = sum(book.value_krw for book in books)
+    base = sum(book.deposits_krw for book in books)
+    pending_count = sum(len(book.pending) for book in books)
     warnings = list(quotes.errors)
     if books and not complete:
         warnings.append("일부 시세·환율 미확인: 원가로 셈 하는 추정치 포함")
     warnings.extend(
-        f"{b.title} · 매수 정지 기록을 확인하세요"
-        for b in books
-        if any("낙폭 정지 중" in n or n.startswith("⏸ 정지 중") for n in b.notes)
+        f"{book.title} · 매수 정지 기록을 확인하세요"
+        for book in books
+        if any("낙폭 정지 중" in note or note.startswith("⏸ 정지 중") for note in book.notes)
     )
     warnings.extend(
-        f"{b.title} · 장부가 오래됨 ({_kst(b.updated_ms)})" for b in books if _stale(b, now_ms)
+        f"{book.title} · 장부가 오래됨 ({_kst(book.updated_ms)})"
+        for book in books
+        if _stale(book, now_ms)
     )
-    warnings.extend(f"{b.title} · {p}" for b in books for p in b.pending)
+    warnings.extend(
+        f"{book.title} · {pending_line}" for book in books for pending_line in book.pending
+    )
     title = (
         f"체결 확인 대기 {pending_count}건"
         if pending_count
@@ -907,8 +959,8 @@ def render_live(
             _change(value, base, hide) if complete else '<span class="mute">시세 확인 필요</span>'
         )
     caution = "확정 수익 아님" if complete else "추정치 포함 · 확정 수익 아님"
-    ledger_ms = max((b.updated_ms for b in books), default=0)
-    stale_n = sum(_stale(b, now_ms) for b in books)
+    ledger_ms = max((book.updated_ms for book in books), default=0)
+    stale_n = sum(_stale(book, now_ms) for book in books)
     stamp = (
         f"장부 업데이트 {_kst(ledger_ms) if ledger_ms else '모름'}"
         f" · 시세 업데이트 {_kst(quotes.at_ms) if quotes.at_ms else '없음'}"
@@ -962,8 +1014,8 @@ def render_live(
     # 체결 대기 줄만 숨긴다. 시세/정지/장부 결측 경고는 계속 읽을 수 있어야 한다.
     if not pending_count and (warnings or not books):
         status += f'<p class="orbit-data-note" data-live="data-note">{escape(detail)}</p>'
-    by_key = {b.key: b for b in books}
-    pad = max((len(b.holdings) for b in books), default=1)
+    by_key = {book.key: book for book in books}
+    pad = max((len(book.holdings) for book in books), default=1)
     toggle = (
         f'<a class="orbit-detail-toggle{" on" if show_detail else ""}" '
         f'href="/live?detail={"close" if show_detail else "open"}" '
@@ -973,19 +1025,23 @@ def render_live(
     )
     cards = "".join(
         _card(
-            by_key.get(k, Book(k, k, "", 0, 0, ())),
+            by_key.get(book_key, Book(book_key, book_key, "", 0, 0, ())),
             quotes,
-            i,
-            recorded=k in by_key,
+            index,
+            recorded=book_key in by_key,
             hide=hide,
             now_ms=now_ms,
             history=hist,
             show_detail=show_detail,
             pad_rows=pad,
         )
-        for i, k in enumerate(("deneb", "vega", "accumulate"))
+        for index, book_key in enumerate(("deneb", "vega", "accumulate"))
     )
-    trades = sorted((t for b in books for t in b.trades), key=lambda t: t.date, reverse=True)
+    trades = sorted(
+        (trade for book in books for trade in book.trades),
+        key=lambda trade: trade.date,
+        reverse=True,
+    )
     return (
         ("" if onboarded else _onboard())
         + hero

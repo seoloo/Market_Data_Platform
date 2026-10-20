@@ -13,6 +13,10 @@
 * 판단 · 문구는 :mod:`auto_trading.ops.risk_news`. 매매 · 주문 없음.
   ``.env`` ``RISK_NEWS_OFF=true`` 면 끔.
 * 기록: ``data/risk_news/seen.json`` (본 기사) · ``log.jsonl`` (모든 판단).
+
+언제 실행: 예약 작업 매시 17 분 (``run``).
+읽고 쓰는 것: ``data/toss/*.json`` (적립 종목) · 토스 보유 조회(읽기만) · 구글 뉴스 · 야후 RSS ·
+              Laya · Gemini → 투자 봇 텔레그램 · ``data/risk_news/``.
 """
 
 from __future__ import annotations
@@ -77,41 +81,49 @@ CRYPTO = (
 
 
 def _us(sym: str, group: str) -> Asset:
+    """[쓰임] 미국 종목 하나를 감시 대상으로 (영어 이름 · 검색어 · 야후 기호)."""
     name = NAMES.get(sym, f"the stock or ETF with ticker {sym}")
     return Asset(sym, name, f"{sym} stock", yahoo=sym, group=group)
 
 
 def assets(root: Path = REPO) -> list[Asset]:
-    out = [_us(s, "Deneb") for s in DENEB_SYMBOLS]
+    """[쓰임] 감시할 대상 목록 — Deneb · 적립 장부 종목 · Vega 코인 + 업비트 · 토스 수동 보유.
+    [이유] 국내 종목은 영어 기사가 드물어 뺀다."""
+    out = [_us(symbol, "Deneb") for symbol in DENEB_SYMBOLS]
     acc: list[str] = []
-    for f in sorted((root / "data" / "toss").glob("*.json")):
+    for path in sorted((root / "data" / "toss").glob("*.json")):
         try:
-            d = json.loads(f.read_text(encoding="utf-8"))
+            body = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(d, dict) and "baseline_qty" in d and d.get("symbol"):
-            acc.append(str(d["symbol"]).upper())
-    out += [_us(s, "토스 적립") for s in sorted(set(acc)) if s not in DENEB_SYMBOLS]
+        if isinstance(body, dict) and "baseline_qty" in body and body.get("symbol"):
+            acc.append(str(body["symbol"]).upper())
+    out += [_us(symbol, "토스 적립") for symbol in sorted(set(acc)) if symbol not in DENEB_SYMBOLS]
     out += list(CRYPTO)
-    known = {a.key for a in out}
+    known = {asset.key for asset in out}
     try:  # 그 밖 미국 보유 (수동) — 조회만, 실패하면 건너뜀
         from auto_trading.config.secrets import load_toss_credentials
         from auto_trading.exchange.toss import TossReader, TossTokenCache, is_kr_symbol
 
-        r = TossReader(
+        reader = TossReader(
             load_toss_credentials(root / ".env"), TossTokenCache(root / "data" / "toss_token.json")
         )
         try:
-            held = r.holdings()
+            held = reader.holdings()
         finally:
-            r.close()
-        out += [_us(s, "수동 보유") for s in sorted(held) if s not in known and not is_kr_symbol(s)]
+            reader.close()
+        out += [
+            _us(symbol, "수동 보유")
+            for symbol in sorted(held)
+            if symbol not in known and not is_kr_symbol(symbol)
+        ]
     except Exception as exc:
         print(f"토스 보유 조회 건너뜀: {type(exc).__name__}")
     return out
 
 
 def _fresh(published: str, now: datetime) -> bool:
+    """[쓰임] 기사가 최근 :data:`FRESH_H` 시간 안인가."""
     try:
         return now - parsedate_to_datetime(published) <= timedelta(hours=FRESH_H)
     except (TypeError, ValueError, IndexError):
@@ -119,6 +131,7 @@ def _fresh(published: str, now: datetime) -> bool:
 
 
 def fetch(asset: Asset, now: datetime) -> list[Headline]:
+    """[쓰임] 대상 하나의 새 기사들 (구글 뉴스 · 미국 종목은 야후 RSS)."""
     urls = [
         "https://news.google.com/rss/search?q="
         + quote(asset.query + " when:1d")
@@ -130,14 +143,14 @@ def fetch(asset: Asset, now: datetime) -> list[Headline]:
     stamp = now.isoformat(timespec="seconds")
     for url in urls:
         try:
-            r = httpx.get(url, headers=_UA, timeout=15, follow_redirects=True)
+            response = httpx.get(url, headers=_UA, timeout=15, follow_redirects=True)
         except httpx.HTTPError:
             continue
-        if r.status_code != 200:
+        if response.status_code != 200:
             continue
-        for it in parse_feed(r.text, "risk", stamp):
-            if _fresh(it.published, now) and not is_junk(it):
-                out.append(Headline(asset, it.title.strip(), it.link, it.published))
+        for item in parse_feed(response.text, "risk", stamp):
+            if _fresh(item.published, now) and not is_junk(item):
+                out.append(Headline(asset, item.title.strip(), item.link, item.published))
     return out[:PER_ASSET]
 
 
@@ -148,22 +161,24 @@ def _decide(
     key = load_gemini_key(root / ".env")
     if key is None:
         return pick_alerts(new, choices, ALERT_MIN), {}
-    cands = pick_alerts(new, choices, CANDIDATE_MIN)
-    if not cands:
+    candidates = pick_alerts(new, choices, CANDIDATE_MIN)
+    if not candidates:
         return [], {}
     from scripts.market_brief import ask_gemini
 
-    system, user = confirm_prompt(cands)
+    system, user = confirm_prompt(candidates)
     answer, _attempts = ask_gemini(key.value, system, user)
     if not isinstance(answer, dict):
         return pick_alerts(new, choices, ALERT_MIN), {}
-    ok = parse_confirm(answer, len(cands))
-    kept = [c for k, c in enumerate(cands, 1) if k in ok]
-    whys = {n: ok[k] for n, k in enumerate(sorted(ok), 1)}
+    confirmed = parse_confirm(answer, len(candidates))
+    kept = [candidate for number, candidate in enumerate(candidates, 1) if number in confirmed]
+    whys = {order: confirmed[number] for order, number in enumerate(sorted(confirmed), 1)}
     return kept, whys
 
 
 def run(root: Path = REPO, *, send: bool = True) -> int:
+    """[쓰임] 한 번 감시 — 새 기사 → Laya 위험 후보 → Gemini 확인 → 알림 · 기록.
+    [이유] '이미 일어난 중대 사건' 으로 확인된 것만 알린다 (헛알림 줄이기)."""
     if read_env_file(root / ".env").get("RISK_NEWS_OFF", "").strip().lower() == "true":
         print("위험 뉴스 감시 꺼짐 (RISK_NEWS_OFF)")
         return 0
@@ -174,25 +189,26 @@ def run(root: Path = REPO, *, send: bool = True) -> int:
     now = datetime.now(UTC)
     store = SeenStore(DATA / "seen.json")
     items: list[Headline] = []
-    for a in assets(root):
-        items += fetch(a, now)
+    for watched in assets(root):
+        items += fetch(watched, now)
     new = store.new(items)
     if not new:
         print("새 기사 없음")
         return 0
     try:
-        results = laya.batch([state_of(h) for h in new], RISK_Q, "english")
+        results = laya.batch([state_of(headline) for headline in new], RISK_Q, "english")
     finally:
         laya.close()
     choices = [
-        (c.label, c.prob) if (c := choice_of(res, "risk")) is not None else None for res in results
+        (choice.label, choice.prob) if (choice := choice_of(res, "risk")) is not None else None
+        for res in results
     ]
     alerts, whys = _decide(new, choices, root)
-    done = [h for h, c in zip(new, choices, strict=False) if c is not None]
+    done = [headline for headline, choice in zip(new, choices, strict=False) if choice is not None]
     print(f"새 기사 {len(new)} · 판단 {len(done)} · 알림 {len(alerts)} · {laya.tokens} 토큰")
     if not send:
-        for h, label, prob in alerts:
-            print(f"  {h.asset.key} {label} {prob:.2f} {h.title[:90]}")
+        for headline, label, prob in alerts:
+            print(f"  {headline.asset.key} {label} {prob:.2f} {headline.title[:90]}")
         return 0
     if alerts:
         creds = load_telegram_credentials(root / ".env")
@@ -208,13 +224,14 @@ def run(root: Path = REPO, *, send: bool = True) -> int:
     store.mark(done)  # 판단이 끝난 기사만 기억 (Laya 실패 칸은 다음에 다시)
     store.save()
     DATA.mkdir(parents=True, exist_ok=True)
-    with (DATA / "log.jsonl").open("a", encoding="utf-8") as fh:
+    with (DATA / "log.jsonl").open("a", encoding="utf-8") as log_file:
         for row in log_rows(new, choices, now.isoformat(timespec="seconds")):
-            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            log_file.write(json.dumps(row, ensure_ascii=False) + "\n")
     return 0
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (예약은 ``run``)."""
     if argv[:1] == ["run"]:
         return run(send="--no-send" not in argv)
     raise SystemExit("usage: python -m scripts.risk_news run [--no-send]")

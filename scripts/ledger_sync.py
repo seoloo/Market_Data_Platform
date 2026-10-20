@@ -9,6 +9,10 @@
 * 모듈 설명: :mod:`auto_trading.ops.live_ledger`. Supabase 표는 ``docs/supabase/schema.sql``.
 * ``.env`` 의 ``SUPABASE_URL`` · ``SUPABASE_SERVICE_KEY`` (Secret 키) 를 쓴다. 키는 출력하지 않는다.
 * Supabase 가 안 되면 PC DB 는 그대로 남고 끝 코드 2 (다음 실행이 다시 올림).
+
+언제 실행: 예약 작업 하루 한 번 (``run``).
+읽고 쓰는 것: 실거래 장부(거래 · 입금은 계좌 조회 없이 그대로) · 오늘 평가 한 줄
+              (``scripts/live_snapshot`` → ``data/live/history.jsonl``) → PC SQLite · Supabase.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def _rows() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """[쓰임] 장부 → (거래 · 입금 줄, 하루 평가 줄). 시세 · 계좌 조회 없이 장부 그대로."""
     books = build_books(
         REPO, Quotes(), sync=False
     )  # 거래 · 입금은 장부 그대로(시세 · 계좌 조회 없이)
@@ -53,6 +58,7 @@ def _snapshot_today() -> None:
 
 
 def run(push: bool) -> int:
+    """[쓰임] 오늘 평가 기록(``push``) → PC DB → (``push`` 면) Supabase."""
     if push:
         _snapshot_today()
     events, snaps = _rows()
@@ -75,22 +81,24 @@ def run(push: bool) -> int:
 
 
 def status() -> int:
+    """[쓰임] PC 기록 DB 의 줄 수 보기 (읽기 전용으로 연다)."""
     path = REPO / DB_PATH
     if not path.exists():
         print("아직 PC 기록 DB 없음 — python -m scripts.ledger_sync run")
         return 0
     with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as db:
-        for account, kind, n, amount in db.execute(
+        for account, kind, rows, amount in db.execute(
             "SELECT account, kind, COUNT(*), SUM(amount) FROM ledger_events "
             "GROUP BY account, kind ORDER BY account, kind"
         ):
-            print(f"{account:<11} {kind:<8} {n:>4}줄 · 금액 합 {amount or 0:,.2f}")
+            print(f"{account:<11} {kind:<8} {rows:>4}줄 · 금액 합 {amount or 0:,.2f}")
         n_s = db.execute("SELECT COUNT(*) FROM daily_snapshots").fetchone()[0]
     print(f"하루 평가 {n_s}줄")
     return 0
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (예약은 ``run``)."""
     if argv == ["run"]:
         return run(push=True)
     if argv == ["local"]:
