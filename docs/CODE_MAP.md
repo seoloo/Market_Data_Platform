@@ -66,6 +66,7 @@
 | `user_settings` | 설정 폼 검사 · 바뀐 칸 · 저장 파일(줄바꿈까지) · 바꾼 기록 · 종목 추가/빼기 · 비상 정지 (2 단계) |
 | `live_ledger` | 장부 → 거래 줄 · 하루 평가 줄 · SQLite 두 번 쓰기 · Supabase 로 보낼 것 (2 단계) |
 | `deneb_chat` · `deneb_retry` · `deneb_harvest` · `deneb_dividend_step` · `deneb_gold_dividend` | Deneb 금액 묻기 · 답 · 밤 매수 / 재시도 / 12 월 공제 실현 / 배당 단계 제안 / 금 섞기 · 배당 둘째 달 (`tests/golden/test_deneb_golden.py`, 3 단계) |
+| `vega_more` · `toss_kr` · `deposit_split` · `liquidate` | Vega 정지 30 일 · 정지 풀기 · 주간 요약 · 현황 / 국내 적립 실행기 / 입금 나누기 글 / 전부 정리 (`tests/golden/test_vega_kr_golden.py` · `test_liquidate_golden.py`, 4 단계) |
 
 작업 브랜치(worktree)에서 돌릴 때는 그 브랜치 코드를 읽도록 `PYTHONPATH=<브랜치>/src;<브랜치>` 를 꼭 준다
 (가상환경이 원래 폴더 `src` 에 연결돼 있어, 안 주면 원래 코드를 시험하게 된다).

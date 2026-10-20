@@ -1,4 +1,9 @@
-"""QS 실거래 (docs/research/118) — QNDX 적립을 문서 110 QS 규칙으로 바꾸는 순수 판단. I/O 없음.
+"""QS 전략 계산 (docs/research/118) — QNDX 적립을 문서 110 QS 규칙으로 바꾸는 판단 (계산만).
+
+언제 쓰나: ``scripts/toss_accumulate.py`` 가 ``QS_LIVE = True`` 일 때만 — **지금은 꺼짐**
+           (2026-10-09 사용자 "전략 qs는 그냥 페이퍼에만 등록 해줘",
+           Paper 는 ``scripts/qs_paper.py``).
+읽고 쓰는 것: 없음 — 장부 ``data/toss/QS_SWITCH.json`` 모양(:class:`QsLiveState`)과 계산만.
 
 규칙 (110 그대로, 사용자 결정 2026-10-04 "실거래를 하자"):
 
