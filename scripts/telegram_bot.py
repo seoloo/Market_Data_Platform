@@ -1,4 +1,10 @@
-"""텔레그램 '현황' 명령 — 폰에서 "현황" 을 보내면 실거래 요약을 답장한다 (사용자 2026-10-10).
+"""텔레그램 투자 봇 — 현황 · Paper · 정리 · 정지풀기 · 적립 · 개별주 명령에 답한다 (2026-10-10 ~).
+
+언제 실행: 2 분마다 ``AutoTrading_Telegram_Bot`` (``run``). 같은 실행에서 정리 이어 하기 ·
+           개별주 감시 · 경제 일정 · 나무 모의 · 그림자 기록 · 매일 Paper 요약 ·
+           매일 안전 점검도 돈다.
+읽고 쓰는 것: 텔레그램(받은 글 대기열 ``data/telegram/inbox.json``) · 장부들(현황) ·
+              버튼 번호 ``data/telegram/acc_buttons`` · ``data/size_guard/telegram`` · 설정.
 
 사용 예::
 
@@ -15,7 +21,10 @@
   (5 분 · 한 번). 누르면 다시 확인한 뒤 예약 → 정규장 시작 직후 지정가.
   매 실행(2 분)마다 예약 매수 · −3% 손절 감시를 돌린다.
   주문은 버튼을 눌렀을 때만 · 설정 ``stock.orders`` · 토스 주문 허용일 때만.
-* '현황' 내용은 대시보드 실거래 홈과 같다: 장부 + 공개 시세(키 없음).
+* '현황' 내용은 대시보드 실거래 홈과 같다: 장부 + 공개 시세(키 없음) + 실제 계좌 동기화.
+
+디자인 패턴: **Command + 목록표** — 받은 명령을 종류별로 나누는 표(:data:`COMMAND_KINDS`)와
+매 실행 부가 작업 표(:data:`BACKGROUND_JOBS`) 하나씩 (리팩토링 5 단계, 2026-10-21).
 """
 
 from __future__ import annotations
@@ -24,6 +33,7 @@ import contextlib
 import json
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +77,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def inbox_path(root: Path = REPO) -> Path:
+    """[쓰임] 받은 글 대기열 파일 (Deneb 대화와 나눠 읽는다)."""
     return root / "data" / "telegram" / "inbox.json"
 
 
@@ -81,11 +92,12 @@ def _start_offset(root: Path) -> int:
 
 
 def report(root: Path = REPO) -> str:
+    """[쓰임] '현황' 답 — 실거래 요약(대시보드와 같은 계산) + 파이어 목표 % + 💹 개별주 현황."""
     coins, tickers = needed(root)
-    q = fetch_quotes(coins, tickers)
-    books = build_books(root, q)
-    text = summary_text(books, q, int(time.time() * 1000))
-    value = sum(b.value_krw for b in books)
+    quotes = fetch_quotes(coins, tickers)
+    books = build_books(root, quotes)
+    text = summary_text(books, quotes, int(time.time() * 1000))
+    value = sum(book.value_krw for book in books)
     target = float(user_settings.get(root, "fire.target_krw"))
     text += f"\n🎯 파이어 목표 {target / 1e8:g}억까지 {value / target:.1%}"
     stock = _stock_summary()
@@ -95,9 +107,9 @@ def report(root: Path = REPO) -> str:
 def _stock_summary() -> list[str]:
     """💹 개별주 예약 · 보유 · 손절 거리 (2026-10-16 '현황에 개별주'). 실패해도 현황은 보낸다."""
     try:
-        from scripts import size_guard as sg
+        from scripts import size_guard
 
-        return sg.summary_lines()
+        return size_guard.summary_lines()
     except Exception as exc:
         print(f"개별주 현황 건너뜀: {type(exc).__name__}: {exc}")
         return []
@@ -167,18 +179,18 @@ COMMANDS_MENU = [
 
 def pin_help(root: Path = REPO) -> str:
     """사용법을 보내고 대화방 공지로 고정한다 (예전 고정은 모두 푼다) + '/' 메뉴."""
-    creds = load_telegram_credentials(root / ".env")
-    if creds is None:
+    credentials = load_telegram_credentials(root / ".env")
+    if credentials is None:
         return "텔레그램 설정 없음"
-    bot = TelegramNotifier(creds)
+    bot = TelegramNotifier(credentials)
     try:
-        mid = bot.send_message(HELP)
+        message_id = bot.send_message(HELP)
         bot.unpin_all()
-        bot.pin(mid)
+        bot.pin(message_id)
         bot.set_commands(COMMANDS_MENU)
     finally:
         bot.close()
-    return f"투자 봇 공지 고정 (메시지 {mid})"
+    return f"투자 봇 공지 고정 (메시지 {message_id})"
 
 
 LIQ_WAIT_S = 120
@@ -186,21 +198,24 @@ LIQ_WAIT_S = 120
 
 
 def _liq_buttons(nonce: str) -> list[list[dict[str, str]]]:
-    def b(text: str, arg: str) -> dict[str, str]:
+    """[쓰임] '정리' 범위 버튼들 (버튼 값 ``liq:<번호>:<범위>``)."""
+
+    def button(text: str, arg: str) -> dict[str, str]:
         return {"text": text, "callback_data": f"liq:{nonce}:{arg}"}
 
     return [
-        [b("🧯 전부 정리", "all")],
-        [b("Vega 만", "vega"), b("Deneb 만", "deneb")],
-        [b("자동 적립 (종목 고르기)", "accmenu"), b("개별주만", "stock")],
-        [b("Altair 만", "altair"), b("Sirius 만", "sirius")],
-        [b("취소", "cancel")],
+        [button("🧯 전부 정리", "all")],
+        [button("Vega 만", "vega"), button("Deneb 만", "deneb")],
+        [button("자동 적립 (종목 고르기)", "accmenu"), button("개별주만", "stock")],
+        [button("Altair 만", "altair"), button("Sirius 만", "sirius")],
+        [button("취소", "cancel")],
     ]
 
 
 def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
-    """'정리' · '정지풀기' 글과 그 버튼. 버튼을 보냈으면 True (이 실행에서 답을 기다린다)."""
-    from scripts import liquidate as liq
+    """[쓰임] '정리' · '정지풀기' 글과 그 버튼. 버튼을 보냈으면 True (이 실행에서 답을 기다린다).
+    [이유] 버튼 번호는 5 분 · 한 번만 — 오래된 버튼이나 두 번 누름으로 정리가 다시 시작되지 않게."""
+    from scripts import liquidate
 
     now = int(time.time() * 1000)
     if msg.data:
@@ -211,7 +226,7 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
         if len(parts) != 3:
             return False
         kind, nonce, arg = parts
-        if not liq.STORE.use_request(nonce, now, kind):
+        if not liquidate.STORE.use_request(nonce, now, kind):
             bot.send("⌛ 지난 버튼이에요 (5 분 지남 · 이미 누름) — 다시 보내 주세요")
             return False
         if arg == "cancel":
@@ -219,65 +234,68 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
                 bot.edit(msg.message_id, "취소했어요 — 아무것도 바꾸지 않았어요")
             return False
         if kind == "liq" and arg == "accmenu":  # 자동 적립 — 종목을 골라 정리 (2026-10-18)
-            return _acc_liq_menu(bot, liq, now, msg.message_id)
+            return _acc_liq_menu(bot, liquidate, now, msg.message_id)
         if kind == "liq" and arg.startswith("a="):
             sym = arg[2:]
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🧯 자동 적립 {sym} 정리 시작 — 결과를 곧 보내요")
-            liq.start(f"acc:{sym}", "텔레그램")
+            liquidate.start(f"acc:{sym}", "텔레그램")
             return False
         if kind == "liq" and arg.startswith("s="):
             sym = arg[2:]
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🧯 {sym} 정리 시작 — 결과를 곧 보내요")
-            liq.start(f"sym:{sym}", "텔레그램")
+            liquidate.start(f"sym:{sym}", "텔레그램")
         elif kind == "liq" and arg in SCOPES:
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🧯 {SCOPES[arg]} 정리 시작 — 결과를 곧 보내요")
-            liq.start(arg, "텔레그램")  # 결과는 start 가 보낸다
+            liquidate.start(arg, "텔레그램")  # 결과는 start 가 보낸다
         elif kind == "unh" and arg in GROUPS:
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"▶ {GROUPS[arg]} 정지 풀기")
-            liq.unhalt(arg, "텔레그램")
+            liquidate.unhalt(arg, "텔레그램")
         return False
     query = liquidation_symbol(msg)
     if query:
-        from scripts import size_guard as sg
+        from scripts import size_guard
 
         try:
-            sym, name = sg.resolve(query)
+            symbol, name = size_guard.resolve(query)
         except SystemExit as exc:  # 여러 종목이 맞음
             bot.send(f"⚠ {exc}")
             return False
-        nonce = liq.STORE.new_request(now, "liq")
+        nonce = liquidate.STORE.new_request(now, "liq")
         rows = [
-            [{"text": f"🧯 {name} 정리", "callback_data": f"liq:{nonce}:s={sym}"}],
+            [{"text": f"🧯 {name} 정리", "callback_data": f"liq:{nonce}:s={symbol}"}],
             [{"text": "취소", "callback_data": f"liq:{nonce}:cancel"}],
         ]
         bot.send_message(
-            liq.preview_text(f"sym:{sym}") + "\n\n누르면 바로 시작해요 (5 분 안, 한 번만)",
+            liquidate.preview_text(f"sym:{symbol}") + "\n\n누르면 바로 시작해요 (5 분 안, 한 번만)",
             buttons=rows,
         )
         return True
     word = msg.text.strip().lower().replace(" ", "")
     if word in LIQ_WORDS:
-        nonce = liq.STORE.new_request(now, "liq")
-        text = liq.preview_text("all")
+        nonce = liquidate.STORE.new_request(now, "liq")
+        text = liquidate.preview_text("all")
         bot.send_message(
             text + "\n\n범위를 누르면 바로 시작해요 (5 분 안, 한 번만)",
             buttons=_liq_buttons(nonce),
         )
         return True
     if word in UNHALT_WORDS:
-        on = {g: r for g, r in liq.halts().items() if r}
-        if not on:
+        halted = {group: reason for group, reason in liquidate.halts().items() if reason}
+        if not halted:
             extra = " (전체 비상 정지는 설정 화면에서)" if root_halt().exists() else ""
             bot.send("정지 중인 그룹이 없어요" + extra)
             return False
-        nonce = liq.STORE.new_request(now, "unh")
-        rows = [[{"text": f"{GROUPS[g]} 풀기", "callback_data": f"unh:{nonce}:{g}"}] for g in on]
+        nonce = liquidate.STORE.new_request(now, "unh")
+        rows = [
+            [{"text": f"{GROUPS[group]} 풀기", "callback_data": f"unh:{nonce}:{group}"}]
+            for group in halted
+        ]
         rows.append([{"text": "취소", "callback_data": f"unh:{nonce}:cancel"}])
-        lines = [f"⛔ {GROUPS[g]}: {r}" for g, r in on.items()]
+        lines = [f"⛔ {GROUPS[group]}: {reason}" for group, reason in halted.items()]
         bot.send_message(
             "\n".join([*lines, "", "풀면 다음 실행부터 그 전략이 자기 규칙대로 다시 사요"]),
             buttons=rows,
@@ -286,20 +304,27 @@ def handle_liquidation(bot: TelegramNotifier, msg: InboxMessage) -> bool:
     return False
 
 
-def _acc_liq_menu(bot: TelegramNotifier, liq: Any, now: int, message_id: int) -> bool:
-    """정리 → 자동 적립: 적립 몫이 있는 종목마다 버튼 + 적립 전부 + 취소."""
-    items, notes = liq.plan("acc")
-    nonce = liq.STORE.new_request(now, "liq")
+def _acc_liq_menu(bot: TelegramNotifier, liquidate: Any, now: int, message_id: int) -> bool:
+    """[쓰임] 정리 → 자동 적립: 적립 몫이 있는 종목마다 버튼 + 적립 전부 + 취소."""
+    items, notes = liquidate.plan("acc")
+    nonce = liquidate.STORE.new_request(now, "liq")
     rows = [
-        [{"text": f"🧯 {it.symbol} {it.want:f}주", "callback_data": f"liq:{nonce}:a={it.symbol}"}]
-        for it in items
+        [
+            {
+                "text": f"🧯 {item.symbol} {item.want:f}주",
+                "callback_data": f"liq:{nonce}:a={item.symbol}",
+            }
+        ]
+        for item in items
     ]
     if items:
         rows.append([{"text": "🧯 적립 전부 정리", "callback_data": f"liq:{nonce}:acc"}])
     rows.append([{"text": "취소", "callback_data": f"liq:{nonce}:cancel"}])
     lines = ["🧯 자동 적립 — 어느 종목을 정리할까요? (적립 몫만 · 지정가)"]
-    lines += [f"· {it.symbol} 적립 몫 {it.want:f}주" for it in items] or ["팔 적립 몫이 없어요"]
-    lines += [f"· {n}" for n in notes]
+    lines += [f"· {item.symbol} 적립 몫 {item.want:f}주" for item in items] or [
+        "팔 적립 몫이 없어요"
+    ]
+    lines += [f"· {note}" for note in notes]
     lines.append("종목을 고르면 그 종목 적립도 멈춰요(목록에서 빼기) — 다시 하려면 '적립' → 추가")
     with contextlib.suppress(NotifyError):
         bot.edit(message_id, "자동 적립 종목 고르기 ↓")
@@ -310,8 +335,11 @@ def _acc_liq_menu(bot: TelegramNotifier, liq: Any, now: int, message_id: int) ->
 # ------------------------------------------------------------------ 💰 자동 적립 추가 · 빼기
 
 ACC_STORE = Store(REPO / "data" / "telegram" / "acc_buttons")
+"""'적립' 버튼 번호 (5 분 · 한 번) — 정리 버튼과 같은 방식."""
 ACC_PENDING = REPO / "data" / "telegram" / "acc_pending.json"
+"""확인 버튼이 가리키는 할 일 (번호 → 추가 · 빼기 · 금액 내용)."""
 ACC_WAIT_S = 120
+"""'적립' 버튼 · 답장을 이 실행 안에서 기다리는 시간."""
 
 
 def _acc_parse(text: str) -> tuple[str, str, str]:
@@ -328,35 +356,41 @@ def _acc_parse(text: str) -> tuple[str, str, str]:
         except ValueError:
             pass
     query = " ".join(parts)
-    kr = re.fullmatch(r"\d{6}", query) is not None or re.search("[가-힣]", query) is not None
-    return query, "KR" if kr else "US", daily
+    korean = re.fullmatch(r"\d{6}", query) is not None or re.search("[가-힣]", query) is not None
+    return query, "KR" if korean else "US", daily
 
 
 def _acc_pending(nonce: str | None = None, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     """확인 버튼이 가리키는 할 일 (번호 → 추가 · 빼기 내용). 10 분 지난 것은 지운다."""
     try:
-        d: dict[str, Any] = json.loads(ACC_PENDING.read_text(encoding="utf-8"))
+        pending: dict[str, Any] = json.loads(ACC_PENDING.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        d = {}
+        pending = {}
     if nonce is not None and payload is not None:
-        d = {k: v for k, v in d.items() if time.time() - float(v.get("at", 0)) < 600}
-        d[nonce] = {**payload, "at": time.time()}
+        pending = {
+            key: value
+            for key, value in pending.items()
+            if time.time() - float(value.get("at", 0)) < 600
+        }
+        pending[nonce] = {**payload, "at": time.time()}
         ACC_PENDING.parent.mkdir(parents=True, exist_ok=True)
-        ACC_PENDING.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    return d
+        ACC_PENDING.write_text(json.dumps(pending, ensure_ascii=False), encoding="utf-8")
+    return pending
 
 
-def _acc_unit(x: dict[str, Any]) -> str:
-    return f"₩{x['daily']:,.0f}" if x["mkt"] == "KR" else f"${x['daily']:g}"
+def _acc_unit(item: dict[str, Any]) -> str:
+    """[쓰임] 하루 금액 글 — 국내 '₩5,000' · 미국 '$1'."""
+    return f"₩{item['daily']:,.0f}" if item["mkt"] == "KR" else f"${item['daily']:g}"
 
 
 def _acc_menu(bot: TelegramNotifier, root: Path) -> bool:
+    """[쓰임] '적립' 메뉴 — 지금 종목 목록 + [➕ 추가] · 종목마다 [✏️ 금액] [➖ 빼기] · [닫기]."""
     items = user_settings.acc_items(user_settings.load(root))
     nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
     lines = ["💰 자동 적립 종목 — 바꾸면 내일 적립분부터 (보유는 그대로)"]
     lines += [
-        f"· {x['name']}({x['sym']}) 하루 {_acc_unit(x)}{'' if x['on'] else ' · 꺼짐'}"
-        for x in items
+        f"· {item['name']}({item['sym']}) 하루 {_acc_unit(item)}{'' if item['on'] else ' · 꺼짐'}"
+        for item in items
     ] or ["· 적립 종목 없음"]
     lines.append(
         f"최대 {user_settings.MAX_ITEMS} 개 · QNDX 는 QS 전략과 얽혀 여기서 못 바꿔요 · "
@@ -365,10 +399,10 @@ def _acc_menu(bot: TelegramNotifier, root: Path) -> bool:
     rows = [[{"text": "➕ 종목 추가", "callback_data": f"acc:{nonce}:add"}]]
     rows += [
         [
-            {"text": f"✏️ {x['sym']} 금액", "callback_data": f"acc:{nonce}:amt={x['key']}"},
-            {"text": f"➖ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:rm={x['key']}"},
+            {"text": f"✏️ {item['sym']} 금액", "callback_data": f"acc:{nonce}:amt={item['key']}"},
+            {"text": f"➖ {item['sym']} 빼기", "callback_data": f"acc:{nonce}:rm={item['key']}"},
         ]
-        for x in items
+        for item in items
     ]
     rows.append([{"text": "닫기", "callback_data": f"acc:{nonce}:cancel"}])
     bot.send_message("\n".join(lines), buttons=rows)
@@ -376,6 +410,8 @@ def _acc_menu(bot: TelegramNotifier, root: Path) -> bool:
 
 
 def _acc_confirm_add(bot: TelegramNotifier, root: Path, text: str) -> bool:
+    """[쓰임] '기호 금액' 답 → 설정 화면과 같은 검사 → 확인 카드 [✅ 추가] [취소].
+    [이유] 바로 저장하지 않고 한 번 더 묻는다 — 잘못 찾은 종목에 매일 돈이 들어가지 않게."""
     from auto_trading.ops.kr_accumulate import read_universe
 
     query, mkt, daily = _acc_parse(text)
@@ -401,19 +437,20 @@ def _acc_confirm_add(bot: TelegramNotifier, root: Path, text: str) -> bool:
 
 
 def _acc_confirm_rm(bot: TelegramNotifier, root: Path, key: str) -> bool:
-    items = {x["key"]: x for x in user_settings.acc_items(user_settings.load(root))}
-    x = items.get(key)
-    if x is None:
+    """[쓰임] 빼기 확인 카드 [✅ 빼기] [취소] (내일 적립분부터, 보유는 그대로)."""
+    items = {item["key"]: item for item in user_settings.acc_items(user_settings.load(root))}
+    item = items.get(key)
+    if item is None:
         bot.send("⚠ 이미 목록에 없는 종목이에요")
         return False
     nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
     _acc_pending(nonce, {"action": "rm", "key": key})
     rows = [
-        [{"text": f"✅ {x['sym']} 빼기", "callback_data": f"acc:{nonce}:ok"}],
+        [{"text": f"✅ {item['sym']} 빼기", "callback_data": f"acc:{nonce}:ok"}],
         [{"text": "취소", "callback_data": f"acc:{nonce}:cancel"}],
     ]
     bot.send_message(
-        f"💰 {x['name']}({x['sym']}) 하루 {_acc_unit(x)} 적립을 목록에서 뺄까요?\n"
+        f"💰 {item['name']}({item['sym']}) 하루 {_acc_unit(item)} 적립을 목록에서 뺄까요?\n"
         "내일 적립분부터 안 사요 · 보유는 그대로 (팔려면 '정리' → 자동 적립)",
         buttons=rows,
     )
@@ -421,22 +458,26 @@ def _acc_confirm_rm(bot: TelegramNotifier, root: Path, key: str) -> bool:
 
 
 def _acc_ask_amount(bot: TelegramNotifier, root: Path, key: str) -> bool:
-    x = {i["key"]: i for i in user_settings.acc_items(user_settings.load(root))}.get(key)
-    if x is None:
+    """[쓰임] [✏️ 금액] → '새 하루 금액을 답장해 주세요' (답장 입력칸을 연다)."""
+    items = {item["key"]: item for item in user_settings.acc_items(user_settings.load(root))}
+    item = items.get(key)
+    if item is None:
         bot.send("⚠ 이미 목록에 없는 종목이에요")
         return False
-    rng = "₩500 ~ ₩30,000" if x["mkt"] == "KR" else "$0.5 ~ $20"
-    mid = bot.send_message(
-        f"✏️ {x['name']}({x['sym']}) 지금 하루 {_acc_unit(x)} — 새 하루 금액을 답장해 주세요"
-        f" ({rng})",
+    allowed_range = "₩500 ~ ₩30,000" if item["mkt"] == "KR" else "$0.5 ~ $20"
+    message_id = bot.send_message(
+        f"✏️ {item['name']}({item['sym']}) 지금 하루 {_acc_unit(item)}"
+        " — 새 하루 금액을 답장해 주세요"
+        f" ({allowed_range})",
         force_reply=True,
-        placeholder="예: 3" if x["mkt"] == "US" else "예: 2000",
+        placeholder="예: 3" if item["mkt"] == "US" else "예: 2000",
     )
-    set_acc_ask(mid, int(time.time()), kind="amt", key=key)
+    set_acc_ask(message_id, int(time.time()), kind="amt", key=key)
     return True
 
 
 def _acc_confirm_amount(bot: TelegramNotifier, root: Path, key: str, text: str) -> bool:
+    """[쓰임] 새 하루 금액 답 → 설정 화면과 같은 범위 검사 → 확인 카드 [✅ 바꾸기] [취소]."""
     amount = text.strip().replace(",", "").replace("$", "").replace("원", "").replace("₩", "")
     current = user_settings.load(root)
     new, errors = user_settings.set_daily(current, key, amount)
@@ -447,7 +488,7 @@ def _acc_confirm_amount(bot: TelegramNotifier, root: Path, key: str, text: str) 
     if not changes:
         bot.send("지금 금액과 같아요 — 바꾸지 않았어요")
         return False
-    c = changes[0]
+    change = changes[0]
     nonce = ACC_STORE.new_request(int(time.time() * 1000), "acc")
     _acc_pending(nonce, {"action": "amt", "key": key, "daily": amount})
     rows = [
@@ -455,14 +496,16 @@ def _acc_confirm_amount(bot: TelegramNotifier, root: Path, key: str, text: str) 
         [{"text": "취소", "callback_data": f"acc:{nonce}:cancel"}],
     ]
     bot.send_message(
-        f"✏️ {c.label} {user_settings.show(c.key, c.before)} → "
-        f"{user_settings.show(c.key, c.after)} — 내일 적립분부터. 맞으면 [✅ 바꾸기]",
+        f"✏️ {change.label} {user_settings.show(change.key, change.before)} → "
+        f"{user_settings.show(change.key, change.after)} — 내일 적립분부터. 맞으면 [✅ 바꾸기]",
         buttons=rows,
     )
     return True
 
 
 def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> None:
+    """[쓰임] [✅] 누름 → 그때 설정으로 다시 검사해 저장(추가 · 빼기 · 금액) → 결과 한 통.
+    [이유] 확인 카드를 보낸 뒤 설정이 바뀌었을 수 있어, 저장 직전에 다시 검사한다."""
     from datetime import UTC, datetime
 
     from auto_trading.ops.kr_accumulate import read_universe
@@ -490,17 +533,19 @@ def _acc_apply(bot: TelegramNotifier, root: Path, payload: dict[str, Any]) -> No
     changes = user_settings.diff(current, new)
     user_settings.apply(root, changes, datetime.now(UTC), by="텔레그램", new=new)
 
-    def line(c: user_settings.Change) -> str:
-        if c.key.endswith((".usd", ".daily")):
-            before, after = user_settings.show(c.key, c.before), user_settings.show(c.key, c.after)
-            return f"{c.label} {before} → {after}"
-        return c.label
+    def line(change: user_settings.Change) -> str:
+        if change.key.endswith((".usd", ".daily")):
+            before = user_settings.show(change.key, change.before)
+            after = user_settings.show(change.key, change.after)
+            return f"{change.label} {before} → {after}"
+        return change.label
 
-    bot.send("✅ " + " · ".join(line(c) for c in changes) + " — 내일 적립분부터")
+    bot.send("✅ " + " · ".join(line(change) for change in changes) + " — 내일 적립분부터")
 
 
 def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> bool:
-    """'적립' 메뉴 · 버튼 · 추가 답장 · '적립 추가 PLTR 3' · '적립 빼기 BTQ'. 기다리면 True."""
+    """[쓰임] '적립' 메뉴 · 버튼 · 추가 답장 · '적립 추가 PLTR 3' · '적립 금액 BTQ 3' ·
+    '적립 빼기 BTQ'. 버튼 · 답장을 기다려야 하면 True."""
     if msg.data:
         if msg.callback_id:
             with contextlib.suppress(NotifyError):
@@ -517,14 +562,14 @@ def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> b
                 bot.edit(msg.message_id, "닫았어요 — 아무것도 바꾸지 않았어요")
             return False
         if arg == "add":
-            mid = bot.send_message(
+            message_id = bot.send_message(
                 "➕ 추가할 종목과 하루 금액을 답장해 주세요\n"
                 "미국: 기호 + 달러 (예: PLTR 3) · 국내: 이름이나 6 자리 코드 + 원"
                 " (예: 삼성전자 10000)\n금액을 빼면 기본(미국 $1 · 국내 5,000원)",
                 force_reply=True,
                 placeholder="예: PLTR 3",
             )
-            set_acc_ask(mid, int(time.time()))
+            set_acc_ask(message_id, int(time.time()))
             return True
         if arg.startswith("rm="):
             return _acc_confirm_rm(bot, root, arg[3:])
@@ -547,21 +592,25 @@ def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> b
     if len(parts) >= 3 and parts[1] in ("추가", "더하기"):
         return _acc_confirm_add(bot, root, parts[2])
     if len(parts) >= 3 and parts[1] in ("금액", "변경", "바꾸기"):
-        bits = parts[2].split()
+        words = parts[2].split()
         hit = [
-            x
-            for x in user_settings.acc_items(user_settings.load(root))
-            if bits and x["sym"] == bits[0].upper()
+            item
+            for item in user_settings.acc_items(user_settings.load(root))
+            if words and item["sym"] == words[0].upper()
         ]
-        if len(bits) != 2 or not hit:
+        if len(words) != 2 or not hit:
             bot.send("⚠ '적립 금액 BTQ 3' 처럼 목록에 있는 종목과 새 하루 금액을 적어 주세요")
             return False
-        return _acc_confirm_amount(bot, root, hit[0]["key"], bits[1])
+        return _acc_confirm_amount(bot, root, hit[0]["key"], words[1])
     if len(parts) >= 3 and parts[1] in ("빼기", "삭제", "제거"):
-        sym = parts[2].strip().upper()
-        hit = [x for x in user_settings.acc_items(user_settings.load(root)) if x["sym"] == sym]
+        symbol = parts[2].strip().upper()
+        hit = [
+            item
+            for item in user_settings.acc_items(user_settings.load(root))
+            if item["sym"] == symbol
+        ]
         if not hit:
-            bot.send(f"⚠ {sym} 는 적립 목록에 없어요")
+            bot.send(f"⚠ {symbol} 는 적립 목록에 없어요")
             return False
         return _acc_confirm_rm(bot, root, hit[0]["key"])
     return _acc_menu(bot, root)
@@ -570,17 +619,18 @@ def handle_acc(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> b
 def _acc(
     bot: TelegramNotifier, msgs: list[InboxMessage], queue: InboxQueue, inbox: TelegramInbox
 ) -> None:
+    """[쓰임] '적립' 글들을 처리하고, 버튼 · 답장을 기다려야 하면 이 실행 안에서 2 분까지."""
     from auto_trading.core.errors import AutoTradingError
 
     try:
         waiting = False
-        for m in msgs:
-            waiting = handle_acc(bot, m) or waiting
+        for message in msgs:
+            waiting = handle_acc(bot, message) or waiting
         deadline = time.monotonic() + ACC_WAIT_S
         while waiting and time.monotonic() < deadline:
             time.sleep(3)
-            for m in queue.take(inbox, is_acc):
-                if handle_acc(bot, m):
+            for message in queue.take(inbox, is_acc):
+                if handle_acc(bot, message):
                     deadline = time.monotonic() + ACC_WAIT_S
     except (AutoTradingError, KeyError, OSError, ValueError) as exc:
         bot.send(f"⚠ 적립 처리 오류: {type(exc).__name__} {exc}"[:500])
@@ -595,15 +645,16 @@ def _stock_query(text: str) -> str:
     """'개별주 NVDA' · '/stock 삼성전자' · '개별주NVDA' → 'NVDA' · '삼성전자' (없으면 빈 값)."""
     from auto_trading.notify.inbox import STOCK_PREFIXES
 
-    t = text.strip()
-    low = t.lower()
-    for p in sorted(STOCK_PREFIXES, key=len, reverse=True):
-        if low.startswith(p):
-            return t[len(p) :].strip()
-    return t
+    stripped = text.strip()
+    lowered = stripped.lower()
+    for prefix in sorted(STOCK_PREFIXES, key=len, reverse=True):
+        if lowered.startswith(prefix):
+            return stripped[len(prefix) :].strip()
+    return stripped
 
 
 def _polaris(bot: TelegramNotifier, msg: InboxMessage) -> bool:
+    """[쓰임] 🧭 Polaris 회차 버튼 ([🛒 매수] · [이번 달 건너뛰기]) → Polaris 실행기에 넘긴다."""
     from scripts import polaris
 
     if msg.callback_id:
@@ -619,8 +670,10 @@ def _polaris(bot: TelegramNotifier, msg: InboxMessage) -> bool:
 
 
 def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) -> bool:
-    """'개별주 …' 글과 그 버튼. 버튼을 보냈으면 True (이 실행에서 답을 기다린다)."""
-    from scripts import size_guard as sg
+    """[쓰임] '개별주 …' 글과 그 버튼 (추천 · 예약 · 수량 · 손절 해제 · 월간 추천 · PEAD).
+    버튼을 보냈으면 True (이 실행에서 답을 기다린다).
+    [이유] 주문은 버튼을 눌렀을 때만 · 설정 ``stock.orders`` 가 켜졌을 때만."""
+    from scripts import size_guard
 
     if msg.data.startswith("pol:"):  # 🧭 Polaris 회차 버튼 — 나무, 토스 개별주 설정과 별개
         return _polaris(bot, msg)
@@ -670,12 +723,12 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
         if kind == "stp":  # PEAD 알림 버튼 — 다음 정규장이 끝날 때까지 유효(알림 기록이 지킴)
             if arg == "cancel":
                 with contextlib.suppress(NotifyError):
-                    bot.edit(msg.message_id, "건너뛰었어요 — " + sg.skip_pead(nonce))
+                    bot.edit(msg.message_id, "건너뛰었어요 — " + size_guard.skip_pead(nonce))
                 return False
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🛒 PEAD {arg} 다시 확인하고 예약해요…")
             try:
-                bot.send(sg.reserve_pead(nonce))
+                bot.send(size_guard.reserve_pead(nonce))
             except (SystemExit, ValueError) as exc:
                 bot.send(f"⚠ PEAD 예약 못 함 — {exc}")
             return False
@@ -690,12 +743,12 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
             with contextlib.suppress(NotifyError):
                 bot.edit(msg.message_id, f"🛒 {arg} 다시 확인하고 예약해요…")
             try:
-                bot.send(sg.reserve(arg))
+                bot.send(size_guard.reserve(arg))
             except SystemExit as exc:  # 다른 실행 중 · 종목 못 찾음
                 bot.send(f"⚠ 예약 못 함 — {exc}")
         elif kind == "stkr":
             try:
-                bot.send("🛡 손절 해제 — " + sg._set_status(arg, ("holding",), "released"))
+                bot.send("🛡 손절 해제 — " + size_guard._set_status(arg, ("holding",), "released"))
             except SystemExit as exc:
                 bot.send(f"⚠ 해제 못 함 — {exc}")
         elif kind == "stq":  # [수량 바꾸기] · [그래도 매수] → 몇 주?
@@ -703,11 +756,11 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
                 bot.edit(msg.message_id, f"✏️ {arg} 몇 주 살지 물어볼게요")
             return _ask_qty(bot, arg)
         elif kind == "sko":  # 수량 확인 → 예약
-            sym, _, n = arg.rpartition(":")
+            symbol, _, qty_text = arg.rpartition(":")
             with contextlib.suppress(NotifyError):
-                bot.edit(msg.message_id, f"🛒 {sym} {n}주 다시 확인하고 예약해요…")
+                bot.edit(msg.message_id, f"🛒 {symbol} {qty_text}주 다시 확인하고 예약해요…")
             try:
-                bot.send(sg.reserve(sym, qty=int(n)))
+                bot.send(size_guard.reserve(symbol, qty=int(qty_text)))
             except (SystemExit, ValueError) as exc:
                 bot.send(f"⚠ 예약 못 함 — {exc}")
         return False
@@ -720,18 +773,23 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
     else:
         query = _stock_query(msg.text)
     if not query:
-        act = [t for t in sg.load_tickets() if t.active]
-        holding = [t for t in act if t.status == "holding"]
-        if act:
+        active = [ticket for ticket in size_guard.load_tickets() if ticket.active]
+        holding = [ticket for ticket in active if ticket.status == "holding"]
+        if active:
             nonce = STOCK_STORE.new_request(now, "stkr")
             rows = [
-                [{"text": f"{t.name} 손절 해제", "callback_data": f"stkr:{nonce}:{t.id}"}]
-                for t in holding
+                [
+                    {
+                        "text": f"{ticket.name} 손절 해제",
+                        "callback_data": f"stkr:{nonce}:{ticket.id}",
+                    }
+                ]
+                for ticket in holding
             ]
             bot.send_message(
-                "💹 지금 예약 · 손절 현황" + "\n\n" + sg.status(), buttons=rows or None
+                "💹 지금 예약 · 손절 현황" + "\n\n" + size_guard.status(), buttons=rows or None
             )
-        mid = bot.send_message(
+        message_id = bot.send_message(
             "💹 어떤 종목을 살까요?"
             + "\n\n"
             + "종목 이름이나 기호를 답장해 주세요 (예: 삼성전자 · 현대차 · NVDA)"
@@ -740,33 +798,41 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
             force_reply=True,
             placeholder="종목 이름 (예: 삼성전자)",
         )
-        set_stock_ask(mid, int(time.time()))
+        set_stock_ask(message_id, int(time.time()))
         return True
     try:
-        a = sg.advise(query)
+        advice = size_guard.advise(query)
     except SystemExit as exc:
         bot.send(f"⚠ {exc}")
         return False
     from auto_trading.ops.position_size import advice_text
 
-    text = advice_text(a)
-    if not a.ok and not a.can_override:
+    text = advice_text(advice)
+    if not advice.ok and not advice.can_override:
         bot.send(text)
         return False
-    buy = STOCK_STORE.new_request(now, "stk")
-    qty = STOCK_STORE.new_request(now, "stq")
-    if a.ok:
+    buy_nonce = STOCK_STORE.new_request(now, "stk")
+    qty_nonce = STOCK_STORE.new_request(now, "stq")
+    if advice.ok:
         rows = [
             [
-                {"text": f"🛒 {a.qty}주 매수", "callback_data": f"stk:{buy}:{a.symbol}"},
-                {"text": "✏️ 수량 바꾸기", "callback_data": f"stq:{qty}:{a.symbol}"},
+                {
+                    "text": f"🛒 {advice.qty}주 매수",
+                    "callback_data": f"stk:{buy_nonce}:{advice.symbol}",
+                },
+                {"text": "✏️ 수량 바꾸기", "callback_data": f"stq:{qty_nonce}:{advice.symbol}"},
             ],
-            [{"text": "취소", "callback_data": f"stk:{buy}:cancel"}],
+            [{"text": "취소", "callback_data": f"stk:{buy_nonce}:cancel"}],
         ]
     else:
         rows = [
-            [{"text": "✏️ 그래도 매수 (수량 입력)", "callback_data": f"stq:{qty}:{a.symbol}"}],
-            [{"text": "취소", "callback_data": f"stk:{buy}:cancel"}],
+            [
+                {
+                    "text": "✏️ 그래도 매수 (수량 입력)",
+                    "callback_data": f"stq:{qty_nonce}:{advice.symbol}",
+                }
+            ],
+            [{"text": "취소", "callback_data": f"stk:{buy_nonce}:cancel"}],
         ]
     bot.send_message(text + "\n\n누르면 다시 확인한 뒤 예약해요 (5 분 안, 한 번만)", buttons=rows)
     return True
@@ -775,65 +841,70 @@ def handle_stock(bot: TelegramNotifier, msg: InboxMessage, root: Path = REPO) ->
 def _ask_qty(bot: TelegramNotifier, symbol: str) -> bool:
     """'몇 주 살까요?' — 답장 입력칸을 열고 질문 기록(kind=qty)을 남긴다."""
     from auto_trading.ops.position_size import advice_text, qty_prompt_text
-    from scripts import size_guard as sg
+    from scripts import size_guard
 
     try:
-        a = sg.advise(symbol)
+        advice = size_guard.advise(symbol)
     except SystemExit as exc:
         bot.send(f"⚠ {exc}")
         return False
-    if not a.can_override:
-        bot.send(advice_text(a))
+    if not advice.can_override:
+        bot.send(advice_text(advice))
         return False
-    mid = bot.send_message(qty_prompt_text(a), force_reply=True, placeholder="주 수 (예: 5)")
-    set_stock_ask(mid, int(time.time()), kind="qty", symbol=a.symbol)
+    message_id = bot.send_message(
+        qty_prompt_text(advice), force_reply=True, placeholder="주 수 (예: 5)"
+    )
+    set_stock_ask(message_id, int(time.time()), kind="qty", symbol=advice.symbol)
     return True
 
 
 def _confirm_qty(bot: TelegramNotifier, symbol: str, text: str) -> bool:
     """'5' · '5주' 답 → 마지막 확인 카드 + [✅ N주 예약] [취소]."""
     from auto_trading.ops.position_size import CAP, confirm_text
-    from scripts import size_guard as sg
+    from scripts import size_guard
 
     digits = text.strip().removesuffix("주").strip()
     if not digits.isdigit() or not symbol:
         bot.send("⚠ 주 수는 숫자로 답해 주세요 (예: 5) — 다시 '개별주' 부터 해 주세요")
         return False
-    n = int(digits)
+    qty = int(digits)
     try:
-        a = sg.advise(symbol)
+        advice = size_guard.advise(symbol)
     except SystemExit as exc:
         bot.send(f"⚠ {exc}")
         return False
-    if not a.can_override or not 1 <= n <= a.max_qty:
-        bot.send(f"⚠ {a.name} 은 1 ~ {a.max_qty}주만 살 수 있어요 (한 종목 {CAP:.0%} · 현금)")
+    if not advice.can_override or not 1 <= qty <= advice.max_qty:
+        bot.send(
+            f"⚠ {advice.name} 은 1 ~ {advice.max_qty}주만 살 수 있어요 (한 종목 {CAP:.0%} · 현금)"
+        )
         return False
     nonce = STOCK_STORE.new_request(int(time.time() * 1000), "sko")
     rows = [
-        [{"text": f"✅ {n}주 예약", "callback_data": f"sko:{nonce}:{a.symbol}:{n}"}],
+        [{"text": f"✅ {qty}주 예약", "callback_data": f"sko:{nonce}:{advice.symbol}:{qty}"}],
         [{"text": "취소", "callback_data": f"sko:{nonce}:cancel"}],
     ]
-    bot.send_message(confirm_text(a, n), buttons=rows)
+    bot.send_message(confirm_text(advice, qty), buttons=rows)
     return True
 
 
 def _stock(
     bot: TelegramNotifier, msgs: list[InboxMessage], queue: InboxQueue, inbox: TelegramInbox
 ) -> None:
+    """[쓰임] '개별주' 글들을 처리하고, 버튼 · 답장을 기다려야 하면 이 실행 안에서 2 분까지."""
     from auto_trading.core.errors import AutoTradingError
 
     try:
         waiting = False
-        for m in msgs:
-            waiting = handle_stock(bot, m) or waiting
+        for message in msgs:
+            waiting = handle_stock(bot, message) or waiting
         deadline = time.monotonic() + STOCK_WAIT_S
         while waiting and time.monotonic() < deadline:
             time.sleep(3)
-            for m in queue.take(inbox, is_stock):
-                more = handle_stock(bot, m)
+            for message in queue.take(inbox, is_stock):
+                more = handle_stock(bot, message)
                 if more:  # 질문에 답해 추천 버튼을 보냄 → 버튼을 다시 기다린다
                     deadline = time.monotonic() + STOCK_WAIT_S
-                elif m.data:
+                elif message.data:
                     waiting = False
     except (AutoTradingError, KeyError, OSError, ValueError) as exc:
         bot.send(f"⚠ 개별주 처리 오류: {type(exc).__name__} {exc}"[:500])
@@ -842,13 +913,13 @@ def _stock(
 def _size_guard(root: Path) -> None:
     """개별주 예약 매수 · −3% 손절 감시 — 2 분마다 (할 일 없으면 토스를 부르지 않는다)."""
     try:
-        from scripts import size_guard as sg
+        from scripts import size_guard
 
-        with sg._Lock():
-            done = sg.tick()
+        with size_guard._Lock():
+            done = size_guard.tick()
         if done:
             print(f"개별주: {len(done)} 건 알림")
-        if sg.monthly_review():
+        if size_guard.monthly_review():
             print("개별주 월간 복기 보냄")
     except SystemExit:
         print("개별주: 다른 실행 중 — 다음에")
@@ -857,89 +928,102 @@ def _size_guard(root: Path) -> None:
 
 
 def root_halt(root: Path = REPO) -> Path:
+    """[쓰임] 전체 비상 정지 파일 ``data/HALT``."""
     return root / "data" / "HALT"
 
 
 def _liquidation(
     bot: TelegramNotifier, msgs: list[InboxMessage], queue: InboxQueue, inbox: TelegramInbox
 ) -> None:
+    """[쓰임] '정리' · '정지풀기' 글들을 처리하고, 범위 버튼을 이 실행 안에서 2 분까지 기다린다."""
     from auto_trading.core.errors import AutoTradingError
 
     try:
         waiting = False
-        for m in msgs:
-            waiting = handle_liquidation(bot, m) or waiting
+        for message in msgs:
+            waiting = handle_liquidation(bot, message) or waiting
         deadline = time.monotonic() + LIQ_WAIT_S
         while waiting and time.monotonic() < deadline:
             time.sleep(3)
-            for m in queue.take(inbox, is_liquidation):
-                handle_liquidation(bot, m)
-                if m.data:
+            for message in queue.take(inbox, is_liquidation):
+                handle_liquidation(bot, message)
+                if message.data:
                     waiting = False
     except (AutoTradingError, KeyError, OSError) as exc:
         bot.send(f"⚠ 정리 처리 오류: {type(exc).__name__} {exc}"[:500])
 
 
+def _word(message: InboxMessage) -> str:
+    """[쓰임] 비교용 글 — 앞뒤 공백 · 대소문자 · 띄어쓰기를 무시."""
+    return message.text.strip().lower().replace(" ", "")
+
+
+def _sort_commands(commands: list[InboxMessage]) -> dict[str, list[InboxMessage]]:
+    """[쓰임] 받은 명령을 종류별로 나눈다 (:data:`COMMAND_KINDS` 순서, 한 글은 한 종류에만).
+    [이유] 종류마다 처리 함수가 다르고, '현황' 은 다른 어느 종류에도 안 맞는 명령 모두다."""
+    kinds: dict[str, list[InboxMessage]] = {kind: [] for kind in COMMAND_KINDS}
+    for message in commands:
+        if not message.data and message.text.strip().lower() in HELP_WORDS:
+            kinds["help"].append(message)
+        if not message.data and _word(message) in PAPER_WORDS:
+            kinds["paper"].append(message)
+        if not message.data and _word(message) in DEPOSIT_WORDS:
+            kinds["deposit"].append(message)
+        if is_acc(message):
+            kinds["acc"].append(message)
+        elif is_stock(message):
+            kinds["stock"].append(message)
+        if is_liquidation(message):
+            kinds["liquidation"].append(message)
+    for message in commands:
+        already = any(message in kinds[kind] for kind in ("acc", "help", "paper", "deposit"))
+        if not is_liquidation(message) and not is_stock(message) and not already:
+            kinds["status"].append(message)
+    return kinds
+
+
+COMMAND_KINDS = ("help", "paper", "status", "liquidation", "stock", "acc", "deposit")
+"""명령 종류 — 이 순서로 처리한다 (도움 · Paper · 현황은 여러 번 와도 답은 한 통)."""
+
+
 def run(root: Path = REPO) -> int:
-    creds = load_telegram_credentials(root / ".env")
-    if creds is None:
+    """[쓰임] 2 분마다 한 번 — 받은 명령에 답하고, 부가 작업(:data:`BACKGROUND_JOBS`)을 돈다."""
+    credentials = load_telegram_credentials(root / ".env")
+    if credentials is None:
         print("텔레그램 설정 없음")
         return 0
     queue = InboxQueue(inbox_path(root), _start_offset(root))
-    inbox = TelegramInbox(creds)
+    inbox = TelegramInbox(credentials)
     try:
-        cmds = queue.take(inbox, is_command)
+        commands = queue.take(inbox, is_command)
     except NotifyError as exc:
         print(f"텔레그램 받기 실패: {exc}")
         return 1
-    helps = [m for m in cmds if not m.data and m.text.strip().lower() in HELP_WORDS]
-    papers = [
-        m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in PAPER_WORDS
-    ]
-    deposits = [
-        m for m in cmds if not m.data and m.text.strip().lower().replace(" ", "") in DEPOSIT_WORDS
-    ]
-    acc_msgs = [m for m in cmds if is_acc(m)]
-    stock_msgs = [m for m in cmds if is_stock(m) and m not in acc_msgs]
-    status_cmds = [
-        m
-        for m in cmds
-        if not is_liquidation(m)
-        and not is_stock(m)
-        and m not in acc_msgs
-        and m not in helps
-        and m not in papers
-        and m not in deposits
-    ]
-    liq_msgs = [m for m in cmds if is_liquidation(m)]
-    bot = TelegramNotifier(creds)
+    kinds = _sort_commands(commands)
+    bot = TelegramNotifier(credentials)
     try:
-        if helps:
+        # 명령 종류 → 처리 (Command + 목록표)
+        if kinds["help"]:
             bot.send(HELP)
-        if papers:
+        if kinds["paper"]:
             bot.send(paper_text(root))  # 여러 번 보내도 한 통
-        if status_cmds:
+        if kinds["status"]:
             text = report(root)  # 여러 번 보내도 답은 한 통
             bot.send(text)
             print(text)
-        if liq_msgs:
-            _liquidation(bot, liq_msgs, queue, inbox)
-        if stock_msgs:
-            _stock(bot, stock_msgs, queue, inbox)
-        if acc_msgs:
-            _acc(bot, acc_msgs, queue, inbox)
-        if deposits:  # 2026-10-19 바이낸스 입금 확인 · 분배 멈춤 (Vega 업비트로, Altair 정리)
+        if kinds["liquidation"]:
+            _liquidation(bot, kinds["liquidation"], queue, inbox)
+        if kinds["stock"]:
+            _stock(bot, kinds["stock"], queue, inbox)
+        if kinds["acc"]:
+            _acc(bot, kinds["acc"], queue, inbox)
+        if kinds["deposit"]:  # 2026-10-19 바이낸스 입금 확인 · 분배 멈춤 (Vega 업비트로)
             bot.send("💰 바이낸스 입금 확인은 멈췄어요 — Vega 는 업비트 원화로 넣으면 돼요")
     finally:
         bot.close()
-    _resume_liquidation()
-    _size_guard(root)
-    _event_alert(root)
-    _namu_follow(root)
-    _shadow_272()
-    _paper_daily(root)
-    _safety_daily()
-    if not cmds:
+    for _name, job in BACKGROUND_JOBS:
+        job(root)
+    if not commands:
         print("현황 봇: 받은 명령 없음")
     beat_and_alert(
         root,
@@ -948,6 +1032,19 @@ def run(root: Path = REPO) -> int:
         alert=bool(user_settings.get(root, "alerts.bot_down")),
     )
     return 0
+
+
+BACKGROUND_JOBS: tuple[tuple[str, Callable[[Path], None]], ...] = (
+    ("정리 이어 하기", lambda root: _resume_liquidation()),
+    ("개별주 예약 · 손절 감시", lambda root: _size_guard(root)),
+    ("경제 일정 경고", lambda root: _event_alert(root)),
+    ("나무 모의 따라가기", lambda root: _namu_follow(root)),
+    ("그림자 기록 272", lambda root: _shadow_272()),
+    ("매일 Paper 요약", lambda root: _paper_daily(root)),
+    ("매일 안전 점검", lambda root: _safety_daily()),
+)
+"""매 실행(2 분)마다 명령 처리 뒤 이 순서로 도는 부가 작업 — 하나가 실패해도 다음은 돈다
+(각 함수가 스스로 실패를 삼킨다). 함수는 이 표가 부를 때 찾는다(시험이 바꿔 끼울 수 있게)."""
 
 
 def _paper_daily(root: Path) -> None:
@@ -968,10 +1065,10 @@ def _paper_daily(root: Path) -> None:
     today = now.date().isoformat()
     if not daily_due((now.hour, now.minute), today, last):
         return
-    creds = load_telegram_credentials(root / ".env")
-    if creds is None:
+    credentials = load_telegram_credentials(root / ".env")
+    if credentials is None:
         return
-    bot = TelegramNotifier(creds)
+    bot = TelegramNotifier(credentials)
     try:
         bot.send(paper_text(root).replace("📒 Paper 요약", f"📒 오늘의 Paper ({today})", 1))
     except NotifyError as exc:
@@ -1037,15 +1134,16 @@ def _event_alert(root: Path) -> None:
 def _resume_liquidation() -> None:
     """진행 중인 '전부 정리' 가 있으면 이어 한다 (토스는 장 열린 뒤 · 10 분 미체결 다시 내기)."""
     from auto_trading.core.errors import AutoTradingError
-    from scripts import liquidate as liq
+    from scripts import liquidate
 
     try:
-        liq.resume()
+        liquidate.resume()
     except (AutoTradingError, KeyError, OSError) as exc:
         print(f"정리 이어 하기 실패: {exc}")
 
 
 def main(argv: list[str]) -> int:
+    """[쓰임] 명령 이름 → 함수 (예약은 ``run``)."""
     if argv == ["run"]:
         return run()
     if argv == ["pin-help"]:
