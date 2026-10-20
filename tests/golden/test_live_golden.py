@@ -33,7 +33,7 @@ def _normalize(text: str, tmp_path: Path) -> str:
     [이유] 이 셋은 리팩토링과 관계없이 매번 달라서, 그대로 두면 코드를 안 바꿔도 비교가 깨진다."""
     for form in (str(tmp_path), tmp_path.as_posix(), str(tmp_path).replace("\\", "\\\\")):
         text = text.replace(form, "<TMP>")
-    text = re.sub(r"(acc|liq|stk):[0-9a-f]{8}:", r"\1:<NONCE>:", text)
+    text = re.sub(r"(acc|liq|stk|unh):[0-9a-f]{8}:", r"\1:<NONCE>:", text)
     return re.sub(r'"at_ms": \d+', '"at_ms": <NOW>', text)
 
 

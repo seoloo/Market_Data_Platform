@@ -1,0 +1,696 @@
+## 현황 글
+📊 [실거래 현황] 10/09 22:00
+💼 총 입금 234,550원 → 평가 225,900원
+   └ 손익 🔻 -8,650원 (-3.69%)
+
+━━━━━━━━━━━━
+🌟 Deneb · 토스
+130,000원 → 117,000원 · 🔻 -13,000원 (-10.00%)
+   └ TQQQ 1주 104,000원 · -5.9%
+   └ 현금 13,000원
+   └ ⏳ SCHD 3주 · 지정가 $34.00
+
+━━━━━━━━━━━━
+🌌 Vega · 업비트
+100,000원 → 105,000원 · 🔺 +5,000원 (+5.00%)
+   └ 🟢 BTC 55,000원 · +9.9%
+   └ 현금 50,000원
+
+━━━━━━━━━━━━
+💰 자동 적립 · 토스
+4,550원 → 3,900원 · 🔻 -650원 (-14.29%)
+   └ BTQ 1주 3,900원 · -14.3%
+
+━━━━━━━━━━━━
+공개 시세 · 원/달러 1,300.0 · 세금 전
+## 실거래 홈
+<section class="orbit-hero"><div class="orbit-hero-art" aria-hidden="true"><img class="orbit-hero-cat" src="/assets/orbit-hero-light.png" alt=""><svg class="orbit-hero-fx" viewBox="0 0 1536 1024" aria-hidden="true" focusable="false"><defs><filter id="obi-glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="14"/></filter><filter id="obi-spark" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><clipPath id="obi-front"><rect x="700" y="548" width="800" height="200" transform="rotate(-11 1075 556)"/></clipPath></defs><g class="fx-glow" clip-path="url(#obi-front)"><ellipse class="fx-ring" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-glow)"/><ellipse class="fx-flow" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-spark)"/></g><path class="fx-twinkle" style="animation-delay:0.0s" d="M868 274Q868 300 894 300Q868 300 868 326Q868 300 842 300Q868 300 868 274Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.2s" d="M1292 226Q1292 252 1318 252Q1292 252 1292 278Q1292 252 1266 252Q1292 252 1292 226Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.0s" d="M1255 514Q1255 540 1281 540Q1255 540 1255 566Q1255 540 1229 540Q1255 540 1255 514Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:0.6s" d="M1004 592Q1004 618 1030 618Q1004 618 1004 644Q1004 618 978 618Q1004 618 1004 592Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.7s" d="M1405 442Q1405 468 1431 468Q1405 468 1405 494Q1405 468 1379 468Q1405 468 1405 442Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.6s" d="M822 444Q822 470 848 470Q822 470 822 496Q822 470 796 470Q822 470 822 444Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:3.1s" d="M640 156Q640 182 666 182Q640 182 640 208Q640 182 614 182Q640 182 640 156Z" filter="url(#obi-spark)"/><g class="fx-awake"><ellipse class="fx-lid" cx="978" cy="442" rx="38" ry="44"/><path class="fx-shut" d="M948 446Q978 470 1008 446"/><ellipse class="fx-lid" cx="1108" cy="450" rx="41" ry="42"/><path class="fx-shut" d="M1075 454Q1108 477 1141 454"/></g><g class="fx-sleep"><g class="fx-zzz"><text class="fx-z" x="1248" y="420">z</text><text class="fx-z" x="1282" y="388" style="animation-delay:1.1s">z</text><text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text></g><g class="fx-sleepy"><ellipse cx="978" cy="452" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye0"><ellipse cx="978" cy="452" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye0)"><ellipse cx="978" cy="452" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="978" cy="457" rx="23" ry="23" fill="#08133a"/><circle cx="986" cy="453" r="6" fill="#ffffff"/><rect x="938" y="412" width="80" height="38" fill="#071a52"/></g><path d="M944 451Q978 443 1012 451" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/><ellipse cx="1111" cy="462" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye1"><ellipse cx="1111" cy="462" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye1)"><ellipse cx="1111" cy="462" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="1111" cy="467" rx="23" ry="23" fill="#08133a"/><circle cx="1119" cy="463" r="6" fill="#ffffff"/><rect x="1071" y="422" width="80" height="38" fill="#071a52"/></g><path d="M1077 461Q1111 453 1145 461" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/></g></g></svg></div><div class="orbit-greeting"><span>안녕하세요,</span><h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1><p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div><section class="orbit-networth" id="orbit-assets" aria-labelledby="live-total-title"><div><h2 id="live-total-title">내 자산 <a class="orbit-eye" href="/live?amounts=hide" aria-label="금액 숨기기" title="금액 숨기기"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+  <circle cx="12" cy="12" r="3" />
+</svg><span>숨기기</span></a></h2><strong data-live="total" class="orbit-total">225,900<small>원</small></strong></div><div><span>기준 금액</span><b data-live="base">234,550원</b></div><div><span>평가 차액</span><strong data-live="change"><span class="neg"><b>-8,650원</b><small>-3.69%</small></span></strong><small class="orbit-caution">ⓘ 확정 수익 아님</small></div><p class="orbit-updated" data-live="updated">장부 업데이트 10/09 21:00 · 시세 업데이트 10/09 22:00</p></section><button type="button" class="orbit-help-card" popovertarget="orbit-guide"><b><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" />
+</svg> 화면 읽는 법 <svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="m9 18 6-6-6-6" />
+</svg></b><span>이 화면에서<br>무엇을 볼 수 있나요?</span></button></section><details class="orbit-alert" id="orbit-attention"><summary><span class="orbit-alert-mark">!</span><b>먼저 확인해 주세요 · <span>체결 확인 대기 1건</span></b><span class="orbit-alert-copy">Deneb · SCHD 3주 · 지정가 $34.00</span><span class="orbit-chevron">›</span></summary><div>Deneb · SCHD 3주 · 지정가 $34.00<p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></details><section popover="auto" class="orbit-popover" id="orbit-status" role="dialog" aria-labelledby="orbit-status-title"><header><h2 id="orbit-status-title">확인할 사항</h2><button type="button" class="orbit-close" popovertarget="orbit-status" popovertargetaction="hide" aria-label="확인할 사항 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div data-live="status"><p>체결 확인 대기 1건</p><p>Deneb · SCHD 3주 · 지정가 $34.00</p></div><p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></section><section popover="auto" class="orbit-popover" id="orbit-accounts" role="dialog" aria-labelledby="orbit-accounts-title"><header><h2 id="orbit-accounts-title">연결 계좌</h2><button type="button" class="orbit-close" popovertarget="orbit-accounts" popovertargetaction="hide" aria-label="연결 계좌 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><ul class="orbit-accounts-list" data-live="accounts"><li><div><b>Deneb</b><small>토스증권 · 미국 주식</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>Vega</b><small>업비트 · 코인</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>자동 적립</b><small>토스증권 · 주식 모으기</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li></ul><p>‘마지막 조회 성공’은 매매 프로그램이 계좌를 조회한 뒤 장부를 저장한 시각입니다. 이 화면은 계좌를 새로 조회하지 않고 저장 장부만 표시합니다. 계좌번호·API 키는 표시하지 않습니다.</p></div></section><div class="orbit-cards-tools"><a class="orbit-detail-toggle" href="/live?detail=open" aria-expanded="false">상세 보기<span aria-hidden="true">⌄</span></a></div><div class="orbit-cards"><section id="live-book-0" class="orbit-card orbit-deneb"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><h2>미국 주식</h2><span>Deneb</span></div></div><div class="orbit-card-summary" data-live="card-deneb-summary"><div><strong>117,000<span>원</span></strong><p><span class="neg"><b>-13,000원</b><small>-10.00%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-deneb-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-deneb-0" aria-label="TQQQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ</b><small>ProShares UltraPro QQQ</small></div></div><div class="orbit-holding-value"><b>104,000원</b><small><span class="neg"><b>-6,500원</b><small>-5.88%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-deneb-0" role="dialog" aria-labelledby="orbit-h-deneb-0-title"><header><h2 id="orbit-h-deneb-0-title">TQQQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-deneb-0" popovertargetaction="hide" aria-label="TQQQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-deneb-0"><dt>보유 수량</dt><dd>1주</dd><dt>평균 매입단가</dt><dd>110,500원</dd><dt>현재 가격</dt><dd>104,000원</dd><dt>현재 가격 (달러)</dt><dd>$80.00</dd><dt>평가금액</dt><dd>104,000원</dd><dt>평가손익</dt><dd><span class="neg"><b>-6,500원</b><small>-5.88%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-deneb-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>13,000원</b><small>남은 달러 $10.00</small></div><div class="orbit-dt-tile"><span>이번 달 납입</span><b>130,000원</b><small>10월 첫 거래일</small></div><div class="orbit-dt-tile"><span>TQQQ 목표 비중</span><b>60%</b></div><div class="orbit-dt-tile"><span>급락 브레이크</span><b class="ok">안 걸림</b><small>고점 −15%⁠면 절반 팖</small></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.8889 0 0;background:#378ADD"></span><span style="flex:0.1111 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#378ADD"></i>TQQQ 89%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 11%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>TQQQ</td><td>1주</td><td>$85.00</td><td>$80.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:89%;background:#378ADD"></i><u style="left:60%"></u></span><em class="warn">89 / 60%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">다음 매수 11월 첫 거래일</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-1" class="orbit-card orbit-vega"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48" />
+  <path d="M15 6h1v4" />
+  <path d="m6.134 14.768.866-.5 2 3.464" />
+  <circle cx="16" cy="8" r="6" />
+</svg></span><div><h2>코인</h2><span>Vega</span></div></div><div class="orbit-card-summary" data-live="card-vega-summary"><div><strong>105,000<span>원</span></strong><p><span class="pos"><b>+5,000원</b><small>+5.00%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-vega-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-vega-0" aria-label="BTC 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC</b><small>비트코인</small></div></div><div class="orbit-holding-value"><b>55,000원</b><small><span class="pos"><b>+4,975원</b><small>+9.95%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-vega-0" role="dialog" aria-labelledby="orbit-h-vega-0-title"><header><h2 id="orbit-h-vega-0-title">BTC 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-vega-0" popovertargetaction="hide" aria-label="BTC 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-vega-0"><dt>보유 수량</dt><dd>0.0005</dd><dt>평균 매입단가</dt><dd>100,050,000원</dd><dt>현재 가격</dt><dd>110,000,000원</dd><dt>평가금액</dt><dd>55,000원</dd><dt>평가손익</dt><dd><span class="pos"><b>+4,975원</b><small>+9.95%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd><dt>메모</dt><dd>🟢 추세 켜짐 · 목표 50%</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-vega-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>50,000원</b><small>남은 돈</small></div><div class="orbit-dt-tile"><span>사는 중인 코인</span><b class="ok">1 / 3개</b></div><div class="orbit-dt-tile"><span>최고점 기준</span><b>−0.0%</b><small>−30%⁠면 매수 멈춤</small></div><div class="orbit-dt-tile"><span>매수</span><b class="ok">하는 중</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.5238 0 0;background:#EF9F27"></span><span style="flex:0.4762 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#EF9F27"></i>BTC 52%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 48%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>BTC</td><td>0.0005</td><td>100,050,000</td><td>110,000,000</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:52%;background:#EF9F27"></i><u style="left:50%"></u></span><em>52 / 50%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 09:05 판단</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-2" class="orbit-card orbit-accumulate"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><h2>자동 적립</h2><span>자동 적립</span></div></div><div class="orbit-card-summary" data-live="card-accumulate-summary"><div><strong>3,900<span>원</span></strong><p><span class="neg"><b>-650원</b><small>-14.29%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-accumulate-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-accumulate-0" aria-label="BTQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ</b><small>BTQ</small></div></div><div class="orbit-holding-value"><b>3,900원</b><small><span class="neg"><b>-650원</b><small>-14.29%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-accumulate-0" role="dialog" aria-labelledby="orbit-h-accumulate-0-title"><header><h2 id="orbit-h-accumulate-0-title">BTQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-accumulate-0" popovertargetaction="hide" aria-label="BTQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-accumulate-0"><dt>보유 수량</dt><dd>1주</dd><dt>평균 매입단가</dt><dd>4,550원</dd><dt>현재 가격</dt><dd>3,900원</dd><dt>현재 가격 (달러)</dt><dd>$3.00</dd><dt>평가금액</dt><dd>3,900원</dd><dt>평가손익</dt><dd><span class="neg"><b>-650원</b><small>-14.29%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-accumulate-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>넣은 원가</span><b>4,550원</b><small>적립 매입원가</small></div><div class="orbit-dt-tile"><span>적립 종목</span><b>1개</b></div><div class="orbit-dt-tile"><span>현금</span><b>0원</b></div><div class="orbit-dt-tile"><span>마지막 적립</span><b>10/08</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:1.0000 0 0;background:#D4537E"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#D4537E"></i>BTQ 100%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 비중)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중</th></tr><tr><td>BTQ</td><td>1주</td><td>$3.50</td><td>$3.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:100%;background:#D4537E"></i></span><em>100%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 적립 · 토스 주식 모으기</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section></div><div class="orbit-bottom"><section class="orbit-panel orbit-history"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg>자산 변화</h2><div class="orbit-views" role="group" aria-label="그래프 종류"><label><input type="radio" name="orbit-view" value="asset" checked><span>자산 변화</span></label><label><input type="radio" name="orbit-view" value="perf" ><span>투자 성과</span></label></div><div class="orbit-periods" role="group" aria-label="자산 변화 표시 기간"><label><input type="radio" name="orbit-range" value="w1" ><span>1주</span></label><label><input type="radio" name="orbit-range" value="m1" checked><span>1개월</span></label><label><input type="radio" name="orbit-range" value="m3" ><span>3개월</span></label><label><input type="radio" name="orbit-range" value="m6" ><span>6개월</span></label><label><input type="radio" name="orbit-range" value="y1" ><span>1년</span></label></div></div><div data-live="history"><div class="orbit-chart-empty"><span>평가 기록 대기</span><p>하루 한 번 남기는 실거래 평가 기록이 2일 이상 쌓이면 그래프가 그려집니다.</p></div></div><p class="orbit-chart-note">실거래 장부만 표시 · 하루 한 번 남긴 평가 기록만 · 기록 없는 과거는 채우지 않음 · 자산 변화 = 입금으로 늘어난 금액 포함 · 투자 성과 = 입출금 영향 뺀 수익률</p></section><section class="orbit-panel orbit-recent" id="orbit-recent"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M16 22h2a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v2.85" />
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+  <path d="M8 14v2.2l1.6 1" />
+  <circle cx="8" cy="16" r="6" />
+</svg>거래 내역 <small>(최근 5건)</small></h2><button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">전체 보기 ›</button><section popover="auto" class="orbit-popover" id="orbit-all-trades" role="dialog" aria-labelledby="orbit-all-trades-title"><header><h2 id="orbit-all-trades-title">거래 내역</h2><button type="button" class="orbit-close" popovertarget="orbit-all-trades" popovertargetaction="hide" aria-label="거래 내역 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div class="orbit-trade-filter" role="group" aria-label="거래 종류"><label><input type="radio" name="orbit-trade-filter" id="tf-all" value="all" checked><span>전체</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-buy" value="buy" ><span>매수</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-sell" value="sell" ><span>매도</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-deposit" value="deposit" ><span>입금</span></label></div><ul class="orbit-trades-list" data-live="trades-all"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 130,000원</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 1주</b><small>2026-10-09 · 체결가 $85.00 · 금액 $85.00</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 3주</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 100,000원</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 0.0005</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 50,000원 · 수수료 25원</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ 매수 1주</b><small>2026-10-08 · 체결가 $3.50 · 금액 $3.50 · 1,300.0원/$</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-sell orbit-trade-empty">매도 기록이 아직 없습니다.</li></ul></div></section></div><ul data-live="trades-recent"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 130,000원</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 1주</b><small>2026-10-09 · 체결가 $85.00 · 금액 $85.00</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 3주</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 100,000원</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 0.0005</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 50,000원 · 수수료 25원</small></div><span class="orbit-trade-state state-done">체결</span></li></ul></section></div>
+## 가린 홈
+<section class="orbit-hero"><div class="orbit-hero-art" aria-hidden="true"><img class="orbit-hero-cat" src="/assets/orbit-hero-light.png" alt=""><svg class="orbit-hero-fx" viewBox="0 0 1536 1024" aria-hidden="true" focusable="false"><defs><filter id="obi-glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="14"/></filter><filter id="obi-spark" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><clipPath id="obi-front"><rect x="700" y="548" width="800" height="200" transform="rotate(-11 1075 556)"/></clipPath></defs><g class="fx-glow" clip-path="url(#obi-front)"><ellipse class="fx-ring" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-glow)"/><ellipse class="fx-flow" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-spark)"/></g><path class="fx-twinkle" style="animation-delay:0.0s" d="M868 274Q868 300 894 300Q868 300 868 326Q868 300 842 300Q868 300 868 274Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.2s" d="M1292 226Q1292 252 1318 252Q1292 252 1292 278Q1292 252 1266 252Q1292 252 1292 226Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.0s" d="M1255 514Q1255 540 1281 540Q1255 540 1255 566Q1255 540 1229 540Q1255 540 1255 514Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:0.6s" d="M1004 592Q1004 618 1030 618Q1004 618 1004 644Q1004 618 978 618Q1004 618 1004 592Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.7s" d="M1405 442Q1405 468 1431 468Q1405 468 1405 494Q1405 468 1379 468Q1405 468 1405 442Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.6s" d="M822 444Q822 470 848 470Q822 470 822 496Q822 470 796 470Q822 470 822 444Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:3.1s" d="M640 156Q640 182 666 182Q640 182 640 208Q640 182 614 182Q640 182 640 156Z" filter="url(#obi-spark)"/><g class="fx-awake"><ellipse class="fx-lid" cx="978" cy="442" rx="38" ry="44"/><path class="fx-shut" d="M948 446Q978 470 1008 446"/><ellipse class="fx-lid" cx="1108" cy="450" rx="41" ry="42"/><path class="fx-shut" d="M1075 454Q1108 477 1141 454"/></g><g class="fx-sleep"><g class="fx-zzz"><text class="fx-z" x="1248" y="420">z</text><text class="fx-z" x="1282" y="388" style="animation-delay:1.1s">z</text><text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text></g><g class="fx-sleepy"><ellipse cx="978" cy="452" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye0"><ellipse cx="978" cy="452" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye0)"><ellipse cx="978" cy="452" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="978" cy="457" rx="23" ry="23" fill="#08133a"/><circle cx="986" cy="453" r="6" fill="#ffffff"/><rect x="938" y="412" width="80" height="38" fill="#071a52"/></g><path d="M944 451Q978 443 1012 451" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/><ellipse cx="1111" cy="462" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye1"><ellipse cx="1111" cy="462" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye1)"><ellipse cx="1111" cy="462" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="1111" cy="467" rx="23" ry="23" fill="#08133a"/><circle cx="1119" cy="463" r="6" fill="#ffffff"/><rect x="1071" y="422" width="80" height="38" fill="#071a52"/></g><path d="M1077 461Q1111 453 1145 461" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/></g></g></svg></div><div class="orbit-greeting"><span>안녕하세요,</span><h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1><p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div><section class="orbit-networth" id="orbit-assets" aria-labelledby="live-total-title"><div><h2 id="live-total-title">내 자산 <a class="orbit-eye on" href="/live?amounts=show" aria-label="금액 보이기" title="금액 보이기"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+  <circle cx="12" cy="12" r="3" />
+</svg><span>보이기</span></a></h2><strong data-live="total" class="orbit-total">•••••<small>원</small></strong></div><div><span>기준 금액</span><b data-live="base">•••••원</b></div><div><span>평가 차액</span><strong data-live="change"><span class="mute"><b>•••••원</b><small>•••••</small></span></strong><small class="orbit-caution">ⓘ 확정 수익 아님</small></div><p class="orbit-updated" data-live="updated">장부 업데이트 10/09 21:00 · 시세 업데이트 10/09 22:00</p></section><button type="button" class="orbit-help-card" popovertarget="orbit-guide"><b><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" />
+</svg> 화면 읽는 법 <svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="m9 18 6-6-6-6" />
+</svg></b><span>이 화면에서<br>무엇을 볼 수 있나요?</span></button></section><details class="orbit-alert" id="orbit-attention"><summary><span class="orbit-alert-mark">!</span><b>먼저 확인해 주세요 · <span>체결 확인 대기 1건</span></b><span class="orbit-alert-copy">Deneb · SCHD 3주 · 지정가 $34.00</span><span class="orbit-chevron">›</span></summary><div>Deneb · SCHD 3주 · 지정가 $34.00<p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></details><section popover="auto" class="orbit-popover" id="orbit-status" role="dialog" aria-labelledby="orbit-status-title"><header><h2 id="orbit-status-title">확인할 사항</h2><button type="button" class="orbit-close" popovertarget="orbit-status" popovertargetaction="hide" aria-label="확인할 사항 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div data-live="status"><p>체결 확인 대기 1건</p><p>Deneb · SCHD 3주 · 지정가 $34.00</p></div><p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></section><section popover="auto" class="orbit-popover" id="orbit-accounts" role="dialog" aria-labelledby="orbit-accounts-title"><header><h2 id="orbit-accounts-title">연결 계좌</h2><button type="button" class="orbit-close" popovertarget="orbit-accounts" popovertargetaction="hide" aria-label="연결 계좌 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><ul class="orbit-accounts-list" data-live="accounts"><li><div><b>Deneb</b><small>토스증권 · 미국 주식</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>Vega</b><small>업비트 · 코인</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>자동 적립</b><small>토스증권 · 주식 모으기</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li></ul><p>‘마지막 조회 성공’은 매매 프로그램이 계좌를 조회한 뒤 장부를 저장한 시각입니다. 이 화면은 계좌를 새로 조회하지 않고 저장 장부만 표시합니다. 계좌번호·API 키는 표시하지 않습니다.</p></div></section><div class="orbit-cards-tools"><a class="orbit-detail-toggle" href="/live?detail=open" aria-expanded="false">상세 보기<span aria-hidden="true">⌄</span></a></div><div class="orbit-cards"><section id="live-book-0" class="orbit-card orbit-deneb"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><h2>미국 주식</h2><span>Deneb</span></div></div><div class="orbit-card-summary" data-live="card-deneb-summary"><div><strong>•••••<span>원</span></strong><p><span class="mute"><b>•••••원</b><small>•••••</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-deneb-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-deneb-0" aria-label="TQQQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ</b><small>ProShares UltraPro QQQ</small></div></div><div class="orbit-holding-value"><b>•••••원</b><small><span class="mute"><b>•••••원</b><small>•••••</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-deneb-0" role="dialog" aria-labelledby="orbit-h-deneb-0-title"><header><h2 id="orbit-h-deneb-0-title">TQQQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-deneb-0" popovertargetaction="hide" aria-label="TQQQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-deneb-0"><dt>보유 수량</dt><dd>•••••</dd><dt>평균 매입단가</dt><dd>110,500원</dd><dt>현재 가격</dt><dd>104,000원</dd><dt>현재 가격 (달러)</dt><dd>$80.00</dd><dt>평가금액</dt><dd>•••••원</dd><dt>평가손익</dt><dd><span class="mute"><b>•••••원</b><small>•••••</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-deneb-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>•••••원</b><small>남은 달러 •••••</small></div><div class="orbit-dt-tile"><span>이번 달 납입</span><b>•••••원</b><small>10월 첫 거래일</small></div><div class="orbit-dt-tile"><span>TQQQ 목표 비중</span><b>60%</b></div><div class="orbit-dt-tile"><span>급락 브레이크</span><b class="ok">안 걸림</b><small>고점 −15%⁠면 절반 팖</small></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.8889 0 0;background:#378ADD"></span><span style="flex:0.1111 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#378ADD"></i>TQQQ 89%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 11%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>TQQQ</td><td>•••••</td><td>$85.00</td><td>$80.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:89%;background:#378ADD"></i><u style="left:60%"></u></span><em class="warn">89 / 60%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">다음 매수 11월 첫 거래일</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-1" class="orbit-card orbit-vega"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48" />
+  <path d="M15 6h1v4" />
+  <path d="m6.134 14.768.866-.5 2 3.464" />
+  <circle cx="16" cy="8" r="6" />
+</svg></span><div><h2>코인</h2><span>Vega</span></div></div><div class="orbit-card-summary" data-live="card-vega-summary"><div><strong>•••••<span>원</span></strong><p><span class="mute"><b>•••••원</b><small>•••••</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-vega-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-vega-0" aria-label="BTC 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC</b><small>비트코인</small></div></div><div class="orbit-holding-value"><b>•••••원</b><small><span class="mute"><b>•••••원</b><small>•••••</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-vega-0" role="dialog" aria-labelledby="orbit-h-vega-0-title"><header><h2 id="orbit-h-vega-0-title">BTC 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-vega-0" popovertargetaction="hide" aria-label="BTC 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-vega-0"><dt>보유 수량</dt><dd>•••••</dd><dt>평균 매입단가</dt><dd>100,050,000원</dd><dt>현재 가격</dt><dd>110,000,000원</dd><dt>평가금액</dt><dd>•••••원</dd><dt>평가손익</dt><dd><span class="mute"><b>•••••원</b><small>•••••</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd><dt>메모</dt><dd>🟢 추세 켜짐 · 목표 50%</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-vega-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>•••••원</b><small>남은 돈</small></div><div class="orbit-dt-tile"><span>사는 중인 코인</span><b class="ok">1 / 3개</b></div><div class="orbit-dt-tile"><span>최고점 기준</span><b>−0.0%</b><small>−30%⁠면 매수 멈춤</small></div><div class="orbit-dt-tile"><span>매수</span><b class="ok">하는 중</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.5238 0 0;background:#EF9F27"></span><span style="flex:0.4762 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#EF9F27"></i>BTC 52%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 48%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>BTC</td><td>•••••</td><td>100,050,000</td><td>110,000,000</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:52%;background:#EF9F27"></i><u style="left:50%"></u></span><em>52 / 50%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 09:05 판단</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-2" class="orbit-card orbit-accumulate"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><h2>자동 적립</h2><span>자동 적립</span></div></div><div class="orbit-card-summary" data-live="card-accumulate-summary"><div><strong>•••••<span>원</span></strong><p><span class="mute"><b>•••••원</b><small>•••••</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-accumulate-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-accumulate-0" aria-label="BTQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ</b><small>BTQ</small></div></div><div class="orbit-holding-value"><b>•••••원</b><small><span class="mute"><b>•••••원</b><small>•••••</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-accumulate-0" role="dialog" aria-labelledby="orbit-h-accumulate-0-title"><header><h2 id="orbit-h-accumulate-0-title">BTQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-accumulate-0" popovertargetaction="hide" aria-label="BTQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-accumulate-0"><dt>보유 수량</dt><dd>•••••</dd><dt>평균 매입단가</dt><dd>4,550원</dd><dt>현재 가격</dt><dd>3,900원</dd><dt>현재 가격 (달러)</dt><dd>$3.00</dd><dt>평가금액</dt><dd>•••••원</dd><dt>평가손익</dt><dd><span class="mute"><b>•••••원</b><small>•••••</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-accumulate-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>넣은 원가</span><b>•••••원</b><small>적립 매입원가</small></div><div class="orbit-dt-tile"><span>적립 종목</span><b>1개</b></div><div class="orbit-dt-tile"><span>현금</span><b>•••••원</b></div><div class="orbit-dt-tile"><span>마지막 적립</span><b>10/08</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:1.0000 0 0;background:#D4537E"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#D4537E"></i>BTQ 100%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 비중)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중</th></tr><tr><td>BTQ</td><td>•••••</td><td>$3.50</td><td>$3.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:100%;background:#D4537E"></i></span><em>100%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 적립 · 토스 주식 모으기</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section></div><div class="orbit-bottom"><section class="orbit-panel orbit-history"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg>자산 변화</h2><div class="orbit-views" role="group" aria-label="그래프 종류"><label><input type="radio" name="orbit-view" value="asset" checked><span>자산 변화</span></label><label><input type="radio" name="orbit-view" value="perf" ><span>투자 성과</span></label></div><div class="orbit-periods" role="group" aria-label="자산 변화 표시 기간"><label><input type="radio" name="orbit-range" value="w1" ><span>1주</span></label><label><input type="radio" name="orbit-range" value="m1" checked><span>1개월</span></label><label><input type="radio" name="orbit-range" value="m3" ><span>3개월</span></label><label><input type="radio" name="orbit-range" value="m6" ><span>6개월</span></label><label><input type="radio" name="orbit-range" value="y1" ><span>1년</span></label></div></div><div data-live="history"><div class="orbit-chart-empty"><span>평가 기록 대기</span><p>하루 한 번 남기는 실거래 평가 기록이 2일 이상 쌓이면 그래프가 그려집니다.</p></div></div><p class="orbit-chart-note">실거래 장부만 표시 · 하루 한 번 남긴 평가 기록만 · 기록 없는 과거는 채우지 않음 · 자산 변화 = 입금으로 늘어난 금액 포함 · 투자 성과 = 입출금 영향 뺀 수익률</p></section><section class="orbit-panel orbit-recent" id="orbit-recent"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M16 22h2a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v2.85" />
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+  <path d="M8 14v2.2l1.6 1" />
+  <circle cx="8" cy="16" r="6" />
+</svg>거래 내역 <small>(최근 5건)</small></h2><button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">전체 보기 ›</button><section popover="auto" class="orbit-popover" id="orbit-all-trades" role="dialog" aria-labelledby="orbit-all-trades-title"><header><h2 id="orbit-all-trades-title">거래 내역</h2><button type="button" class="orbit-close" popovertarget="orbit-all-trades" popovertargetaction="hide" aria-label="거래 내역 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div class="orbit-trade-filter" role="group" aria-label="거래 종류"><label><input type="radio" name="orbit-trade-filter" id="tf-all" value="all" checked><span>전체</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-buy" value="buy" ><span>매수</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-sell" value="sell" ><span>매도</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-deposit" value="deposit" ><span>입금</span></label></div><ul class="orbit-trades-list" data-live="trades-all"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 •••••</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 •••••</b><small>2026-10-09 · 체결가 $85.00 · 금액 •••••</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 •••••</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 •••••</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 •••••</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 ••••• · 수수료 •••••</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ 매수 •••••</b><small>2026-10-08 · 체결가 $3.50 · 금액 ••••• · 1,300.0원/$</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-sell orbit-trade-empty">매도 기록이 아직 없습니다.</li></ul></div></section></div><ul data-live="trades-recent"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 •••••</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 •••••</b><small>2026-10-09 · 체결가 $85.00 · 금액 •••••</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 •••••</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 •••••</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 •••••</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 ••••• · 수수료 •••••</small></div><span class="orbit-trade-state state-done">체결</span></li></ul></section></div>
+## 페이지 dark
+<!doctype html><html lang="ko" data-theme="dark" data-page="live"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><noscript><meta http-equiv="refresh" content="60"></noscript><title>오르빗 · 내 자산</title><link rel="icon" type="image/png" href="/assets/obi.png?v=3"><link rel="icon" type="image/x-icon" href="/favicon.ico?v=3"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="오르빗"><meta name="theme-color" content="#0c1630"><style>:root{color-scheme:light;--ink:#101b49;--muted:#526a94;--line:#d1e3f5;--surface:#ffffffed;--soft:#eaf3fc;--blue:#1677df}
+html[data-theme=dark]{color-scheme:dark;--ink:#edf3ff;--muted:#aabddd;--line:#344a70;--surface:#101e3bea;--soft:#233858;--blue:#83c9ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font:15px/1.5 "Segoe UI","Malgun Gothic",sans-serif;color:var(--ink);background:#eef7ff url('/assets/orbit-space-light.png') center/cover fixed;min-height:100vh}
+html[data-theme=dark] body{background:#060d27 url('/assets/orbit-space-dark.png') center/cover fixed}
+a{color:inherit;text-decoration:none}button,input,summary{font:inherit}button{color:inherit;border:0;background:none;cursor:pointer}
+a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid #2e8cff;outline-offset:3px}
+h1,h2,p{margin:0}h2{font-size:23px;line-height:1.3}small{font-size:13px}ul{list-style:none;padding:0;margin:0}
+.pos{color:#008c70}.neg{color:#c33355}.mute{color:var(--muted)}html[data-theme=dark] .pos{color:#57dfc0}html[data-theme=dark] .neg{color:#ff829e}
+.orbit-icon{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.topbar{min-height:64px;display:flex;align-items:center;gap:clamp(12px,3vw,55px);padding:8px clamp(14px,2vw,30px);border-bottom:1px solid var(--line);background:var(--surface);position:relative;z-index:2}
+.logo{display:flex;align-items:center;gap:10px;font-size:26px;font-weight:800}.logo img{object-fit:contain}
+.orbit-nav{display:flex;align-items:center;justify-content:center;gap:clamp(3px,1vw,20px);flex:1}
+.orbit-nav>a,.orbit-nav>button{display:flex;align-items:center;gap:9px;white-space:nowrap;font-size:clamp(14px,1.1vw,17px);padding:10px clamp(8px,1vw,17px);color:var(--muted);border-radius:24px;min-height:44px}
+.orbit-nav .on{background:var(--soft);color:var(--blue)}.orbit-nav>a:hover,.orbit-nav>button:hover{background:var(--soft)}
+.orbit-tools{display:flex;gap:10px;align-items:center;color:var(--muted)}
+.orbit-tools>a,.orbit-tools>button{display:grid;place-items:center;min-height:42px;min-width:42px;border-radius:50%}
+.orbit-tools>a{background:var(--soft);color:var(--blue)}.orbit-tools>button:hover{background:var(--soft)}
+.orbit-popover{position:fixed;inset:0;margin:auto;padding:0;width:min(620px,calc(100vw - 28px));max-height:calc(100dvh - 32px);height:fit-content;border:1px solid var(--line);border-radius:24px;background:var(--surface);color:var(--ink);box-shadow:0 24px 90px #00000040;overflow:hidden}
+.orbit-popover:popover-open{display:flex;flex-direction:column}.orbit-popover::backdrop{background:#07112466;backdrop-filter:blur(5px)}
+.orbit-popover>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
+.orbit-popover h2{font-size:21px}.orbit-close{display:grid;place-items:center;width:44px;height:44px;flex-shrink:0;border-radius:50%;background:var(--soft);color:var(--ink)}.orbit-close:hover{background:var(--line)}
+.orbit-popover-body{padding:6px 24px 22px;overflow:auto;overscroll-behavior:contain;min-height:0}
+.orbit-popover p{margin:14px 0;color:var(--muted);overflow-wrap:anywhere}
+.orbit-themes{display:flex;gap:12px;margin-top:16px}.orbit-themes a{padding:10px 24px;border:1px solid var(--line);border-radius:14px}.orbit-themes [aria-current=true]{background:var(--soft);color:var(--blue)}
+.orbit-main{max-width:1680px;margin:auto;padding:0 clamp(14px,1.7vw,28px) 24px}
+.orbit-hero{--hero-indent:24px;min-height:320px;position:relative;padding:24px var(--hero-indent);display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:22px;align-items:end;isolation:isolate}
+.orbit-hero::before{content:"";position:absolute;inset:0;z-index:-3;pointer-events:none;background:radial-gradient(ellipse at 75% 15%,#98d8ff50,transparent 65%)}
+.orbit-hero-art{position:absolute;inset:0 calc(-1 * clamp(14px,1.7vw,28px));z-index:-2;overflow:hidden;pointer-events:none;border-radius:0 0 28px 28px}
+.orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{position:absolute;right:0;top:-162px;width:1050px;height:700px;object-fit:contain;max-width:none;mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,#000 78%,transparent);mask-composite:intersect}
+html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 30% 85% at 76% 45%,#000 55%,transparent 100%)}
+.orbit-greeting{grid-column:1;align-self:start}.orbit-greeting>span{font-size:clamp(16px,1.4vw,21px);color:var(--muted)}
+.orbit-greeting h1{font-size:clamp(28px,2.8vw,44px);letter-spacing:-1.5px;line-height:1.35}.orbit-greeting h1 span{font-size:.9em}
+.orbit-greeting p{color:var(--muted);font-size:clamp(13px,1.2vw,18px);margin-top:4px}
+.orbit-networth{grid-column:1;margin-left:calc(-1 * var(--hero-indent));display:grid;grid-template-columns:1.55fr .9fr 1fr;align-items:center;min-width:0;min-height:142px;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(15px,1.5vw,25px)}
+.orbit-networth>div{min-width:0}.orbit-networth>div+div{border-left:1px solid var(--line);padding-left:clamp(12px,1.3vw,25px)}
+.orbit-networth h2{font-size:20px;display:flex;gap:20px;align-items:center}.orbit-networth h2 svg{width:22px;color:var(--muted)}
+.orbit-total{display:block;font-size:clamp(28px,3.2vw,53px);font-weight:800;letter-spacing:-1.5px;overflow-wrap:anywhere}.orbit-total small{font-size:.6em;margin-left:3px}
+.orbit-networth>div>span{display:block;color:var(--muted)}.orbit-networth>div>b{display:block;font-size:clamp(16px,1.3vw,21px);overflow-wrap:anywhere}
+.orbit-networth>div>strong:not(.orbit-total){display:block;font-size:clamp(17px,1.5vw,24px);overflow-wrap:anywhere}
+.orbit-networth>div>strong:not(.orbit-total) span{display:block;line-height:1.3}.orbit-networth>div>strong:not(.orbit-total) small{display:block;font-weight:400;font-size:15px}
+.orbit-caution{display:inline-block;padding:2px 8px;background:var(--soft);color:var(--muted);border-radius:15px;margin-top:6px;font-size:11px}
+.orbit-help-card{grid-column:2;grid-row:2;justify-self:end;padding:15px 18px;background:var(--surface);border:1px solid var(--line);border-radius:24px;width:200px;text-align:left}
+.orbit-help-card b{display:flex;align-items:center;gap:6px;font-size:16px}.orbit-help-card svg{width:20px}.orbit-help-card>span{display:block;color:var(--muted);font-size:14px;margin-top:8px}
+.orbit-data-note{margin:0 0 14px;padding:0 8px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.orbit-alert{border:1px solid #f6c6dc;border-radius:22px;background:#fff1f8ed;margin:0 0 14px;color:#201d4d}
+.orbit-alert summary{display:flex;align-items:center;gap:16px;padding:11px 20px;min-height:56px;cursor:pointer;list-style:none}
+.orbit-alert-mark{display:grid;place-items:center;background:linear-gradient(#ff7898,#f33368);color:white;border-radius:50%;height:33px;width:33px;font-size:23px;font-weight:800;flex-shrink:0}
+.orbit-alert b{font-size:16px;flex-shrink:0}.orbit-alert b>span{color:#c33355}.orbit-alert-copy{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#5b648a}
+.orbit-chevron{margin-left:auto;color:var(--muted);font-size:28px}.orbit-alert>div{padding:0 24px 18px;overflow-wrap:anywhere}.orbit-alert>div p{margin-top:7px}
+html[data-theme=dark] .orbit-alert{background:#34213ce8;border-color:#714064;color:#f1dfea}html[data-theme=dark] .orbit-alert b>span{color:#ff8cad}html[data-theme=dark] .orbit-alert-copy{color:var(--muted)}
+.orbit-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(12px,1vw,18px)}
+.orbit-card{min-width:0;padding:clamp(16px,1.5vw,24px) clamp(16px,1.5vw,24px) 8px;border:1px solid var(--line);border-radius:24px;background:var(--surface);container-type:inline-size}
+.orbit-cruise{border-color:#cfc4ed}.orbit-accumulate{border-color:#a9e0d5}html[data-theme=dark] .orbit-cruise{border-color:#4e407b}html[data-theme=dark] .orbit-accumulate{border-color:#2d6461}
+.orbit-card-heading{display:flex;align-items:center;gap:12px}.orbit-category-icon{display:grid;place-items:center;flex-shrink:0;height:52px;width:52px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#57baff,#067eff)}
+.orbit-category-icon svg{height:29px;width:29px;stroke-width:1.8}.orbit-cruise .orbit-category-icon{background:linear-gradient(135deg,#a799ff,#6753ff)}.orbit-accumulate .orbit-category-icon{background:linear-gradient(135deg,#61d5b3,#079980)}
+.orbit-card h2{font-size:clamp(19px,1.5vw,23px)}.orbit-card-heading>div>span{font-size:16px;color:var(--muted)}
+.orbit-card-summary{display:flex;align-items:center;gap:10px;margin:15px 0;min-height:78px}.orbit-card-summary>div:first-child{min-width:0;flex:1}
+.orbit-card-summary strong{font-size:clamp(30px,9cqw,45px);letter-spacing:-1.5px;overflow-wrap:anywhere}.orbit-card-summary strong>span{font-size:.6em;letter-spacing:0;margin-left:3px}
+.orbit-card-summary p{font-size:15px;font-weight:600}.orbit-card-summary p small{display:inline;margin-left:8px;font-size:14px}
+.orbit-spark-empty{width:92px;flex-shrink:0;color:var(--muted);font-size:11px;text-align:right;border-bottom:1px dashed var(--line);padding-bottom:9px}
+.orbit-row-label{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:8px}
+.orbit-holdings>li{display:flex;align-items:center;gap:8px;min-height:63px;padding:9px 0;border-bottom:1px solid var(--line)}.orbit-holdings>li:last-child{border:0}
+.orbit-holding-name{display:flex;align-items:center;gap:10px;min-width:0;flex:1}.orbit-coin{height:40px;width:40px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;background:var(--soft);color:var(--blue);overflow:hidden}
+.orbit-coin img{width:100%;height:100%;object-fit:contain}
+.coin-tqqq{color:#fff;background:linear-gradient(145deg,#9673ff,#5056da)}
+.coin-schd{color:#fff;background:linear-gradient(145deg,#48d6af,#078b74)}
+.coin-btq{color:#fff;background:linear-gradient(145deg,#bc80fa,#7043c7)}
+.coin-qs{color:#fff;background:linear-gradient(145deg,#54c9ed,#237bc8)}
+.coin-wqtm{color:#fff;background:linear-gradient(145deg,#81a7ff,#466bdb)}
+.orbit-coin .orbit-icon{width:24px;height:24px;stroke-width:1.8}
+.orbit-holding-name b{font-size:16px}.orbit-holding-name small{display:block;color:var(--muted);font-size:12px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orbit-holding-value{text-align:right;flex-shrink:0}.orbit-holding-value b{font-size:16px}.orbit-holding-value small{display:block;font-size:12px}
+.orbit-holding-value small b{font-size:12px;font-weight:400}.orbit-holding-value small small{display:inline;margin-left:4px}
+.orbit-book-detail summary{list-style:none;cursor:pointer;text-align:right;color:var(--muted);font-size:12px;padding:9px 0}
+.orbit-detail-close,.orbit-book-detail[open] .orbit-detail-open{display:none}.orbit-book-detail[open] .orbit-detail-close{display:inline}
+.orbit-book-detail>div{font-size:12px;color:var(--muted);padding-top:5px;overflow-wrap:anywhere}.orbit-book-detail p,.orbit-book-detail li{margin:4px 0}
+.orbit-bottom{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}.orbit-panel{border:1px solid var(--line);background:var(--surface);border-radius:24px;padding:18px 22px;min-width:0}
+.orbit-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.orbit-panel-heading h2{display:flex;align-items:center;gap:9px;font-size:18px}
+.orbit-panel-heading h2 svg{color:var(--blue)}.orbit-panel-heading small{font-weight:400;color:var(--muted);font-size:12px}
+.orbit-periods{display:flex;gap:5px;flex-wrap:wrap}.orbit-periods label{cursor:pointer}.orbit-periods input{position:absolute;opacity:0;width:1px;height:1px}
+.orbit-periods span{display:block;background:var(--soft);color:var(--muted);border-radius:17px;font-size:12px;padding:6px 12px;white-space:nowrap}
+.orbit-periods input:checked+span{background:#1677df;color:#fff}.orbit-periods input:focus-visible+span{outline:3px solid #448eff;outline-offset:2px}
+.orbit-chart-empty{min-height:126px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:repeating-linear-gradient(to top,transparent,transparent 39px,var(--line) 40px);margin-top:12px;color:var(--muted);font-size:13px}
+.orbit-chart-empty>span{font-size:17px;font-weight:600}.orbit-chart-empty p{margin-top:8px;text-align:center}.orbit-chart-note{color:var(--muted);font-size:11px;margin-top:8px}
+.orbit-recent ul,.orbit-trades-list{margin-top:12px}.orbit-recent li,.orbit-trades-list li{display:flex;align-items:center;gap:12px;margin:5px 0;padding:6px 0;min-height:48px}
+.orbit-recent li>div,.orbit-trades-list li>div{flex:1;min-width:0}.orbit-recent li b,.orbit-trades-list li b{font-size:14px;display:block;overflow-wrap:anywhere}
+.orbit-recent li small,.orbit-trades-list li small{display:block;font-size:12px;color:var(--muted)}
+.orbit-trade-state{background:#e1f7ee;color:#127861;padding:5px 10px;border-radius:20px;font-size:12px;white-space:nowrap}html[data-theme=dark] .orbit-trade-state{background:#174d43;color:#73e9c9}
+.orbit-recent>ul{max-height:180px;overflow:auto;scrollbar-width:thin}.orbit-all-trades{font-size:13px;color:var(--blue);white-space:nowrap;padding:8px 0}
+summary::-webkit-details-marker{display:none}
+@container(max-width:360px){.orbit-spark-empty{display:none}.orbit-holding-name small{max-width:115px}.orbit-card-summary strong{font-size:34px}}
+@media(max-width:1100px){
+ .orbit-nav{gap:3px}.orbit-nav>a,.orbit-nav>button{padding:10px}.orbit-nav>a>span,.orbit-nav>button>span{display:none}
+ .orbit-hero{--hero-indent:0px;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);padding:24px 0}
+ .orbit-help-card{width:170px;padding:14px}.orbit-help-card b{font-size:14px}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{right:-120px}
+ .orbit-networth{grid-template-columns:1.5fr 1fr 1fr}.orbit-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .orbit-card:last-child{grid-column:1/-1}.orbit-alert-copy{display:none}.orbit-bottom{grid-template-columns:1fr 1fr}
+}
+@media(max-width:760px){
+ .orbit-hero{min-height:335px;grid-template-columns:1fr;gap:16px}
+ .orbit-greeting{max-width:80%}.orbit-greeting h1{font-size:29px}.orbit-greeting p{max-width:75%}.orbit-help-card{display:none}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{width:640px;height:427px;right:-30px;top:-70px}
+ html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 31% 39% at 82% 20%,#000 60%,transparent 100%)}
+ .orbit-networth{grid-column:1}.orbit-total{font-size:35px}.orbit-cards,.orbit-bottom{grid-template-columns:1fr}.orbit-card:last-child{grid-column:auto}
+ .orbit-card-summary strong{font-size:clamp(32px,8cqw,43px)}
+}
+@media(max-width:520px){
+ .topbar{flex-wrap:wrap;gap:5px}.logo{font-size:24px}.logo img{height:38px;width:38px}.orbit-tools{margin-left:auto}
+ .orbit-nav{order:3;flex-basis:100%;justify-content:space-between}.orbit-nav>a,.orbit-nav>button{padding:10px 14px}
+ .orbit-hero{min-height:340px;padding:20px 0;gap:18px}.orbit-greeting h1{font-size:26px;letter-spacing:-1px}.orbit-greeting h1 span{display:none}
+ .orbit-greeting p{font-size:12px}
+ .orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{width:410px;height:273px;right:-20px;top:-15px}
+ .orbit-networth{grid-template-columns:1fr 1fr;gap:9px;padding:15px 18px}.orbit-networth>div:first-child{grid-column:1/-1}
+ .orbit-networth>div:nth-child(2){border:0;padding:0}.orbit-networth>div:nth-child(3){padding-left:12px}.orbit-networth h2{font-size:18px}
+ .orbit-total{font-size:38px}.orbit-networth>div>span{font-size:12px}.orbit-alert summary{gap:8px;padding:11px 12px}
+ .orbit-alert b{flex-shrink:1;font-size:12px}.orbit-alert-mark{height:27px;width:27px;font-size:20px}
+ .orbit-card h2{font-size:21px}.orbit-card-summary strong{font-size:35px}.orbit-holding-name small{max-width:110px}
+ .orbit-holding-value b{font-size:14px}.orbit-holding-value small b{font-size:11px}.orbit-panel{padding:16px}
+ .orbit-periods{width:100%;justify-content:space-between}.orbit-periods span{padding:6px 11px}.orbit-trade-state{font-size:10px;padding:5px 8px}
+ .orbit-popover>header{padding:12px 16px}.orbit-popover-body{padding:4px 16px 16px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* 2026-10-10 보완: 금액 숨기기 · 갱신 시각 · 추정 · 종목 상세 · 그래프 · 거래 필터 · 계좌 상태 · 첫 안내 */
+.orbit-eye{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;font-weight:500;text-decoration:none;border:1px solid var(--line);border-radius:14px;padding:3px 9px}
+.orbit-eye svg{width:16px!important}.orbit-eye:hover,.orbit-eye.on{color:var(--blue);border-color:var(--blue)}
+.orbit-updated{grid-column:1/-1;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--muted);font-size:12px}
+.orbit-card-stamp{color:var(--muted);font-size:11px;margin-top:4px}
+.orbit-stale{color:#d6455d!important;font-weight:600}[data-theme=dark] .orbit-stale{color:#ff8fa3!important}
+.orbit-est{font-style:normal;font-size:11px;font-weight:600;color:#a15c00;background:#fff1d6;border-radius:8px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+[data-theme=dark] .orbit-est{color:#ffd28a;background:#4a3510}
+.orbit-holdings>li{padding:0}
+.orbit-holding-btn{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;min-height:63px;padding:9px 4px;cursor:pointer;border-radius:12px}
+.orbit-holding-btn:hover{background:var(--soft)}.orbit-holding-btn:focus-visible{outline:3px solid #448eff;outline-offset:1px}
+.orbit-detail-list{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin:4px 0 12px}
+.orbit-detail-list dt{color:var(--muted)}.orbit-detail-list dd{text-align:right;font-weight:600}
+.orbit-detail-list dd span b{font-weight:600}.orbit-detail-list dd small{margin-left:6px}
+.orbit-detail-foot{color:var(--muted);font-size:11px;margin-top:8px}
+.orbit-history .orbit-panel-heading{flex-wrap:wrap;gap:8px}
+.orbit-views{display:flex;gap:5px}.orbit-views label{cursor:pointer}.orbit-views input{position:absolute;opacity:0;width:1px;height:1px}
+.orbit-views span{display:block;border:1px solid var(--line);color:var(--muted);border-radius:17px;font-size:12px;padding:5px 11px;white-space:nowrap}
+.orbit-views input:checked+span{border-color:var(--blue);color:var(--blue);font-weight:600}.orbit-views input:focus-visible+span{outline:3px solid #448eff;outline-offset:2px}
+.orbit-plot{display:none;margin-top:10px}
+.orbit-history:has(input[value=asset]:checked):has(input[value=w1]:checked) .p-w1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m1]:checked) .p-m1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m3]:checked) .p-m3.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m6]:checked) .p-m6.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=y1]:checked) .p-y1.v-asset,
+.orbit-history:has(input[value=perf]:checked):has(input[value=w1]:checked) .p-w1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m1]:checked) .p-m1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m3]:checked) .p-m3.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m6]:checked) .p-m6.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=y1]:checked) .p-y1.v-perf{display:block}
+.orbit-history:has(input[value=asset]:checked):has(input[value=w1]:checked) .orbit-chart-empty.p-w1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m1]:checked) .orbit-chart-empty.p-m1.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m3]:checked) .orbit-chart-empty.p-m3.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=m6]:checked) .orbit-chart-empty.p-m6.v-asset,
+.orbit-history:has(input[value=asset]:checked):has(input[value=y1]:checked) .orbit-chart-empty.p-y1.v-asset,
+.orbit-history:has(input[value=perf]:checked):has(input[value=w1]:checked) .orbit-chart-empty.p-w1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m1]:checked) .orbit-chart-empty.p-m1.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m3]:checked) .orbit-chart-empty.p-m3.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=m6]:checked) .orbit-chart-empty.p-m6.v-perf,
+.orbit-history:has(input[value=perf]:checked):has(input[value=y1]:checked) .orbit-chart-empty.p-y1.v-perf{display:flex}
+.orbit-plot-svg{width:100%;height:auto;display:block}
+.orbit-plot-svg .grid{stroke:var(--line);stroke-width:1}.orbit-plot-svg .axis{fill:var(--muted);font-size:11px}
+.orbit-plot-line{fill:none;stroke:var(--blue);stroke-width:2.4;stroke-linejoin:round}
+.orbit-plot-base{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4}
+.orbit-plot-cap{color:var(--muted);font-size:12px;margin-top:4px}
+.orbit-spark{width:92px;height:34px;flex-shrink:0}.orbit-spark polyline{fill:none;stroke-width:2;stroke-linejoin:round}
+.orbit-spark.pos polyline{stroke:#16a37f}.orbit-spark.neg polyline{stroke:#d6455d}
+.orbit-trade-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.orbit-trade-filter label{cursor:pointer}
+.orbit-trade-filter input{position:absolute;opacity:0;width:1px;height:1px}
+.orbit-trade-filter span{display:block;background:var(--soft);color:var(--muted);border-radius:16px;font-size:12px;padding:6px 12px}
+.orbit-trade-filter input:checked+span{background:#1677df;color:#fff}.orbit-trade-filter input:focus-visible+span{outline:3px solid #448eff;outline-offset:2px}
+.orbit-trade-filter:has(#tf-buy:checked)+.orbit-trades-list>li:not(.kind-buy),
+.orbit-trade-filter:has(#tf-sell:checked)+.orbit-trades-list>li:not(.kind-sell),
+.orbit-trade-filter:has(#tf-deposit:checked)+.orbit-trades-list>li:not(.kind-deposit){display:none}
+.orbit-trade-state.state-wait{background:#fff1d6;color:#a15c00}.orbit-trade-state.state-other{background:var(--soft);color:var(--muted)}
+.orbit-trade-state.state-deposit{background:#e3efff;color:#1f5fb8}
+[data-theme=dark] .orbit-trade-state.state-wait{background:#4a3510;color:#ffd28a}[data-theme=dark] .orbit-trade-state.state-deposit{background:#1d3560;color:#9cc7ff}
+.orbit-accounts-list{display:grid;gap:10px;margin-bottom:12px}
+.orbit-accounts-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.orbit-accounts-list li small{display:block;color:var(--muted);font-size:12px}.orbit-accounts-list .orbit-trade-state{white-space:normal;text-align:right}
+.orbit-onboard{background:var(--surface);border:2px solid var(--blue);border-radius:22px;padding:18px 22px;margin-bottom:18px}
+.orbit-onboard h2{font-size:18px;margin-bottom:10px}.orbit-onboard ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-left:18px}
+.orbit-onboard li b{display:block}.orbit-onboard li span{color:var(--muted);font-size:13px}
+.orbit-onboard-key{margin-top:12px;font-weight:600;color:var(--blue)}
+.orbit-onboard-actions{display:flex;gap:10px;margin-top:10px}
+.orbit-onboard-actions a,.orbit-onboard-actions button{font:inherit;font-size:13px;border-radius:16px;padding:7px 14px;cursor:pointer;text-decoration:none}
+.orbit-onboard-actions a{background:#1677df;color:#fff}.orbit-onboard-actions button{background:none;border:1px solid var(--line);color:var(--ink)}
+.orbit-refresh-failed::after{content:" · 새로 고침 실패 (다음 분에 다시)";color:#d6455d}
+@media (max-width:700px){.orbit-onboard ol{grid-template-columns:1fr}}
+/* 거래 내역 창: 필터를 바꿔도 크기 고정, 넘치면 창 안에서 스크롤 (사용자 2026-10-10) */
+#orbit-all-trades{height:min(640px,calc(100dvh - 32px))}
+#orbit-all-trades .orbit-popover-body{flex:1;overflow-y:auto}
+#orbit-all-trades .orbit-popover-body{padding-top:0}
+#orbit-all-trades .orbit-trade-filter{position:sticky;top:0;z-index:1;background:#fff;margin:0 -24px 6px;padding:12px 24px 10px;box-shadow:0 1px 0 var(--line)}
+[data-theme=dark] #orbit-all-trades .orbit-trade-filter{background:#101e3b}
+.orbit-trade-filter:has(#tf-all:checked)+.orbit-trades-list>.orbit-trade-empty{display:none}
+.orbit-trade-empty{color:var(--muted);justify-content:center}
+/* 보유 상세 (2026-10-10 사용자 승인 시안: 상태 타일 · 구성 막대 · 종목 표) */
+.orbit-dt{display:block}
+.orbit-dt-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin-top:6px}
+.orbit-dt-tile{background:var(--soft);border-radius:12px;padding:10px 6px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px}
+.orbit-dt-tile span{font-size:11px;color:var(--muted)}
+.orbit-dt-tile b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.orbit-dt-tile small{font-size:11px;color:var(--muted);line-height:1.35}
+.orbit-dt-tile b.ok{color:#16a37f}.orbit-dt-tile b.warn{color:#c47a00}
+[data-theme=dark] .orbit-dt-tile b.ok{color:#57dfc0}[data-theme=dark] .orbit-dt-tile b.warn{color:#ffc46b}
+.orbit-dt-sec{font-size:12px;color:var(--muted);margin:14px 0 6px}
+.orbit-dt-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--soft)}
+.orbit-dt-legend{display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:6px;justify-content:flex-end}
+.orbit-dt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.orbit-dt-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;font-variant-numeric:tabular-nums}
+.orbit-dt-table th{font-weight:400;color:var(--muted);text-align:right;padding:5px 0;border-bottom:1px solid var(--line)}
+.orbit-dt-table td{text-align:right;padding:8px 0;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orbit-dt-table th:first-child,.orbit-dt-table td:first-child{text-align:left;font-weight:600}
+.orbit-dt-wt{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-left:8px}
+.orbit-dt-gauge{position:relative;flex:1;max-width:80px;height:6px;background:var(--soft);border-radius:3px}
+.orbit-dt-gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.orbit-dt-gauge u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.orbit-dt-wt em{font-style:normal;width:58px;text-align:right}.orbit-dt-wt em.warn{color:#c47a00}
+[data-theme=dark] .orbit-dt-wt em.warn{color:#ffc46b}
+.orbit-dt-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.orbit-dt-chip{font-size:12px;background:var(--soft);border-radius:10px;padding:4px 9px;color:var(--muted)}
+.orbit-dt-foot{font-size:11px;color:var(--muted);margin-left:auto}
+/* 상세 보기 버튼 하나로 세 카드 상세 함께 열기 · 상세는 카드 바닥에 · 단어 단위 줄바꿈 (2026-10-10) */
+.orbit-cards-tools{display:flex;justify-content:flex-end;margin:0 0 10px}
+.orbit-detail-toggle{display:inline-flex;align-items:center;gap:6px;background:#1677df;color:#fff;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none}
+.orbit-detail-toggle:hover{background:#0f5fbf}.orbit-detail-toggle.on{background:#0c447c}
+.orbit-detail-toggle:focus-visible{outline:3px solid #448eff;outline-offset:2px}
+[data-theme=dark] .orbit-detail-toggle{background:#2f7fe0}[data-theme=dark] .orbit-detail-toggle.on{background:#185fa5}
+.orbit-card{display:flex;flex-direction:column}
+.orbit-dt.orbit-book-detail{margin-top:auto;padding:14px 0 8px;border-top:1px dashed var(--line)}
+.orbit-dt.orbit-book-detail[hidden]{display:none}
+.orbit-dt-tile,.orbit-dt-tile span,.orbit-dt-tile small{word-break:keep-all;text-wrap:balance}
+/* 2026-10-10 줄 맞춤 · 배경 이음 · 상세 버튼 카드 안 · 구성 막대 꽉 채움 */
+.orbit-hero-art{border-radius:0;mask-image:linear-gradient(to bottom,#000 62%,transparent 100%),linear-gradient(to left,transparent 0,#000 9%);mask-composite:intersect}
+@media(min-width:761px){html[data-theme=dark] .orbit-hero-art{mask-image:radial-gradient(ellipse 30% 85% at 76% 45%,#000 55%,transparent 100%),linear-gradient(to bottom,#000 62%,transparent 100%);mask-composite:intersect}}
+.orbit-cards-tools{display:none}
+.orbit-card-heading .orbit-detail-toggle{margin-left:auto;align-self:center}
+.orbit-detail-toggle{background:var(--blue);color:#fff;border:0}
+.orbit-detail-toggle:hover{filter:brightness(1.08);background:var(--blue)}
+.orbit-detail-toggle.on{background:var(--blue);box-shadow:inset 0 0 0 2px #ffffff55}
+[data-theme=dark] .orbit-detail-toggle,[data-theme=dark] .orbit-detail-toggle.on{background:var(--blue);color:#06122b}
+.orbit-cards{grid-auto-rows:auto}
+.orbit-card{display:flex;flex-direction:column}
+.orbit-dt.orbit-book-detail{margin-top:0;display:flex;flex-direction:column}
+.orbit-dt.orbit-book-detail[hidden]{display:none}
+.orbit-dt-bottom{margin-top:auto;padding-top:12px}
+:root{--dt-cash:#9fb3cf}[data-theme=dark]{--dt-cash:#5d7398}
+.orbit-dt-bar{background:none;gap:0}
+.orbit-holdings>li.orbit-pad{min-height:63px;border-bottom-color:transparent}
+.orbit-holdings>li:not(.orbit-pad):has(+li.orbit-pad){border-bottom:0}
+.orbit-dt-table tr.orbit-pad td{border-bottom-color:transparent}
+.orbit-dt-tile{min-height:94px}
+.orbit-dt.orbit-book-detail{margin-top:auto}
+/* 상세 보기 버튼: 화면 읽는 법 카드와 자동 적립 카드 사이, 오른쪽 선 맞춤 (2026-10-10) */
+.orbit-cards-tools{display:flex;justify-content:flex-end;margin:0;padding:0}
+.orbit-help-card{margin-right:calc(-1 * var(--hero-indent,0px))}
+.orbit-cards-tools{margin:-12px 0 12px}
+/* 타일 숫자 글색: 테마 파랑 (상태 초록·노랑은 그대로) (2026-10-10) */
+.orbit-dt-tile b:not(.ok):not(.warn){color:var(--blue)}
+
+/* 오비 움직임 — 그림과 같은 크기의 SVG 층 (orbit_home.HERO_FX, 2026-10-10) */
+.orbit-hero-fx{pointer-events:none;overflow:visible}
+.fx-lid{fill:#071a5e;transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0);animation:obi-blink 5.2s infinite}
+.fx-shut{fill:none;stroke:#3fe6f0;stroke-width:7;stroke-linecap:round;opacity:0;animation:obi-shut 5.2s infinite}
+@keyframes obi-blink{0%,90%,100%{transform:scaleY(0)}93%,95%{transform:scaleY(1)}97%{transform:scaleY(.2)}}
+@keyframes obi-shut{0%,92%,96.5%,100%{opacity:0}93%,95.5%{opacity:1}}
+.fx-twinkle{fill:#e9fdff;stroke:#62e8ff;stroke-width:3;transform-box:fill-box;transform-origin:center;opacity:0;animation:obi-twinkle 3.6s ease-in-out infinite}
+@keyframes obi-twinkle{0%,100%{opacity:0;transform:scale(.3) rotate(0)}45%,55%{opacity:1;transform:scale(1.15) rotate(25deg)}}
+.fx-ring{fill:none;stroke:#7ff6ff;stroke-width:30;opacity:.12;animation:obi-ring 4.6s ease-in-out infinite}
+@keyframes obi-ring{0%,100%{opacity:.1}50%{opacity:.55}}
+.fx-flow{fill:none;stroke:#ffffff;stroke-width:9;stroke-linecap:round;stroke-dasharray:90 1202;opacity:.9;animation:obi-flow 3.2s linear infinite}
+@keyframes obi-flow{to{stroke-dashoffset:-1292}}
+.fx-sleep{display:none}
+html[data-theme=dark] .fx-awake{display:none}
+html[data-theme=dark] .fx-sleep{display:inline}
+.fx-z{fill:#c9d8ff;font:800 44px 'Segoe UI',sans-serif;opacity:0;animation:obi-z 3.3s ease-out infinite}
+@keyframes obi-z{0%{opacity:0;transform:translate(0,0)}30%{opacity:.9}100%{opacity:0;transform:translate(26px,-60px)}}
+/* 다크: 12 초마다 약 2 초 졸린 눈을 반쯤 떴다가(그동안 zzz 꺼짐) 다시 잔다 */
+.fx-sleepy{opacity:0;animation:obi-sleepy 12s ease-in-out infinite}
+.fx-zzz{animation:obi-zzz 12s ease-in-out infinite}
+@keyframes obi-sleepy{0%,79%,100%{opacity:0}81%,97%{opacity:1}}
+@keyframes obi-zzz{0%,77%,100%{opacity:1}79.5%,98.5%{opacity:0}}
+.ico-to-light{display:none}
+html[data-theme=dark] .ico-to-light{display:inline-flex}
+html[data-theme=dark] .ico-to-dark{display:none}
+/* 오비가 그림 속에 있어 그림 전체를 살짝 움직인다 — 그림과 SVG 층을 같은 움직임으로 묶어
+   눈꺼풀 위치가 어긋나지 않게. 중심은 오비(원본 1040, 470 = 67.7%, 45.9%). */
+.orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{transform-origin:67.7% 45.9%;animation:obi-float 6.5s ease-in-out infinite}
+@keyframes obi-float{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-16px) rotate(-1deg)}65%{transform:translateY(-5px) rotate(.8deg)}}
+html[data-theme=dark] .orbit-hero-art img,html[data-theme=dark] .orbit-hero-art .orbit-hero-fx{animation:obi-breathe 6s ease-in-out infinite}
+@keyframes obi-breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-12px) scale(1.015)}}
+@media (prefers-reduced-motion:reduce){.orbit-hero-fx *{animation:none!important}.orbit-hero-art img,.orbit-hero-art .orbit-hero-fx{animation:none!important}.fx-lid,.fx-shut,.fx-twinkle,.fx-z,.fx-flow,.fx-sleepy{opacity:0}}
+</style><script src="/assets/orbit-live.js" defer></script></head><body><div class="topbar"><a class="logo" href="/live"><img src="/assets/orbit-obi.png" alt="오비, 네온 궤도 속 우주 고양이" width="44" height="44"><b>오르빗</b></a><nav class="orbit-nav" aria-label="주 메뉴"><a class="on" href="/live" aria-current="page" aria-label="홈"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+  <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+</svg><span>홈</span></a><a href="/live#orbit-assets" aria-label="내 자산"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z" />
+  <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+</svg><span>내 자산</span></a><a href="/" aria-label="Paper 기록"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg><span>Paper</span></a><button type="button" class="orbit-accounts" popovertarget="orbit-accounts" aria-label="연결 계좌"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" />
+  <path d="M3 7h18" />
+  <rect x="3" y="3" width="18" height="18" rx="2" />
+</svg><span>연결 계좌</span></button><a class="orbit-settings" href="/settings" aria-label="설정"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 17H5" />
+  <path d="M19 7h-9" />
+  <circle cx="17" cy="17" r="3" />
+  <circle cx="7" cy="7" r="3" />
+</svg><span>설정</span></a><button type="button" class="orbit-guide" popovertarget="orbit-guide" aria-label="화면 읽는 법"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" />
+</svg><span>화면 읽는 법</span></button><section popover="auto" class="orbit-popover" id="orbit-guide" role="dialog" aria-labelledby="orbit-guide-title"><header><h2 id="orbit-guide-title">화면 읽는 법</h2><button type="button" class="orbit-close" popovertarget="orbit-guide" popovertargetaction="hide" aria-label="화면 읽는 법 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><p>내 자산은 실거래 장부의 현금과 보유 평가액입니다. 기준 금액은 총 입금 + 적립 매입원가입니다. 평가 차액은 세금 전이며 확정 수익이 아닙니다.</p><p>시세가 없으면 원가로 셈 하고 <em class='orbit-est'>추정</em>을 붙입니다. 주문 접수 ≠ 체결 완료. 장부만으로 프로그램의 현재 가동 여부를 확정하지 않습니다.</p><p>‘장부 업데이트’는 매매 프로그램이 장부를 마지막으로 저장한 시각, ‘시세 업데이트’는 이 화면이 공개 시세를 받은 시각입니다. 화면이 열려 있다고 매매가 정상이라는 뜻은 아닙니다.</p><p>Deneb은 미국 주식, Vega는 BTC·ETH·SOL, 자동 적립은 주식 모으기입니다. 이 화면은 읽기 전용입니다. 앱을 닫아도 매매 프로그램은 종료되지 않습니다.</p><p>자산 그래프는 하루 한 번 남긴 실거래 평가 기록만 그립니다. 기록이 없는 과거는 채우지 않습니다. 입금은 수익이 아닙니다.</p></div></section></nav><div class="orbit-tools"><button type="button" popovertarget="orbit-status" aria-label="확인할 사항"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+  <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+</svg></button><a class="orbit-theme-toggle" href="/live?theme=light" aria-label="라이트 모드로 전환" title="라이트 모드로 전환"><span class="ico-to-dark"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+</svg></span><span class="ico-to-light"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="4" />
+  <path d="M12 2v2" />
+  <path d="M12 20v2" />
+  <path d="m4.93 4.93 1.41 1.41" />
+  <path d="m17.66 17.66 1.41 1.41" />
+  <path d="M2 12h2" />
+  <path d="M20 12h2" />
+  <path d="m6.34 17.66-1.41 1.41" />
+  <path d="m19.07 4.93-1.41 1.41" />
+</svg></span></a></div></div><main class="orbit-main"><section class="orbit-hero"><div class="orbit-hero-art" aria-hidden="true"><img class="orbit-hero-cat" src="/assets/orbit-hero-dark-sleep.png" alt=""><svg class="orbit-hero-fx" viewBox="0 0 1536 1024" aria-hidden="true" focusable="false"><defs><filter id="obi-glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="14"/></filter><filter id="obi-spark" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><clipPath id="obi-front"><rect x="700" y="548" width="800" height="200" transform="rotate(-11 1075 556)"/></clipPath></defs><g class="fx-glow" clip-path="url(#obi-front)"><ellipse class="fx-ring" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-glow)"/><ellipse class="fx-flow" cx="1075" cy="556" rx="300" ry="78" transform="rotate(-11 1075 556)" filter="url(#obi-spark)"/></g><path class="fx-twinkle" style="animation-delay:0.0s" d="M868 274Q868 300 894 300Q868 300 868 326Q868 300 842 300Q868 300 868 274Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.2s" d="M1292 226Q1292 252 1318 252Q1292 252 1292 278Q1292 252 1266 252Q1292 252 1292 226Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.0s" d="M1255 514Q1255 540 1281 540Q1255 540 1255 566Q1255 540 1229 540Q1255 540 1255 514Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:0.6s" d="M1004 592Q1004 618 1030 618Q1004 618 1004 644Q1004 618 978 618Q1004 618 1004 592Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:2.7s" d="M1405 442Q1405 468 1431 468Q1405 468 1405 494Q1405 468 1379 468Q1405 468 1405 442Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:1.6s" d="M822 444Q822 470 848 470Q822 470 822 496Q822 470 796 470Q822 470 822 444Z" filter="url(#obi-spark)"/><path class="fx-twinkle" style="animation-delay:3.1s" d="M640 156Q640 182 666 182Q640 182 640 208Q640 182 614 182Q640 182 640 156Z" filter="url(#obi-spark)"/><g class="fx-awake"><ellipse class="fx-lid" cx="978" cy="442" rx="38" ry="44"/><path class="fx-shut" d="M948 446Q978 470 1008 446"/><ellipse class="fx-lid" cx="1108" cy="450" rx="41" ry="42"/><path class="fx-shut" d="M1075 454Q1108 477 1141 454"/></g><g class="fx-sleep"><g class="fx-zzz"><text class="fx-z" x="1248" y="420">z</text><text class="fx-z" x="1282" y="388" style="animation-delay:1.1s">z</text><text class="fx-z" x="1320" y="350" style="animation-delay:2.2s">Z</text></g><g class="fx-sleepy"><ellipse cx="978" cy="452" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye0"><ellipse cx="978" cy="452" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye0)"><ellipse cx="978" cy="452" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="978" cy="457" rx="23" ry="23" fill="#08133a"/><circle cx="986" cy="453" r="6" fill="#ffffff"/><rect x="938" y="412" width="80" height="38" fill="#071a52"/></g><path d="M944 451Q978 443 1012 451" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/><ellipse cx="1111" cy="462" rx="44" ry="26" fill="#071a52"/><clipPath id="obi-eye1"><ellipse cx="1111" cy="462" rx="33" ry="30"/></clipPath><g clip-path="url(#obi-eye1)"><ellipse cx="1111" cy="462" rx="33" ry="30" fill="#36dbe8"/><ellipse cx="1111" cy="467" rx="23" ry="23" fill="#08133a"/><circle cx="1119" cy="463" r="6" fill="#ffffff"/><rect x="1071" y="422" width="80" height="38" fill="#071a52"/></g><path d="M1077 461Q1111 453 1145 461" fill="none" stroke="#3fe6f0" stroke-width="7" stroke-linecap="round"/></g></g></svg></div><div class="orbit-greeting"><span>안녕하세요,</span><h1>오늘도 오비와 함께 <span aria-hidden="true">🪐</span></h1><p>작은 투자가 만드는 더 나은 오늘, 자동으로 차곡차곡</p></div><section class="orbit-networth" id="orbit-assets" aria-labelledby="live-total-title"><div><h2 id="live-total-title">내 자산 <a class="orbit-eye" href="/live?amounts=hide" aria-label="금액 숨기기" title="금액 숨기기"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+  <circle cx="12" cy="12" r="3" />
+</svg><span>숨기기</span></a></h2><strong data-live="total" class="orbit-total">225,900<small>원</small></strong></div><div><span>기준 금액</span><b data-live="base">234,550원</b></div><div><span>평가 차액</span><strong data-live="change"><span class="neg"><b>-8,650원</b><small>-3.69%</small></span></strong><small class="orbit-caution">ⓘ 확정 수익 아님</small></div><p class="orbit-updated" data-live="updated">장부 업데이트 10/09 21:00 · 시세 업데이트 10/09 22:00</p></section><button type="button" class="orbit-help-card" popovertarget="orbit-guide"><b><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" />
+</svg> 화면 읽는 법 <svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="m9 18 6-6-6-6" />
+</svg></b><span>이 화면에서<br>무엇을 볼 수 있나요?</span></button></section><details class="orbit-alert" id="orbit-attention"><summary><span class="orbit-alert-mark">!</span><b>먼저 확인해 주세요 · <span>체결 확인 대기 1건</span></b><span class="orbit-alert-copy">Deneb · SCHD 3주 · 지정가 $34.00</span><span class="orbit-chevron">›</span></summary><div>Deneb · SCHD 3주 · 지정가 $34.00<p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></details><section popover="auto" class="orbit-popover" id="orbit-status" role="dialog" aria-labelledby="orbit-status-title"><header><h2 id="orbit-status-title">확인할 사항</h2><button type="button" class="orbit-close" popovertarget="orbit-status" popovertargetaction="hide" aria-label="확인할 사항 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div data-live="status"><p>체결 확인 대기 1건</p><p>Deneb · SCHD 3주 · 지정가 $34.00</p></div><p>주문 접수 ≠ 체결 완료. 프로그램의 현재 가동 여부를 확정하지 않습니다.</p></div></section><section popover="auto" class="orbit-popover" id="orbit-accounts" role="dialog" aria-labelledby="orbit-accounts-title"><header><h2 id="orbit-accounts-title">연결 계좌</h2><button type="button" class="orbit-close" popovertarget="orbit-accounts" popovertargetaction="hide" aria-label="연결 계좌 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><ul class="orbit-accounts-list" data-live="accounts"><li><div><b>Deneb</b><small>토스증권 · 미국 주식</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>Vega</b><small>업비트 · 코인</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li><li><div><b>자동 적립</b><small>토스증권 · 주식 모으기</small></div><span class="orbit-trade-state state-done">마지막 조회 성공 · 10/09 21:00</span></li></ul><p>‘마지막 조회 성공’은 매매 프로그램이 계좌를 조회한 뒤 장부를 저장한 시각입니다. 이 화면은 계좌를 새로 조회하지 않고 저장 장부만 표시합니다. 계좌번호·API 키는 표시하지 않습니다.</p></div></section><div class="orbit-cards-tools"><a class="orbit-detail-toggle" href="/live?detail=open" aria-expanded="false">상세 보기<span aria-hidden="true">⌄</span></a></div><div class="orbit-cards"><section id="live-book-0" class="orbit-card orbit-deneb"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><h2>미국 주식</h2><span>Deneb</span></div></div><div class="orbit-card-summary" data-live="card-deneb-summary"><div><strong>117,000<span>원</span></strong><p><span class="neg"><b>-13,000원</b><small>-10.00%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-deneb-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-deneb-0" aria-label="TQQQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ</b><small>ProShares UltraPro QQQ</small></div></div><div class="orbit-holding-value"><b>104,000원</b><small><span class="neg"><b>-6,500원</b><small>-5.88%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-deneb-0" role="dialog" aria-labelledby="orbit-h-deneb-0-title"><header><h2 id="orbit-h-deneb-0-title">TQQQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-deneb-0" popovertargetaction="hide" aria-label="TQQQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-deneb-0"><dt>보유 수량</dt><dd>1주</dd><dt>평균 매입단가</dt><dd>110,500원</dd><dt>현재 가격</dt><dd>104,000원</dd><dt>현재 가격 (달러)</dt><dd>$80.00</dd><dt>평가금액</dt><dd>104,000원</dd><dt>평가손익</dt><dd><span class="neg"><b>-6,500원</b><small>-5.88%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-deneb-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>13,000원</b><small>남은 달러 $10.00</small></div><div class="orbit-dt-tile"><span>이번 달 납입</span><b>130,000원</b><small>10월 첫 거래일</small></div><div class="orbit-dt-tile"><span>TQQQ 목표 비중</span><b>60%</b></div><div class="orbit-dt-tile"><span>급락 브레이크</span><b class="ok">안 걸림</b><small>고점 −15%⁠면 절반 팖</small></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.8889 0 0;background:#378ADD"></span><span style="flex:0.1111 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#378ADD"></i>TQQQ 89%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 11%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>TQQQ</td><td>1주</td><td>$85.00</td><td>$80.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:89%;background:#378ADD"></i><u style="left:60%"></u></span><em class="warn">89 / 60%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">다음 매수 11월 첫 거래일</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-1" class="orbit-card orbit-vega"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48" />
+  <path d="M15 6h1v4" />
+  <path d="m6.134 14.768.866-.5 2 3.464" />
+  <circle cx="16" cy="8" r="6" />
+</svg></span><div><h2>코인</h2><span>Vega</span></div></div><div class="orbit-card-summary" data-live="card-vega-summary"><div><strong>105,000<span>원</span></strong><p><span class="pos"><b>+5,000원</b><small>+5.00%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-vega-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-vega-0" aria-label="BTC 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC</b><small>비트코인</small></div></div><div class="orbit-holding-value"><b>55,000원</b><small><span class="pos"><b>+4,975원</b><small>+9.95%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-vega-0" role="dialog" aria-labelledby="orbit-h-vega-0-title"><header><h2 id="orbit-h-vega-0-title">BTC 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-vega-0" popovertargetaction="hide" aria-label="BTC 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-vega-0"><dt>보유 수량</dt><dd>0.0005</dd><dt>평균 매입단가</dt><dd>100,050,000원</dd><dt>현재 가격</dt><dd>110,000,000원</dd><dt>평가금액</dt><dd>55,000원</dd><dt>평가손익</dt><dd><span class="pos"><b>+4,975원</b><small>+9.95%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd><dt>메모</dt><dd>🟢 추세 켜짐 · 목표 50%</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-vega-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>현금</span><b>50,000원</b><small>남은 돈</small></div><div class="orbit-dt-tile"><span>사는 중인 코인</span><b class="ok">1 / 3개</b></div><div class="orbit-dt-tile"><span>최고점 기준</span><b>−0.0%</b><small>−30%⁠면 매수 멈춤</small></div><div class="orbit-dt-tile"><span>매수</span><b class="ok">하는 중</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:0.5238 0 0;background:#EF9F27"></span><span style="flex:0.4762 0 0;background:var(--dt-cash)"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#EF9F27"></i>BTC 52%</span><span><i class="orbit-dt-dot" style="background:var(--dt-cash)"></i>현금 48%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 · 세로선 = 목표)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중 / 목표</th></tr><tr><td>BTC</td><td>0.0005</td><td>100,050,000</td><td>110,000,000</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:52%;background:#EF9F27"></i><u style="left:50%"></u></span><em>52 / 50%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 09:05 판단</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section><section id="live-book-2" class="orbit-card orbit-accumulate"><div class="orbit-card-heading"><span class="orbit-category-icon"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><h2>자동 적립</h2><span>자동 적립</span></div></div><div class="orbit-card-summary" data-live="card-accumulate-summary"><div><strong>3,900<span>원</span></strong><p><span class="neg"><b>-650원</b><small>-14.29%</small></span></p><p class="orbit-card-stamp">장부 업데이트 10/09 21:00</p></div><div class="orbit-spark-empty" aria-label="평가 기록 대기">평가 기록 대기</div></div><div class="orbit-row-label"><span>보유 종목 (1개)</span><span>평가금액</span></div><ul class="orbit-holdings" data-live="card-accumulate-holdings"><li><button type="button" class="orbit-holding-btn" popovertarget="orbit-h-accumulate-0" aria-label="BTQ 보유 상세 열기"><div class="orbit-holding-name"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ</b><small>BTQ</small></div></div><div class="orbit-holding-value"><b>3,900원</b><small><span class="neg"><b>-650원</b><small>-14.29%</small></span></small></div></button></li></ul><section popover="auto" class="orbit-popover" id="orbit-h-accumulate-0" role="dialog" aria-labelledby="orbit-h-accumulate-0-title"><header><h2 id="orbit-h-accumulate-0-title">BTQ 보유 상세</h2><button type="button" class="orbit-close" popovertarget="orbit-h-accumulate-0" popovertargetaction="hide" aria-label="BTQ 보유 상세 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><dl class="orbit-detail-list" data-live="orbit-h-accumulate-0"><dt>보유 수량</dt><dd>1주</dd><dt>평균 매입단가</dt><dd>4,550원</dd><dt>현재 가격</dt><dd>3,900원</dd><dt>현재 가격 (달러)</dt><dd>$3.00</dd><dt>평가금액</dt><dd>3,900원</dd><dt>평가손익</dt><dd><span class="neg"><b>-650원</b><small>-14.29%</small></span></dd><dt>가격 기준</dt><dd>10/09 22:00</dd></dl><p class='orbit-detail-foot'>장부 기준 · 세금 전 · 주문 기능 없음</p></div></section><div class="orbit-dt orbit-book-detail" data-live="card-accumulate-detail" hidden><div class="orbit-dt-tiles"><div class="orbit-dt-tile"><span>넣은 원가</span><b>4,550원</b><small>적립 매입원가</small></div><div class="orbit-dt-tile"><span>적립 종목</span><b>1개</b></div><div class="orbit-dt-tile"><span>현금</span><b>0원</b></div><div class="orbit-dt-tile"><span>마지막 적립</span><b>10/08</b></div></div><p class="orbit-dt-sec">지금 구성</p><div class="orbit-dt-bar"><span style="flex:1.0000 0 0;background:#D4537E"></span></div><div class="orbit-dt-legend"><span><i class="orbit-dt-dot" style="background:#D4537E"></i>BTQ 100%</span></div><p class="orbit-dt-sec">종목별 (막대 = 지금 비중)</p><table class="orbit-dt-table"><colgroup><col style="width:14%"><col style="width:20%"><col style="width:19%"><col style="width:19%"><col style="width:28%"></colgroup><tr><th>종목</th><th>수량</th><th>평균 단가</th><th>현재가</th><th>비중</th></tr><tr><td>BTQ</td><td>1주</td><td>$3.50</td><td>$3.00</td><td><div class="orbit-dt-wt"><span class="orbit-dt-gauge"><i style="width:100%;background:#D4537E"></i></span><em>100%</em></div></td></tr></table><div class="orbit-dt-bottom"><span class="orbit-dt-chip">매일 적립 · 토스 주식 모으기</span><span class="orbit-dt-foot">장부 기준 · 세금 전 · 평가액</span></div></div></section></div><div class="orbit-bottom"><section class="orbit-panel orbit-history"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg>자산 변화</h2><div class="orbit-views" role="group" aria-label="그래프 종류"><label><input type="radio" name="orbit-view" value="asset" checked><span>자산 변화</span></label><label><input type="radio" name="orbit-view" value="perf" ><span>투자 성과</span></label></div><div class="orbit-periods" role="group" aria-label="자산 변화 표시 기간"><label><input type="radio" name="orbit-range" value="w1" ><span>1주</span></label><label><input type="radio" name="orbit-range" value="m1" checked><span>1개월</span></label><label><input type="radio" name="orbit-range" value="m3" ><span>3개월</span></label><label><input type="radio" name="orbit-range" value="m6" ><span>6개월</span></label><label><input type="radio" name="orbit-range" value="y1" ><span>1년</span></label></div></div><div data-live="history"><div class="orbit-chart-empty"><span>평가 기록 대기</span><p>하루 한 번 남기는 실거래 평가 기록이 2일 이상 쌓이면 그래프가 그려집니다.</p></div></div><p class="orbit-chart-note">실거래 장부만 표시 · 하루 한 번 남긴 평가 기록만 · 기록 없는 과거는 채우지 않음 · 자산 변화 = 입금으로 늘어난 금액 포함 · 투자 성과 = 입출금 영향 뺀 수익률</p></section><section class="orbit-panel orbit-recent" id="orbit-recent"><div class="orbit-panel-heading"><h2><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M16 22h2a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v2.85" />
+  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+  <path d="M8 14v2.2l1.6 1" />
+  <circle cx="8" cy="16" r="6" />
+</svg>거래 내역 <small>(최근 5건)</small></h2><button type="button" class="orbit-all-trades" popovertarget="orbit-all-trades">전체 보기 ›</button><section popover="auto" class="orbit-popover" id="orbit-all-trades" role="dialog" aria-labelledby="orbit-all-trades-title"><header><h2 id="orbit-all-trades-title">거래 내역</h2><button type="button" class="orbit-close" popovertarget="orbit-all-trades" popovertargetaction="hide" aria-label="거래 내역 닫기" autofocus><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg></button></header><div class="orbit-popover-body"><div class="orbit-trade-filter" role="group" aria-label="거래 종류"><label><input type="radio" name="orbit-trade-filter" id="tf-all" value="all" checked><span>전체</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-buy" value="buy" ><span>매수</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-sell" value="sell" ><span>매도</span></label><label><input type="radio" name="orbit-trade-filter" id="tf-deposit" value="deposit" ><span>입금</span></label></div><ul class="orbit-trades-list" data-live="trades-all"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 130,000원</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 1주</b><small>2026-10-09 · 체결가 $85.00 · 금액 $85.00</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 3주</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 100,000원</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 0.0005</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 50,000원 · 수수료 25원</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-btq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="1" />
+  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z" />
+  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z" />
+</svg></span><div><b>BTQ 매수 1주</b><small>2026-10-08 · 체결가 $3.50 · 금액 $3.50 · 1,300.0원/$</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-sell orbit-trade-empty">매도 기록이 아직 없습니다.</li></ul></div></section></div><ul data-live="trades-recent"><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 130,000원</b><small>2026-10-09 · $100.00 환전 · 1,300.0원/$</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-tqqq"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 16v5" />
+  <path d="M16 14.639V21" />
+  <path d="M20 10.656V21" />
+  <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" />
+  <path d="M4 18.463V21" />
+  <path d="M8 14.656V21" />
+</svg></span><div><b>TQQQ 매수 1주</b><small>2026-10-09 · 체결가 $85.00 · 금액 $85.00</small></div><span class="orbit-trade-state state-done">체결</span></li><li class="kind-buy"><span class="orbit-coin coin-schd"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+  <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+  <path d="M5 21h14" />
+</svg></span><div><b>SCHD 매수 3주</b><small>2026-10-09 · 가격 $34.00 · 지정가 $34.00</small></div><span class="orbit-trade-state state-wait">접수 · 체결 확인 대기</span></li><li class="kind-deposit"><span class="orbit-coin coin-other"><svg class="orbit-icon" viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+  <path d="M12 18V6" />
+</svg></span><div><b>입금 100,000원</b><small>2026-10-08</small></div><span class="orbit-trade-state state-deposit">입금 기록</span></li><li class="kind-buy"><span class="orbit-coin coin-btc"><img src="/assets/icons/btc.svg" alt="" aria-hidden="true" width="38" height="38"></span><div><b>BTC 매수 0.0005</b><small>2026-10-08 · 체결가 100,000,000원 · 금액 50,000원 · 수수료 25원</small></div><span class="orbit-trade-state state-done">체결</span></li></ul></section></div></main></body></html>
