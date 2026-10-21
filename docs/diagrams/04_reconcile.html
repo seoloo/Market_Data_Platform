@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 44px 1fr 44px 1.25fr; align-items: center; }
+  .col { display: flex; flex-direction: column; gap: 14px; }
+  .causes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .cause { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .cause b { font-size: 13px; display: block; }
+  .cause span { font-size: 12px; color: var(--ink-soft); }
+  .bottom { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-top: 18px; }
+  .eq { font-size: 13px; color: var(--ink); background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 8px; line-height: 1.7; }
+</style></head>
+<body><div class="figure">
+
+  <div class="head">
+    <div>
+      <h1>스트림 봉 = 배치 봉 대사 — 끊겨도 정확히 알아채고 메운다</h1>
+      <p>PC가 항상 켜져 있지 않으니 스트림은 반드시 끊긴다. 그래서 목표는 '24시간 무중단'이 아니라 '빈 곳을 정확히 찾아 메우기'다.</p>
+    </div>
+    <span class="badge plan">계획 · 구현 전</span>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <div class="box stream"><span class="tag">스트림</span><h3>D일 스트림 1분봉</h3><p>Kafka → 실시간 집계<br>워터마크 지난 봉만 확정</p></div>
+      <div class="box silver"><span class="tag">배치</span><h3>D일 배치 1분봉</h3><p>Silver 체결 표(일 파일) →<br>스트림과 <b>같은 계산 함수</b></p></div>
+    </div>
+
+    <div class="arrow"><svg width="40" height="120"><path d="M2 24 C 20 24, 20 60, 34 60" fill="none" stroke="#8a8f98" stroke-width="2"/><path d="M2 96 C 20 96, 20 60, 34 60" fill="none" stroke="#8a8f98" stroke-width="2"/><path d="M29 55l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+
+    <div class="box plain">
+      <span class="tag">분마다 비교</span>
+      <h3>완전히 같아야 한다</h3>
+      <div class="eq">시가 · 고가 · 저가 · 종가 = 정확히 같음<br>거래량 · 공격 매수량 = 소수점까지 같음<br>체결 수 = (마지막 번호 − 첫 번호 + 1) 합</div>
+    </div>
+
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+
+    <div class="col">
+      <div class="box okbox"><span class="tag">일치</span><h3>그대로 확정</h3><p>하루 일치율을 신선도와 함께 기록</p></div>
+      <div class="box badbox"><span class="tag">불일치 → 원인 나누기</span>
+        <div class="causes">
+          <div class="cause"><b>스트림 빈 곳</b><span>체결 번호가 끊김 · PC 잠듦</span></div>
+          <div class="cause"><b>늦게 도착</b><span>워터마크 뒤에 온 체결</span></div>
+          <div class="cause"><b>중복</b><span>재연결 때 같은 체결 두 번</span></div>
+          <div class="cause"><b>기타</b><span>원인 미상 · 사람이 확인</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="box"><h3><span class="pill ok">✓</span>메우기</h3><p>빈 곳은 '미완성'으로 표시해 두고, 바이낸스 일 파일이 나오면 배치로 다시 계산해 바꿔 넣는다. 바꾼 기록은 Delta 버전으로 남는다.</p></div>
+    <div class="box"><h3><span class="pill ink">!</span>공식 1분봉은 참고용</h3><p>공식 봉과는 분 경계 체결 배정이 달라 정확히 맞지 않는다. 연구 216에서 하루 1,440분 중 1,110분만 정확히 일치했다(합계는 같음).</p></div>
+  </div>
+
+  <div class="foot"><span>Market Data Platform · 그림 4 · 스트림 · 배치 대사</span><span>근거: docs/research/216 §4.2 · scripts/paper_watchdog.py (PC가 꺼지는 시간)</span></div>
+</div></body></html>

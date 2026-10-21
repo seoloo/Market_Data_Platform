@@ -1,0 +1,97 @@
+/* Market Data Platform 흐름도 공통 스타일 — README 그림이 한 벌처럼 보이게 */
+:root {
+  --ink: #1b2333;        /* 본문 글자 (기존 README 그림과 같은 남색) */
+  --ink-soft: #5b6475;   /* 설명 글자 */
+  --line: #d9dee7;       /* 테두리 */
+  --paper: #ffffff;
+  --wash: #f6f8fb;       /* 구역 배경 */
+
+  --bronze: #b46a2a;  --bronze-wash: #fbf1e7;
+  --silver: #5f6f86;  --silver-wash: #eef2f7;
+  --gold:   #b88a12;  --gold-wash:   #fbf5e2;
+  --stream: #3b5bdb;  --stream-wash: #edf1fd;
+  --ok:     #1f8a5b;  --ok-wash:     #e8f5ee;
+  --warn:   #d48a1c;  --warn-wash:   #fdf3e3;
+  --bad:    #c2453d;  --bad-wash:    #fbecea;
+  --muted:  #8a8f98;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  width: 1200px;
+  word-break: keep-all;   /* 한국어를 단어 중간에서 줄바꿈하지 않는다 */
+  -webkit-font-smoothing: antialiased;
+}
+
+.figure { padding: 36px 44px 28px; }
+
+/* 머리: 제목 · 한 줄 설명 · 상태 배지 */
+.head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; }
+.head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.3px; }
+.head p  { font-size: 15px; color: var(--ink-soft); margin-top: 6px; }
+.badge {
+  font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+  white-space: nowrap; border: 1.5px solid currentColor;
+}
+.badge.done { color: var(--ok); background: var(--ok-wash); }
+.badge.plan { color: var(--silver); background: var(--silver-wash); }
+
+/* 상자 */
+.box {
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 14px 16px;
+}
+.box h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 4px; }
+.box p, .box li { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+.box ul { list-style: none; }
+.box li::before { content: "·"; margin-right: 6px; color: var(--muted); }
+.tag {
+  display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px;
+  border-radius: 6px; margin-bottom: 8px; letter-spacing: 0.2px;
+}
+
+/* 계층 색 */
+.bronze { border-color: var(--bronze); background: var(--bronze-wash); }
+.bronze .tag { background: var(--bronze); color: #fff; }
+.silver { border-color: var(--silver); background: var(--silver-wash); }
+.silver .tag { background: var(--silver); color: #fff; }
+.gold   { border-color: var(--gold); background: var(--gold-wash); }
+.gold .tag { background: var(--gold); color: #fff; }
+.stream { border-color: var(--stream); background: var(--stream-wash); }
+.stream .tag { background: var(--stream); color: #fff; }
+.okbox  { border-color: var(--ok); background: var(--ok-wash); }
+.okbox .tag { background: var(--ok); color: #fff; }
+.badbox { border-color: var(--bad); background: var(--bad-wash); }
+.badbox .tag { background: var(--bad); color: #fff; }
+.plain .tag { background: var(--ink); color: #fff; }
+
+/* 화살표 */
+.arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.arrow svg { display: block; }
+.arrow-label { font-size: 11.5px; color: var(--ink-soft); text-align: center; margin-top: 2px; }
+
+/* 구역 */
+.lane {
+  background: var(--wash); border-radius: 16px; padding: 16px 18px; position: relative;
+}
+.lane-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin-bottom: 12px; letter-spacing: 0.3px; }
+
+/* 번호 알약 */
+.pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700;
+  color: #fff; background: var(--bad); margin-right: 8px; flex: none;
+}
+.pill.ok { background: var(--ok); }
+.pill.ink { background: var(--ink); }
+
+/* 꼬리말 */
+.foot {
+  display: flex; justify-content: space-between; margin-top: 22px; padding-top: 12px;
+  border-top: 1px solid var(--line); font-size: 12px; color: var(--muted);
+}
+.num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
