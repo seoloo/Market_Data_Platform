@@ -1,6 +1,7 @@
-"""과거 캔들 백필.
+"""과거 캔들 백필 — 공개 아카이브에서 월 · 일 단위 zip 을 받아 ``candles`` 표에 넣는다.
 
-공개 아카이브에서 월/일 단위로 받아 DB 에 적재한다 (08-external-apis.md §2).
+언제 쓰나: 사람이 연구 전에 ``scripts/backfill.py`` 로 직접 실행한다 (예약 작업 없음).
+읽고 쓰는 것: data.binance.vision 의 봉 zip (읽기) → ``candles`` 표 (쓰기, 저장소 upsert).
 
 설계 요점:
 
@@ -39,19 +40,24 @@ DEFAULT_START = date(2019, 9, 8)
 
 
 def _to_date(ms: int) -> date:
+    """[쓰임] epoch 밀리초 → UTC 날짜."""
     return datetime.fromtimestamp(ms / 1000, tz=UTC).date()
 
 
 def _to_ms(day: date) -> int:
+    """[쓰임] UTC 날짜 → 그날 00:00 의 epoch 밀리초."""
     return int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp() * 1000)
 
 
 def _first_of_next_month(day: date) -> date:
+    """[쓰임] 다음 달 1 일 ('28 일 + 4 일' 은 어느 달이든 다음 달에 들어간다)."""
     return (day.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 
 @dataclass(frozen=True, slots=True)
 class BackfillPlan:
+    """받을 파일 목록 — 한 종목 · 한 타임프레임, 이어 받기 시작점."""
+
     symbol: str
     timeframe: Timeframe
     files: tuple[ArchiveFile, ...]
@@ -79,9 +85,11 @@ class BackfillResult:
 
     @property
     def ok(self) -> bool:
+        """[쓰임] 오류가 하나도 없으면 True (파일 없음은 오류가 아니라 '누락' 으로 따로 센다)."""
         return not self.errors
 
     def summary(self) -> str:
+        """[쓰임] 사람이 읽는 한 줄 요약 — 예 ``[OK] BTCUSDT 1m: 3/3 파일, 1,234봉``."""
         status = "OK" if self.ok else f"오류 {len(self.errors)}건"
         return (
             f"[{status}] {self.symbol} {self.timeframe.value}: "
@@ -99,11 +107,10 @@ def plan_archive_files(
     *,
     resume_from: date | None = None,
 ) -> BackfillPlan:
-    """받아야 할 아카이브 파일 목록을 만든다.
-
-    완료된 달은 월별 파일로, ``end`` 가 속한 달은 일별 파일로 계획한다.
-    월별 아카이브는 그 달이 끝나야 생성되기 때문이다.
-    """
+    """[쓰임] 받아야 할 아카이브 파일 목록을 만든다 — 끝난 달은 월 파일, ``end`` 가 속한 달은 일
+              파일.
+    [이유] 월별 아카이브는 그 달이 끝나야 생성되기 때문이다. ``resume_from`` 이 있으면 그 날 이전은
+           계획하지 않는다."""
     effective_start = max(start, resume_from) if resume_from is not None else start
     if effective_start > end:
         return BackfillPlan(symbol, timeframe, (), resume_from)
@@ -141,7 +148,7 @@ def plan_archive_files(
 
 
 class Backfiller:
-    """아카이브 → DB 적재 오케스트레이터."""
+    """아카이브 → DB 적재를 차례로 진행하는 실행기 (받기는 클라이언트, 저장은 저장소에 맡긴다)."""
 
     __slots__ = ("_client", "_repo", "verify_checksum")
 
@@ -157,13 +164,11 @@ class Backfiller:
         self.verify_checksum = verify_checksum
 
     def resume_point(self, symbol: str, timeframe: Timeframe) -> date | None:
-        """이미 받은 마지막 봉이 속한 **달의 1일**.
-
-        마지막 봉의 다음 날부터 받지 않고 그 달을 통째로 다시 받는 이유:
-        월별 아카이브는 달 단위로만 제공되고, upsert 이므로 재적재가 안전하다.
-        """
-        last = self._repo.last_open_ms(symbol, timeframe)
-        return None if last is None else _to_date(last).replace(day=1)
+        """[쓰임] 이어 받을 시작점 — 이미 받은 마지막 봉이 속한 **달의 1 일** (없으면 None).
+        [이유] 마지막 봉 다음 날이 아니라 그 달을 통째로 다시 받는다. 월별 아카이브는 달 단위로만
+               제공되고, upsert 라 다시 넣어도 안전하다."""
+        last_open_ms = self._repo.last_open_ms(symbol, timeframe)
+        return None if last_open_ms is None else _to_date(last_open_ms).replace(day=1)
 
     def run(
         self,
@@ -176,7 +181,9 @@ class Backfiller:
         resume: bool = True,
         progress: Callable[[ArchiveFile, int], None] | None = None,
     ) -> BackfillResult:
-        """계획을 세우고 순서대로 적재한다."""
+        """[쓰임] 계획을 세우고 파일마다 받기 → 저장을 차례로 한 뒤, 결과(받음 · 누락 · 오류)를
+                  돌려준다.
+        [이유] 한 파일이 실패해도 멈추지 않고 결과에 적는다 — 어디까지 됐는지 한눈에 보이게."""
         result = BackfillResult(symbol=symbol, timeframe=timeframe)
         resume_from = self.resume_point(symbol, timeframe) if resume else None
         plan = plan_archive_files(symbol, timeframe, start, end, resume_from=resume_from)
@@ -219,7 +226,7 @@ class Backfiller:
         ingested_ms: int,
         resume: bool = True,
     ) -> list[BackfillResult]:
-        """여러 타임프레임을 순서대로 백필한다."""
+        """[쓰임] 여러 타임프레임을 순서대로 :meth:`run` 하고 결과 목록을 돌려준다."""
         return [
             self.run(
                 symbol,
@@ -240,6 +247,7 @@ class Backfiller:
         *,
         ingested_ms: int,
     ) -> int:
+        """[쓰임] 받은 봉을 출처 ``bulk`` 로 저장하고 저장한 개수를 돌려준다 (빈 파일이면 0)."""
         if not candles:
             return 0
         return self._repo.upsert_many(

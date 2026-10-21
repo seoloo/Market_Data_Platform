@@ -1,4 +1,7 @@
-"""시장 데이터 무결성 검증.
+"""시장 데이터 무결성 검증 — 빈 봉 · 재집계 불일치 · 이상한 가격과 거래량을 찾아 보고서로 모은다.
+
+언제 쓰나: ``scripts/backfill.py`` 가 백필 뒤 검사할 때 (사람이 직접 실행) — 연구에 쓰기 전 관문.
+읽고 쓰는 것: ``candles`` 표 (읽기만). 결과는 :class:`IntegrityReport` 로 돌려줄 뿐 저장하지 않는다.
 
 게이트 1 (10-roadmap.md) 의 마지막 항목이다:
 
@@ -41,6 +44,8 @@ _DAY_MS = 86_400_000
 
 
 class IssueKind(StrEnum):
+    """찾은 문제의 종류."""
+
     GAP = "gap"
     RESAMPLE_MISMATCH = "resample_mismatch"
     """원인이 규명되지 않은 불일치. 우리 집계 로직이나 데이터 사본의 문제를 뜻한다."""
@@ -56,6 +61,8 @@ class IssueKind(StrEnum):
 
 
 class Severity(StrEnum):
+    """심각도 — ``critical`` 이 하나라도 있으면 보고서가 통과하지 못한다."""
+
     INFO = "info"
     WARN = "warn"
     CRITICAL = "critical"
@@ -63,6 +70,8 @@ class Severity(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class IntegrityIssue:
+    """문제 하나 (종류 · 심각도 · 타임프레임 · 구간 · 사람이 읽는 설명)."""
+
     kind: IssueKind
     severity: Severity
     timeframe: Timeframe
@@ -104,34 +113,45 @@ class IntegrityReport:
     checked: dict[str, int] = field(default_factory=dict)
 
     def add(self, issue: IntegrityIssue) -> None:
+        """[쓰임] 문제 하나를 보고서에 더한다."""
         self.issues.append(issue)
 
     @property
     def ok(self) -> bool:
-        """critical 이 없으면 통과. warn 은 사람이 판단한다 (예: 거래소 점검 갭)."""
-        return not any(i.severity is Severity.CRITICAL for i in self.issues)
+        """[쓰임] critical 이 없으면 통과.
+        [이유] warn 은 사람이 판단한다 (예: 거래소 점검으로 실제로 봉이 없는 갭)."""
+        return not any(issue.severity is Severity.CRITICAL for issue in self.issues)
 
     @property
     def critical(self) -> list[IntegrityIssue]:
-        return [i for i in self.issues if i.severity is Severity.CRITICAL]
+        """[쓰임] critical 문제만 모아서."""
+        return [issue for issue in self.issues if issue.severity is Severity.CRITICAL]
 
     def by_kind(self, kind: IssueKind) -> list[IntegrityIssue]:
-        return [i for i in self.issues if i.kind is kind]
+        """[쓰임] 한 종류의 문제만 모아서."""
+        return [issue for issue in self.issues if issue.kind is kind]
 
     def summary(self) -> str:
+        """[쓰임] 사람이 읽는 한 줄 요약 — 문제가 없으면 검사한 봉 수, 있으면 종류별 건수."""
         if not self.issues:
-            checked = ", ".join(f"{tf}={n:,}봉" for tf, n in sorted(self.checked.items()))
+            checked = ", ".join(
+                f"{checked_name}={bar_count:,}봉"
+                for checked_name, bar_count in sorted(self.checked.items())
+            )
             return f"[OK] {self.symbol}: 문제 없음 ({checked})"
-        counts: dict[str, int] = {}
+        count_by_kind: dict[str, int] = {}
         for issue in self.issues:
-            counts[issue.kind.value] = counts.get(issue.kind.value, 0) + 1
-        detail = ", ".join(f"{k} {v}건" for k, v in sorted(counts.items()))
+            count_by_kind[issue.kind.value] = count_by_kind.get(issue.kind.value, 0) + 1
+        detail = ", ".join(
+            f"{kind_name} {issue_count}건"
+            for kind_name, issue_count in sorted(count_by_kind.items())
+        )
         status = "OK(warn)" if self.ok else f"CRITICAL {len(self.critical)}건"
         return f"[{status}] {self.symbol}: {detail}"
 
 
 class IntegrityChecker:
-    """캔들 데이터 무결성 검증기."""
+    """캔들 데이터 무결성 검증기 — 갭 · 재집계 대조 · 이상치 세 가지 검사를 한다."""
 
     __slots__ = ("_repo", "thresholds")
 
@@ -155,11 +175,9 @@ class IntegrityChecker:
         from_ms: int | None = None,
         to_ms: int | None = None,
     ) -> None:
-        """결측 구간을 찾아 보고한다.
-
-        갭 자체가 곧 실패는 아니다 — 거래소 점검으로 실제로 봉이 없을 수 있다.
-        긴 갭만 critical 로 올리고, 나머지는 사람이 판단하도록 warn 으로 남긴다.
-        """
+        """[쓰임] 빠진 봉 구간을 찾아 보고서에 더한다 — 4 시간 이상이면 critical, 짧으면 warn.
+        [이유] 갭 자체가 곧 실패는 아니다 — 거래소 점검으로 실제로 봉이 없을 수 있다. 긴 갭만
+               critical 로 올리고, 나머지는 사람이 판단하도록 warn 으로 남긴다."""
         gaps = self._repo.find_gaps(symbol, timeframe, from_ms=from_ms, to_ms=to_ms)
         for gap in gaps:
             span_ms = gap.missing_to_ms - gap.missing_from_ms + timeframe.ms
@@ -189,13 +207,13 @@ class IntegrityChecker:
         from_ms: int | None = None,
         to_ms: int | None = None,
     ) -> None:
-        """1m 을 합친 값과 거래소가 준 상위 TF 원본을 대조한다.
-
-        둘 다 같은 체결 스트림에서 나오므로 **정확히 일치해야 한다.**
-        불일치는 데이터 오염이거나 우리 집계 로직 버그라는 뜻이다.
-        """
+        """[쓰임] 1m 을 합친 값과 거래소가 준 상위 봉(``target``)을 봉마다 대조하고, 다른 곳은
+                  원인까지 적는다.
+        [이유] 둘 다 같은 체결 스트림에서 나오므로 **정확히 일치해야 한다.** 원인이 설명되지 않는
+               불일치는 데이터 오염이거나 우리 집계 로직 버그라는 뜻이라 critical 로 올린다."""
+        # 1 단계: 대조할 원본 상위 봉 · 1m 봉 읽기 (없으면 경고만 남기고 끝)
         target_rows = self._repo.get_range(symbol, target, from_ms=from_ms, to_ms=to_ms)
-        stored = {c.open_ms: c for c in target_rows}
+        stored = {candle.open_ms: candle for candle in target_rows}
         if not stored:
             report.add(
                 IntegrityIssue(
@@ -223,10 +241,11 @@ class IntegrityChecker:
             )
             return
 
+        # 2 단계: 1m 을 합쳐 봉마다 원본과 비교 · 원인 분류 (종류별로 상위 N 건만 자세히)
         buckets = bucket_candles(source_candles, target)
         derived = resample_candles(source_candles, source, target, require_complete=True)
         compared = 0
-        counts: dict[IssueKind, int] = {}
+        count_by_kind: dict[IssueKind, int] = {}
 
         for candle in derived:
             original = stored.get(candle.open_ms)
@@ -238,9 +257,9 @@ class IntegrityChecker:
                 continue
 
             kind, cause = _classify(original, candle, buckets.get(candle.open_ms, []))
-            counts[kind] = counts.get(kind, 0) + 1
+            count_by_kind[kind] = count_by_kind.get(kind, 0) + 1
             severity = Severity.CRITICAL if kind is IssueKind.RESAMPLE_MISMATCH else Severity.WARN
-            if counts[kind] <= self.thresholds.max_reported_mismatches:
+            if count_by_kind[kind] <= self.thresholds.max_reported_mismatches:
                 report.add(
                     IntegrityIssue(
                         kind=kind,
@@ -252,8 +271,9 @@ class IntegrityChecker:
                     )
                 )
 
+        # 3 단계: 대조한 봉 수 기록 · 너무 많아 다 못 적은 종류는 합계 한 줄
         report.checked[f"{target.value}:resample"] = compared
-        for kind, total in counts.items():
+        for kind, total in count_by_kind.items():
             if total > self.thresholds.max_reported_mismatches:
                 report.add(
                     IntegrityIssue(
@@ -284,10 +304,10 @@ class IntegrityChecker:
         from_ms: int | None = None,
         to_ms: int | None = None,
     ) -> None:
-        """가격 스파이크, 정지된 가격, 거래량 0 구간을 찾는다.
-
-        OHLC 관계 위반은 :class:`Candle` 타입이 읽는 순간 막으므로 여기서 다루지 않는다.
-        """
+        """[쓰임] 가격 급등락 · 오래 멈춘 가격 · 거래량 0 이 이어지는 구간을 찾는다.
+        [이유] 수백만 봉을 한 번에 읽지 않고 ``chunk_days`` 일씩 나눠 읽는다(메모리). 창 경계에서도
+               '직전 봉' 과 '연속 개수' 를 이어 받아 같은 결과가 나온다. OHLC 관계 위반은
+               :class:`Candle` 타입이 읽는 순간 막으므로 여기서 다루지 않는다."""
         start = from_ms if from_ms is not None else self._repo.first_open_ms(symbol, timeframe)
         end = to_ms if to_ms is not None else self._repo.last_open_ms(symbol, timeframe)
         if start is None or end is None:
@@ -315,14 +335,14 @@ class IntegrityChecker:
             candles = self._repo.get_range(symbol, timeframe, from_ms=cursor, to_ms=window_end)
             for candle in candles:
                 total += 1
-                previous, flat_run, zero_volume_run = self._inspect(
+                previous, flat_run, zero_volume_run = self._inspect_candle(
                     candle, previous, flat_run, zero_volume_run, timeframe, report
                 )
             cursor = window_end + 1
 
         report.checked[timeframe.value] = total
 
-    def _inspect(
+    def _inspect_candle(
         self,
         candle: Candle,
         previous: Candle | None,
@@ -331,11 +351,14 @@ class IntegrityChecker:
         timeframe: Timeframe,
         report: IntegrityReport,
     ) -> tuple[Candle, int, int]:
-        t = self.thresholds
+        """[쓰임] 봉 하나를 직전 봉과 비교해 이상치를 보고서에 더하고, 다음 봉에 넘길 상태
+                  ``(이 봉, 같은 종가 연속 수, 거래량 0 연속 수)`` 를 돌려준다.
+        [이유] 연속 구간은 임계 개수가 되는 순간 한 번만 보고한다 — 같은 구간을 두 번 적지 않게."""
+        limits = self.thresholds
 
         if previous is not None:
             change = abs(safe_div(candle.close - previous.close, previous.close))
-            if change > t.price_spike_pct:
+            if change > limits.price_spike_pct:
                 report.add(
                     IntegrityIssue(
                         kind=IssueKind.PRICE_SPIKE,
@@ -345,12 +368,12 @@ class IntegrityChecker:
                         to_ms=candle.open_ms,
                         detail=(
                             f"종가 {previous.close} -> {candle.close} "
-                            f"({change:.1%} 변화, 임계 {t.price_spike_pct:.0%})"
+                            f"({change:.1%} 변화, 임계 {limits.price_spike_pct:.0%})"
                         ),
                     )
                 )
             flat_run = flat_run + 1 if candle.close == previous.close else 0
-            if flat_run == t.flat_price_bars:
+            if flat_run == limits.flat_price_bars:
                 report.add(
                     IntegrityIssue(
                         kind=IssueKind.FLAT_PRICE,
@@ -364,7 +387,7 @@ class IntegrityChecker:
 
         if candle.volume == ZERO:
             zero_volume_run += 1
-            if zero_volume_run == t.zero_volume_bars:
+            if zero_volume_run == limits.zero_volume_bars:
                 report.add(
                     IntegrityIssue(
                         kind=IssueKind.ZERO_VOLUME,
@@ -391,13 +414,10 @@ class IntegrityChecker:
         to_ms: int | None = None,
         resample_targets: Sequence[Timeframe] | None = None,
     ) -> IntegrityReport:
-        """게이트 1 검증 전체를 수행한다.
-
-        Args:
-            resample_targets: 1m 과 대조할 상위 TF. 기본은 ``timeframes`` 중 1m 의
-                정수배인 것들. 1d 는 1m 1440개가 모두 있어야 하므로 갭이 있으면
-                자연히 건너뛴다.
-        """
+        """[쓰임] 게이트 1 검증 전체 — 타임프레임마다 갭 · 이상치, 그다음 1m 과 상위 봉 대조.
+        [이유] ``resample_targets`` 기본값은 ``timeframes`` 중 1m 이 아닌 것들. 1d 는 1m 1440개가
+               모두 있어야 하므로 갭이 있으면 자연히 건너뛴다. 1m 이 검사 대상에 없으면 대조할 수
+               없어 경고를 남긴다."""
         report = IntegrityReport(symbol=symbol)
 
         for timeframe in timeframes:
@@ -407,7 +427,7 @@ class IntegrityChecker:
         targets = (
             resample_targets
             if resample_targets is not None
-            else [tf for tf in timeframes if tf is not Timeframe.M1]
+            else [timeframe for timeframe in timeframes if timeframe is not Timeframe.M1]
         )
         if Timeframe.M1 in timeframes:
             for target in targets:
@@ -435,26 +455,23 @@ _VOLUME_FIELDS = ("volume", "quote_volume", "trade_count")
 
 
 def _classify(original: Candle, derived: Candle, members: list[Candle]) -> tuple[IssueKind, str]:
-    """불일치의 **원인**을 규명한다.
-
-    게이트 기준은 "불일치 0건" 이 아니라 "**원인 미규명** 불일치 0건" 이다.
-    거래소의 1m 아카이브와 상위 TF 아카이브는 실제로 서로 어긋나는 구간이 있으므로
-    완전 일치는 달성 불가능한 요구다 (2026-09-21 실데이터 확인).
-
-    우리 집계 로직이나 데이터 사본의 문제라면 소수의 고립된 버킷이 아니라
-    전 구간에서 체계적으로 어긋난다. 그래서 아래 두 원인에 해당하지 않는 불일치만
-    CRITICAL 로 올린다.
-    """
-    has_filler = any(c.volume == ZERO for c in members)
-    price_differs = any(getattr(original, f) != getattr(derived, f) for f in _PRICE_FIELDS)
+    """[쓰임] 원본 봉과 합친 봉이 다를 때 그 **원인**을 정해 ``(종류, 설명)`` 으로 돌려준다.
+    [이유] 게이트 기준은 "불일치 0건" 이 아니라 "**원인 미규명** 불일치 0건" 이다. 거래소의 1m
+           아카이브와 상위 TF 아카이브는 실제로 서로 어긋나는 구간이 있으므로 완전 일치는 달성
+           불가능한 요구다 (2026-09-21 실데이터 확인). 우리 집계 로직이나 데이터 사본의 문제라면
+           소수의 고립된 버킷이 아니라 전 구간에서 체계적으로 어긋난다. 그래서 아래 두 원인에
+           해당하지 않는 불일치만 CRITICAL 로 올린다."""
+    has_filler = any(member.volume == ZERO for member in members)
+    price_differs = any(
+        getattr(original, field_name) != getattr(derived, field_name)
+        for field_name in _PRICE_FIELDS
+    )
 
     if has_filler and price_differs:
         # 1m 아카이브는 거래 없는 분을 직전가 O=H=L=C, volume=0 으로 채운다.
         # 상위 TF 는 실제 체결부터 시작하므로 open/low/high 가 어긋난다.
-        return (
-            IssueKind.SOURCE_FILLER_BAR,
-            f"1m 거래량0 채움봉 {sum(1 for c in members if c.volume == ZERO)}개로 인한 차이",
-        )
+        filler_count = sum(1 for member in members if member.volume == ZERO)
+        return (IssueKind.SOURCE_FILLER_BAR, f"1m 거래량0 채움봉 {filler_count}개로 인한 차이")
     if original.volume != derived.volume:
         direction = "상위TF 누락" if derived.volume > original.volume else "1m 누락"
         return (
@@ -467,13 +484,14 @@ def _classify(original: Candle, derived: Candle, members: list[Candle]) -> tuple
 
 
 def _compare(original: Candle, derived: Candle) -> list[str]:
-    """두 봉의 차이를 사람이 읽을 수 있는 문자열로 돌려준다."""
+    """[쓰임] 두 봉에서 값이 다른 칸을 ``"칸 원본=… 재집계=…"`` 글로 모아 돌려준다 (같으면 빈
+    목록)."""
     diffs: list[str] = []
     for field_name in ("open", "high", "low", "close", "volume", "quote_volume"):
-        a: Decimal = getattr(original, field_name)
-        b: Decimal = getattr(derived, field_name)
-        if a != b:
-            diffs.append(f"{field_name} 원본={a} 재집계={b}")
+        original_value: Decimal = getattr(original, field_name)
+        derived_value: Decimal = getattr(derived, field_name)
+        if original_value != derived_value:
+            diffs.append(f"{field_name} 원본={original_value} 재집계={derived_value}")
     if original.trade_count != derived.trade_count:
         diffs.append(f"trade_count 원본={original.trade_count} 재집계={derived.trade_count}")
     return diffs

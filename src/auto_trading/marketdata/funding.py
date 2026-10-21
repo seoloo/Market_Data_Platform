@@ -1,4 +1,7 @@
-"""funding rate 백필.
+"""funding rate 백필 — 월별 아카이브를 받아 ``funding_rates`` 표에 넣는다.
+
+언제 쓰나: 연구 · 백테스트 전에 ``scripts/backfill_funding.py`` 로 직접 실행한다 (예약 없음).
+읽고 쓰는 것: data.binance.vision 의 fundingRate zip (읽기) → ``funding_rates`` 표 (쓰기).
 
 **왜 필요한가**: 리스크 게이트는 진입 전에 `funding_rate` 와 `next_funding_ms` 를
 요구한다 (05-risk-engine.md G5.4). 이 데이터가 없으면 게이트가 fail-closed 되어
@@ -42,9 +45,11 @@ class FundingBackfillResult:
 
     @property
     def ok(self) -> bool:
+        """[쓰임] 오류가 하나도 없으면 True (파일 없음은 '누락' 으로 따로 센다)."""
         return not self.errors
 
     def summary(self) -> str:
+        """[쓰임] 사람이 읽는 한 줄 요약 — 예 ``[OK] BTCUSDT funding: 3/3 파일, 279건``."""
         status = "OK" if self.ok else f"오류 {len(self.errors)}건"
         missing = f", 누락 {len(self.files_missing)}개" if self.files_missing else ""
         return (
@@ -61,14 +66,10 @@ def plan_funding_files(
     *,
     resume_from: date | None = None,
 ) -> tuple[FundingArchiveFile, ...]:
-    """받아야 할 월별 아카이브 목록.
-
-    **끝나지 않은 달은 제외한다.** 월별 아카이브는 그 달이 끝나야 생성되므로,
-    포함하면 매번 404 가 나고 "누락" 으로 기록되어 진짜 결측과 구별되지 않는다.
-
-    ``end`` 가 그 달의 **마지막 날**이면 그 달은 완료된 것으로 본다. 과거 구간을
-    ``--end 2024-12-31`` 처럼 명시했을 때 12월이 조용히 빠지는 것을 막는다.
-    """
+    """[쓰임] 받아야 할 월별 funding 아카이브 목록 — **끝나지 않은 달은 뺀다.**
+    [이유] 월별 아카이브는 그 달이 끝나야 생성되므로, 포함하면 매번 404 가 나고 "누락" 으로 기록되어
+           진짜 결측과 구별되지 않는다. ``end`` 가 그 달의 **마지막 날**이면 그 달은 완료된 것으로
+           본다 — ``--end 2024-12-31`` 처럼 명시했을 때 12월이 조용히 빠지는 것을 막는다."""
     effective_start = max(start, resume_from) if resume_from is not None else start
     if effective_start > end:
         return ()
@@ -81,15 +82,17 @@ def plan_funding_files(
 
 
 def _next_month(day: date) -> date:
+    """[쓰임] 다음 달 1 일."""
     return (day.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 
 def _last_day_of_month(day: date) -> date:
+    """[쓰임] 그 달의 마지막 날 (다음 달 1 일 − 하루)."""
     return _next_month(day) - timedelta(days=1)
 
 
 class FundingBackfiller:
-    """아카이브 → ``funding_rates`` 적재."""
+    """funding 아카이브 → ``funding_rates`` 적재 실행기."""
 
     __slots__ = ("_client", "_repo", "verify_checksum")
 
@@ -112,32 +115,34 @@ class FundingBackfiller:
         end: date,
         resume: bool = True,
     ) -> FundingBackfillResult:
-        """``start`` 부터 ``end`` 직전 달까지 적재한다.
-
-        ``resume`` 이면 이미 저장된 마지막 정산 시각이 속한 달부터 다시 받는다.
-        그 달은 일부만 저장됐을 수 있으므로 통째로 다시 받는다 — upsert 라 안전하다.
-        """
+        """[쓰임] ``start`` 부터 끝난 달까지 파일마다 받기 → 저장을 하고 결과를 돌려준다.
+        [이유] ``resume`` 이면 이미 저장된 마지막 정산 시각이 속한 달부터 다시 받는다. 그 달은
+               일부만 저장됐을 수 있으므로 통째로 다시 받는다 — upsert 라 안전하다."""
         resume_from = self._resume_point(symbol) if resume else None
         files = plan_funding_files(symbol, start, end, resume_from=resume_from)
         result = FundingBackfillResult(symbol=symbol, files_planned=len(files))
 
-        for archive in files:
+        for archive_file in files:
             try:
-                rates = self._client.fetch_funding(archive, verify_checksum=self.verify_checksum)
+                rates = self._client.fetch_funding(
+                    archive_file, verify_checksum=self.verify_checksum
+                )
             except (AutoTradingError, OSError) as exc:
-                result.errors.append(f"{archive}: {exc}")
+                result.errors.append(f"{archive_file}: {exc}")
                 continue
             if rates is None:
-                result.files_missing.append(str(archive))
+                result.files_missing.append(str(archive_file))
                 continue
             result.files_fetched += 1
             result.rates_written += self._write(symbol, rates)
         return result
 
     def _write(self, symbol: str, rates: tuple[FundingRate, ...]) -> int:
+        """[쓰임] 받은 정산 내역을 저장하고 개수를 돌려준다."""
         return self._repo.upsert_many(symbol, rates)
 
     def _resume_point(self, symbol: str) -> date | None:
+        """[쓰임] 이어 받을 시작점 — 저장된 마지막 정산 시각이 속한 달의 1 일 (없으면 None)."""
         last_ms = self._repo.last_funding_ms(symbol)
         if last_ms is None:
             return None

@@ -1,5 +1,8 @@
 """저장된 봉에서 :class:`MarketSnapshot` 을 만드는 인과성 관문.
 
+언제 쓰나: 백테스트(``backtest/feed.py``)가 판단 시각마다 "그때 알 수 있던 시장 상태" 를 만들 때.
+읽고 쓰는 것: ``candles`` · ``funding_rates`` 표 (읽기만, 저장소를 거쳐서).
+
 **이 모듈이 look-ahead 를 막는 마지막 실무 방어선이다.** Pure Core 는 스냅샷에 담긴
 것만 볼 수 있으므로 (AGENTS.md §3.2), 여기서 미래 봉을 한 개라도 넣으면 백테스트
 성적이 통째로 거짓이 된다. 그래서 이 모듈의 규칙은 셋뿐이다.
@@ -55,15 +58,14 @@ class TimeframeRequirement:
 
 
 def build_requirements(cfg: RootConfig) -> tuple[TimeframeRequirement, ...]:
-    """설정에서 타임프레임별 필요 봉 수를 계산한다.
-
-    같은 TF 를 여러 소비자가 쓰면 가장 깊은 요구치를 택한다. 각 소비자가 자기
-    warm-up 을 선언하므로, feature 파라미터를 바꾸면 스냅샷 깊이도 따라 바뀐다.
-    """
+    """[쓰임] 설정에서 타임프레임별로 확보해야 할 마감봉 수를 계산한다 (짧은 타임프레임부터).
+    [이유] 같은 TF 를 여러 소비자가 쓰면 가장 깊은 요구치를 택한다. 각 소비자가 자기 warm-up 을
+           선언하므로, feature 파라미터를 바꾸면 스냅샷 깊이도 따라 바뀐다 (손으로 적지 않는다)."""
     safety = cfg.data.warmup_safety_bars
     needs: dict[Timeframe, tuple[int, str]] = {}
 
     def require(timeframe: Timeframe, bars: int, reason: str) -> None:
+        """[쓰임] 요구치 하나를 등록한다 — 이미 더 깊은 요구가 있으면 그것을 둔다 (여유 봉 포함)."""
         current = needs.get(timeframe)
         total = bars + safety
         if current is None or total > current[0]:
@@ -99,8 +101,8 @@ def build_requirements(cfg: RootConfig) -> tuple[TimeframeRequirement, ...]:
     require(Timeframe.M1, cfg.risk.recent_spike_window_min + 1, "risk.recent_spike")
 
     return tuple(
-        TimeframeRequirement(timeframe=tf, bars=bars, reason=reason)
-        for tf, (bars, reason) in sorted(needs.items(), key=lambda item: item[0].ms)
+        TimeframeRequirement(timeframe=timeframe, bars=bars, reason=reason)
+        for timeframe, (bars, reason) in sorted(needs.items(), key=lambda item: item[0].ms)
     )
 
 
@@ -126,6 +128,7 @@ class SnapshotBuilder:
 
     @property
     def requirements(self) -> tuple[TimeframeRequirement, ...]:
+        """[쓰임] 이 빌더가 타임프레임마다 확보하려는 봉 수 목록."""
         return self._requirements
 
     def build(
@@ -140,12 +143,12 @@ class SnapshotBuilder:
         next_funding_ms: int | None = None,
         spread_bps: Decimal | None = None,
     ) -> MarketSnapshot:
-        """``as_of_ms`` 시점에 알 수 있었던 시장 상태를 만든다.
-
-        ``mark_price`` 를 주지 않으면 가장 짧은 TF 의 마지막 **마감** 종가를 쓴다.
-        이것이 백테스트 관례이며, 그 사실을 ``data_quality.notes`` 에 남긴다 —
-        실거래(거래소 mark price)와 값의 출처가 다르다는 점이 기록에 보여야 한다.
-        """
+        """[쓰임] ``as_of_ms`` 시점에 알 수 있었던 시장 상태(마감봉 · funding · 기준 가격 · 품질
+                  표시)를 만든다.
+        [이유] 봉이 모자라거나 · 오래됐거나 · 빠진 곳이 있으면 채우지 않고 ``data_quality`` 에
+               표시한다 — 진입은 상위에서 거부된다(fail-closed). ``mark_price`` 를 주지 않으면 가장
+               짧은 TF 의 마지막 **마감** 종가를 쓰고, 그 사실을 ``data_quality.notes`` 에 남긴다 —
+               실거래(거래소 mark price)와 값의 출처가 다르다는 점이 기록에 보여야 한다."""
         target = self._cfg.symbol if symbol is None else symbol
         series: list[TimeframeSeries] = []
         missing: list[Timeframe] = []
@@ -202,15 +205,11 @@ class SnapshotBuilder:
         next_funding_ms: int | None,
         notes: list[str],
     ) -> tuple[Decimal | None, int | None]:
-        """저장된 정산 내역에서 현재 funding 을 찾는다.
-
-        호출자가 값을 주면 그대로 쓴다 (실거래에서는 거래소가 실시간 값을 준다).
-        저장소가 없거나 해당 시점 이전 정산이 없으면 **추정하지 않고 ``None``** 을
-        돌려준다 — 리스크 게이트가 ``DATA_QUALITY`` 로 진입을 거부하도록 두는 것이
-        옳다 (AGENTS.md §3.6 fail-closed).
-
-        ``funding_ms <= as_of_ms`` 만 보므로 미래 정산이 새어들 수 없다.
-        """
+        """[쓰임] 저장된 정산 내역에서 ``as_of_ms`` 의 funding 비율과 다음 정산 시각을 찾는다.
+        [이유] 호출자가 값을 주면 그대로 쓴다 (실거래에서는 거래소가 실시간 값을 준다). 저장소가
+               없거나 해당 시점 이전 정산이 없으면 **추정하지 않고 ``None``** 을 돌려준다 — 리스크
+               게이트가 ``DATA_QUALITY`` 로 진입을 거부하도록 두는 것이 옳다 (AGENTS.md §3.6
+               fail-closed). ``funding_ms <= as_of_ms`` 만 보므로 미래 정산이 새어들 수 없다."""
         if funding_rate is not None and next_funding_ms is not None:
             return funding_rate, next_funding_ms
         if self._funding is None:
@@ -231,11 +230,9 @@ class SnapshotBuilder:
         )
 
     def _is_stale(self, series: TimeframeSeries, as_of_ms: int) -> bool:
-        """마지막 마감봉이 너무 오래됐는가.
-
-        정상이라면 마지막 마감봉의 나이는 봉 하나 길이 미만이다. 그보다
-        ``staleness_multiple`` 배 넘게 벌어지면 피드가 끊긴 것으로 본다.
-        """
+        """[쓰임] 마지막 마감봉이 너무 오래됐는지 (봉이 하나도 없어도 True).
+        [이유] 정상이라면 마지막 마감봉의 나이는 봉 하나 길이 미만이다. 그보다
+               ``staleness_multiple`` 배 넘게 벌어지면 피드가 끊긴 것으로 본다."""
         last = series.last
         if last is None:
             return True
@@ -248,6 +245,8 @@ class SnapshotBuilder:
         mark_price: Decimal | None,
         notes: list[str],
     ) -> Decimal:
+        """[쓰임] 기준 가격을 정한다 — 주어진 값, 없으면 가장 짧은 TF 의 마지막 마감 종가.
+        [이유] 어느 TF 에도 마감봉이 없으면 가격을 지어내지 않고 오류를 낸다."""
         if mark_price is not None:
             return mark_price
         for candidate in series:  # build_requirements 가 TF 오름차순을 보장한다
