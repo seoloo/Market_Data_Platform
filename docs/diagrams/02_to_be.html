@@ -3,7 +3,12 @@
 <style>
   .row { display: grid; grid-template-columns: 1fr 40px 1.1fr 40px 1.2fr 40px 1.1fr; align-items: center; }
   .lanes { display: flex; flex-direction: column; gap: 14px; }
-  .meet { display: grid; grid-template-columns: 1fr 1.1fr; gap: 14px; margin-top: 14px; }
+  .meet { display: grid; grid-template-columns: 1fr 40px 1.5fr; gap: 0; margin-top: 14px; align-items: stretch; }
+  .meet .arrow { align-self: center; }
+  .dbgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .dbgrid div { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .dbgrid b { font-size: 13px; display: block; color: var(--ink); }
+  .dbgrid span { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
   .strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
   .strip .box h3 { font-size: 14px; }
   .where { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin-top: 6px; }
@@ -49,15 +54,22 @@
 
   <div class="meet">
     <div class="box okbox"><span class="tag">매일 대사</span><h3>스트림 1분봉 = 배치 1분봉 ?</h3><p>같은 날의 두 봉을 같은 계산으로 비교한다. 다르면 원인을 나누고, 끊긴 구간은 일 파일로 메운다.</p></div>
-    <div class="box plain"><span class="tag">실행 기록</span><h3>모든 작업이 남기는 것</h3><p>코드 버전 · 설정 해시 · 입력 체크섬 · 출력 버전 · 행 수 · 걸린 시간 · 최대 메모리 · 데이터 신선도</p></div>
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+    <div class="box dbbox"><span class="tag">POSTGRESQL · 로컬 Docker</span><h3>작고 자주 보는 것만 — 큰 데이터는 Delta에</h3>
+      <div class="dbgrid">
+        <div><b>실행 기록</b><span>코드 버전 · 설정 해시 · 입력 체크섬 · 출력 버전 · 행 수 · 걸린 시간 · 최대 메모리 · 신선도</span></div>
+        <div><b>감사 · 대사 결과</b><span>의심일 · 교체 · 제외, 날마다 일치율과 불일치 원인</span></div>
+        <div><b>조회용 1분봉</b><span>Gold의 복사본. 원본은 Delta 하나, 복사 뒤 행 수 · 체크섬으로 맞춤</span></div>
+      </div>
+    </div>
   </div>
 
   <div class="strip">
     <div class="box"><h3>단일 PC 그대로</h3><p>RAM 32GB · 12스레드. 클러스터처럼 꾸미지 않는다</p></div>
-    <div class="box"><h3>필요할 때만 켜기</h3><p>Docker Compose 프로필 stream · spark</p></div>
+    <div class="box"><h3>필요할 때만 켜기</h3><p>Docker Compose 프로필 db · spark · stream</p></div>
     <div class="box"><h3>키 없이 시연</h3><p>합성 틱 · 녹화 재생으로 처음부터 끝까지</p></div>
     <div class="box"><h3>데이터는 커밋 안 함</h3><p>받는 코드와 체크섬 목록만 레포에</p></div>
   </div>
 
-  <div class="foot"><span>Market Data Platform · 그림 2 · 목표 구조</span><span>Bronze 원본 → Silver 정제 → Gold 연구용 (메달리온 레이크하우스)</span></div>
+  <div class="foot"><span>Market Data Platform · 그림 2 · 목표 구조</span><span>Bronze 원본 → Silver 정제 → Gold 연구용 (메달리온 레이크하우스) · 기록 · 조회는 로컬 PostgreSQL</span></div>
 </div></body></html>
