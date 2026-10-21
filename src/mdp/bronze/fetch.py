@@ -42,16 +42,27 @@ import httpx
 
 from mdp.bronze.archive import BASE_URL, ArchiveFile, Dataset, Granularity, months_between
 from mdp.errors import BronzeConflictError, DataIntegrityError, SourceUnavailableError
-from mdp.runlog.recorder import Artifact, NullRecorder, PostgresRecorder, RunRecorder, record_run
+from mdp.runlog.recorder import (
+    Artifact,
+    NullRecorder,
+    PostgresRecorder,
+    RunHandle,
+    RunRecorder,
+    record_run,
+)
 
 __all__ = [
     "BronzeFetcher",
     "FetchResult",
     "FetchStatus",
     "default_bronze_root",
+    "log_json",
     "main",
     "parse_checksum",
+    "read_manifest",
+    "record_result",
     "run_fetch",
+    "setup_cli_logging",
     "update_manifest",
 ]
 
@@ -76,6 +87,8 @@ class FetchStatus(StrEnum):
     """Bronze 에 이미 있고 원천 체크섬과 같다 — 다시 받지 않았다."""
     MISSING_AT_SOURCE = "missing_at_source"
     """원천에 그 기간 파일이 없다(404)."""
+    SKIPPED_KNOWN = "skipped_known"
+    """체크섬 목록에 있고 Bronze 파일 크기도 같아 원천에 묻지 않고 건너뛰었다(증분 받기)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,27 +330,34 @@ class BronzeFetcher:
         )
 
 
+def read_manifest(manifest_path: Path) -> dict[str, tuple[int, str]]:
+    """[쓰임] 체크섬 목록 CSV → {상대 경로: (크기, SHA-256)}. 파일이 없으면 빈 사전.
+    [이유] 증분 받기(:mod:`mdp.bronze.sync`)가 '이미 받은 것' 을 이 목록으로 판단한다."""
+    entries: dict[str, tuple[int, str]] = {}
+    if manifest_path.exists():
+        with manifest_path.open(encoding="utf-8", newline="") as stream:
+            for row in csv.DictReader(stream):
+                entries[row["relative_path"]] = (int(row["size_bytes"]), row["sha256"])
+    return entries
+
+
 def update_manifest(manifest_path: Path, results: Iterable[FetchResult]) -> int:
     """[쓰임] 체크섬 목록 CSV 에 받은 파일(경로 · 크기 · SHA-256)을 더하거나 고친다. 바뀐 줄 수를
               돌려준다.
     [이유] 데이터는 커밋하지 않고 이 목록만 커밋한다(절대 규칙 5) — 누가 다시 받아도 같은 파일인지
            이 목록으로 확인한다. 경로 순으로 정렬해 두 번 돌려도 같은 파일이 나온다."""
-    rows: dict[str, tuple[str, str]] = {}
-    if manifest_path.exists():
-        with manifest_path.open(encoding="utf-8", newline="") as stream:
-            for row in csv.DictReader(stream):
-                rows[row["relative_path"]] = (row["size_bytes"], row["sha256"])
+    entries = read_manifest(manifest_path)
     changed_count = 0
     for result in results:
         if result.sha256 is None or result.size_bytes is None:
             continue
-        entry = (str(result.size_bytes), result.sha256)
-        if rows.get(result.file.relative_path) != entry:
-            rows[result.file.relative_path] = entry
+        entry = (result.size_bytes, result.sha256)
+        if entries.get(result.file.relative_path) != entry:
+            entries[result.file.relative_path] = entry
             changed_count += 1
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [",".join(MANIFEST_COLUMNS)]
-    lines += [f"{path},{size},{sha}" for path, (size, sha) in sorted(rows.items())]
+    lines += [f"{path},{size},{sha}" for path, (size, sha) in sorted(entries.items())]
     _write_text_atomic(manifest_path, "\n".join(lines) + "\n")
     return changed_count
 
@@ -388,41 +408,52 @@ def run_fetch(
             for file in files:
                 result = fetcher.fetch(file)
                 results.append(result)
-                run.add(
-                    Artifact(
-                        path=file.relative_path,
-                        layer="bronze",
-                        status=result.status.value,
-                        size_bytes=result.size_bytes,
-                        sha256=result.sha256,
-                        elapsed_s=round(result.elapsed_s, 3),
-                    )
-                )
-                _log_json(
-                    event="fetch",
-                    path=file.relative_path,
-                    status=result.status.value,
-                    size_bytes=result.size_bytes,
-                    sha256=result.sha256,
-                    elapsed_s=round(result.elapsed_s, 3),
-                )
-            _log_json(event="run", run_id=str(run.run_id), job="bronze.fetch")
+                record_result(run, result)
+            log_json(event="run", run_id=str(run.run_id), job="bronze.fetch")
     finally:
         changed_count = update_manifest(manifest_path, results)
-        _log_json(event="manifest", path=str(manifest_path), changed=changed_count)
+        log_json(event="manifest", path=str(manifest_path), changed=changed_count)
     return results
 
 
-def _log_json(**fields: object) -> None:
+def record_result(run: RunHandle, result: FetchResult) -> None:
+    """[쓰임] 받기 한 건을 실행 기록(산출물 한 줄)과 JSON 로그 한 줄로 남긴다.
+    [이유] 받기 · 증분 받기가 같은 모양으로 남겨야 표 하나로 함께 본다."""
+    fields = {
+        "path": result.file.relative_path,
+        "status": result.status.value,
+        "size_bytes": result.size_bytes,
+        "sha256": result.sha256,
+        "elapsed_s": round(result.elapsed_s, 3),
+    }
+    run.add(
+        Artifact(
+            path=result.file.relative_path,
+            layer="bronze",
+            status=result.status.value,
+            size_bytes=result.size_bytes,
+            sha256=result.sha256,
+            elapsed_s=round(result.elapsed_s, 3),
+        )
+    )
+    log_json(event="fetch", **fields)
+
+
+def log_json(**fields: object) -> None:
     """[쓰임] 한 줄 JSON 로그 — 사람이 읽고, 오케스트레이터(4-6)도 그대로 읽는다."""
     log.info(json.dumps(fields, ensure_ascii=False))
+
+
+def setup_cli_logging() -> None:
+    """[쓰임] 명령줄 실행용 로그 설정 — 메시지(JSON)만 표준 출력으로, httpx 요청 줄은 숨긴다."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """[쓰임] 명령줄 실행 — 달마다 받고(또는 크기만 보고) 체크섬 목록 · 실행 기록을 남긴다.
     [이유] DB 주소가 없으면 기록만 빼고 그대로 돈다 — DB 를 안 띄운 PC 에서도 받기는 된다."""
-    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
-    logging.getLogger("httpx").setLevel(logging.WARNING)  # 요청마다 찍히는 줄은 JSON 로그를 가린다
+    setup_cli_logging()
     args = _build_parser().parse_args(argv)
     last_month: date = args.to_month or args.from_month
     files = [
@@ -433,7 +464,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     with BronzeFetcher(bronze_root) as fetcher:
         if args.probe:
             for file in files:
-                _log_json(event="probe", path=file.relative_path, size_bytes=fetcher.probe(file))
+                log_json(event="probe", path=file.relative_path, size_bytes=fetcher.probe(file))
             return 0
         params: dict[str, object] = {
             "dataset": args.dataset,
@@ -447,7 +478,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             with PostgresRecorder(args.pg_dsn) as recorder:
                 run_fetch(fetcher, files, args.manifest, recorder, params)
         else:
-            _log_json(event="runlog_off", reason="MDP_PG_DSN 없음 — 실행 기록 없이 받는다")
+            log_json(event="runlog_off", reason="MDP_PG_DSN 없음 — 실행 기록 없이 받는다")
             run_fetch(fetcher, files, args.manifest, NullRecorder(), params)
     return 0
 
