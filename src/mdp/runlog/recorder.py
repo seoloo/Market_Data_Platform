@@ -62,6 +62,8 @@ class Artifact:
     sha256: str | None = None
     row_count: int | None = None
     elapsed_s: float | None = None
+    table_version: int | None = None
+    """Delta 표일 때 이 작업이 만든 표 버전 (파일이면 None)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,11 +165,11 @@ class PostgresRecorder:
         바꾼다."""
         self._connection.execute(
             "INSERT INTO run_artifacts (run_id, artifact_path, layer, status, size_bytes, sha256,"
-            " row_count, elapsed_s) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " row_count, elapsed_s, table_version) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
             " ON CONFLICT (run_id, artifact_path) DO UPDATE SET layer = EXCLUDED.layer,"
             " status = EXCLUDED.status, size_bytes = EXCLUDED.size_bytes,"
             " sha256 = EXCLUDED.sha256, row_count = EXCLUDED.row_count,"
-            " elapsed_s = EXCLUDED.elapsed_s",
+            " elapsed_s = EXCLUDED.elapsed_s, table_version = EXCLUDED.table_version",
             (
                 run_id,
                 artifact.path,
@@ -177,6 +179,7 @@ class PostgresRecorder:
                 artifact.sha256,
                 artifact.row_count,
                 artifact.elapsed_s,
+                artifact.table_version,
             ),
         )
 

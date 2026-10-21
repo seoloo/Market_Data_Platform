@@ -74,6 +74,10 @@ ignore = [
 "scripts/**" = ["T20"]
 # 포트폴리오 보고서 생성기 — 한국어 문단 · HTML · SVG 문자열이 대부분이라 줄 길이 · 짧은 이름 규칙을 보지 않는다.
 "scripts/portfolio/**" = ["T20", "E501", "N802", "N806", "N812"]
+# PySpark 관례 `from pyspark.sql import functions as F` 를 따른다.
+"src/mdp/silver/**" = ["N812"]
+"src/mdp/gold/**" = ["N812"]
+"tests/mdp/spark/**" = ["N812"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["auto_trading"]
@@ -87,6 +91,11 @@ warn_unreachable = true
 warn_no_return = true
 show_error_codes = true
 files = ["src", "tests"]
+
+# pyspark · delta 는 Spark 이미지(docker/spark) 안에만 있다 — 호스트 mypy 는 타입 정보 없이 지나간다.
+[[tool.mypy.overrides]]
+module = ["pyspark.*", "delta.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "scripts.*"
