@@ -1,0 +1,4 @@
+relative_path,size_bytes,sha256
+data/futures/um/monthly/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-03.zip,847406944,8ceb6fd06fc3bff87870e7adc362ca0e2f463f57a04599d2506e40320921401d
+data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2024-03.zip,939,711dcaf2a341aedfd06447b4117b540f60adb0784c5e64a313c718e4cf092bc3
+data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-03.zip,1950611,040b8e448e4243072b88b0d9908dfebed91bba943b75f4e831fa5337a2e1dab9
