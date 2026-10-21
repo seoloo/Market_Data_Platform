@@ -16,8 +16,8 @@
 | 2 | 실주문 · 실계좌 코드 걷어 내기 — 묶음 1/6 끝, 나머지는 파이프라인 뒤 **공개 전까지** (6-3) | 🟡 일부 · [목록](docs/LIVE_REMOVAL_PLAN.md) |
 | 3-1 | **Bronze 받기** — 바이낸스 공개 아카이브를 받은 그대로 보관 + 체크섬 대조 · 체크섬 목록 | ✅ 끝 · BTCUSDT 2024-03 (체결 · 1 분봉 · funding) |
 | 3-2 | 실행 기록 — 로컬 PostgreSQL(Docker Compose 프로필 `db`) | ✅ 끝 · 작업마다 코드 버전 · 인자 해시 · 산출물 체크섬 · 최대 메모리 |
-| 3-3 | 증분 받기 · 백필 — 새 파일 · 빠진 날만, 두 번 돌려도 같은 결과 | ⏳ 다음 |
-| 4-1 | Silver 감사 — Spark · Delta 로 중복 · 빈 곳 · 잘림, 걸러 낸 것은 격리 표로 | ⏳ 계획 |
+| 3-3 | 증분 받기 · 백필 — 새 파일 · 빠진 날만, 두 번 돌려도 같은 결과 | ✅ 끝 · 끝난 달은 월 파일 · 이번 달은 일 파일, `--days` 백필 |
+| 4-1 | Silver 감사 — Spark · Delta 로 중복 · 빈 곳 · 잘림, 걸러 낸 것은 격리 표로 | ⏳ 다음 |
 | 4-2 | DuckDB 조회 층 — Silver Delta 표를 Spark 없이 SQL 로 읽고 감사 결과 검산 | ⏳ 계획 |
 | 4-3 | 벤치마크 — 기존 스크립트 · Spark · DuckDB 로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) | ⏳ 계획 |
 | 4-4 | Gold 1 분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 | ⏳ 계획 |
@@ -67,17 +67,21 @@ docker compose --profile db up -d                     # 실행 기록용 Postgre
 export MDP_PG_DSN=postgresql://mdp:mdp_local_only@127.0.0.1:56432/mdp
 python -m mdp.bronze.fetch --dataset aggTrades --symbol BTCUSDT --from-month 2024-03 --probe
 python -m mdp.bronze.fetch --dataset aggTrades --symbol BTCUSDT --from-month 2024-03
+python -m mdp.bronze.sync --dataset klines --interval 1m --symbol BTCUSDT --start 2026-08-01
+python -m mdp.bronze.sync --dataset aggTrades --symbol BTCUSDT --days 2024-03-05
 ```
 
 - `--probe` 는 받지 않고 크기만 본다. Bronze 위치는 `--root` 또는 `MDP_BRONZE_ROOT`, 없으면 `data/lake/bronze`.
 - `MDP_PG_DSN` 이 없으면 실행 기록만 빼고 그대로 돈다.
+- `sync` 는 체크섬 목록에 있고 크기가 같은 파일은 원천에 묻지 않고 건너뛴다(`--verify` 면 다시 대조).
+  최근 날짜가 원천에 아직 없으면 오류가 아니라 '아직 안 올라옴' 으로 남기고 다음 실행에서 다시 받는다.
 
 ## 저장소 안내
 
 | 곳 | 내용 |
 |---|---|
 | `src/mdp/` | **새 파이프라인 코드** (README 3 단계부터). `auto_trading` 을 import 하지 않는다 |
-| `src/mdp/bronze/` | Bronze 받기 — 원천 zip 을 흘려 받으며 체크섬 대조, 원천 경로 그대로 보관 · 덮어쓰지 않음 |
+| `src/mdp/bronze/` | Bronze 받기(`fetch`) · 증분 받기와 백필(`sync`) — 흘려 받으며 체크섬 대조, 원천 경로 그대로 · 덮어쓰지 않음 |
 | `manifests/bronze/` | 받은 원천 파일의 체크섬 목록(경로 · 크기 · SHA-256) — 데이터 대신 이것만 커밋 |
 | `src/mdp/runlog/` | 실행 기록 — 작업(`pipeline_runs`) · 산출물(`run_artifacts`)을 PostgreSQL 에, 마이그레이션 SQL |
 | `docker-compose.yml` | 로컬 서비스, 필요한 프로필만 켠다 (지금은 `db` = PostgreSQL) |
