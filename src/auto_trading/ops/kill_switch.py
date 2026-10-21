@@ -36,8 +36,8 @@ GROUPS: dict[str, str] = {
     "sirius": "Sirius",
 }
 """그룹 키(정지 파일 이름 ``HALT_<키>`` 에 들어감) → 화면에 보이는 이름.
-은퇴한 Altair(2026-10-19)는 리팩토링 5 단계(2026-10-21)에서 뺐다 — 남은 ``HALT_altair`` 는
-읽는 실행기가 없어 아무 일도 하지 않는다."""
+은퇴한 Altair(2026-10-19)는 리팩토링 5 단계(2026-10-21)에서 뺐다 — 남아 있던 ``HALT_altair`` 는
+``data/archive/retired-2026-10-21/`` 로 옮겼다(읽는 실행기 없음)."""
 
 LEGACY: dict[str, str] = {"vega": "cruise", "deneb": "glide"}
 """지금 그룹 키 → 2026-10-15 이름 변경 전 그룹 키.

@@ -25,7 +25,7 @@
 |---|---|---|
 | 토스 주문 · 조회 | `exchange/toss.py` | 토스 Open API, 토큰 `data/toss_token.json` |
 | 업비트 주문 · 조회 | `exchange/upbit.py` | 업비트 API |
-| 긴급 정지 (파일이 있으면 새 주문 멈춤) | `ops/kill_switch.py` | `data/HALT`(전체) · `data/HALT_<그룹>`(vega · deneb · acc · stock · sirius — 남은 `HALT_altair` 는 읽는 곳 없음) |
+| 긴급 정지 (파일이 있으면 새 주문 멈춤) | `ops/kill_switch.py` | `data/HALT`(전체) · `data/HALT_<그룹>`(vega · deneb · acc · stock · sirius — 옛 `HALT_altair` 는 `data/archive/retired-2026-10-21/` 로 옮김) |
 | 장부 파일 읽기 · 쓰기 (임시 파일에 쓰고 바꿔 끼움, 형식 그대로) | `ops/ledger_file.py` | 부르는 쪽 장부 (설정 · 안전 점검 기록 · Deneb · Vega · 국내 적립 · 정리) |
 | 전부 정리 (누를 때만 — 전부 · Vega · Deneb · 적립 · 개별주 · Sirius · 한 종목) | `scripts/liquidate.py` · `ops/liquidate.py` · `ui/liquidate_panel.py` | `data/liquidate/` · 보고 `reports/liquidate/` |
 | 사용자 설정 (오르빗 설정 화면 · 텔레그램 '적립') | `ops/user_settings.py` · `ui/settings_page.py` | `data/settings/settings.json` · 바꾼 기록 `changes.jsonl` |

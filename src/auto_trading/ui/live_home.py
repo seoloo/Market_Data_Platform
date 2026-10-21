@@ -30,8 +30,8 @@ __all__ = ["Quotes", "Trade", "build_books", "fetch_quotes", "live_page", "load_
 VEGA_COINS = ("BTC", "ETH", "SOL")
 SHOW_UPBIT = True
 """업비트 Vega 장부를 보일지 (2026-10-15 바이낸스로 옮길 때 껐다가 10-19 업비트로 되돌리며 다시 켬).
-바이낸스 Vega · Altair 장부(``data/vega/`` · ``data/altair_live/``)는 기록으로만 남고 화면에서 뺐다
-— 그 카드 코드는 리팩토링 5 단계(2026-10-21)에서 지웠다."""
+바이낸스 Vega · Altair 장부는 화면에서 뺐다 — 카드 코드는 리팩토링 5 단계(2026-10-21)에서 지웠고,
+장부는 ``data/archive/retired-2026-10-21/`` 에 보관."""
 DENEB_TICKERS = ("TQQQ", "SCHD", "IAUM")
 _SKIP = frozenset({"M3", "QS_SWITCH"})
 """data/toss 안에서 적립 장부가 아닌 파일 (Deneb 은 따로, QS_SWITCH 는 Paper)."""
