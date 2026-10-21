@@ -3,7 +3,7 @@
 <style>
   .row { display: grid; grid-template-columns: 1fr 40px 1.1fr 40px 1.2fr 40px 1.1fr; align-items: center; }
   .lanes { display: flex; flex-direction: column; gap: 14px; }
-  .meet { display: grid; grid-template-columns: 1fr 40px 1.5fr; gap: 0; margin-top: 14px; align-items: stretch; }
+  .meet { display: grid; grid-template-columns: 0.9fr 40px 1.6fr 14px 0.8fr; gap: 0; margin-top: 14px; align-items: stretch; }
   .meet .arrow { align-self: center; }
   .dbgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 8px; }
   .dbgrid div { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
@@ -62,14 +62,16 @@
         <div><b>조회용 1분봉</b><span>Gold의 복사본. 원본은 Delta 하나, 복사 뒤 행 수 · 체크섬으로 맞춤</span></div>
       </div>
     </div>
+    <div></div>
+    <div class="box plain"><span class="tag">DUCKDB · 읽기만</span><h3>가벼운 조회</h3><p>Silver · Gold Delta 표를 Spark 없이 SQL로. 검산 · 벤치마크 · 키 없는 시연</p></div>
   </div>
 
   <div class="strip">
     <div class="box"><h3>단일 PC 그대로</h3><p>RAM 32GB · 12스레드. 클러스터처럼 꾸미지 않는다</p></div>
-    <div class="box"><h3>필요할 때만 켜기</h3><p>Docker Compose 프로필 db · spark · stream</p></div>
+    <div class="box"><h3>필요할 때만 켜기</h3><p>Docker Compose 프로필 db · spark · stream · airflow</p></div>
     <div class="box"><h3>키 없이 시연</h3><p>합성 틱 · 녹화 재생으로 처음부터 끝까지</p></div>
     <div class="box"><h3>데이터는 커밋 안 함</h3><p>받는 코드와 체크섬 목록만 레포에</p></div>
   </div>
 
-  <div class="foot"><span>Market Data Platform · 그림 2 · 목표 구조</span><span>Bronze 원본 → Silver 정제 → Gold 연구용 (메달리온 레이크하우스) · 기록 · 조회는 로컬 PostgreSQL</span></div>
+  <div class="foot"><span>Market Data Platform · 그림 2 · 목표 구조</span><span>Bronze 원본 → Silver 정제 → Gold 연구용 (메달리온 레이크하우스) · 작은 표는 PostgreSQL · 가벼운 조회는 DuckDB</span></div>
 </div></body></html>
