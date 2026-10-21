@@ -30,7 +30,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/auto_trading"]
+packages = ["src/auto_trading", "src/mdp"]
 
 
 # ---------------------------------------------------------------- ruff
