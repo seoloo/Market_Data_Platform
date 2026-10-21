@@ -43,7 +43,10 @@ def schema_dsn() -> Iterator[str]:
 
 def test_migrations_apply_once_and_detect_edits(schema_dsn: str, tmp_path: Path) -> None:
     with psycopg.connect(schema_dsn, autocommit=True) as connection:
-        assert apply_migrations(connection) == ["001_pipeline_runs.sql"]
+        assert apply_migrations(connection) == [
+            "001_pipeline_runs.sql",
+            "002_artifact_table_version.sql",
+        ]
         assert apply_migrations(connection) == []
 
         edited = tmp_path / "sql"
