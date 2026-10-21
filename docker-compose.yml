@@ -1,0 +1,33 @@
+# Market Data Platform 로컬 서비스 — 필요한 것만 프로필로 켠다 (단일 PC, README 그림 2).
+#
+#   docker compose --profile db up -d      # 로컬 PostgreSQL (실행 기록 · 감사 결과 · 조회용 표)
+#   docker compose --profile db down       # 끄기 (자료는 이름 있는 볼륨 mdp_pg 에 남는다)
+#
+# 접속: postgresql://mdp:<MDP_PG_PASSWORD>@127.0.0.1:56432/mdp
+#   - 이 PC 에서만 열린다(127.0.0.1). 비밀번호는 환경 변수 MDP_PG_PASSWORD, 없으면 시연용 기본값.
+#   - 포트 56432: 같은 PC 의 다른 프로젝트 PostgreSQL(55432 등)과 겹치지 않게 골랐다.
+# 다음 프로필(spark · stream · airflow)은 해당 단계(README 4 ~ 5)에서 더한다.
+
+name: mdp
+
+services:
+  postgres:
+    image: postgres:17.6
+    profiles: ["db"]
+    environment:
+      POSTGRES_DB: mdp
+      POSTGRES_USER: mdp
+      POSTGRES_PASSWORD: ${MDP_PG_PASSWORD:-mdp_local_only}
+    ports:
+      - "127.0.0.1:56432:5432"
+    volumes:
+      - mdp_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdp -d mdp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  mdp_pg:
