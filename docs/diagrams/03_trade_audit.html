@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .steps { display: grid; grid-template-columns: 1fr 36px 1fr 36px 1fr 36px 1fr; align-items: stretch; }
+  .steps .arrow { align-self: center; }
+  .step h3 { display: flex; align-items: center; }
+  .big { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-left: 4px; }
+  .defects { margin-top: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .result { margin-top: 18px; }
+  .bars { display: grid; grid-template-columns: 200px 1fr; row-gap: 12px; align-items: center; margin-top: 10px; }
+  .bars .label { font-size: 14px; text-align: right; padding-right: 14px; color: var(--ink); }
+  .bar { height: 26px; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; color: #fff; font-weight: 700; font-size: 14px; }
+</style></head>
+<body><div class="figure">
+
+  <div class="head">
+    <div>
+      <h1>체결 데이터 품질 감사 — 수익을 보기 전에 결함부터 찾았다</h1>
+      <p>바이낸스 선물 체결 기록(aggTrades) BTC · ETH, 2020-01 ~ 2026-08. 공식 파일이라도 그대로 믿지 않았다.</p>
+    </div>
+    <span class="badge done">구현됨 · 연구 216</span>
+  </div>
+
+  <div class="steps">
+    <div class="box step"><h3><span class="pill ink">1</span>받기</h3><div class="big">160<small>개 월 파일</small></div><p>약 86GB · sha256 대조<br>160 / 160 통과</p></div>
+    <div class="arrow"><svg width="32" height="16"><path d="M2 8h24" stroke="#8a8f98" stroke-width="2"/><path d="M21 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+    <div class="box step"><h3><span class="pill ink">2</span>한 줄씩 검사</h3><div class="big">64.6<small>억 행</small></div><p>체결 번호 빈 곳 · 중복<br>시각 역행 · 시각 단위</p></div>
+    <div class="arrow"><svg width="32" height="16"><path d="M2 8h24" stroke="#8a8f98" stroke-width="2"/><path d="M21 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+    <div class="box step"><h3><span class="pill ink">3</span>하루 대조</h3><div class="big">0.5<small>% 기준</small></div><p>매시 00분 체결 합 vs 공식 1분봉<br>넘거나 빈 곳이 있으면 의심일</p></div>
+    <div class="arrow"><svg width="32" height="16"><path d="M2 8h24" stroke="#8a8f98" stroke-width="2"/><path d="M21 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+    <div class="box step"><h3><span class="pill ink">4</span>다시 받아 교체</h3><div class="big">268<small>일 의심</small></div><p>의심일만 일 파일로 다시 받아<br>같은 기준으로 재검사</p></div>
+  </div>
+
+  <div class="defects">
+    <div class="box badbox"><span class="tag">결함 1 · 잘림</span><h3>정확히 2,000만 행에서 끊김</h3><p>BTC 2020-04 · 05 · 11 월 파일. 하루 단위로 날이 빠져 있었다</p></div>
+    <div class="box badbox"><span class="tag">결함 2 · 중복</span><h3>2022-09 모든 체결이 두 번</h3><p>BTC 431만 건 · ETH 1,339만 건 중복. 1일 · 10일은 빠짐</p></div>
+    <div class="box badbox"><span class="tag">결함 3 · 빈 곳</span><h3>번호는 이어지는데 거래량이 빔</h3><p>예: 2020-04-10 05:00 거래량<br>월 파일 297.8 BTC vs 공식 1분봉 2,421 BTC</p></div>
+  </div>
+
+  <div class="box result">
+    <h3>결과 — 의심일 268일을 어떻게 처리했나</h3>
+    <div class="bars">
+      <div class="label">공개 월 파일에서 의심된 날</div><div class="bar" style="width:100%;background:var(--warn)">268일</div>
+      <div class="label">일 파일로 교체해 통과</div><div class="bar" style="width:86.9%;background:var(--ok)">233일</div>
+      <div class="label">교체 불가로 제외</div><div class="bar" style="width:13.1%;min-width:70px;background:var(--muted)">35일</div>
+    </div>
+  </div>
+
+  <div class="foot"><span>Market Data Platform · 그림 3 · 체결 데이터 품질 감사</span><span>근거: docs/research/216-quarter-hour-flow-pilot.md §4.3 (숫자 변경 없음)</span></div>
+</div></body></html>

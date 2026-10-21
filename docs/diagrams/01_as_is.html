@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .flow { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1.15fr 40px 1fr; align-items: stretch; }
+  .flow .arrow { align-self: center; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .issues { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 22px; }
+  .issue { display: flex; align-items: flex-start; }
+  .issue h3 { font-size: 14.5px; }
+  .size { float: right; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .warnline { color: var(--bad) !important; font-weight: 700; }
+</style></head>
+<body><div class="figure">
+
+  <div class="head">
+    <div>
+      <h1>지금 구조 — 스크립트가 받아서 바로 SQLite에 넣는다</h1>
+      <p>연구마다 스크립트가 따로 받고, 운영 DB 하나에 시장 데이터와 주문 기록이 함께 쌓인다.</p>
+    </div>
+    <span class="badge done">현재 상태</span>
+  </div>
+
+  <div class="flow">
+    <div class="stack">
+      <div class="box plain"><span class="tag">원천</span><h3>바이낸스 공개 아카이브</h3><p>월·일 zip + CHECKSUM<br>봉 · funding · 지표 · 체결</p></div>
+      <div class="box plain"><span class="tag">원천</span><h3>거래소 REST</h3><p>바이낸스 · 업비트 최근 봉</p></div>
+      <div class="box plain"><span class="tag">원천</span><h3>공개 API</h3><p>SEC · FRED · KRX · DART · Yahoo</p></div>
+    </div>
+
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+
+    <div class="stack">
+      <div class="box"><h3>백필 스크립트</h3><p>marketdata/backfill.py 등<br>사람이 직접 실행 (예약 없음)</p></div>
+      <div class="box"><h3>연구별 수집 스크립트</h3><p>scripts/fetch_* · run_*<br>연구마다 따로 받고 따로 저장</p></div>
+      <div class="box badbox"><span class="tag">체결 86GB</span><h3>run_qflow_216.py</h3><p>받기 → sha256 확인 → 집계<br><span class="warnline">→ 원본 삭제</span></p></div>
+    </div>
+
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+
+    <div class="stack">
+      <div class="box"><h3>trading.db <span class="size">7.8GB</span></h3><p>SQLite 한 파일<br>봉 2,183만 행 · 지표 1,525만 행<br>+ 주문 · 체결 · 계좌 · 위험 상태</p></div>
+      <div class="box"><h3>data/research/ <span class="size">5.1GB</span></h3><p>연구 번호별 폴더<br>JSON · pickle · csv.gz 섞임</p></div>
+      <div class="box"><h3>원본 zip <span class="size">3.1GB</span></h3><p>data/external/binance_vision/<br>봉 원본만 남아 있음</p></div>
+    </div>
+
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+
+    <div class="stack">
+      <div class="box okbox"><span class="tag">잘 된 점</span><h3>읽는 쪽</h3><ul><li>백테스트 · 연구 판정</li><li>마감봉만 쓰기 (미래 누출 시험)</li><li>체크섬 · 해시 고정</li><li>Paper 가상 장부</li></ul></div>
+    </div>
+  </div>
+
+  <div class="issues">
+    <div class="box issue"><span class="pill">1</span><div><h3>메모리 6.7GB</h3><p>작업 1,776개를 한 번에 제출해 결과가 메모리에 쌓였다</p></div></div>
+    <div class="box issue"><span class="pill">2</span><div><h3>쓰기 잠금</h3><p>수집기 두 개가 같은 DB에 쓰자 뒤의 것이 한 건도 못 썼다</p></div></div>
+    <div class="box issue"><span class="pill">3</span><div><h3>다시 처리 불가</h3><p>체결 원본 86GB를 지워서 규칙을 바꾸면 다시 받아야 한다</p></div></div>
+    <div class="box issue"><span class="pill">4</span><div><h3>계층 · 이력 없음</h3><p>원본 · 정제 · 분석 구분, 파티션, 실행 이력이 없다</p></div></div>
+  </div>
+
+  <div class="foot"><span>Market Data Platform · 그림 1 · 지금 구조</span><span>근거: marketdata/bulk.py · docs/current/OPERATIONS.md · docs/research/216</span></div>
+</div></body></html>

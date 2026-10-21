@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .row { display: grid; grid-template-columns: 1fr 40px 1.1fr 40px 1.2fr 40px 1.1fr; align-items: center; }
+  .lanes { display: flex; flex-direction: column; gap: 14px; }
+  .meet { display: grid; grid-template-columns: 1fr 1.1fr; gap: 14px; margin-top: 14px; }
+  .strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+  .strip .box h3 { font-size: 14px; }
+  .where { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin-top: 6px; }
+  .down { text-align: center; color: var(--muted); font-size: 12px; margin: 6px 0 -4px; }
+</style></head>
+<body><div class="figure">
+
+  <div class="head">
+    <div>
+      <h1>목표 구조 — 원본은 그대로 두고, 몇 번이든 다시 만든다</h1>
+      <p>Bronze에 받은 그대로 보관하고, Silver · Gold는 언제든 다시 계산한다. 배치와 스트림이 같은 답을 내는지 매일 맞춰 본다.</p>
+    </div>
+    <span class="badge plan">계획 · 구현 전</span>
+  </div>
+
+  <div class="lanes">
+    <div class="lane">
+      <div class="lane-title">배치 — Spark (단일 PC 로컬 모드)</div>
+      <div class="row">
+        <div class="box plain"><span class="tag">원천</span><h3>바이낸스 공개 아카이브</h3><p>월 · 일 zip + CHECKSUM<br>체결 · 1분봉 · funding</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box bronze"><span class="tag">BRONZE</span><h3>받은 그대로</h3><p>zip 원본 + 체크섬 목록<br>바꾸지 않고 지우지 않는다</p><div class="where">F: 하드디스크</div></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box silver"><span class="tag">SILVER</span><h3>정제 · 검증된 Delta 표</h3><p>종목 / 날짜로 나눠 저장<br>중복 제거 · 빈 곳 · 잘림 감사<br>걸러 낸 것은 격리 표로</p><div class="where">C: SSD · 시간여행으로 버전 비교</div></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box gold"><span class="tag">GOLD</span><h3>연구용</h3><p>체결로 만든 1분봉<br>10초 체결 흐름 창</p></div>
+      </div>
+    </div>
+
+    <div class="lane">
+      <div class="lane-title">스트림 — Kafka 1대 + Spark Structured Streaming</div>
+      <div class="row">
+        <div class="box plain"><span class="tag">원천</span><h3>공개 실시간 체결</h3><p>바이낸스 WebSocket<br>또는 녹화 틱 재생 (키 없음)</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box stream"><span class="tag">KAFKA</span><h3>원본 보존 토픽</h3><p>받은 원문 + 받은 시각<br>오프셋으로 다시 읽기</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box stream"><span class="tag">컨슈머</span><h3>1분봉 만들기</h3><p>체결 번호로 중복 제거<br>늦게 온 체결은 워터마크로 처리</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box gold"><span class="tag">GOLD</span><h3>스트림 1분봉</h3><p>확정된 봉만 기록<br>끊긴 구간은 '미완성' 표시</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meet">
+    <div class="box okbox"><span class="tag">매일 대사</span><h3>스트림 1분봉 = 배치 1분봉 ?</h3><p>같은 날의 두 봉을 같은 계산으로 비교한다. 다르면 원인을 나누고, 끊긴 구간은 일 파일로 메운다.</p></div>
+    <div class="box plain"><span class="tag">실행 기록</span><h3>모든 작업이 남기는 것</h3><p>코드 버전 · 설정 해시 · 입력 체크섬 · 출력 버전 · 행 수 · 걸린 시간 · 최대 메모리 · 데이터 신선도</p></div>
+  </div>
+
+  <div class="strip">
+    <div class="box"><h3>단일 PC 그대로</h3><p>RAM 32GB · 12스레드. 클러스터처럼 꾸미지 않는다</p></div>
+    <div class="box"><h3>필요할 때만 켜기</h3><p>Docker Compose 프로필 stream · spark</p></div>
+    <div class="box"><h3>키 없이 시연</h3><p>합성 틱 · 녹화 재생으로 처음부터 끝까지</p></div>
+    <div class="box"><h3>데이터는 커밋 안 함</h3><p>받는 코드와 체크섬 목록만 레포에</p></div>
+  </div>
+
+  <div class="foot"><span>Market Data Platform · 그림 2 · 목표 구조</span><span>Bronze 원본 → Silver 정제 → Gold 연구용 (메달리온 레이크하우스)</span></div>
+</div></body></html>
