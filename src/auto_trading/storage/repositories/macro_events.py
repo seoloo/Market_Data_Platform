@@ -1,4 +1,9 @@
-"""G6의 시점별 거시 일정 판본을 읽는다. 완전성 인증은 이 계층의 책임이 아니다."""
+"""거시 일정(CPI · 고용 발표 등) 판본 읽기 — ``macro_events`` 표.
+
+언제 쓰나: 백테스트 G6 게이트가 '그 시점에 공개돼 있던 발표 일정' 을 볼 때.
+읽고 쓰는 것: ``macro_events`` 표 (읽기만). 완전성 인증은 이 계층의 책임이 아니다
+              (backtest/calendar_manifest 가 매니페스트로 따로 확인한다).
+"""
 
 from __future__ import annotations
 
@@ -21,11 +26,9 @@ class MacroEventRepository:
     def schedule_revisions(
         self, *, indicators: frozenset[str], as_of_ms: int
     ) -> tuple[ScheduledMacroEvent, ...]:
-        """감사 구간 끝까지 공개된 판본만 반환한다.
-
-        ``period``는 동일 이벤트의 판본을 묶는 영속 키다. 비어 있다면
-        일정을 임의로 추론하지 않고 데이터 오류로 거부한다.
-        """
+        """[쓰임] 고른 지표의 발표 일정 중 ``as_of_ms`` 까지 공개된 판본만 (지표 · 기간 · 판본 순).
+        [이유] 일정도 나중에 바뀐다 — 그때 몰랐던 새 판본을 쓰면 미래를 보는 셈이다. ``period`` 는
+               같은 발표의 판본을 묶는 키라, 비어 있으면 일정을 추측하지 않고 오류를 낸다."""
         if not indicators or as_of_ms <= 0:
             raise ValueError("조회할 이벤트 종류와 양수 as_of_ms가 필요하다")
         placeholders = ",".join("?" for _ in indicators)

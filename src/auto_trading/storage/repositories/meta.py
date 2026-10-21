@@ -1,4 +1,7 @@
-"""재현성 고정점 저장소 — 설정·코드 버전.
+"""재현성 고정점 저장소 — 설정 · 코드 버전 (``config_versions`` · ``code_versions`` 표).
+
+언제 쓰나: 백테스트 · Paper 실행이 시작할 때 '지금 설정 · 코드' 를 등록하고 그 번호를 결과에 남긴다.
+읽고 쓰는 것: ``config_versions`` · ``code_versions`` 표.
 
 "왜 그 거래가 발생했는가"를 재구성하려면 결정 시점의 **설정·코드·입력**이 모두
 고정되어야 한다 (03-data-model.md §2). 이 모듈은 앞의 두 개를 담당한다.
@@ -18,6 +21,8 @@ __all__ = ["CodeVersion", "ConfigVersion", "MetaRepository"]
 
 @dataclass(frozen=True, slots=True)
 class ConfigVersion:
+    """등록된 설정 하나 (번호 · 설정 해시 · 등록 시각)."""
+
     id: int
     hash: str
     created_ms: int
@@ -25,6 +30,8 @@ class ConfigVersion:
 
 @dataclass(frozen=True, slots=True)
 class CodeVersion:
+    """등록된 코드 상태 하나 (번호 · git 커밋 · 커밋 안 된 변경이 있었는지 · 등록 시각)."""
+
     id: int
     git_sha: str
     dirty: bool
@@ -32,15 +39,13 @@ class CodeVersion:
 
     @property
     def allows_live_trading(self) -> bool:
-        """커밋되지 않은 변경이 있으면 실거래를 금지한다 (게이트 G1.4).
-
-        재현할 수 없는 코드로 실거래를 하면 사후에 무슨 일이 있었는지 알 수 없다.
-        """
+        """[쓰임] 커밋되지 않은 변경이 없을 때만 True (게이트 G1.4).
+        [이유] 재현할 수 없는 코드로 돌리면 사후에 무슨 일이 있었는지 알 수 없다."""
         return not self.dirty
 
 
 class MetaRepository:
-    """설정·코드 버전을 등록하고 조회한다."""
+    """설정 · 코드 버전을 등록하고 조회하는 창구."""
 
     __slots__ = ("_conn",)
 
@@ -57,10 +62,8 @@ class MetaRepository:
         created_ms: int,
         note: str | None = None,
     ) -> ConfigVersion:
-        """설정 버전을 등록한다. 같은 해시면 기존 행을 재사용한다 (멱등).
-
-        재기동할 때마다 같은 설정으로 새 행이 생기면 이력이 무의미해진다.
-        """
+        """[쓰임] 설정을 등록하고 그 번호를 돌려준다. 같은 해시가 이미 있으면 그 줄을 그대로 쓴다.
+        [이유] 재기동할 때마다 같은 설정으로 새 줄이 생기면 이력이 무의미해진다 (멱등)."""
         existing = self.get_config_by_hash(config_hash)
         if existing is not None:
             return existing
@@ -71,6 +74,7 @@ class MetaRepository:
         return ConfigVersion(id=int(cursor.lastrowid or 0), hash=config_hash, created_ms=created_ms)
 
     def get_config_by_hash(self, config_hash: str) -> ConfigVersion | None:
+        """[쓰임] 설정 해시로 등록된 설정을 찾는다 (없으면 None)."""
         row = self._conn.execute(
             "SELECT id, hash, created_ms FROM config_versions WHERE hash = ?",
             (config_hash,),
@@ -82,7 +86,7 @@ class MetaRepository:
         )
 
     def get_config_json(self, config_version_id: int) -> str | None:
-        """과거 결정을 재현할 때 그 시점의 설정 원문을 꺼낸다."""
+        """[쓰임] 설정 번호로 그때의 설정 원문(JSON)을 꺼낸다 — 과거 결정을 재현할 때."""
         row = self._conn.execute(
             "SELECT config_json FROM config_versions WHERE id = ?", (config_version_id,)
         ).fetchone()
@@ -98,7 +102,10 @@ class MetaRepository:
         deps: dict[str, str],
         created_ms: int,
     ) -> CodeVersion:
-        """코드 버전을 등록한다. 같은 (sha, dirty, deps) 조합이면 재사용한다."""
+        """[쓰임] 코드 상태(커밋 · 변경 여부 · 의존성 버전)를 등록하고 번호를 돌려준다.
+        같은 조합이 이미 있으면 그 번호를 그대로 쓴다.
+        [이유] 의존성은 :func:`canonical_json` 으로 바꿔 저장한다 — 키 순서만 달라도 다른 줄이
+               생기는 일을 막는다."""
         deps_json = canonical_json(deps)
         row = self._conn.execute(
             "SELECT id, created_ms FROM code_versions"
@@ -121,6 +128,7 @@ class MetaRepository:
         )
 
     def get_code(self, code_version_id: int) -> CodeVersion | None:
+        """[쓰임] 코드 번호로 등록된 코드 상태를 찾는다 (없으면 None)."""
         row = self._conn.execute(
             "SELECT id, git_sha, dirty, created_ms FROM code_versions WHERE id = ?",
             (code_version_id,),
