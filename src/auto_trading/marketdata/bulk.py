@@ -1,4 +1,8 @@
-"""대량 병렬 수집 공통 루프.
+"""대량 병렬 수집 공통 루프 — 작업을 배치로 나눠 병렬로 받고, 배치마다 커밋한다.
+
+언제 쓰나: 여러 종목 · 여러 달을 한꺼번에 받는 수집 스크립트(``scripts/backfill_universe_*.py``).
+읽고 쓰는 것: 부르는 쪽이 넘긴 ``work``(받기) · ``write``(저장) 함수가 정한다. 이 루프는 DB 에
+              배치마다 커밋하고 WAL 을 잘라 낼 뿐이다.
 
 2026-09-22 에 두 가지로 실패했고, 그 둘을 한 곳에서 막기 위해 만들었다.
 
@@ -43,20 +47,21 @@ def run_batched(
     batch_size: int = DEFAULT_BATCH,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> None:
-    """``jobs`` 를 배치로 나눠 병렬 수행하고 배치마다 커밋한다.
-
-    ``work`` 는 스레드에서 돌고 (네트워크), ``write`` 는 메인 스레드에서 돈다 (SQLite).
-    SQLite 연결을 스레드 간에 공유하지 않기 위한 분리다.
-    """
+    """[쓰임] ``jobs`` 를 ``batch_size`` 개씩 ``work`` 로 병렬 처리하고, 배치마다 ``write`` → 커밋.
+    [이유] ``work`` 는 스레드에서(네트워크), ``write`` 는 메인 스레드에서(SQLite) 돈다 — SQLite
+           연결을 스레드끼리 나눠 쓰지 않으려고. 머리말의 두 실패(메모리 · 잠금)를 함께 막는다."""
     if batch_size < 1:
         raise ValueError(f"batch_size 는 1 이상이어야 한다: {batch_size}")
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for start in range(0, len(jobs), batch_size):
-            chunk = jobs[start : start + batch_size]
-            results = list(pool.map(work, chunk))
+        for batch_start in range(0, len(jobs), batch_size):
+            # 1 단계: 이번 배치만 병렬로 받는다 (결과가 메모리에 한 배치만 남게)
+            batch_jobs = jobs[batch_start : batch_start + batch_size]
+            results = list(pool.map(work, batch_jobs))
+            # 2 단계: 한 트랜잭션으로 저장 · 커밋, 결과를 비워 메모리를 돌려준다
             with db.transaction():
                 write(results)
             results.clear()
+            # 3 단계: WAL 을 잘라 파일이 커지지 않게
             db.connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             if on_progress is not None:
-                on_progress(min(start + batch_size, len(jobs)), len(jobs))
+                on_progress(min(batch_start + batch_size, len(jobs)), len(jobs))

@@ -1,4 +1,8 @@
-"""Binance 공개 데이터 아카이브 클라이언트 (data.binance.vision).
+"""Binance 공개 아카이브 클라이언트 (data.binance.vision) — zip 받기 · 체크섬 검증 · CSV 읽기.
+
+언제 쓰나: 백필 모듈(backfill · funding · metrics)과 수집 스크립트가 과거 자료를 받을 때.
+읽고 쓰는 것: ``https://data.binance.vision`` 의 zip 과 ``.CHECKSUM`` (읽기만). 디스크 · DB 에는
+              쓰지 않는다 — 파싱한 값을 돌려줄 뿐이고, 저장은 부르는 쪽(백필)이 한다.
 
 REST ``/fapi/v1/klines`` 로 수년치를 받으면 레이트 리밋을 크게 소모한다.
 공개 아카이브는 월/일 단위 zip 으로 제공되어 대량 백필에 적합하다 (08-external-apis.md §2).
@@ -56,6 +60,8 @@ _MS_UPPER_BOUND: Final = 4_102_444_800_000
 
 
 class Granularity(StrEnum):
+    """아카이브 파일 단위 — 한 달치(``monthly``) 또는 하루치(``daily``)."""
+
     MONTHLY = "monthly"
     DAILY = "daily"
 
@@ -80,7 +86,7 @@ class RemoteArchive(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ArchiveFile:
-    """아카이브 파일 하나 (월 또는 일 단위)."""
+    """봉(klines) 아카이브 파일 하나 (월 또는 일 단위)."""
 
     symbol: str
     timeframe: Timeframe
@@ -91,21 +97,27 @@ class ArchiveFile:
 
     @property
     def stem(self) -> str:
+        """[쓰임] 확장자 없는 파일 이름 — 예 ``BTCUSDT-1m-2024-03`` (월) · ``BTCUSDT-1m-2024-03-01``
+                  (일).
+        [이유] zip 안 CSV 이름도 이것과 같아야 한다 — 받은 뒤 내용물 이름을 대조하는 데 쓴다."""
         if self.granularity is Granularity.MONTHLY:
             return f"{self.symbol}-{self.timeframe.value}-{self.period:%Y-%m}"
         return f"{self.symbol}-{self.timeframe.value}-{self.period:%Y-%m-%d}"
 
     @property
     def filename(self) -> str:
+        """[쓰임] zip 파일 이름 (``<stem>.zip``)."""
         return f"{self.stem}.zip"
 
     def url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] zip 을 받을 전체 주소."""
         return (
             f"{base_url}/data/{self.market}/{self.granularity.value}/klines/"
             f"{self.symbol}/{self.timeframe.value}/{self.filename}"
         )
 
     def checksum_url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] 같은 zip 의 SHA-256 이 적힌 ``.CHECKSUM`` 파일 주소."""
         return f"{self.url(base_url)}.CHECKSUM"
 
     def __str__(self) -> str:
@@ -114,23 +126,27 @@ class ArchiveFile:
 
 @dataclass(frozen=True, slots=True)
 class FundingArchiveFile:
-    """funding rate 아카이브 (월 단위만 제공된다)."""
+    """funding rate 아카이브 파일 하나 (월 단위만 제공된다)."""
 
     symbol: str
     period: date
 
     @property
     def stem(self) -> str:
+        """[쓰임] 확장자 없는 파일 이름 — 예 ``BTCUSDT-fundingRate-2024-03``."""
         return f"{self.symbol}-fundingRate-{self.period:%Y-%m}"
 
     @property
     def filename(self) -> str:
+        """[쓰임] zip 파일 이름 (``<stem>.zip``)."""
         return f"{self.stem}.zip"
 
     def url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] zip 을 받을 전체 주소."""
         return f"{base_url}/data/futures/um/monthly/fundingRate/{self.symbol}/{self.filename}"
 
     def checksum_url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] 같은 zip 의 ``.CHECKSUM`` 파일 주소."""
         return f"{self.url(base_url)}.CHECKSUM"
 
     def __str__(self) -> str:
@@ -139,23 +155,27 @@ class FundingArchiveFile:
 
 @dataclass(frozen=True, slots=True)
 class MetricsArchiveFile:
-    """포지셔닝 지표 아카이브 (**일 단위만** 제공된다 — 월별 파일이 없다)."""
+    """포지셔닝 지표 아카이브 파일 하나 (**일 단위만** 제공된다 — 월별 파일이 없다)."""
 
     symbol: str
     period: date
 
     @property
     def stem(self) -> str:
+        """[쓰임] 확장자 없는 파일 이름 — 예 ``BTCUSDT-metrics-2024-03-09``."""
         return f"{self.symbol}-metrics-{self.period:%Y-%m-%d}"
 
     @property
     def filename(self) -> str:
+        """[쓰임] zip 파일 이름 (``<stem>.zip``)."""
         return f"{self.stem}.zip"
 
     def url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] zip 을 받을 전체 주소."""
         return f"{base_url}/data/futures/um/daily/metrics/{self.symbol}/{self.filename}"
 
     def checksum_url(self, base_url: str = BASE_URL) -> str:
+        """[쓰임] 같은 zip 의 ``.CHECKSUM`` 파일 주소."""
         return f"{self.url(base_url)}.CHECKSUM"
 
     def __str__(self) -> str:
@@ -163,7 +183,8 @@ class MetricsArchiveFile:
 
 
 def months_between(start: date, end: date) -> list[date]:
-    """``start`` 부터 ``end`` 까지 각 달의 1일을 나열한다 (양끝 포함)."""
+    """[쓰임] ``start`` 가 속한 달부터 ``end`` 가 속한 달까지, 각 달의 1 일을 차례로 (양끝 포함).
+    [이유] 다음 달 1 일은 '28 일 + 4 일' 로 구한다 — 달마다 날 수가 달라도 늘 다음 달이 된다."""
     if end < start:
         return []
     months: list[date] = []
@@ -176,23 +197,25 @@ def months_between(start: date, end: date) -> list[date]:
 
 
 def days_between(start: date, end: date) -> list[date]:
-    """``start`` 부터 ``end`` 까지 날짜를 나열한다 (양끝 포함)."""
+    """[쓰임] ``start`` 부터 ``end`` 까지 날짜를 하루씩 (양끝 포함). 순서가 뒤집혀 있으면 빈
+    목록."""
     if end < start:
         return []
-    return [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    return [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
 
 
 def _normalize_timestamp(raw: int) -> int:
-    """타임스탬프를 밀리초로 맞춘다.
-
-    Binance 아카이브는 원래 밀리초를 쓰지만 일부 시기의 파일이 마이크로초로 제공된 적이 있다.
-    단위를 잘못 읽으면 봉 시각이 통째로 어긋나고, 그 사실을 알아채기 어렵다.
-    방어적으로 정규화하고, 아래에서 봉 길이를 교차 검증한다.
-    """
+    """[쓰임] 타임스탬프를 밀리초로 맞춘다 (2100 년보다 큰 값이면 마이크로초로 보고 1000 으로
+              나눈다).
+    [이유] Binance 아카이브는 원래 밀리초를 쓰지만 일부 시기의 파일이 마이크로초로 제공된 적이 있다.
+           단위를 잘못 읽으면 봉 시각이 통째로 어긋나고, 그 사실을 알아채기 어렵다. 방어적으로
+           정규화하고, 아래에서 봉 길이를 교차 검증한다."""
     return raw // 1000 if raw > _MS_UPPER_BOUND else raw
 
 
 def _to_decimal(text: str, field: str, open_ms: int) -> Decimal:
+    """[쓰임] CSV 칸 글자를 Decimal 로 바꾼다. 못 읽으면 어느 칸 · 어느 시각인지 담아 오류를 낸다.
+    [이유] float 를 거치면 가격 · 수량 정밀도가 깨진다 (09-failure-modes.md F10)."""
     try:
         return Decimal(text.strip())
     except (InvalidOperation, AttributeError) as exc:
@@ -202,7 +225,9 @@ def _to_decimal(text: str, field: str, open_ms: int) -> Decimal:
 
 
 def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
-    """Binance klines CSV 를 :class:`Candle` 로 변환한다.
+    """[쓰임] Binance 봉(klines) CSV 를 :class:`Candle` 목록(시작 시각 순)으로 바꾼다.
+    [이유] 읽는 즉시 세 가지를 검사해 잘못된 파일을 조용히 받아들이지 않는다 — 칸 수, 시작 시각이 봉
+           경계에 맞는지, 봉 길이(close − open)가 타임프레임과 같은지(단위 오판 탐지).
 
     컬럼: open_time, open, high, low, close, volume, close_time, quote_volume,
     count, taker_buy_volume, taker_buy_quote_volume, ignore
@@ -217,6 +242,7 @@ def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
     candles: list[Candle] = []
 
     for line_no, row in enumerate(reader, start=1):
+        # 1 단계: 빈 줄 · 칸 수 · 헤더 줄 거르기
         if not row:
             continue
         if len(row) < _EXPECTED_COLUMNS:
@@ -228,6 +254,7 @@ def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
                 continue  # 헤더 행
             raise DataIntegrityError(f"open_time 이 숫자가 아니다 (line {line_no}): {row[0]!r}")
 
+        # 2 단계: 시각 단위 맞추기 · 봉 경계 · 봉 길이 검사
         open_ms = _normalize_timestamp(int(row[0]))
         close_ms = _normalize_timestamp(int(row[6]))
 
@@ -245,6 +272,7 @@ def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
                 "타임스탬프 단위가 다를 수 있다."
             )
 
+        # 3 단계: 봉 만들기 (Candle 이 OHLC 관계를 한 번 더 검사한다)
         candles.append(
             Candle(
                 open_ms=open_ms,
@@ -259,12 +287,13 @@ def parse_klines_csv(data: bytes, timeframe: Timeframe) -> tuple[Candle, ...]:
             )
         )
 
-    candles.sort(key=lambda c: c.open_ms)
+    candles.sort(key=lambda candle: candle.open_ms)
     return tuple(candles)
 
 
 def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
-    """fundingRate CSV 를 파싱한다.
+    """[쓰임] fundingRate CSV 를 :class:`FundingRate` 목록(정산 시각 순)으로 바꾼다.
+    [이유] 같은 정산 시각이 두 번 나오면 바로 오류 — 조용히 합치면 funding 비용이 두 배로 잡힌다.
 
     컬럼: ``calc_time, funding_interval_hours, last_funding_rate``.
     구버전 파일에는 헤더가 없을 수 있으므로 첫 줄을 보고 판단한다.
@@ -280,7 +309,7 @@ def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
         rows = rows[1:]  # 헤더
 
     rates: list[FundingRate] = []
-    seen: set[int] = set()
+    seen_funding_ms: set[int] = set()
     for line_no, row in enumerate(rows, start=1):
         if not row or not row[0].strip():
             continue
@@ -294,9 +323,9 @@ def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
             interval_hours = int(row[1])
         except ValueError as exc:
             raise DataIntegrityError(f"fundingRate 정수 파싱 실패 (line {line_no}): {exc}") from exc
-        if funding_ms in seen:
+        if funding_ms in seen_funding_ms:
             raise DataIntegrityError(f"funding 정산 시각 중복: {funding_ms} (line {line_no})")
-        seen.add(funding_ms)
+        seen_funding_ms.add(funding_ms)
         rates.append(
             FundingRate(
                 funding_ms=funding_ms,
@@ -305,12 +334,14 @@ def parse_funding_csv(data: bytes) -> tuple[FundingRate, ...]:
             )
         )
 
-    rates.sort(key=lambda r: r.funding_ms)
+    rates.sort(key=lambda rate: rate.funding_ms)
     return tuple(rates)
 
 
 def parse_metrics_csv(data: bytes) -> tuple[PerpMetrics, ...]:
-    """포지셔닝 지표 CSV 를 파싱한다.
+    """[쓰임] 포지셔닝 지표 CSV 를 :class:`PerpMetrics` 목록(시각 순)으로 바꾼다.
+    [이유] 거래소 파일 결함을 그대로 드러낸다 — 값이 다른 중복은 거부, 값이 같은 중복만 하나로
+           합치고, 빈 칸 줄은 메우지 않고 '그 시각 없음' 으로 둔다.
 
     컬럼: ``create_time, symbol, sum_open_interest, sum_open_interest_value,
     count_toptrader_long_short_ratio, sum_toptrader_long_short_ratio,
@@ -329,7 +360,7 @@ def parse_metrics_csv(data: bytes) -> tuple[PerpMetrics, ...]:
     if rows[0] and not rows[0][0].strip()[:1].isdigit():
         rows = rows[1:]  # 헤더
 
-    seen: dict[int, PerpMetrics] = {}
+    entry_by_ms: dict[int, PerpMetrics] = {}
     for line_no, row in enumerate(rows, start=1):
         if not row or not row[0].strip():
             continue
@@ -339,7 +370,7 @@ def parse_metrics_csv(data: bytes) -> tuple[PerpMetrics, ...]:
                 f"{_METRICS_COLUMNS}개를 기대한다"
             )
         at_ms = _parse_metrics_time(row[0], line_no)
-        if any(not row[i].strip() for i in range(2, _METRICS_COLUMNS)):
+        if any(not row[column].strip() for column in range(2, _METRICS_COLUMNS)):
             # 값이 비어 있는 스냅샷이 실제로 존재한다 (2026-09-22 실측: 2021-05-07 등).
             # 0 이나 직전값으로 메우지 않고 **그 시각을 없는 것으로** 둔다 — 결측은
             # find_gaps 가 드러내고, 그 구간에서는 신호를 만들지 않는다.
@@ -353,20 +384,21 @@ def parse_metrics_csv(data: bytes) -> tuple[PerpMetrics, ...]:
             account_long_short_ratio=_to_decimal(row[6], "account_long_short_ratio", at_ms),
             taker_buy_sell_ratio=_to_decimal(row[7], "taker_buy_sell_ratio", at_ms),
         )
-        previous = seen.get(at_ms)
+        previous = entry_by_ms.get(at_ms)
         if previous is not None and previous != entry:
             raise DataIntegrityError(
                 f"같은 시각에 서로 다른 지표가 있다 (line {line_no}, at_ms={at_ms})"
             )
-        seen[at_ms] = entry
+        entry_by_ms[at_ms] = entry
 
     # 빈 행은 거래소 측 결측이다. 하루 전체가 비어 있는 날도 실제로 있다
     # (2026-09-22 실측: 2021-12-31, 2022-01-01). 오류가 아니라 "그 시각 데이터 없음"
     # 이므로 빈 튜플을 돌려주고, 결과는 find_gaps 가 드러낸다.
-    return tuple(seen[key] for key in sorted(seen))
+    return tuple(entry_by_ms[at_ms] for at_ms in sorted(entry_by_ms))
 
 
 def _parse_metrics_time(text: str, line_no: int) -> int:
+    """[쓰임] ``YYYY-MM-DD HH:MM:SS`` (UTC) 글자를 epoch 밀리초로 바꾼다. 형식이 다르면 오류."""
     try:
         parsed = datetime.strptime(text.strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
     except ValueError as exc:
@@ -375,17 +407,20 @@ def _parse_metrics_time(text: str, line_no: int) -> int:
 
 
 def _extract_single_csv(payload: bytes, expected_stem: str) -> bytes:
+    """[쓰임] zip 에서 CSV 하나를 꺼낸다 — CSV 가 정확히 1 개, 이름이 ``<stem>.csv`` 여야 한다.
+    [이유] 엉뚱한 파일(다른 종목 · 다른 날)을 받아도 체크섬은 맞을 수 있어 내용물 이름까지 본다."""
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-        names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
-        if len(names) != 1:
-            raise DataIntegrityError(f"zip 안에 CSV 가 정확히 1개여야 한다: {names}")
-        if names[0] != f"{expected_stem}.csv":
-            raise DataIntegrityError(f"zip 내용물 이름이 예상과 다르다: {names[0]}")
-        return archive.read(names[0])
+        csv_names = [name for name in archive.namelist() if name.lower().endswith(".csv")]
+        if len(csv_names) != 1:
+            raise DataIntegrityError(f"zip 안에 CSV 가 정확히 1개여야 한다: {csv_names}")
+        if csv_names[0] != f"{expected_stem}.csv":
+            raise DataIntegrityError(f"zip 내용물 이름이 예상과 다르다: {csv_names[0]}")
+        return archive.read(csv_names[0])
 
 
 def _parse_checksum(text: str) -> str:
-    """``<sha256>  <filename>`` 형식에서 해시만 뽑는다."""
+    """[쓰임] ``.CHECKSUM`` 내용(``<sha256> <filename>``)에서 해시 64 자만 뽑아 소문자로
+    돌려준다."""
     parts = text.strip().split()
     if not parts or len(parts[0]) != 64:
         raise DataIntegrityError(f"CHECKSUM 형식을 읽을 수 없다: {text[:80]!r}")
@@ -393,7 +428,7 @@ def _parse_checksum(text: str) -> str:
 
 
 class BinanceVisionClient:
-    """공개 아카이브에서 캔들을 가져온다.
+    """공개 아카이브에서 zip 을 받아 체크섬을 확인하고 봉 · funding · 지표로 바꿔 주는 창구.
 
     ``httpx.Client`` 를 주입받으므로 테스트에서 ``MockTransport`` 로 대체할 수 있다.
     실제 네트워크 없이 전 경로를 검증한다.
@@ -410,6 +445,8 @@ class BinanceVisionClient:
         request_delay_s: float = 0.0,
         timeout_s: float = 60.0,
     ) -> None:
+        """[쓰임] ``client`` 를 주지 않으면 직접 만들고, 다 쓰면 :meth:`close` 가 그것만 닫는다.
+        [이유] 밖에서 받은 연결은 부른 쪽 것이라 여기서 닫지 않는다 (``_owns_client``)."""
         self.base_url = base_url.rstrip("/")
         self.max_retries = max_retries
         self.request_delay_s = request_delay_s
@@ -417,6 +454,7 @@ class BinanceVisionClient:
         self._client = client if client is not None else httpx.Client(timeout=timeout_s)
 
     def close(self) -> None:
+        """[쓰임] 이 클라이언트가 직접 만든 HTTP 연결만 닫는다."""
         if self._owns_client:
             self._client.close()
 
@@ -428,8 +466,11 @@ class BinanceVisionClient:
 
     # ------------------------------------------------------------- 내부
 
-    def _get(self, url: str) -> httpx.Response | None:
-        """GET 요청. 404 는 ``None`` (해당 기간 파일이 없음), 그 외 오류는 재시도."""
+    def _get_with_retry(self, url: str) -> httpx.Response | None:
+        """[쓰임] GET 요청. 404 는 None(그 기간 파일이 없음), 성공은 응답, 그 밖의 오류는 다시
+                  시도한다.
+        [이유] 네트워크 · 서버 오류는 잠깐 뒤 다시 하면 대개 풀린다. 기다림은 시도마다 두 배(최대 8
+               배). ``max_retries`` 번 모두 실패하면 :class:`ExchangeError`."""
         last_error: Exception | None = None
         for attempt in range(self.max_retries):
             if self.request_delay_s and attempt == 0:
@@ -451,18 +492,16 @@ class BinanceVisionClient:
     # ------------------------------------------------------------- 공개
 
     def download(self, file: RemoteArchive, *, verify_checksum: bool = True) -> bytes | None:
-        """zip 원문을 가져온다. 해당 기간 파일이 없으면 ``None``.
-
-        Raises:
-            DataIntegrityError: 체크섬 불일치.
-        """
-        response = self._get(file.url(self.base_url))
+        """[쓰임] zip 원문 바이트를 받는다. 그 기간 파일이 없으면 None.
+        [이유] ``.CHECKSUM`` 이 없거나 해시가 다르면 받지 않는다(:class:`DataIntegrityError`) — 검증
+               없이 들어온 데이터는 이후 모든 결과를 의심하게 만든다."""
+        response = self._get_with_retry(file.url(self.base_url))
         if response is None:
             return None
         payload = response.content
 
         if verify_checksum:
-            checksum_response = self._get(file.checksum_url(self.base_url))
+            checksum_response = self._get_with_retry(file.checksum_url(self.base_url))
             if checksum_response is None:
                 raise DataIntegrityError(
                     f"CHECKSUM 파일이 없다: {file}. 검증 없이 데이터를 받지 않는다."
@@ -478,7 +517,7 @@ class BinanceVisionClient:
     def fetch_candles(
         self, file: ArchiveFile, *, verify_checksum: bool = True
     ) -> tuple[Candle, ...] | None:
-        """아카이브를 받아 파싱한다. 파일이 없으면 ``None``."""
+        """[쓰임] 봉 아카이브를 받아(체크섬 확인) 봉 목록으로 돌려준다. 파일이 없으면 None."""
         payload = self.download(file, verify_checksum=verify_checksum)
         if payload is None:
             return None
@@ -488,7 +527,7 @@ class BinanceVisionClient:
     def fetch_funding(
         self, file: FundingArchiveFile, *, verify_checksum: bool = True
     ) -> tuple[FundingRate, ...] | None:
-        """funding 아카이브를 받아 파싱한다. 해당 달 파일이 없으면 ``None``."""
+        """[쓰임] funding 아카이브를 받아 정산 목록으로 돌려준다. 그 달 파일이 없으면 None."""
         payload = self.download(file, verify_checksum=verify_checksum)
         if payload is None:
             return None
@@ -497,7 +536,7 @@ class BinanceVisionClient:
     def fetch_metrics(
         self, file: MetricsArchiveFile, *, verify_checksum: bool = True
     ) -> tuple[PerpMetrics, ...] | None:
-        """지표 아카이브를 받아 파싱한다. 해당 날짜 파일이 없으면 ``None``."""
+        """[쓰임] 지표 아카이브를 받아 스냅샷 목록으로 돌려준다. 그 날짜 파일이 없으면 None."""
         payload = self.download(file, verify_checksum=verify_checksum)
         if payload is None:
             return None
@@ -505,5 +544,5 @@ class BinanceVisionClient:
 
 
 def utc_today(now_ms: int) -> date:
-    """epoch ms 를 UTC 날짜로 변환한다."""
+    """[쓰임] epoch 밀리초를 UTC 날짜로 바꾼다 (백필 끝 날짜를 정할 때)."""
     return datetime.fromtimestamp(now_ms / 1000, tz=UTC).date()
