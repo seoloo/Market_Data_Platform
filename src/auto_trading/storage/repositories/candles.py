@@ -1,4 +1,7 @@
-"""캔들 저장소.
+"""캔들(봉) 저장소 — ``candles`` · ``candle_gaps`` 표 읽기 · 쓰기.
+
+언제 쓰나: 백필(marketdata/backfill)이 봉을 넣고, 무결성 검사 · 스냅샷 · 백테스트가 봉을 읽을 때.
+읽고 쓰는 것: ``candles`` (봉), ``candle_gaps`` (발견한 빈 구간 기록).
 
 금액·수량은 ``TEXT``(Decimal 문자열)로 저장한다. ``float`` 를 거치면 정밀도가 깨진다
 (09-failure-modes.md F10).
@@ -22,7 +25,7 @@ __all__ = ["CandleGap", "CandleRepository"]
 
 @dataclass(frozen=True, slots=True)
 class CandleGap:
-    """연속되어야 할 봉 사이의 결측 구간."""
+    """연속되어야 할 봉 사이의 결측 구간 (빠진 첫 봉 · 마지막 봉의 시작 시각과 개수)."""
 
     timeframe: Timeframe
     missing_from_ms: int
@@ -31,6 +34,8 @@ class CandleGap:
 
 
 def _row_to_candle(row: sqlite3.Row) -> Candle:
+    """[쓰임] DB 한 줄을 :class:`Candle` 로 바꾼다 (TEXT 로 저장한 값은 Decimal 로 되돌린다).
+    [이유] Candle 을 만들 때 고가 ≥ 저가 같은 관계를 검사하므로, DB 의 잘못된 값도 여기서 막힌다."""
     return Candle(
         open_ms=int(row["open_ms"]),
         close_ms=int(row["close_ms"]),
@@ -45,7 +50,10 @@ def _row_to_candle(row: sqlite3.Row) -> Candle:
 
 
 class CandleRepository:
-    """캔들 읽기/쓰기. 저장소 접근은 전부 이 계층 뒤에 숨긴다."""
+    """캔들 읽기/쓰기 창구. 저장소 접근은 전부 이 계층 뒤에 숨긴다.
+
+    ``exchange`` 는 같은 표에 여러 거래소 봉을 함께 두기 위한 구분 값이다 (기본 바이낸스 USD-M).
+    """
 
     __slots__ = ("_conn", "exchange")
 
@@ -64,32 +72,29 @@ class CandleRepository:
         source: str,
         ingested_ms: int,
     ) -> int:
-        """캔들을 삽입하거나 갱신한다.
-
-        같은 봉을 여러 소스(bulk / rest / ws)에서 받을 수 있으므로 멱등해야 한다.
-        ``source`` 는 나중에 데이터 출처를 추적하기 위해 덮어쓴다.
-
-        Returns:
-            처리한 봉 수.
-        """
+        """[쓰임] 봉들을 넣고 처리한 봉 수를 돌려준다. 같은 봉(거래소 · 종목 · 타임프레임 · 시작
+                  시각)이 이미 있으면 새 값으로 바꾼다.
+        [이유] 같은 봉을 여러 출처(bulk / rest / ws)에서 받을 수 있으므로 몇 번 넣어도 결과가 같아야
+               한다 (멱등). ``source`` · ``ingested_ms`` 는 '어디서 · 언제 받은 값인가' 를
+               추적하려고 덮어쓴다."""
         rows = [
             (
                 self.exchange,
                 symbol,
                 timeframe.value,
-                c.open_ms,
-                c.close_ms,
-                str(c.open),
-                str(c.high),
-                str(c.low),
-                str(c.close),
-                str(c.volume),
-                str(c.quote_volume),
-                c.trade_count,
+                candle.open_ms,
+                candle.close_ms,
+                str(candle.open),
+                str(candle.high),
+                str(candle.low),
+                str(candle.close),
+                str(candle.volume),
+                str(candle.quote_volume),
+                candle.trade_count,
                 source,
                 ingested_ms,
             )
-            for c in candles
+            for candle in candles
         ]
         if not rows:
             return 0
@@ -119,10 +124,9 @@ class CandleRepository:
         to_ms: int | None = None,
         limit: int | None = None,
     ) -> tuple[Candle, ...]:
-        """구간 조회 (open_ms 오름차순).
-
-        ``limit`` 을 주면 **최근** N개를 가져와 다시 오름차순으로 돌려준다.
-        """
+        """[쓰임] 구간 ``[from_ms, to_ms]`` (봉 시작 시각 기준) 의 봉을 시간 순서로 돌려준다.
+        ``limit`` 을 주면 **가장 최근** N 개를 가져와 다시 시간 순서로 돌려준다.
+        [이유] 최근 N 개는 DB 에서 내림차순으로 잘라 와야 빠르다 — 그래서 뒤집어서 돌려준다."""
         clauses = ["exchange = ?", "symbol = ?", "timeframe = ?"]
         params: list[object] = [self.exchange, symbol, timeframe.value]
         if from_ms is not None:
@@ -142,7 +146,7 @@ class CandleRepository:
         rows = self._conn.execute(sql, params).fetchall()
         if limit is not None:
             rows = list(reversed(rows))
-        return tuple(_row_to_candle(r) for r in rows)
+        return tuple(_row_to_candle(row) for row in rows)
 
     def get_closed_series(
         self,
@@ -152,22 +156,21 @@ class CandleRepository:
         *,
         limit: int,
     ) -> TimeframeSeries:
-        """``as_of_ms`` 시점에 **마감된** 봉만 담은 시계열.
-
-        형성 중인 봉을 제외하는 것이 look-ahead 차단의 기본이다 (AGENTS.md §3.2).
-        ``close_ms <= as_of_ms`` 조건이 그 역할을 한다.
-        """
+        """[쓰임] ``as_of_ms`` 시점에 **이미 마감된** 봉만 최근 ``limit`` 개 담아 시계열로 돌려준다.
+        [이유] 아직 형성 중인 봉을 쓰면 그 시점에는 몰랐던 값(미래)을 보는 셈이다 (look-ahead,
+               AGENTS.md §3.2). ``close_ms <= as_of_ms`` 조건이 그것을 막는다."""
         rows = self._conn.execute(
             "SELECT * FROM candles"
             " WHERE exchange = ? AND symbol = ? AND timeframe = ? AND close_ms <= ?"
             " ORDER BY open_ms DESC LIMIT ?",
             (self.exchange, symbol, timeframe.value, as_of_ms, limit),
         ).fetchall()
-        candles = tuple(_row_to_candle(r) for r in reversed(rows))
+        candles = tuple(_row_to_candle(row) for row in reversed(rows))
         return TimeframeSeries(timeframe=timeframe, candles=candles)
 
     def last_open_ms(self, symbol: str, timeframe: Timeframe) -> int | None:
-        """마지막으로 저장된 봉의 시작 시각. 백필 재개 지점을 찾는 데 쓴다."""
+        """[쓰임] 마지막으로 저장된 봉의 시작 시각 (없으면 None).
+        [이유] 백필을 이어 받을 지점을 찾는 데 쓴다."""
         row = self._conn.execute(
             "SELECT MAX(open_ms) AS m FROM candles"
             " WHERE exchange = ? AND symbol = ? AND timeframe = ?",
@@ -176,6 +179,7 @@ class CandleRepository:
         return None if row is None or row["m"] is None else int(row["m"])
 
     def first_open_ms(self, symbol: str, timeframe: Timeframe) -> int | None:
+        """[쓰임] 처음 저장된 봉의 시작 시각 (없으면 None) — 무결성 검사의 시작점."""
         row = self._conn.execute(
             "SELECT MIN(open_ms) AS m FROM candles"
             " WHERE exchange = ? AND symbol = ? AND timeframe = ?",
@@ -184,6 +188,7 @@ class CandleRepository:
         return None if row is None or row["m"] is None else int(row["m"])
 
     def count(self, symbol: str, timeframe: Timeframe) -> int:
+        """[쓰임] 저장된 봉 개수."""
         row = self._conn.execute(
             "SELECT COUNT(*) AS c FROM candles WHERE exchange = ? AND symbol = ? AND timeframe = ?",
             (self.exchange, symbol, timeframe.value),
@@ -200,11 +205,9 @@ class CandleRepository:
         from_ms: int | None = None,
         to_ms: int | None = None,
     ) -> tuple[CandleGap, ...]:
-        """결측 구간을 찾는다.
-
-        SQL 로 직접 인접 봉 간격을 비교한다. 전 구간을 파이썬으로 끌어오면
-        수백만 행에서 메모리를 낭비한다.
-        """
+        """[쓰임] 이웃한 두 봉 사이가 봉 하나 길이보다 벌어진 곳(빠진 봉)을 모두 찾는다.
+        [이유] SQL 창 함수(``LEAD``)로 DB 안에서 바로 비교한다 — 수백만 행을 파이썬으로 끌어오면
+               메모리를 낭비한다."""
         clauses = ["exchange = ?", "symbol = ?", "timeframe = ?"]
         params: list[object] = [self.exchange, symbol, timeframe.value]
         if from_ms is not None:
@@ -225,19 +228,20 @@ class CandleRepository:
         params.append(timeframe.ms)
         rows = self._conn.execute(sql, params).fetchall()
 
-        step = timeframe.ms
+        bar_ms = timeframe.ms
         return tuple(
             CandleGap(
                 timeframe=timeframe,
-                missing_from_ms=int(r["open_ms"]) + step,
-                missing_to_ms=int(r["next_ms"]) - step,
-                bar_count=(int(r["next_ms"]) - int(r["open_ms"])) // step - 1,
+                missing_from_ms=int(row["open_ms"]) + bar_ms,
+                missing_to_ms=int(row["next_ms"]) - bar_ms,
+                bar_count=(int(row["next_ms"]) - int(row["open_ms"])) // bar_ms - 1,
             )
-            for r in rows
+            for row in rows
         )
 
     def record_gaps(self, symbol: str, gaps: Sequence[CandleGap], *, detected_ms: int) -> int:
-        """발견한 갭을 기록한다. 같은 갭을 다시 넣어도 중복되지 않는다."""
+        """[쓰임] 찾은 빈 구간을 ``candle_gaps`` 에 '미해결' 로 적는다 (같은 구간은 한 줄만).
+        [이유] 빈 구간이 남아 있으면 진입을 막는 게이트(G2.3)가 이 표를 본다."""
         if not gaps:
             return 0
         self._conn.executemany(
@@ -252,19 +256,21 @@ class CandleRepository:
                 (
                     self.exchange,
                     symbol,
-                    g.timeframe.value,
-                    g.missing_from_ms,
-                    g.missing_to_ms,
-                    g.bar_count,
+                    gap.timeframe.value,
+                    gap.missing_from_ms,
+                    gap.missing_to_ms,
+                    gap.bar_count,
                     detected_ms,
                 )
-                for g in gaps
+                for gap in gaps
             ],
         )
         return len(gaps)
 
     def resolve_gaps(self, symbol: str, timeframe: Timeframe, *, resolved_ms: int) -> int:
-        """이제 데이터가 채워진 갭을 해소 처리한다."""
+        """[쓰임] 이제 봉이 다 채워진 빈 구간을 '해소' 로 바꾸고, 바꾼 개수를 돌려준다.
+        [이유] 빈 구간 안의 봉 수가 ``bar_count`` 이상일 때만 해소로 본다 — 일부만 채워진 구간을
+               해소로 잘못 처리하지 않는다."""
         cursor = self._conn.execute(
             "UPDATE candle_gaps SET resolved = 1, resolved_ms = ?"
             " WHERE exchange = ? AND symbol = ? AND timeframe = ? AND resolved = 0"
@@ -279,7 +285,8 @@ class CandleRepository:
         return cursor.rowcount
 
     def open_gap_count(self, symbol: str, timeframe: Timeframe | None = None) -> int:
-        """미해결 갭 수. 0 이 아니면 진입을 거부한다 (게이트 G2.3)."""
+        """[쓰임] 아직 해소되지 않은 빈 구간 수 (``timeframe`` 을 주면 그 타임프레임만).
+        [이유] 0 이 아니면 진입을 거부한다 (게이트 G2.3) — 빠진 봉 위에서 판단하지 않는다."""
         if timeframe is None:
             row = self._conn.execute(
                 "SELECT COUNT(*) AS c FROM candle_gaps"
