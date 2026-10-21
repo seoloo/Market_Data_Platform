@@ -13,6 +13,7 @@
   --ok:     #1f8a5b;  --ok-wash:     #e8f5ee;
   --warn:   #d48a1c;  --warn-wash:   #fdf3e3;
   --bad:    #c2453d;  --bad-wash:    #fbecea;
+  --db:     #6b4fbb;  --db-wash:     #f1edfa;   /* 로컬 PostgreSQL (작은 기록 · 조회 표) */
   --muted:  #8a8f98;
 }
 
@@ -67,6 +68,8 @@ body {
 .okbox .tag { background: var(--ok); color: #fff; }
 .badbox { border-color: var(--bad); background: var(--bad-wash); }
 .badbox .tag { background: var(--bad); color: #fff; }
+.dbbox  { border-color: var(--db); background: var(--db-wash); }
+.dbbox .tag { background: var(--db); color: #fff; }
 .plain .tag { background: var(--ink); color: #fff; }
 
 /* 화살표 */
