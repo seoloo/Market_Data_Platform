@@ -231,6 +231,7 @@ def test_main_probe_and_fetch_end_to_end(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger="mdp.bronze.fetch")
+    monkeypatch.delenv("MDP_PG_DSN", raising=False)  # 실행 기록 없이
     transport, _ = _transport(_source())
     real_client: Callable[..., httpx.Client] = httpx.Client
     monkeypatch.setattr(
@@ -258,4 +259,5 @@ def test_main_probe_and_fetch_end_to_end(
     assert main(common) == 0
     out = caplog.text
     assert '"status": "downloaded"' in out and '"changed": 1' in out
+    assert '"event": "runlog_off"' in out
     assert PAYLOAD_SHA256 in manifest.read_text()

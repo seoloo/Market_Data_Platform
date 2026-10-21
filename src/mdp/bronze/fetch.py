@@ -4,7 +4,8 @@
 읽고 쓰는 것:
 - 읽기: ``https://data.binance.vision`` 의 zip · ``.CHECKSUM``
 - 쓰기: Bronze 폴더 ``<root>/<원천 경로>`` 의 zip 과 ``.CHECKSUM`` (한 번 쓴 파일은 바꾸지 않는다),
-        체크섬 목록 ``manifests/bronze/binance.csv`` (경로 · 크기 · SHA-256, 저장소에 커밋)
+        체크섬 목록 ``manifests/bronze/binance.csv`` (경로 · 크기 · SHA-256, 저장소에 커밋),
+        실행 기록 PostgreSQL ``pipeline_runs`` · ``run_artifacts`` (``MDP_PG_DSN`` 이 있을 때만)
 
 사용 예::
 
@@ -30,7 +31,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -41,6 +42,7 @@ import httpx
 
 from mdp.bronze.archive import BASE_URL, ArchiveFile, Dataset, Granularity, months_between
 from mdp.errors import BronzeConflictError, DataIntegrityError, SourceUnavailableError
+from mdp.runlog.recorder import Artifact, NullRecorder, PostgresRecorder, RunRecorder, record_run
 
 __all__ = [
     "BronzeFetcher",
@@ -49,6 +51,7 @@ __all__ = [
     "default_bronze_root",
     "main",
     "parse_checksum",
+    "run_fetch",
     "update_manifest",
 ]
 
@@ -360,56 +363,92 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--probe", action="store_true", help="받지 않고 원천 크기만 본다")
+    parser.add_argument(
+        "--pg-dsn",
+        default=os.environ.get("MDP_PG_DSN"),
+        help="실행 기록 PostgreSQL 주소 (기본: MDP_PG_DSN, 없으면 기록 안 함)",
+    )
     return parser
 
 
+def run_fetch(
+    fetcher: BronzeFetcher,
+    files: Sequence[ArchiveFile],
+    manifest_path: Path,
+    recorder: RunRecorder,
+    params: Mapping[str, object],
+) -> list[FetchResult]:
+    """[쓰임] 파일들을 차례로 받고, 하나 받을 때마다 실행 기록에 산출물을 남기고, 끝에 체크섬 목록을
+              고친다.
+    [이유] 중간에 실패해도 그때까지 받은 파일은 체크섬 목록에 남기고(``finally``), 실행 기록에는
+           실패와 오류 한 줄이 남는다(:func:`record_run`)."""
+    results: list[FetchResult] = []
+    try:
+        with record_run(recorder, "bronze.fetch", params) as run:
+            for file in files:
+                result = fetcher.fetch(file)
+                results.append(result)
+                run.add(
+                    Artifact(
+                        path=file.relative_path,
+                        layer="bronze",
+                        status=result.status.value,
+                        size_bytes=result.size_bytes,
+                        sha256=result.sha256,
+                        elapsed_s=round(result.elapsed_s, 3),
+                    )
+                )
+                _log_json(
+                    event="fetch",
+                    path=file.relative_path,
+                    status=result.status.value,
+                    size_bytes=result.size_bytes,
+                    sha256=result.sha256,
+                    elapsed_s=round(result.elapsed_s, 3),
+                )
+            _log_json(event="run", run_id=str(run.run_id), job="bronze.fetch")
+    finally:
+        changed_count = update_manifest(manifest_path, results)
+        _log_json(event="manifest", path=str(manifest_path), changed=changed_count)
+    return results
+
+
+def _log_json(**fields: object) -> None:
+    """[쓰임] 한 줄 JSON 로그 — 사람이 읽고, 오케스트레이터(4-6)도 그대로 읽는다."""
+    log.info(json.dumps(fields, ensure_ascii=False))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """[쓰임] 명령줄 실행 — 달마다 받고(또는 크기만 보고) 체크섬 목록을 고친다. 결과는 한 줄 JSON
-              로그.
-    [이유] 로그를 JSON 한 줄로 남겨, 3-2 실행 기록 · 4-6 오케스트레이터가 그대로 읽을 수 있게."""
+    """[쓰임] 명령줄 실행 — 달마다 받고(또는 크기만 보고) 체크섬 목록 · 실행 기록을 남긴다.
+    [이유] DB 주소가 없으면 기록만 빼고 그대로 돈다 — DB 를 안 띄운 PC 에서도 받기는 된다."""
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     logging.getLogger("httpx").setLevel(logging.WARNING)  # 요청마다 찍히는 줄은 JSON 로그를 가린다
     args = _build_parser().parse_args(argv)
+    last_month: date = args.to_month or args.from_month
     files = [
         ArchiveFile(Dataset(args.dataset), args.symbol, month, Granularity.MONTHLY, args.interval)
-        for month in months_between(args.from_month, args.to_month or args.from_month)
+        for month in months_between(args.from_month, last_month)
     ]
     bronze_root: Path = args.root or default_bronze_root()
     with BronzeFetcher(bronze_root) as fetcher:
         if args.probe:
             for file in files:
-                size_bytes = fetcher.probe(file)
-                log.info(
-                    json.dumps(
-                        {"event": "probe", "path": file.relative_path, "size_bytes": size_bytes},
-                        ensure_ascii=False,
-                    )
-                )
+                _log_json(event="probe", path=file.relative_path, size_bytes=fetcher.probe(file))
             return 0
-        results = []
-        for file in files:
-            result = fetcher.fetch(file)
-            results.append(result)
-            log.info(
-                json.dumps(
-                    {
-                        "event": "fetch",
-                        "path": file.relative_path,
-                        "status": result.status.value,
-                        "size_bytes": result.size_bytes,
-                        "sha256": result.sha256,
-                        "elapsed_s": round(result.elapsed_s, 3),
-                    },
-                    ensure_ascii=False,
-                )
-            )
-    changed_count = update_manifest(args.manifest, results)
-    log.info(
-        json.dumps(
-            {"event": "manifest", "path": str(args.manifest), "changed": changed_count},
-            ensure_ascii=False,
-        )
-    )
+        params: dict[str, object] = {
+            "dataset": args.dataset,
+            "symbol": args.symbol,
+            "from_month": f"{args.from_month:%Y-%m}",
+            "to_month": f"{last_month:%Y-%m}",
+            "interval": args.interval,
+            "bronze_root": str(bronze_root),
+        }
+        if args.pg_dsn:
+            with PostgresRecorder(args.pg_dsn) as recorder:
+                run_fetch(fetcher, files, args.manifest, recorder, params)
+        else:
+            _log_json(event="runlog_off", reason="MDP_PG_DSN 없음 — 실행 기록 없이 받는다")
+            run_fetch(fetcher, files, args.manifest, NullRecorder(), params)
     return 0
 
 
