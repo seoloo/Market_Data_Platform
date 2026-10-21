@@ -39,7 +39,7 @@ line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
 # 문서의 코드 블록은 의사코드가 섞여 있으므로 포맷 대상에서 제외한다.
-extend-exclude = ["docs", "*.md", "retired"]
+extend-exclude = ["docs", "*.md"]
 
 [tool.ruff.lint]
 select = [

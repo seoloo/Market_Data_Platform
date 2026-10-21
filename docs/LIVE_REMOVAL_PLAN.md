@@ -128,6 +128,8 @@ Paper · 연구 스크립트 5 개가 이 용도로 쓴다(`run_paper_o1` · `ru
 
 3 번을 '남김' 으로 하면 위 표에서 파일 5 개(코드 3 · 시험 2)와 시험 46 개가 빠진다(지우는 시험 963 개).
 
+**정함 (2026-10-21 사용자 "정할 것 5가지 추천대로 하고")**: 1 지움 · 2 지움 · 3 남김 · 4 지움 · 5 이번엔 남김.
+
 ## 이번 범위 밖 (기록만)
 
 - **개인 정보가 남은 문서**:
@@ -142,9 +144,16 @@ Paper · 연구 스크립트 5 개가 이 용도로 쓴다(`run_paper_o1` · `ru
 
 각 묶음마다 전체 pytest · `pytest -m leakage` · mypy · ruff · lint-imports 를 돌리고 커밋한다.
 
-1. `retired/` · `deploy/tasks/` · `docs/supabase/` (아무도 import 하지 않음)
+1. `retired/` · `docs/supabase/` (아무도 import 하지 않음)
 2. 화면(E) · 봇 · 대시보드 스크립트
-3. 실거래 실행 스크립트(C) · 계산(D) · 창구(F)
+3. 실거래 실행 스크립트(C) · 계산(D) · 창구(F), `deploy/tasks/` — 예약 틀은 `ops/task_setup` 과 그 시험
+   (`test_templates_are_clean` 이 실제 XML 을 읽는다)이 쓰므로 함께 지운다
 4. 주문 실행기(B) · 주문 기록 저장소(G)
 5. 거래소 연결(A), `binance_spot` 쪼개기, `secrets.py` · `.env.example` · `pyproject.toml`
 6. 고칠 곳(위 표)과 남은 시험 정리
+
+## 진행 기록
+
+| 묶음 | 지운 것 | 확인 |
+|---|---|---|
+| 1 | `retired/` (13 개 · 3,759 줄) · `docs/supabase/schema.sql`, `pyproject.toml` ruff 제외 목록에서 `retired` | pytest 4,447 통과 · 10 건너뜀(그대로 — `retired/tests` 는 원래 시험 경로 밖) · leakage 157 통과 · mypy 15 건(그대로) · lint-imports 5 개 지킴 · ruff 16 건 · 서식 3 파일(그대로 — 연구 스크립트 `run_deneb1x_262` · `run_qqq_combo_263` · `run_split_264` 에 원래 있던 것) |
