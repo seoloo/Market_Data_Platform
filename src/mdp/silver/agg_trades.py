@@ -239,6 +239,7 @@ def build_outputs(
     kline_csv_paths: Sequence[str],
     run_id: str,
     materialize: Callable[[Any, str], Any] | None = None,
+    volume_tolerance_pct: float = VOLUME_TOLERANCE_PCT,
 ) -> SilverOutputs:
     """[쓰임] 한 달치 Silver 결과를 만든다(쓰지는 않음). 흐름은 파일 머리말 1 ~ 5 단계.
               ``materialize(df, 이름)`` 를 주면 형식을 맞춘 줄과 깨끗한 체결을 한 번 디스크에 써
@@ -427,7 +428,7 @@ def build_outputs(
             "suspect",
             (F.col("missing_ids_inside_day") != 0)
             | F.col("kline_volume").isNull()
-            | (F.col("volume_diff_pct") > VOLUME_TOLERANCE_PCT),
+            | (F.col("volume_diff_pct") > volume_tolerance_pct),
         )
         .withColumn("period_month", F.lit(month_text))
         .withColumn("run_id", F.lit(run_id))
@@ -525,10 +526,16 @@ def run_silver(
     manifest_path: Path,
     staging_root: Path,
     recorder: RunRecorder,
+    volume_tolerance_pct: float = VOLUME_TOLERANCE_PCT,
 ) -> dict[str, tuple[int, int]]:
     """[쓰임] 한 달치 Silver 를 처음부터 끝까지 — 출처 정하기 → 검증 · 풀기 → 만들기 → 쓰기 → 보고.
     [이유] 실행 기록에 표마다 Delta 버전을 남겨, 나중에 '이 실행이 만든 표' 를 시간여행으로 연다."""
-    params = {"symbol": symbol, "month": f"{month:%Y-%m}", "bronze_root": str(bronze_root)}
+    params = {
+        "symbol": symbol,
+        "month": f"{month:%Y-%m}",
+        "bronze_root": str(bronze_root),
+        "volume_tolerance_pct": volume_tolerance_pct,  # 규칙 값 — 재처리 때 무엇을 바꿨는지 남긴다
+    }
     manifest = read_manifest(manifest_path)
     with record_run(recorder, "silver.agg_trades", params) as run:
         # 1 단계: 출처 정하기 — 체크섬 목록에 있는 것만.
@@ -578,6 +585,7 @@ def run_silver(
                 kline_csvs,
                 str(run.run_id),
                 materialize=to_parquet,
+                volume_tolerance_pct=volume_tolerance_pct,
             )
             written = write_outputs(outputs, symbol, month)
             report_path = _write_report(outputs, symbol, month)
@@ -615,6 +623,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--month", required=True, type=_parse_month, help="YYYY-MM")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--pg-dsn", default=os.environ.get("MDP_PG_DSN"))
+    parser.add_argument(
+        "--volume-tolerance-pct",
+        type=float,
+        default=VOLUME_TOLERANCE_PCT,
+        help=f"날 거래량이 공식 1 분봉과 이만큼(%%) 넘게 다르면 의심일 "
+        f"(기본 {VOLUME_TOLERANCE_PCT})",
+    )
     args = parser.parse_args(argv)
     staging_root = Path(os.environ.get("MDP_STAGING_ROOT", "/tmp/mdp-staging"))
 
@@ -626,6 +641,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest_path=args.manifest,
             staging_root=staging_root,
             recorder=recorder,
+            volume_tolerance_pct=args.volume_tolerance_pct,
         )
 
     if args.pg_dsn:

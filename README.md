@@ -10,13 +10,14 @@
 | 정확성 | 기존 연구 스크립트의 전수 검산 결과와 **모든 항목 일치** (매시 00분 점검값 744/744) |
 | 발견 | 같은 비교에서 기존 빠른 추출기의 **덩어리 경계 버그**를 찾아 원인까지 확인 ([기록](docs/findings/2026-10-21-qflow216-check-minute-chunk-boundary.md)) |
 | 재현성 | 같은 달을 다시 만들어 Delta 이전 버전과 행 단위로 비교 — **차이 0행** |
+| 재처리 | 감사 규칙을 바꿔 다시 만들자 **한 표 한 칸 10행만** 바뀐 것을 시간여행으로 증명, `RESTORE`로 되돌린 뒤 7개 표 모두 원래와 같음 ([기록](docs/REPROCESSING.md)) |
 | 교차 검산 | Spark가 쓴 날 감사 31일을 DuckDB로 처음부터 다시 계산 — **소수점까지 일치**, 6,651만 행 검산 9.5초 |
 | 연구 재현 | Gold 1분봉이 연구 문서의 "2024-03-01, 1,440분 중 1,110분 일치 · 하루 거래량 차 −3.5e-6"을 **같은 숫자로** 다시 냄 ([기록](docs/GOLD_BARS_1M.md)) |
 | 성능 | Silver 한 달치 **65분 → 18분** (Spark 지연 실행 때문에 반복되던 계산을 한 번으로) |
 | 벤치마크 | 같은 과제를 4가지로 — **DuckDB 12초** · Spark 105초 · 기존 전수 추출 134초, 셋 다 같은 답 ([기록](docs/BENCHMARK.md)) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
-> 프로젝트입니다. 지금은 Bronze · Silver · Gold와 DuckDB 조회 층 · PostgreSQL 내보내기까지 구현했고, 재처리 시연 · Airflow · Kafka가 다음 차례입니다
+> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리까지 구현했고, Airflow · Kafka가 다음 차례입니다
 > ([로드맵](docs/ROADMAP.md)).
 
 ## 1. 지금 구현된 흐름
@@ -115,6 +116,7 @@ PostgreSQL `gold_bars_1m`은 `bars_1m`의 조회용 복사본입니다(달 단�
 | 버그 발견 | 위 비교에서 기존 **빠른** 추출기와만 1분이 다름 | 32MB 덩어리 경계가 점검 분 중간(09:00:14)에 걸리면 나머지를 건너뛰는 조건 오류 — 해당 분 8,490건 중 2,630건만 셈 |
 | 최적화 전후 | Delta 시간여행으로 느린 판(v0)과 빠른 판(v1)을 `exceptAll` 양방향 비교 | 66,512,993행 차이 0 |
 | 날 대조 | 31일 거래량을 공식 1분봉 합계와 비교 | 모두 통과, 최대 차이 0.00046% |
+| 재처리 영향 범위 | 의심일 기준 0.5% → 0.0001%로 다시 만들고 7개 표의 이전 · 새 버전을 키로 맞대기 (`mdp.reprocess`) | 바뀐 것은 날 감사 10행의 `suspect` 칸뿐, 체결 · 봉은 0행 변경. `RESTORE` 뒤 모두 원래와 같음 |
 | 복사본 증명 | Gold Delta → PostgreSQL 복사 후 같은 행 · 같은 순서로 이어 붙인 SHA-256을 양쪽에서 따로 계산 | 44,640행 같음, 다시 복사해도 한 벌 |
 | 결함 주입 | 머리줄 · 깨진 줄 · 기간 밖 · 빈 곳 · 두 종류 중복 · 역행 · 마이크로초 시각을 넣은 작은 CSV | Spark 시험 7개 통과 |
 | 세 엔진 교차 | 같은 월 파일을 기존 전수 추출 · DuckDB · Spark로 따로 계산 (벤치마크) | 세 엔진 모두 같은 답, 기존 빠른 추출만 버그 1분 |
@@ -185,12 +187,13 @@ python -m mdp.query.sql "SELECT trade_date, rows, suspect FROM silver_agg_trades
 python -m mdp.bench.main --symbol BTCUSDT --month 2024-03 --rounds 2                       # 벤치마크 (약 10분)
 docker compose run --rm spark python -m mdp.gold.bars_1m --symbol BTCUSDT --month 2024-03  # Gold 1분봉
 python -m mdp.serve.bars_1m --symbol BTCUSDT --month 2024-03                               # PostgreSQL로 복사 · 체크섬
+python -m mdp.reprocess.main --symbol BTCUSDT --month 2024-03 --volume-tolerance-pct 0.0001 # 규칙 바꿔 재처리 · 비교
 ```
 
 시험:
 
 ```bash
-pytest tests/mdp                                                   # 파이프라인 시험 58개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
+pytest tests/mdp                                                   # 파이프라인 시험 62개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
 docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 10개 (컨테이너 안)
 ruff check src tests && mypy
 ```
@@ -211,6 +214,7 @@ src/mdp/
 ├─ silver/    출처 고르기 · 검증 · 풀기(sources) · Silver 체결 감사(agg_trades)
 ├─ gold/      Gold 1분봉 · 공식 봉 대조(bars_1m)
 ├─ serve/     Gold → PostgreSQL 복사 · 양쪽 체크섬(bars_1m)
+├─ reprocess/ 재처리 — 다시 만들기 · 버전 비교(diff) · 되돌리기(restore)
 ├─ spark/     Delta를 켠 로컬 Spark 세션 · 표 경로
 ├─ runlog/    실행 기록(PostgreSQL) · 마이그레이션 SQL
 ├─ query/     DuckDB 조회 층 — Delta 뷰 · 교차 검산(check_silver) · SQL 실행
@@ -225,9 +229,9 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 |
-| ⏳ 다음 | 재처리 시연 — 규칙 변경 → 다시 만들기 → Delta 시간여행으로 전후 비교 |
-| ⏳ 이후 | Airflow → Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 |
+| ⏳ 다음 | Airflow로 묶기 — 받기 → Silver → 검산 → Gold → 복사, 재시도 · 백필 |
+| ⏳ 이후 | Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.
 
