@@ -12,6 +12,7 @@
 | 재현성 | 같은 달을 다시 만들어 Delta 이전 버전과 행 단위로 비교 — **차이 0행** |
 | 교차 검산 | Spark가 쓴 날 감사 31일을 DuckDB로 처음부터 다시 계산 — **소수점까지 일치**, 6,651만 행 검산 9.5초 |
 | 성능 | Silver 한 달치 **65분 → 18분** (Spark 지연 실행 때문에 반복되던 계산을 한 번으로) |
+| 벤치마크 | 같은 과제를 4가지로 — **DuckDB 12초** · Spark 105초 · 기존 전수 추출 134초, 셋 다 같은 답 ([기록](docs/BENCHMARK.md)) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
 > 프로젝트입니다. 지금은 Bronze · Silver와 DuckDB 조회 층까지 구현했고, Gold · Airflow · Kafka가 다음 차례입니다
@@ -103,6 +104,7 @@ data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-03.zip
 | 최적화 전후 | Delta 시간여행으로 느린 판(v0)과 빠른 판(v1)을 `exceptAll` 양방향 비교 | 66,512,993행 차이 0 |
 | 날 대조 | 31일 거래량을 공식 1분봉 합계와 비교 | 모두 통과, 최대 차이 0.00046% |
 | 결함 주입 | 머리줄 · 깨진 줄 · 기간 밖 · 빈 곳 · 두 종류 중복 · 역행 · 마이크로초 시각을 넣은 작은 CSV | Spark 시험 7개 통과 |
+| 세 엔진 교차 | 같은 월 파일을 기존 전수 추출 · DuckDB · Spark로 따로 계산 (벤치마크) | 세 엔진 모두 같은 답, 기존 빠른 추출만 버그 1분 |
 | 멱등 | 같은 받기 · 같은 달 Silver를 두 번 | 두 번째는 받지 않고 건너뜀, 체크섬 목록 변경 0, Silver는 같은 내용의 새 버전 |
 
 기존 연구 문서와 스크립트는 고치지 않았습니다. 버그와 그 영향(확인 필요)은 [발견 기록](docs/findings/2026-10-21-qflow216-check-minute-chunk-boundary.md)에 따로 남겼습니다.
@@ -114,11 +116,22 @@ data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-03.zip
 | 첫 판 | 65분 | 표 5개 · 행 수 세기 · 보고서마다 CSV 읽기부터 다시 계산 |
 | 최적화 | **18분** | 형식을 맞춘 줄과 깨끗한 체결을 임시 Parquet으로 한 번만 만들어 재사용 |
 
+**같은 과제 벤치마크** — 월 파일 하나(66,512,993행)에서 연구 추출기가 뽑던 값(요약 · 빈 곳 · 역행 · 점검 분 744개 · 10초 창 8,928개)을 네 방법으로 ([기록](docs/BENCHMARK.md)):
+
+| 방법 | 걸린 시간 (2판) | 최대 메모리 | 정답지와 |
+|---|---:|---:|---|
+| 기존 전수 추출 (정답지) | 134초 · 145초 | 30MiB | — |
+| 기존 빠른 추출 (연구에서 쓴 것) | 17초 · 17초 | 214MiB | ❌ 1분 다름 (버그) |
+| **DuckDB** | **12초 · 12초** | 4.4GB | ✅ |
+| Spark (Docker) | 105초 · 130초 | 8.2GB (컨테이너, 파일 캐시 포함) | ✅ |
+
+이 크기에서는 DuckDB가 가장 빠르고, 기존 전수 추출은 느리지만 메모리를 거의 쓰지 않습니다. 그래서 **표 쓰기는 Spark + Delta**(트랜잭션 · 달 단위 바꿔 끼우기 · 기간이 늘면 메모리보다 큰 일), **읽기 · 검산은 DuckDB**로 나눴습니다.
+DuckDB는 Windows에서 직접 읽고 Spark는 Docker가 연결한 폴더로 읽어 조건이 완전히 같지는 않습니다(차이 크기는 확인 필요).
+
 환경: 단일 PC(RAM 32GB, 6코어 12스레드), Docker 안 Spark `local[8]`, 드라이버 메모리 6GB.
 
 - 아직 **한 달치**(BTCUSDT 2024-03)만 끝까지 돌렸습니다. 기간을 늘리는 것은 로드맵에 있습니다.
-- 실행 기록의 '최대 메모리'는 파이썬 프로세스만 잰 값입니다. Spark 자바 프로세스는 `docker stats`로 약 9.5GB까지 썼습니다. 벤치마크 단계에서 컨테이너 메모리로 다시 잽니다.
-- 기존 스크립트와의 시간 비교는 하는 일이 달라(값 몇 개만 뽑기 vs 전체 표 만들기) 아직 공정한 비교가 아닙니다. 같은 조건의 벤치마크는 다음 단계입니다.
+- Silver 실행 기록의 '최대 메모리'는 파이썬 프로세스만 잰 값입니다. Spark 쪽 메모리는 위 벤치마크처럼 컨테이너 단위로 잽니다.
 
 ## 7. 설계 결정
 
@@ -156,13 +169,14 @@ docker compose run --rm spark python -m mdp.silver.agg_trades --symbol BTCUSDT -
 python -m mdp.verify.compare_216 --symbol BTCUSDT --month 2024-03                            # 기존 추출기와 비교
 python -m mdp.query.check_silver --symbol BTCUSDT --month 2024-03                            # DuckDB 교차 검산
 python -m mdp.query.sql "SELECT trade_date, rows, suspect FROM silver_agg_trades_audit_daily" # 아무 SQL
+python -m mdp.bench.main --symbol BTCUSDT --month 2024-03 --rounds 2                       # 벤치마크 (약 10분)
 ```
 
 시험:
 
 ```bash
-pytest tests/mdp                                                   # 파이프라인 시험 52개 (PostgreSQL 시험 3개는 MDP_TEST_PG_DSN 있을 때)
-docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 7개 (컨테이너 안)
+pytest tests/mdp                                                   # 파이프라인 시험 56개 (PostgreSQL 시험 3개는 MDP_TEST_PG_DSN 있을 때)
+docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 8개 (컨테이너 안)
 ruff check src tests && mypy
 ```
 
@@ -183,6 +197,7 @@ src/mdp/
 ├─ spark/     Delta를 켠 로컬 Spark 세션 · 표 경로
 ├─ runlog/    실행 기록(PostgreSQL) · 마이그레이션 SQL
 ├─ query/     DuckDB 조회 층 — Delta 뷰 · 교차 검산(check_silver) · SQL 실행
+├─ bench/     벤치마크 — 같은 과제를 기존 추출기 · DuckDB · Spark로, 시간 · 메모리 · 결과 비교
 └─ verify/    기존 연구 추출기와 비교
 manifests/bronze/   받은 원천 파일의 체크섬 목록 (데이터 대신 커밋)
 docker/spark/       Spark + Delta 이미지
@@ -193,9 +208,9 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 |
-| ⏳ 다음 | 벤치마크 — 기존 스크립트 · Spark · DuckDB로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) |
-| ⏳ 이후 | Gold 1분봉 → 재처리 시연(시간여행 비교) → Airflow → Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 |
+| ⏳ 다음 | Gold 1분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 |
+| ⏳ 이후 | 재처리 시연(시간여행 비교) → Airflow → Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.
 
