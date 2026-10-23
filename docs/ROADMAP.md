@@ -17,8 +17,8 @@ README 에는 요약만 두고, 단계별 전체 기록은 여기에 둔다. 단
 | 4-3 | 벤치마크 — 기존 스크립트 · Spark · DuckDB 로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) | ✅ [기록](BENCHMARK.md) · DuckDB 12 초 · Spark 105 초 · 전수 추출 134 초, 셋 다 같은 답 |
 | 4-4 | Gold 1분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 | ✅ [기록](GOLD_BARS_1M.md) · 44,640 행, 연구 216 의 '1,110 분 · −3.5e-6' 재현, PostgreSQL 복사 체크섬 같음 |
 | 4-5 | 재처리 시연 — 규칙 변경 → 다시 만들기 → Delta 시간여행으로 전후 비교 | ✅ [기록](REPROCESSING.md) · 기준 0.5 % → 0.0001 %: 날 감사 10 행 `suspect` 만 변경, RESTORE 뒤 7 개 표 모두 원래와 같음 |
-| 4-6 | Airflow 로 묶기 — 받기 → 감사 → Silver → Gold → 검산, 재시도 · 백필 | ⏳ 다음 |
-| 5-1 | Kafka 스트림 1분봉 | ⏳ |
+| 4-6 | Airflow 로 묶기 — 받기 → Silver → 검산 → Gold → 복사, 재시도 · 백필 | ✅ [기록](AIRFLOW.md) · DAG 로 2024-03 끝까지 14 분, 다시 만든 7 개 표가 이전과 행 단위로 같음 |
+| 5-1 | Kafka 스트림 1분봉 | ⏳ 다음 |
 | 5-2 | 매일 대사 — 스트림 봉 = 배치 봉, 결과는 PostgreSQL | ⏳ |
 | 6-1 | 키 없는 샘플 시연 — 합성 데이터로 끝까지, 결과 확인은 DuckDB | ⏳ |
 | 6-2 | 결정 기록(ADR) — 왜 Delta · 왜 Spark 와 DuckDB 둘 다 · 왜 PostgreSQL 은 작은 표만 | ⏳ |

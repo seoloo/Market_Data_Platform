@@ -11,14 +11,15 @@
 # 레이크 위치 (호스트 → 컨테이너):
 #   - MDP_BRONZE_ROOT (기본 ./data/lake/bronze) → /lake/bronze  읽기만 — Bronze 는 Spark 가 바꾸지 않는다
 #   - MDP_LAKE_ROOT   (기본 ./data/lake)        → /lake         Silver · Gold Delta 표를 쓴다
-# 다음 프로필(stream · airflow)은 해당 단계(README 4-6 · 5)에서 더한다.
+#   docker compose --profile airflow up -d # Airflow (PostgreSQL 도 함께 켠다) — 화면 http://127.0.0.1:58090
+# 다음 프로필(stream)은 해당 단계(README 5)에서 더한다.
 
 name: mdp
 
 services:
   postgres:
     image: postgres:17.6
-    profiles: ["db"]
+    profiles: ["db", "airflow"]   # Airflow 도 기록 DB 로 쓴다
     environment:
       POSTGRES_DB: mdp
       POSTGRES_USER: mdp
@@ -57,6 +58,63 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Airflow 자체 기록(DAG 실행 · 작업 상태)을 담을 DB 'airflow' 를 같은 PostgreSQL 에 만든다(이미 있으면 그대로).
+  airflow-db-init:
+    image: postgres:17.6
+    profiles: ["airflow"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${MDP_PG_PASSWORD:-mdp_local_only}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        psql -h postgres -U mdp -d mdp -tc "SELECT 1 FROM pg_database WHERE datname = 'airflow'"
+        | grep -q 1 || psql -h postgres -U mdp -d mdp -c "CREATE DATABASE airflow"
+
+  # Airflow 한 컨테이너(standalone: 스케줄러 · 화면 · DAG 처리기). 화면은 http://127.0.0.1:58090
+  airflow:
+    build: docker/airflow
+    image: mdp-airflow:3.1.7
+    profiles: ["airflow"]
+    depends_on:
+      airflow-db-init:
+        condition: service_completed_successfully
+    command: ["standalone"]
+    user: "50000:0"
+    group_add:
+      - "0"                 # Docker 소켓(DockerOperator 로 Spark 컨테이너를 띄울 때)
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://mdp:${MDP_PG_PASSWORD:-mdp_local_only}@postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__PARALLELISM: "4"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+      # 이 PC(127.0.0.1)에서만 여는 개발용 — 로그인 없이 모두 관리자. 공개 서버에서 쓰지 않는다.
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      # 가벼운 단계(받기 · 검산 · 복사)가 쓰는 경로와 DB
+      MDP_BRONZE_ROOT: /opt/mdp/bronze
+      MDP_LAKE_ROOT: /opt/mdp/lake
+      MDP_PG_DSN: postgresql://mdp:${MDP_PG_PASSWORD:-mdp_local_only}@postgres:5432/mdp
+      # Spark 컨테이너가 쓰는 실행 기록 주소(호스트 쪽 포트) · 자원
+      MDP_SPARK_PG_DSN: ${MDP_PG_DSN_CONTAINER:-postgresql://mdp:mdp_local_only@host.docker.internal:56432/mdp}
+      MDP_SPARK_MEMORY: ${MDP_SPARK_MEMORY:-6g}
+      MDP_SPARK_CORES: ${MDP_SPARK_CORES:-8}
+    ports:
+      - "127.0.0.1:58090:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./src:/opt/mdp/src:ro
+      - ./manifests:/opt/mdp/manifests          # 받기가 체크섬 목록을 고친다
+      - ${MDP_LAKE_ROOT:-./data/lake}:/opt/mdp/lake
+      - ${MDP_BRONZE_ROOT:-./data/lake/bronze}:/opt/mdp/bronze
+      - mdp_airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   mdp_pg:
   mdp_staging:
+  mdp_airflow_logs:

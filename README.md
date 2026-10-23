@@ -15,9 +15,10 @@
 | 연구 재현 | Gold 1분봉이 연구 문서의 "2024-03-01, 1,440분 중 1,110분 일치 · 하루 거래량 차 −3.5e-6"을 **같은 숫자로** 다시 냄 ([기록](docs/GOLD_BARS_1M.md)) |
 | 성능 | Silver 한 달치 **65분 → 18분** (Spark 지연 실행 때문에 반복되던 계산을 한 번으로) |
 | 벤치마크 | 같은 과제를 4가지로 — **DuckDB 12초** · Spark 105초 · 기존 전수 추출 134초, 셋 다 같은 답 ([기록](docs/BENCHMARK.md)) |
+| 오케스트레이션 | Airflow DAG 하나로 받기 → Silver → 검산 → Gold → 복사 **14분**, 다시 만든 7개 표가 이전과 행 단위로 같음 ([기록](docs/AIRFLOW.md)) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
-> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리까지 구현했고, Airflow · Kafka가 다음 차례입니다
+> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리, Airflow 오케스트레이션까지 구현했고, Kafka가 다음 차례입니다
 > ([로드맵](docs/ROADMAP.md)).
 
 ## 1. 지금 구현된 흐름
@@ -41,7 +42,11 @@ flowchart LR
     BRZ -. 작업마다 .-> LOG[("PostgreSQL 실행 기록<br/>코드 버전 · 인자 해시 ·<br/>산출물 체크섬 · Delta 버전")]
     SLV -. 작업마다 .-> LOG
     DUCK -. 검산 결과 .-> LOG
+    AF{{"Airflow DAG (매달)<br/>순서 · 다시 시도 · 백필"}} -. 차례로 부름 .-> BRZ
 ```
+
+Airflow는 위 단계를 **평소와 같은 명령**으로 차례대로 부르고, 무거운 Spark 단계는 Spark 컨테이너를 따로 띄워
+돌린다([기록](docs/AIRFLOW.md)).
 
 목표 구조 전체(Gold · DuckDB · Kafka 스트림 · 매일 대사 포함)는 아래 그림입니다. 오른쪽 위에 '계획'으로
 표시돼 있고, 단계가 끝날 때마다 고칩니다.
@@ -156,6 +161,7 @@ DuckDB는 Windows에서 직접 읽고 Spark는 Docker가 연결한 폴더로 읽
 | Spark를 Docker 안에서 | Windows에서 Spark 파일 쓰기에 필요한 winutils 문제를 피하고 어느 PC에서나 같은 환경 |
 | '이미 받았나'는 체크섬 목록으로 판단 | 실행 기록 DB 없이도 같은 결과 — 목록은 저장소에 커밋돼 기준이 하나 |
 | 달 단위 `replaceWhere` | 같은 달을 다시 만들면 그 달만 바뀜(멱등), 이전 내용은 Delta 이력에 남음 |
+| Airflow는 순서만, 계산은 기존 명령 | DAG 전용 처리 코드가 없어 손으로 돌린 결과와 DAG 결과가 같은 코드에서 나옴. 명령이 멱등이라 다시 시도가 안전 |
 | decimal | 합계가 더하는 순서와 상관없이 같아야 검증이 가능 |
 
 ## 8. 돌려 보기
@@ -190,10 +196,20 @@ python -m mdp.serve.bars_1m --symbol BTCUSDT --month 2024-03                    
 python -m mdp.reprocess.main --symbol BTCUSDT --month 2024-03 --volume-tolerance-pct 0.0001 # 규칙 바꿔 재처리 · 비교
 ```
 
+Airflow로 한 번에 (화면 http://127.0.0.1:58090):
+
+```bash
+docker compose --profile airflow up -d   # Bronze 를 다른 디스크에 두었다면 MDP_BRONZE_ROOT 를 먼저 설정
+docker exec mdp-airflow-1 airflow dags test mdp_monthly_pipeline 2024-03-01
+```
+
+- `MDP_BRONZE_ROOT`를 빠뜨리고 켜면 Airflow가 빈 `data/lake/bronze`를 보고 다시 받으려 합니다
+  (예: PowerShell `$env:MDP_BRONZE_ROOT = "F:/mdp/bronze"` 뒤에 `up -d`).
+
 시험:
 
 ```bash
-pytest tests/mdp                                                   # 파이프라인 시험 62개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
+pytest tests/mdp                                                   # 파이프라인 시험 68개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
 docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 10개 (컨테이너 안)
 ruff check src tests && mypy
 ```
@@ -205,8 +221,9 @@ ruff check src tests && mypy
 | 언어 · 품질 | Python 3.11+ (Spark 이미지 안은 3.12), pytest, mypy(strict), ruff |
 | 처리 | Apache Spark 4.0.1, Delta Lake 4.0.1 |
 | 저장 · 조회 | Delta(파일 레이크하우스), PostgreSQL 17 (실행 기록), DuckDB 2.0 (Spark 없이 SQL 조회 · 교차 검산) |
-| 실행 환경 | Docker Compose 프로필 (`db`, `spark`) |
-| 다음 단계 | Apache Airflow, Apache Kafka |
+| 오케스트레이션 | Apache Airflow 3.1 (standalone, LocalExecutor, Spark 단계는 DockerOperator) |
+| 실행 환경 | Docker Compose 프로필 (`db`, `spark`, `airflow`) |
+| 다음 단계 | Apache Kafka |
 
 ```text
 src/mdp/
@@ -219,9 +236,12 @@ src/mdp/
 ├─ runlog/    실행 기록(PostgreSQL) · 마이그레이션 SQL
 ├─ query/     DuckDB 조회 층 — Delta 뷰 · 교차 검산(check_silver) · SQL 실행
 ├─ bench/     벤치마크 — 같은 과제를 기존 추출기 · DuckDB · Spark로, 시간 · 메모리 · 결과 비교
+├─ orchestrate/ Airflow DAG 도우미 — 돌릴 달 정하기 · Spark 컨테이너에 붙일 호스트 경로 찾기
 └─ verify/    기존 연구 추출기와 비교
 manifests/bronze/   받은 원천 파일의 체크섬 목록 (데이터 대신 커밋)
+airflow/dags/       Airflow DAG (월 파이프라인)
 docker/spark/       Spark + Delta 이미지
+docker/airflow/     Airflow 이미지 (+ psycopg · DuckDB)
 docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원본
 ```
 
@@ -229,9 +249,9 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 |
-| ⏳ 다음 | Airflow로 묶기 — 받기 → Silver → 검산 → Gold → 복사, 재시도 · 백필 |
-| ⏳ 이후 | Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 · Airflow 오케스트레이션 |
+| ⏳ 다음 | Kafka 스트림 1분봉 + 매일 대사(스트림 봉 = 배치 봉) |
+| ⏳ 이후 | 키 없는 샘플 시연 · 설계 결정 기록 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.
 
