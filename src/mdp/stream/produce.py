@@ -182,11 +182,21 @@ class _Sender:
 
 def _run_replay(args: argparse.Namespace, sender: _Sender) -> None:
     """[쓰임] Bronze 재생 — ``--speed`` 배속(0 이면 최대 속도), 결함 섞기."""
-    faults = Faults(args.duplicate_every, args.delay_every, args.delay_ms)
+    gap = (args.gap_from, args.gap_to) if args.gap_from and args.gap_to else (None, None)
+    faults = Faults(
+        args.duplicate_every,
+        args.delay_every,
+        args.delay_ms,
+        int(gap[0].timestamp() * 1000) if gap[0] else 0,
+        int(gap[1].timestamp() * 1000) if gap[1] else 0,
+    )
     rows = replay_rows(args.manifest, default_bronze_root(), args.symbol, args.start, args.end)
     messages = (replay_message(args.symbol, row) for row in rows)
     wall_start, first_event = time.monotonic(), None
     for event_ms, payload, kind in apply_faults(messages, faults):
+        if kind is Delivery.SKIPPED:
+            sender.counts[kind] += 1
+            continue
         if args.speed > 0:
             first_event = event_ms if first_event is None else first_event
             ahead = (event_ms - first_event) / 1000 / args.speed - (time.monotonic() - wall_start)
@@ -242,6 +252,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--duplicate-every", type=int, default=0)
     parser.add_argument("--delay-every", type=int, default=0)
     parser.add_argument("--delay-ms", type=int, default=0)
+    parser.add_argument("--gap-from", type=_parse_time, help="이 시각부터 보내지 않음 (UTC)")
+    parser.add_argument("--gap-to", type=_parse_time, help="이 시각부터 다시 보냄 (UTC)")
     parser.add_argument("--duration-s", type=float, default=300.0, help="실시간 받는 시간")
     parser.add_argument("--url", help="실시간 주소 (기본: 바이낸스 선물 aggTrade)")
     parser.add_argument("--topic", default=RAW_TOPIC)
@@ -263,6 +275,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "duplicate_every": args.duplicate_every,
         "delay_every": args.delay_every,
         "delay_ms": args.delay_ms,
+        "gap_from": args.gap_from.isoformat() if args.gap_from else None,
+        "gap_to": args.gap_to.isoformat() if args.gap_to else None,
         "duration_s": args.duration_s if args.source == "live" else None,
     }
 
@@ -276,7 +290,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 asyncio.run(_run_live(args, sender))
             sender.close()
-            sent = sum(v for k, v in sender.counts.items() if k != "reconnects")
+            sent = sum(v for k, v in sender.counts.items() if k not in ("reconnects", "skipped"))
             elapsed = time.monotonic() - started
             handle.add(
                 Artifact(

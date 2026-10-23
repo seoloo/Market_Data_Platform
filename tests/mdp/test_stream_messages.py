@@ -63,12 +63,29 @@ def test_delay_releases_exactly_when_due() -> None:
     assert out == [b"1", b"3", b"2", b"5", b"4"]
 
 
+def test_gap_skips_messages_in_range() -> None:
+    out = list(apply_faults(_stream(6), Faults(gap_from_ms=2000, gap_to_ms=4000)))
+    assert [(p, k) for _, p, k in out if k is Delivery.SKIPPED] == [
+        (b"2", Delivery.SKIPPED),
+        (b"3", Delivery.SKIPPED),
+    ]  # 2 · 3 초는 빈 곳, 4 초부터 다시 (끝은 제외)
+    assert [p for _, p, k in out if k is Delivery.NORMAL] == [b"1", b"4", b"5", b"6"]
+
+
 def test_faults_are_deterministic() -> None:
     faults = Faults(duplicate_every=3, delay_every=4, delay_ms=1500)
     assert list(apply_faults(_stream(50), faults)) == list(apply_faults(_stream(50), faults))
 
 
-@pytest.mark.parametrize("kwargs", [{"duplicate_every": -1}, {"delay_every": 3}, {"delay_ms": -5}])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"duplicate_every": -1},
+        {"delay_every": 3},
+        {"delay_ms": -5},
+        {"gap_from_ms": 5, "gap_to_ms": 1},
+    ],
+)
 def test_bad_fault_settings_stop(kwargs: dict[str, int]) -> None:
     with pytest.raises(ValueError):
         Faults(**kwargs)

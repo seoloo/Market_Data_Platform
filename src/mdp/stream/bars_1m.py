@@ -45,7 +45,14 @@ from mdp.runlog.recorder import Artifact, NullRecorder, PostgresRecorder, RunRec
 from mdp.spark.session import lake_root, spark_session, table_path
 from mdp.stream.messages import RAW_TOPIC
 
-__all__ = ["STREAM_TABLE", "main", "parse_raw", "stream_bars", "upsert_bars"]
+__all__ = [
+    "STREAM_TABLE",
+    "ensure_repair_columns",
+    "main",
+    "parse_raw",
+    "stream_bars",
+    "upsert_bars",
+]
 
 STREAM_TABLE: Final = "stream_bars_1m"
 RAW_SCHEMA: Final = (
@@ -54,15 +61,16 @@ RAW_SCHEMA: Final = (
 """원문 JSON 칸 (:mod:`mdp.stream.messages` 의 모양)."""
 
 
-def parse_raw(raw: Any) -> Any:
-    """[쓰임] Kafka 줄(``value`` 바이트 · ``timestamp`` 받은 시각) → 체결 칸.
+def parse_raw(raw: Any, keep: Sequence[str] = ()) -> Any:
+    """[쓰임] Kafka 줄(``value`` 바이트 · ``timestamp`` 받은 시각) → 체결 칸. ``keep`` 칸은 그대로
+              딸려 보낸다(대사가 원천 표시 ``source`` 를 볼 때).
     [이유] 칸 이름 · 타입을 Silver ``agg_trades`` 와 같게 맞춘다 — 같은 집계식을 그대로 쓰려고.
            가격 · 수량은 글자에서 바로 decimal 로(실수를 거치지 않음)."""
     from pyspark.sql import functions as F
 
     trade = F.from_json(F.col("value").cast("string"), RAW_SCHEMA)
     return (
-        raw.select(trade.alias("t"), F.unix_millis("timestamp").alias("received_ms"))
+        raw.select(trade.alias("t"), F.unix_millis("timestamp").alias("received_ms"), *keep)
         .select(
             F.col("t.s").alias("symbol"),
             F.col("t.a").alias("agg_trade_id"),
@@ -73,6 +81,7 @@ def parse_raw(raw: Any) -> Any:
             F.col("t.T").alias("transact_time_ms"),
             F.col("t.m").alias("is_buyer_maker"),
             "received_ms",
+            *keep,
         )
         .where(
             "symbol IS NOT NULL AND agg_trade_id IS NOT NULL AND price IS NOT NULL"
@@ -114,6 +123,20 @@ def stream_bars(trades: Any, watermark: str) -> Any:
     )
 
 
+REPAIR_COLUMNS: Final = {"repaired": "boolean", "repair_run_id": "string"}
+"""대사(5-2)가 배치 봉으로 바꿔 넣은 분 표시 — 스트림이 쓴 봉은 ``repaired = false``."""
+
+
+def ensure_repair_columns(spark: Any, path: str) -> None:
+    """[쓰임] 표에 :data:`REPAIR_COLUMNS` 가 없으면 더한다(먼저 만든 표를 위해, 한 번만).
+    [이유] MERGE 의 '모든 칸 덮어쓰기' 는 양쪽 칸이 같아야 한다 — 스트림과 대사가 같은 칸으로
+           쓴다."""
+    columns = set(spark.read.format("delta").load(path).columns)
+    missing = [f"{name} {kind}" for name, kind in REPAIR_COLUMNS.items() if name not in columns]
+    if missing:
+        spark.sql(f"ALTER TABLE delta.`{path}` ADD COLUMNS ({', '.join(missing)})")
+
+
 def upsert_bars(batch: Any, batch_id: int, run_id: str) -> int:
     """[쓰임] 묶음 하나의 확정된 봉을 Delta 표에 MERGE — (종목, 분)이 같으면 덮어쓰고 없으면 넣는다.
               쓴 줄 수를 돌려준다.
@@ -126,6 +149,8 @@ def upsert_bars(batch: Any, batch_id: int, run_id: str) -> int:
         .withColumn("trade_date", F.to_date("bar_start"))
         .withColumn("batch_id", F.lit(batch_id).cast("long"))
         .withColumn("run_id", F.lit(run_id))
+        .withColumn("repaired", F.lit(False))
+        .withColumn("repair_run_id", F.lit(None).cast("string"))
     )
     count = int(rows.count())
     if count == 0:
@@ -135,6 +160,7 @@ def upsert_bars(batch: Any, batch_id: int, run_id: str) -> int:
     if not DeltaTable.isDeltaTable(spark, path):
         rows.write.format("delta").partitionBy("symbol", "trade_date").save(path)
         return count
+    ensure_repair_columns(spark, path)
     (
         DeltaTable.forPath(spark, path)
         .alias("t")
@@ -175,6 +201,11 @@ def run_stream(args: argparse.Namespace, recorder: RunRecorder) -> dict[str, int
     with record_run(recorder, "stream.bars_1m", params) as handle:
         spark = spark_session("stream.bars_1m")
         spark.sparkContext.setLogLevel("ERROR")
+        path = table_path("gold", STREAM_TABLE)
+        if args.fresh and DeltaTable.isDeltaTable(spark, path):
+            # 원문 토픽을 처음부터 다시 읽으니 표도 비운다 — 예전 처리가 남긴 봉(이번에 안 만든
+            # 분)이 섞이지 않게. 지운 것은 Delta 이력에 남는다(시간여행으로 볼 수 있음).
+            DeltaTable.forPath(spark, path).delete()
         # 상태(분마다 집계 중인 값 · 중복 확인용 번호)를 RocksDB 에 — 메모리(JVM 힙) 대신 디스크로.
         spark.conf.set(
             "spark.sql.streaming.stateStore.providerClass",
@@ -222,7 +253,6 @@ def run_stream(args: argparse.Namespace, recorder: RunRecorder) -> dict[str, int
             "dropped_by_watermark": sum(_dropped_by_watermark(p) for p in progress),
             "bars_written": written["bars"],
         }
-        path = table_path("gold", STREAM_TABLE)
         if DeltaTable.isDeltaTable(spark, path):
             version = int(DeltaTable.forPath(spark, path).history(1).collect()[0]["version"])
             table_rows = spark.read.format("delta").load(path).count()
@@ -266,7 +296,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--topic", default=RAW_TOPIC)
     parser.add_argument("--starting-offsets", default="earliest", help="체크포인트가 없을 때만")
     parser.add_argument("--checkpoint-name", default="default")
-    parser.add_argument("--fresh", action="store_true", help="체크포인트를 지우고 처음부터")
+    parser.add_argument(
+        "--fresh", action="store_true", help="체크포인트 · 표 내용을 지우고 원문 처음부터"
+    )
     parser.add_argument("--bootstrap", default=os.environ.get("MDP_KAFKA_BOOTSTRAP", "kafka:9092"))
     parser.add_argument("--pg-dsn", default=os.environ.get("MDP_PG_DSN"))
     args = parser.parse_args(argv)

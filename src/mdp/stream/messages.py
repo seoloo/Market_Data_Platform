@@ -45,6 +45,8 @@ class Delivery(StrEnum):
     """같은 메시지를 한 번 더 — 재연결 때 같은 체결을 두 번 받는 경우를 흉내 낸다."""
     DELAYED = "delayed"
     """체결 시각보다 늦게 — 네트워크 지연 · 순서 뒤바뀜을 흉내 낸다."""
+    SKIPPED = "skipped"
+    """보내지 않음 — PC 가 잠들었거나 연결이 끊긴 동안의 체결을 흉내 낸다."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,17 +55,26 @@ class Faults:
 
     - ``duplicate_every``: n 번째 메시지마다 한 번 더 보낸다.
     - ``delay_every`` · ``delay_ms``: n 번째 메시지마다 체결 시각으로 ``delay_ms`` 만큼 뒤에 보낸다.
+    - ``gap_from_ms`` · ``gap_to_ms``: 체결 시각이 [from, to) 인 메시지는 보내지 않는다(빈 곳).
     """
 
     duplicate_every: int = 0
     delay_every: int = 0
     delay_ms: int = 0
+    gap_from_ms: int = 0
+    gap_to_ms: int = 0
 
     def __post_init__(self) -> None:
         if min(self.duplicate_every, self.delay_every, self.delay_ms) < 0:
             raise ValueError("결함 설정은 0 이상")
         if self.delay_every and not self.delay_ms:
             raise ValueError("delay_every 를 쓰면 delay_ms 도 줘야 한다")
+        if self.gap_from_ms > self.gap_to_ms:
+            raise ValueError("빈 곳은 gap_from_ms <= gap_to_ms")
+
+    def in_gap(self, time_ms: int) -> bool:
+        """[쓰임] 이 체결 시각이 빈 곳(보내지 않을 구간)인가."""
+        return self.gap_from_ms <= time_ms < self.gap_to_ms
 
 
 def replay_message(symbol: str, row: Sequence[str]) -> tuple[int, bytes]:
@@ -90,12 +101,16 @@ def replay_message(symbol: str, row: Sequence[str]) -> tuple[int, bytes]:
 def apply_faults(
     messages: Iterable[tuple[int, bytes]], faults: Faults
 ) -> Iterator[tuple[int, bytes, Delivery]]:
-    """[쓰임] (체결 시각, 메시지) 흐름에 결함을 섞어 보낼 순서대로 내보낸다.
+    """[쓰임] (체결 시각, 메시지) 흐름에 결함을 섞어 보낼 순서대로 내보낸다. 빈 곳의 메시지는
+              :attr:`Delivery.SKIPPED` 로 내보낸다(보내는 쪽이 세기만 하고 보내지 않음).
     [이유] 늦게 보낼 메시지는 잡아 두었다가, 흐름의 체결 시각이 '원래 시각 + 지연' 을 지나면 그때
            내보낸다 — 실제 지연처럼 '더 나중 체결들 뒤에' 도착한다. 끝나면 남은 것을 모두
            내보낸다."""
     held: list[tuple[int, int, int, bytes]] = []  # (내보낼 시각, 순번, 체결 시각, 메시지)
     for index, (time_ms, payload) in enumerate(messages, start=1):
+        if faults.in_gap(time_ms):
+            yield time_ms, payload, Delivery.SKIPPED
+            continue
         while held and held[0][0] <= time_ms:
             _, _, held_time, held_payload = heapq.heappop(held)
             yield held_time, held_payload, Delivery.DELAYED
