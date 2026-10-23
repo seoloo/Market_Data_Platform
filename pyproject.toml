@@ -82,6 +82,7 @@ ignore = [
 "src/mdp/silver/**" = ["N812"]
 "src/mdp/gold/**" = ["N812"]
 "src/mdp/spark/**" = ["N812"]
+"src/mdp/stream/**" = ["N812"]
 "tests/mdp/spark/**" = ["N812"]
 
 [tool.ruff.lint.isort]
@@ -97,9 +98,10 @@ warn_no_return = true
 show_error_codes = true
 files = ["src", "tests"]
 
-# pyspark · delta 는 Spark 이미지(docker/spark) 안에만 있다 — 호스트 mypy 는 타입 정보 없이 지나간다.
+# pyspark · delta · confluent_kafka · websockets 는 Spark 이미지(docker/spark) 안에만 있다 —
+# 호스트 mypy 는 타입 정보 없이 지나간다.
 [[tool.mypy.overrides]]
-module = ["pyspark.*", "delta.*"]
+module = ["pyspark.*", "delta.*", "confluent_kafka.*", "websockets.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

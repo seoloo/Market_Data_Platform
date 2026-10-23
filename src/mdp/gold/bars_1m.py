@@ -47,7 +47,15 @@ from mdp.silver.sources import plan_month_sources, stage_csv, verify_bronze_file
 from mdp.spark.csv import KLINE_COLUMNS, read_strings
 from mdp.spark.session import spark_session, table_path
 
-__all__ = ["GoldOutputs", "build_bars", "check_against_klines", "main", "run_gold"]
+__all__ = [
+    "BAR_COLUMNS",
+    "GoldOutputs",
+    "bar_aggregations",
+    "build_bars",
+    "check_against_klines",
+    "main",
+    "run_gold",
+]
 
 MINUTE_MS: Final = 60_000
 DECIMAL: Final = "decimal(18,8)"
@@ -76,35 +84,63 @@ def _month_predicate(symbol: str, month: date) -> str:
     )
 
 
-def build_bars(trades: Any, silver_version: int, run_id: str) -> Any:
-    """[쓰임] 깨끗한 체결 DataFrame → 1 분봉 DataFrame (분마다 한 줄).
-    [이유] 시가 · 종가는 ``min_by`` · ``max_by`` 에 (시각, 번호) 묶음을 기준으로 줘서, 같은 밀리초에
+BAR_COLUMNS: Final = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+    "trade_count",
+    "agg_trade_count",
+    "first_agg_trade_id",
+    "last_agg_trade_id",
+)
+"""봉 한 줄의 값 칸 — 배치 봉(``bars_1m``)과 스트림 봉(``stream_bars_1m``)이 같은 칸을
+같은 식으로."""
+
+
+def bar_aggregations() -> list[Any]:
+    """[쓰임] 체결 묶음 → 봉 값 칸(:data:`BAR_COLUMNS`)을 만드는 집계식 목록.
+    [이유] 배치(:func:`build_bars`)와 스트림(:mod:`mdp.stream.bars_1m`)이 **같은 함수**를 쓴다 —
+           두 봉을 맞대는 대사(5-2)에서 '계산이 달라서' 생기는 차이를 처음부터 없앤다.
+           시가 · 종가는 ``min_by`` · ``max_by`` 에 (시각, 번호) 묶음을 기준으로 줘서, 같은 밀리초에
            체결이 여럿이어도 언제나 같은 줄을 고른다(다시 만들어도 같은 봉)."""
     from pyspark.sql import functions as F
 
     order = F.struct("transact_time_ms", "agg_trade_id")
     notional = F.col("price") * F.col("quantity")
     taker_buy = ~F.col("is_buyer_maker")
+    return [
+        F.min_by("price", order).alias("open"),
+        F.max("price").alias("high"),
+        F.min("price").alias("low"),
+        F.max_by("price", order).alias("close"),
+        F.sum("quantity").alias("volume"),
+        F.sum(notional).alias("quote_volume"),
+        F.sum(F.when(taker_buy, F.col("quantity")).otherwise(F.lit(0).cast(DECIMAL))).alias(
+            "taker_buy_volume"
+        ),
+        F.sum(F.when(taker_buy, notional).otherwise(F.lit(0))).alias("taker_buy_quote_volume"),
+        F.sum(F.col("last_trade_id") - F.col("first_trade_id") + 1).alias("trade_count"),
+        F.count("*").alias("agg_trade_count"),
+        F.min("agg_trade_id").alias("first_agg_trade_id"),
+        F.max("agg_trade_id").alias("last_agg_trade_id"),
+    ]
+
+
+def build_bars(trades: Any, silver_version: int, run_id: str) -> Any:
+    """[쓰임] 깨끗한 체결 DataFrame → 1 분봉 DataFrame (분마다 한 줄,
+    값은 :func:`bar_aggregations`)."""
+    from pyspark.sql import functions as F
+
     minute = F.col("transact_time_ms") - F.col("transact_time_ms") % MINUTE_MS
     return (
         trades.withColumn("bar_start_ms", minute)
         .groupBy("symbol", "bar_start_ms")
-        .agg(
-            F.min_by("price", order).alias("open"),
-            F.max("price").alias("high"),
-            F.min("price").alias("low"),
-            F.max_by("price", order).alias("close"),
-            F.sum("quantity").alias("volume"),
-            F.sum(notional).alias("quote_volume"),
-            F.sum(F.when(taker_buy, F.col("quantity")).otherwise(F.lit(0).cast(DECIMAL))).alias(
-                "taker_buy_volume"
-            ),
-            F.sum(F.when(taker_buy, notional).otherwise(F.lit(0))).alias("taker_buy_quote_volume"),
-            F.sum(F.col("last_trade_id") - F.col("first_trade_id") + 1).alias("trade_count"),
-            F.count("*").alias("agg_trade_count"),
-            F.min("agg_trade_id").alias("first_agg_trade_id"),
-            F.max("agg_trade_id").alias("last_agg_trade_id"),
-        )
+        .agg(*bar_aggregations())
         .withColumn("bar_start", F.timestamp_millis("bar_start_ms"))
         .withColumn("trade_date", F.to_date("bar_start"))
         .withColumn("silver_version", F.lit(silver_version).cast("long"))

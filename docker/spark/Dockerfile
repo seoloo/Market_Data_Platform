@@ -28,11 +28,27 @@ RUN cd /opt/spark/jars \
  && echo "3e469898dc4ed083c735ae360beb063adcd12e9d  delta-spark_2.13-4.0.1.jar" | sha1sum -c - \
  && echo "ebc5384d953c1d70d0ce4ceee42892da74051a81  delta-storage-4.0.1.jar" | sha1sum -c -
 
+# Kafka 읽기(Structured Streaming, README 5-1) — Spark 4.0.1 짝 커넥터와 그것이 부르는 라이브러리.
+# 버전은 커넥터 pom 이 적은 그대로(kafka-clients 3.9.1 · commons-pool2 2.12.0, 2026-10-24 확인).
+# 압축 라이브러리(lz4 · snappy · zstd)는 Spark 이미지에 이미 있다.
+RUN cd /opt/spark/jars \
+ && M=https://repo1.maven.org/maven2 \
+ && curl -fsSLO $M/org/apache/spark/spark-sql-kafka-0-10_2.13/4.0.1/spark-sql-kafka-0-10_2.13-4.0.1.jar \
+ && curl -fsSLO $M/org/apache/spark/spark-token-provider-kafka-0-10_2.13/4.0.1/spark-token-provider-kafka-0-10_2.13-4.0.1.jar \
+ && curl -fsSLO $M/org/apache/kafka/kafka-clients/3.9.1/kafka-clients-3.9.1.jar \
+ && curl -fsSLO $M/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar \
+ && echo "75ffc494b738b91fc675fe087ac57417ac408a29  spark-sql-kafka-0-10_2.13-4.0.1.jar" | sha1sum -c - \
+ && echo "398ca8e587f74a0677f6c0a9ff73b4cbdee1f1e4  spark-token-provider-kafka-0-10_2.13-4.0.1.jar" | sha1sum -c - \
+ && echo "86ca079953ed5606257ff298c24666b26da6985b  kafka-clients-3.9.1.jar" | sha1sum -c - \
+ && echo "458563f69fbdaebf7daadfe10dc3a22e42a7de50  commons-pool2-2.12.0.jar" | sha1sum -c -
+
 # 파이썬 쪽: Delta API(delta.tables) · 실행 기록용 PostgreSQL 드라이버 · 받기 모듈이 쓰는 httpx ·
-# 컨테이너 안 시험용 pytest. --no-deps: delta-spark 가 pyspark 를 또 받지 않게(이미지 안 것을 쓴다).
+# 컨테이너 안 시험용 pytest · 체결 보내기(5-1)의 Kafka 클라이언트와 WebSocket.
+# --no-deps: delta-spark 가 pyspark 를 또 받지 않게(이미지 안 것을 쓴다).
 RUN /opt/mdp-venv/bin/pip install --no-cache-dir --no-deps "delta-spark==4.0.1" \
  && /opt/mdp-venv/bin/pip install --no-cache-dir "importlib-metadata>=1.0.0" \
-      "psycopg[binary]==3.2.10" "httpx==0.28.1" "pytest==8.4.2"
+      "psycopg[binary]==3.2.10" "httpx==0.28.1" "pytest==8.4.2" \
+      "confluent-kafka==2.15.1" "websockets==17.1"
 
 # 우리 코드(/app/src, compose 가 연결) + 이미지 안 pyspark · py4j.
 ENV PATH=/opt/mdp-venv/bin:$PATH \

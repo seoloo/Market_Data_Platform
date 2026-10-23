@@ -12,7 +12,8 @@
 #   - MDP_BRONZE_ROOT (기본 ./data/lake/bronze) → /lake/bronze  읽기만 — Bronze 는 Spark 가 바꾸지 않는다
 #   - MDP_LAKE_ROOT   (기본 ./data/lake)        → /lake         Silver · Gold Delta 표를 쓴다
 #   docker compose --profile airflow up -d # Airflow (PostgreSQL 도 함께 켠다) — 화면 http://127.0.0.1:58090
-# 다음 프로필(stream)은 해당 단계(README 5)에서 더한다.
+#   docker compose --profile stream up -d  # Kafka 1 대 (체결 원문 토픽) — 컨테이너끼리 kafka:9092,
+#                                          #   이 PC 에서 127.0.0.1:57092
 
 name: mdp
 
@@ -48,6 +49,7 @@ services:
       # Spark 드라이버 메모리 — 로컬 모드는 드라이버 하나가 모두 한다. Docker 에 준 메모리 안에서.
       MDP_SPARK_MEMORY: ${MDP_SPARK_MEMORY:-6g}
       MDP_SPARK_CORES: ${MDP_SPARK_CORES:-8}
+      MDP_KAFKA_BOOTSTRAP: kafka:9092   # 스트림(5-1) — Kafka 를 켰을 때만 쓴다
     volumes:
       - ./src:/app/src:ro
       - ./tests:/app/tests:ro            # 컨테이너 안 Spark 시험 (tests/mdp/spark)
@@ -114,7 +116,40 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Kafka 한 대(KRaft — 브로커와 컨트롤러를 한 프로세스가, ZooKeeper 없음). 단일 PC 라 복제는 1.
+  kafka:
+    image: apache/kafka:4.3.1
+    profiles: ["stream"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # 안(컨테이너끼리 kafka:9092) · 밖(이 PC 의 도구 127.0.0.1:57092) 두 입구
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:57092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # 토픽은 보내는 쪽이 설정(보관 기간)과 함께 만든다
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx1g
+    ports:
+      - "127.0.0.1:57092:9094"
+    volumes:
+      - mdp_kafka:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
 volumes:
   mdp_pg:
   mdp_staging:
   mdp_airflow_logs:
+  mdp_kafka:
