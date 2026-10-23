@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -14,6 +15,7 @@ from mdp.bronze.archive import ArchiveFile, Dataset
 from mdp.bronze.fetch import BronzeFetcher, run_fetch
 from mdp.runlog.migrate import load_migrations
 from mdp.runlog.recorder import (
+    REPO_ROOT,
     Artifact,
     RunStart,
     RunStatus,
@@ -78,8 +80,10 @@ def test_params_hash_ignores_key_order() -> None:
 
 
 def test_code_version_is_commit_or_unknown(tmp_path: Path) -> None:
+    assert code_version(tmp_path) == "unknown"  # git 저장소가 아닌 곳
+    if shutil.which("git") is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("git 이 없거나 압축본으로 받은 코드 — 커밋 번호를 알 수 없다")
     assert re.fullmatch(r"[0-9a-f]{40}(-dirty)?", code_version())
-    assert code_version(tmp_path) == "unknown"
 
 
 def test_peak_memory_is_measured_on_windows_and_posix() -> None:

@@ -22,6 +22,7 @@ dependencies = [
 # 레이크하우스 파이프라인(src/mdp) — 실행 기록 PostgreSQL 접속
 lake = [
     "psycopg[binary]>=3.2",
+    "duckdb>=2.0,<3",  # 조회 층(src/mdp/query) — Delta 표를 Spark 없이 SQL 로
 ]
 dev = [
     "pytest>=8.0",
@@ -33,6 +34,7 @@ dev = [
     "types-PyYAML",
     # 실행 기록(src/mdp/runlog) 시험 · 타입 검사에 필요 — CI 는 dev 만 설치한다
     "psycopg[binary]>=3.2",
+    "duckdb>=2.0,<3",
 ]
 
 [tool.hatch.build.targets.wheel]

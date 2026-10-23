@@ -13,8 +13,8 @@ README 에는 요약만 두고, 단계별 전체 기록은 여기에 둔다. 단
 | 3-2 | 실행 기록 — 로컬 PostgreSQL(Docker Compose 프로필 `db`) | ✅ 작업마다 코드 버전 · 인자 해시 · 산출물 체크섬 · 최대 메모리 |
 | 3-3 | 증분 받기 · 백필 — 새 파일 · 빠진 날만, 두 번 돌려도 같은 결과 | ✅ 끝난 달은 월 파일 · 이번 달은 일 파일, `--days` 백필 |
 | 4-1 | Silver 감사 — Spark · Delta 로 중복 · 빈 곳 · 잘림, 걸러 낸 것은 격리 표로 | ✅ [기록](SILVER_AGG_TRADES.md) · 연구 216 전수 추출과 일치, 빠른 추출의 [버그 발견](findings/2026-10-21-qflow216-check-minute-chunk-boundary.md) |
-| 4-2 | DuckDB 조회 층 — Silver Delta 표를 Spark 없이 SQL 로 읽고 감사 결과 검산 | ⏳ 다음 |
-| 4-3 | 벤치마크 — 기존 스크립트 · Spark · DuckDB 로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) | ⏳ |
+| 4-2 | DuckDB 조회 층 — Silver Delta 표를 Spark 없이 SQL 로 읽고 감사 결과 검산 | ✅ `mdp.query` · 불변 조건 5 개 + 날 감사 재계산, 2024-03 위반 0 · 31 일 소수점까지 일치 (9.5 초) |
+| 4-3 | 벤치마크 — 기존 스크립트 · Spark · DuckDB 로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) | ⏳ 다음 |
 | 4-4 | Gold 1분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 | ⏳ |
 | 4-5 | 재처리 시연 — 규칙 변경 → 다시 만들기 → Delta 시간여행으로 전후 비교 | ⏳ |
 | 4-6 | Airflow 로 묶기 — 받기 → 감사 → Silver → Gold → 검산, 재시도 · 백필 | ⏳ |

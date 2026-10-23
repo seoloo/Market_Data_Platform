@@ -10,10 +10,11 @@
 | 정확성 | 기존 연구 스크립트의 전수 검산 결과와 **모든 항목 일치** (매시 00분 점검값 744/744) |
 | 발견 | 같은 비교에서 기존 빠른 추출기의 **덩어리 경계 버그**를 찾아 원인까지 확인 ([기록](docs/findings/2026-10-21-qflow216-check-minute-chunk-boundary.md)) |
 | 재현성 | 같은 달을 다시 만들어 Delta 이전 버전과 행 단위로 비교 — **차이 0행** |
+| 교차 검산 | Spark가 쓴 날 감사 31일을 DuckDB로 처음부터 다시 계산 — **소수점까지 일치**, 6,651만 행 검산 9.5초 |
 | 성능 | Silver 한 달치 **65분 → 18분** (Spark 지연 실행 때문에 반복되던 계산을 한 번으로) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
-> 프로젝트입니다. 지금은 Bronze · Silver까지 구현했고, DuckDB · Gold · Airflow · Kafka가 다음 차례입니다
+> 프로젝트입니다. 지금은 Bronze · Silver와 DuckDB 조회 층까지 구현했고, Gold · Airflow · Kafka가 다음 차례입니다
 > ([로드맵](docs/ROADMAP.md)).
 
 ## 1. 지금 구현된 흐름
@@ -31,8 +32,10 @@ flowchart LR
         S2["agg_trades_quarantine<br/>못 쓰는 줄 + 이유"]
         S3["audit_file · gaps · audit_daily<br/>결함 집계 · 위치 · 1분봉 대조"]
     end
+    SLV -->|Spark 없이 SQL · 시간여행| DUCK["DuckDB 조회 층<br/>교차 검산 · 분석"]
     BRZ -. 작업마다 .-> LOG[("PostgreSQL 실행 기록<br/>코드 버전 · 인자 해시 ·<br/>산출물 체크섬 · Delta 버전")]
     SLV -. 작업마다 .-> LOG
+    DUCK -. 검산 결과 .-> LOG
 ```
 
 목표 구조 전체(Gold · DuckDB · Kafka 스트림 · 매일 대사 포함)는 아래 그림입니다. 오른쪽 위에 '계획'으로
@@ -94,6 +97,7 @@ data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-03.zip
 
 | 검증 | 방법 | 결과 |
 |---|---|---|
+| 교차 검산 | Spark가 쓴 표를 DuckDB SQL로 다시 계산 (`mdp.query.check_silver`) — 불변 조건 5개(번호 중복 · 빈 칸 · 날짜 · 가격/수량 · 번호 범위) + 날 감사 재계산 | 66,512,993행 위반 0, 31일 감사 값 소수점까지 일치 (9.5초) |
 | 기존 결과 재현 | 같은 월 파일을 기존 연구 스크립트의 추출기로도 처리해 항목별 비교 (`mdp.verify.compare_216`) | 전수 검산 추출과 행 수 · 번호 · 시각 · 빈 곳 · 역행 · 점검값 744개 모두 일치 (float 끝자리 차이만, 상대 오차 1.2e-13) |
 | 버그 발견 | 위 비교에서 기존 **빠른** 추출기와만 1분이 다름 | 32MB 덩어리 경계가 점검 분 중간(09:00:14)에 걸리면 나머지를 건너뛰는 조건 오류 — 해당 분 8,490건 중 2,630건만 셈 |
 | 최적화 전후 | Delta 시간여행으로 느린 판(v0)과 빠른 판(v1)을 `exceptAll` 양방향 비교 | 66,512,993행 차이 0 |
@@ -150,12 +154,14 @@ python -m mdp.bronze.sync  --dataset aggTrades --symbol BTCUSDT --start 2024-03-
 python -m mdp.bronze.sync  --dataset klines --interval 1m --symbol BTCUSDT --start 2024-03-01 --end 2024-03-31
 docker compose run --rm spark python -m mdp.silver.agg_trades --symbol BTCUSDT --month 2024-03
 python -m mdp.verify.compare_216 --symbol BTCUSDT --month 2024-03                            # 기존 추출기와 비교
+python -m mdp.query.check_silver --symbol BTCUSDT --month 2024-03                            # DuckDB 교차 검산
+python -m mdp.query.sql "SELECT trade_date, rows, suspect FROM silver_agg_trades_audit_daily" # 아무 SQL
 ```
 
 시험:
 
 ```bash
-pytest tests/mdp                                                   # 파이프라인 시험 44개 (PostgreSQL 시험 3개는 MDP_TEST_PG_DSN 있을 때)
+pytest tests/mdp                                                   # 파이프라인 시험 52개 (PostgreSQL 시험 3개는 MDP_TEST_PG_DSN 있을 때)
 docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 7개 (컨테이너 안)
 ruff check src tests && mypy
 ```
@@ -166,9 +172,9 @@ ruff check src tests && mypy
 |---|---|
 | 언어 · 품질 | Python 3.11+ (Spark 이미지 안은 3.12), pytest, mypy(strict), ruff |
 | 처리 | Apache Spark 4.0.1, Delta Lake 4.0.1 |
-| 저장 | Delta(파일 레이크하우스), PostgreSQL 17 (실행 기록) |
+| 저장 · 조회 | Delta(파일 레이크하우스), PostgreSQL 17 (실행 기록), DuckDB 2.0 (Spark 없이 SQL 조회 · 교차 검산) |
 | 실행 환경 | Docker Compose 프로필 (`db`, `spark`) |
-| 다음 단계 | DuckDB, Apache Airflow, Apache Kafka |
+| 다음 단계 | Apache Airflow, Apache Kafka |
 
 ```text
 src/mdp/
@@ -176,6 +182,7 @@ src/mdp/
 ├─ silver/    출처 고르기 · 검증 · 풀기(sources) · Silver 체결 감사(agg_trades)
 ├─ spark/     Delta를 켠 로컬 Spark 세션 · 표 경로
 ├─ runlog/    실행 기록(PostgreSQL) · 마이그레이션 SQL
+├─ query/     DuckDB 조회 층 — Delta 뷰 · 교차 검산(check_silver) · SQL 실행
 └─ verify/    기존 연구 추출기와 비교
 manifests/bronze/   받은 원천 파일의 체크섬 목록 (데이터 대신 커밋)
 docker/spark/       Spark + Delta 이미지
@@ -186,9 +193,9 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 |
-| ⏳ 다음 | DuckDB 조회 층 — Silver Delta 표를 Spark 없이 SQL로 검산 |
-| ⏳ 이후 | 벤치마크(기존 스크립트 · Spark · DuckDB) → Gold 1분봉 → 재처리 시연(시간여행 비교) → Airflow → Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 |
+| ⏳ 다음 | 벤치마크 — 기존 스크립트 · Spark · DuckDB로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) |
+| ⏳ 이후 | Gold 1분봉 → 재처리 시연(시간여행 비교) → Airflow → Kafka 스트림 + 매일 대사 → 키 없는 샘플 시연 · 설계 결정 기록 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.
 
