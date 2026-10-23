@@ -19,7 +19,7 @@ psycopg = pytest.importorskip("psycopg")
 from psycopg.conninfo import make_conninfo  # noqa: E402
 
 from mdp.errors import DataIntegrityError  # noqa: E402
-from mdp.runlog.migrate import SQL_DIR, apply_migrations  # noqa: E402
+from mdp.runlog.migrate import SQL_DIR, apply_migrations, load_migrations  # noqa: E402
 from mdp.runlog.recorder import Artifact, PostgresRecorder, record_run  # noqa: E402
 
 pytestmark = pytest.mark.postgres
@@ -43,10 +43,8 @@ def schema_dsn() -> Iterator[str]:
 
 def test_migrations_apply_once_and_detect_edits(schema_dsn: str, tmp_path: Path) -> None:
     with psycopg.connect(schema_dsn, autocommit=True) as connection:
-        assert apply_migrations(connection) == [
-            "001_pipeline_runs.sql",
-            "002_artifact_table_version.sql",
-        ]
+        expected = [m.filename for m in load_migrations()]
+        assert apply_migrations(connection) == expected and expected[0] == "001_pipeline_runs.sql"
         assert apply_migrations(connection) == []
 
         edited = tmp_path / "sql"

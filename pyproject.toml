@@ -81,6 +81,7 @@ ignore = [
 # PySpark 관례 `from pyspark.sql import functions as F` 를 따른다.
 "src/mdp/silver/**" = ["N812"]
 "src/mdp/gold/**" = ["N812"]
+"src/mdp/spark/**" = ["N812"]
 "tests/mdp/spark/**" = ["N812"]
 
 [tool.ruff.lint.isort]

@@ -50,33 +50,12 @@ from mdp.bronze.fetch import (
 )
 from mdp.runlog.recorder import Artifact, NullRecorder, PostgresRecorder, RunRecorder, record_run
 from mdp.silver.sources import SourcePlan, plan_month_sources, stage_csv, verify_bronze_file
+from mdp.spark.csv import AGG_TRADE_COLUMNS, KLINE_COLUMNS, read_strings
 from mdp.spark.session import lake_root, spark_session, table_path
 
 __all__ = ["SilverOutputs", "build_outputs", "main", "run_silver", "write_outputs"]
 
-RAW_COLUMNS: Final = (
-    "agg_trade_id",
-    "price",
-    "quantity",
-    "first_trade_id",
-    "last_trade_id",
-    "transact_time",
-    "is_buyer_maker",
-)
-KLINE_COLUMNS: Final = (
-    "open_time",
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "close_time",
-    "quote_volume",
-    "count",
-    "taker_buy_volume",
-    "taker_buy_quote_volume",
-    "ignore",
-)
+RAW_COLUMNS: Final = AGG_TRADE_COLUMNS
 MICROSECOND_THRESHOLD: Final = 10**14
 """이보다 큰 시각은 마이크로초 표기로 본다 — 연구 216(``_MICROSECOND_THRESHOLD``)과 같은 기준."""
 VOLUME_TOLERANCE_PCT: Final = 0.5
@@ -101,29 +80,6 @@ class SilverOutputs:
     """파일마다 매시 00 분 [거래량 · 공격 매수량 · 체결 수].
 
     연구 216 추출과 비교하는 값이다(표로 쓰지 않음)."""
-
-
-def _strings_schema(columns: Sequence[str]) -> Any:
-    """[쓰임] 모든 칸을 글자로 읽는 스키마 + 형식이 틀린 줄을 통째로 담을 ``_corrupt`` 칸."""
-    from pyspark.sql.types import StringType, StructField, StructType
-
-    fields = [StructField(name, StringType()) for name in (*columns, "_corrupt")]
-    return StructType(fields)
-
-
-def _read_strings(spark: Any, csv_paths: Sequence[str], columns: Sequence[str]) -> Any:
-    """[쓰임] CSV 들을 글자 그대로 읽고, 줄마다 어느 파일에서 왔는지(``csv_name``)를 붙인다.
-    [이유] 형식이 틀린 줄을 Spark 가 조용히 버리지 않도록 PERMISSIVE + ``_corrupt`` 로 받는다."""
-    from pyspark.sql import functions as F
-
-    return (
-        spark.read.schema(_strings_schema(columns))
-        .option("header", "false")
-        .option("mode", "PERMISSIVE")
-        .option("columnNameOfCorruptRecord", "_corrupt")
-        .csv(list(csv_paths))
-        .withColumn("csv_name", F.element_at(F.split(F.col("_metadata.file_path"), "/"), -1))
-    )
 
 
 def _sources_frame(spark: Any, plan: SourcePlan, csv_name_by_path: dict[str, str]) -> Any:
@@ -257,7 +213,7 @@ def _klines_daily(spark: Any, kline_csv_paths: Sequence[str]) -> Any | None:
 
     if not kline_csv_paths:
         return None
-    raw = _read_strings(spark, kline_csv_paths, KLINE_COLUMNS)
+    raw = read_strings(spark, kline_csv_paths, KLINE_COLUMNS)
     open_ms = F.expr("try_cast(open_time AS bigint)")
     bars = raw.select(
         open_ms.alias("open_ms"),
@@ -304,7 +260,7 @@ def build_outputs(
 
     # 1 · 2 단계: 읽고 형식 맞추고 출처를 붙인다.
     rows = keep(
-        _typed_trades(_read_strings(spark, trade_csv_paths, RAW_COLUMNS)).join(
+        _typed_trades(read_strings(spark, trade_csv_paths, RAW_COLUMNS)).join(
             F.broadcast(_sources_frame(spark, plan, csv_name_by_path)), "csv_name"
         ),
         "rows",

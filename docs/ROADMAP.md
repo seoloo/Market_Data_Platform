@@ -15,8 +15,8 @@ README 에는 요약만 두고, 단계별 전체 기록은 여기에 둔다. 단
 | 4-1 | Silver 감사 — Spark · Delta 로 중복 · 빈 곳 · 잘림, 걸러 낸 것은 격리 표로 | ✅ [기록](SILVER_AGG_TRADES.md) · 연구 216 전수 추출과 일치, 빠른 추출의 [버그 발견](findings/2026-10-21-qflow216-check-minute-chunk-boundary.md) |
 | 4-2 | DuckDB 조회 층 — Silver Delta 표를 Spark 없이 SQL 로 읽고 감사 결과 검산 | ✅ `mdp.query` · 불변 조건 5 개 + 날 감사 재계산, 2024-03 위반 0 · 31 일 소수점까지 일치 (9.5 초) |
 | 4-3 | 벤치마크 — 기존 스크립트 · Spark · DuckDB 로 같은 한 달치 (시간 · 최대 메모리 · 결과 일치) | ✅ [기록](BENCHMARK.md) · DuckDB 12 초 · Spark 105 초 · 전수 추출 134 초, 셋 다 같은 답 |
-| 4-4 | Gold 1분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 | ⏳ 다음 |
-| 4-5 | 재처리 시연 — 규칙 변경 → 다시 만들기 → Delta 시간여행으로 전후 비교 | ⏳ |
+| 4-4 | Gold 1분봉 — 체결로 만들고 PostgreSQL 조회용 표로 복사 | ✅ [기록](GOLD_BARS_1M.md) · 44,640 행, 연구 216 의 '1,110 분 · −3.5e-6' 재현, PostgreSQL 복사 체크섬 같음 |
+| 4-5 | 재처리 시연 — 규칙 변경 → 다시 만들기 → Delta 시간여행으로 전후 비교 | ⏳ 다음 |
 | 4-6 | Airflow 로 묶기 — 받기 → 감사 → Silver → Gold → 검산, 재시도 · 백필 | ⏳ |
 | 5-1 | Kafka 스트림 1분봉 | ⏳ |
 | 5-2 | 매일 대사 — 스트림 봉 = 배치 봉, 결과는 PostgreSQL | ⏳ |
