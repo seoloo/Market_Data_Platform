@@ -31,6 +31,8 @@ dev = [
     "hypothesis>=6.100",
     "import-linter>=2.0",
     "types-PyYAML",
+    # 실행 기록(src/mdp/runlog) 시험 · 타입 검사에 필요 — CI 는 dev 만 설치한다
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.hatch.build.targets.wheel]
