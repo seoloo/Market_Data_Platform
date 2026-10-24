@@ -18,9 +18,10 @@
 | 오케스트레이션 | Airflow DAG 하나로 받기 → Silver → 검산 → Gold → 복사 **14분**, 다시 만든 7개 표가 이전과 행 단위로 같음 ([기록](docs/AIRFLOW.md)) |
 | 스트림 | Kafka → Spark Structured Streaming 1분봉이 중복 · 순서 뒤바뀜을 섞은 하루 재생에서 배치 봉과 **1,440분 모두 같음**, 늦은 체결로 바뀐 26분을 스트림 혼자 찾아냄 ([기록](docs/STREAM.md)) |
 | 매일 대사 | 스트림 봉 ↔ 배치 봉을 분마다 맞대 원인을 나눔 — 받지 못한 체결 **13,897 = 재생이 건너뛴 13,897**, 늦어서 빠진 **678 = Spark가 버린 678**, 배치 봉으로 메운 뒤 1,440분 모두 같음 ([기록](docs/RECONCILE.md)) |
+| 키 없는 시연 | `python -m mdp.sample.demo --with-stream` 하나로 합성 데이터 → Silver → Gold → PostgreSQL → Kafka → 대사, 넣은 결함 5종을 **정답지와 12/12 맞춤, 107초** ([기록](docs/SAMPLE.md)) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
-> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리, Airflow 오케스트레이션, Kafka 스트림 1분봉, 스트림 · 배치 매일 대사까지 구현했고, 키 없는 샘플 시연이 다음 차례입니다
+> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리, Airflow 오케스트레이션, Kafka 스트림 1분봉, 스트림 · 배치 매일 대사, 키 없는 샘플 시연까지 구현했고, 설계 결정 기록(ADR)이 다음 차례입니다
 > ([로드맵](docs/ROADMAP.md)).
 
 ## 1. 지금 구현된 흐름
@@ -175,6 +176,16 @@ DuckDB는 Windows에서 직접 읽고 Spark는 Docker가 연결한 폴더로 읽
 
 ## 8. 돌려 보기
 
+**먼저 키 없이 (Docker Desktop만 있으면, 약 2분)** — 합성 종목 `DEMOUSDT`로 처음부터 끝까지 돌리고 정답과 맞춥니다
+([기록](docs/SAMPLE.md)). `data/sample/` 아래에만 씁니다.
+
+```bash
+pip install -e ".[dev,lake]"
+python -m mdp.sample.demo --with-stream
+```
+
+진짜 데이터로:
+
 준비물: Python 3.11 이상, Docker Desktop, 디스크 약 1GB(한 달치 Bronze). 처음 받기는 약 850MB를 내려받습니다.
 
 ```bash
@@ -229,7 +240,7 @@ docker compose run --rm spark python -m mdp.stream.produce --source live --symbo
 시험:
 
 ```bash
-pytest tests/mdp                                                   # 파이프라인 시험 79개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
+pytest tests/mdp                                                   # 파이프라인 시험 85개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
 docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 12개 (컨테이너 안)
 ruff check src tests && mypy
 ```
@@ -259,6 +270,7 @@ src/mdp/
 ├─ orchestrate/ Airflow DAG 도우미 — 돌릴 달 정하기 · Spark 컨테이너에 붙일 호스트 경로 찾기
 ├─ stream/    Kafka 보내기(실시간 · 재생 + 결함 섞기) · 스트림 1분봉 · 배치 봉과 맞대기
 ├─ reconcile/ 매일 대사 — 원인 나누기(끊김 · 늦음 · 중복) · 배치 봉으로 메우기 · PostgreSQL 기록
+├─ sample/    키 없는 시연 — 합성 Bronze(결함 5종 + 정답지) · 한 번에 돌리기 · DuckDB 로 정답 맞추기
 └─ verify/    기존 연구 추출기와 비교
 manifests/bronze/   받은 원천 파일의 체크섬 목록 (데이터 대신 커밋)
 airflow/dags/       Airflow DAG (월 파이프라인)
@@ -271,8 +283,8 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 · Airflow 오케스트레이션 · Kafka 스트림 1분봉 · 매일 대사 |
-| ⏳ 다음 | 키 없는 샘플 시연 · 설계 결정 기록(ADR) |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 · Airflow 오케스트레이션 · Kafka 스트림 1분봉 · 매일 대사 · 키 없는 샘플 시연 |
+| ⏳ 다음 | 설계 결정 기록(ADR) |
 | ⏳ 공개 전 | 옮겨 온 실주문 코드 걷어 내기 · CI 다듬기 · 화면 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.

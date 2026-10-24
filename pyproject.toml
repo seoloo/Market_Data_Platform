@@ -84,6 +84,7 @@ ignore = [
 "src/mdp/spark/**" = ["N812"]
 "src/mdp/stream/**" = ["N812"]
 "src/mdp/reconcile/**" = ["N812"]
+"src/mdp/sample/**" = ["T201"]   # 사람이 읽는 시연 진행 · 확인표를 찍는다
 "tests/mdp/spark/**" = ["N812"]
 
 [tool.ruff.lint.isort]
