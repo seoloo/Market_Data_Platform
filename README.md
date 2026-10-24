@@ -21,7 +21,7 @@
 | 키 없는 시연 | `python -m mdp.sample.demo --with-stream` 하나로 합성 데이터 → Silver → Gold → PostgreSQL → Kafka → 대사, 넣은 결함 5종을 **정답지와 12/12 맞춤, 107초** ([기록](docs/SAMPLE.md)) |
 
 > 개인 퀀트 연구에서 쓰던 시장 데이터 수집 · 감사 스크립트를 데이터 엔지니어링 방식으로 다시 만드는
-> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리, Airflow 오케스트레이션, Kafka 스트림 1분봉, 스트림 · 배치 매일 대사, 키 없는 샘플 시연까지 구현했고, 설계 결정 기록(ADR)이 다음 차례입니다
+> 프로젝트입니다. 지금은 Bronze · Silver · Gold, DuckDB 조회 층, PostgreSQL 내보내기, 재처리, Airflow 오케스트레이션, Kafka 스트림 1분봉, 스트림 · 배치 매일 대사, 키 없는 샘플 시연, 설계 결정 기록(ADR)까지 구현했습니다. 공개 전에 옮겨 온 실주문 코드 정리가 남았습니다
 > ([로드맵](docs/ROADMAP.md)).
 
 ## 1. 지금 구현된 흐름
@@ -162,6 +162,8 @@ DuckDB는 Windows에서 직접 읽고 Spark는 Docker가 연결한 폴더로 읽
 
 ## 7. 설계 결정
 
+결정마다 맥락 · 다른 안 · 치르는 값 · 잰 근거는 [결정 기록(ADR) 11개](docs/adr/README.md)에 있습니다. 요약:
+
 | 결정 | 이유 |
 |---|---|
 | 큰 데이터는 Delta, PostgreSQL은 작은 표만 | 체결 64.6억 행을 PostgreSQL에 넣으면 색인 없이도 수백 GB로 추정(재 보지 않은 추정) — SSD 여유보다 큼 |
@@ -283,8 +285,7 @@ docs/               규칙 · 결과 · 발견 기록 · 로드맵 · 그림 원
 
 | 상태 | 단계 |
 |---|---|
-| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 · Airflow 오케스트레이션 · Kafka 스트림 1분봉 · 매일 대사 · 키 없는 샘플 시연 |
-| ⏳ 다음 | 설계 결정 기록(ADR) |
+| ✅ 끝 | Bronze 받기 · 실행 기록 · 증분 받기와 백필 · Silver 체결 감사 · DuckDB 조회 층 · 벤치마크 · Gold 1분봉 + PostgreSQL 복사 · 재처리 시연 · Airflow 오케스트레이션 · Kafka 스트림 1분봉 · 매일 대사 · 키 없는 샘플 시연 · 설계 결정 기록(ADR) |
 | ⏳ 공개 전 | 옮겨 온 실주문 코드 걷어 내기 · CI 다듬기 · 화면 |
 
 단계별 전체 기록은 [docs/ROADMAP.md](docs/ROADMAP.md)에 있습니다.
