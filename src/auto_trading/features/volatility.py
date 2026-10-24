@@ -1,6 +1,6 @@
 """B2 — 1시간 ATR 변동성 국면. **거래 허가** 를 담당한다.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §2 B2
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §2 B2
 
 방향 신호가 아니다. "지금 거래해도 되는 국면인가" 를 판정한다.
 

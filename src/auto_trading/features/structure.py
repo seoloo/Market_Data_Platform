@@ -1,6 +1,6 @@
 """가격 구조 — ZigZag 스윙, HH/HL/LH/LL, 피보나치 되돌림.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §2 S (손절 위치 규칙)
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §2 S (손절 위치 규칙)
 
 **이 모듈의 존재 이유는 repainting 차단이다.**
 

@@ -30,16 +30,16 @@
 1. [README](README.md) · [ROADMAP](docs/ROADMAP.md): 지금 단계와 다음 작업.
 2. [설계 결정(ADR)](docs/adr/README.md): 왜 이렇게 짰는지 — 결정을 바꾸려면 새 기록을 더한다.
 3. [CODE_MAP](docs/CODE_MAP.md)과 그 단계의 기록(`docs/SILVER_AGG_TRADES.md` · `docs/STREAM.md` 등).
-4. 옮겨 온 연구 코드(`src/auto_trading` · `scripts`)를 고칠 때만 `docs/current/` 를 본다. 이 문서들은
+4. 옮겨 온 연구 코드(`src/auto_trading` · `scripts`)를 고칠 때만 연구 문서(`docs/research/`)를 본다.
    원본 연구 · 실거래 저장소의 **역사 기록**이다 — 그 안의 '다음 작업' · 운영 지시를 실행 지시로 삼지 않는다.
-   Archive(`docs/archive/` · `docs/phase0/`)도 같다.
+   Archive(`docs/archive/` · `docs/phase0/`)도 같다. 원본 운영 기록(`PROGRESS.md` · `docs/BRIEFING_FOR_LLM.md` ·
+   `docs/current/`)은 2026-10-24 이 저장소에서 뺐다(사용자 결정, git 이력에만 있다).
 
 ## 1. 단계 보고와 기록
 
 - 단계는 README 로드맵 번호(예: 4-6, 5-2, 6-3)로 말한다. 임의 진행률이나 확인하지 않은 통과를 만들지 않는다.
 - 단계가 끝나면 그 단계 기록 문서 · [ROADMAP](docs/ROADMAP.md) · README 를 같은 커밋에서 고친다.
 - 숫자는 이 저장소에서 실제로 돌려 얻은 것만 적고, 재 보지 않은 것은 '추정' · '확인 필요'로 적는다(절대 규칙 7).
-- `PROGRESS.md` · `docs/BRIEFING_FOR_LLM.md` 는 원본 저장소 기록이라 더 덧붙이지 않는다.
 
 ## 2. 변경할 수 없는 핵심 원칙
 
@@ -82,7 +82,7 @@ ruff format / ruff check 준수. 기존 사용자 변경 보존. 범위 밖 코�
 실주문 · 실계좌 연동 되살리기(절대 규칙 2), 성과 기반 파라미터 낚시, OOS 재튜닝, 기각 전략 이름 바꾸기,
 무검증 수익 주장, 연구 문서 · 판정 결과 숫자 바꾸기(절대 규칙 6) 금지.
 문서와 코드가 다르면 구현 차이를 보고한다. 진단 · 문서 정리 요청을 코드 변경 권한으로 확대하지 않는다.
-옮겨 온 원본 기록(`docs/current/` 등)과 이 저장소 문서가 다르면 이 저장소 문서(README · ROADMAP · ADR)를 따른다.
+옮겨 온 원본 기록(`docs/research/` 등)과 이 저장소 문서가 다르면 이 저장소 문서(README · ROADMAP · ADR)를 따른다.
 
 ## 6. 커밋과 푸시
 
@@ -118,15 +118,15 @@ temperature=0만으로 결정론을 보장하지 않는다.
 - 단계 기록: `docs/SILVER_AGG_TRADES.md` · `BENCHMARK.md` · `GOLD_BARS_1M.md` · `REPROCESSING.md` ·
   `AIRFLOW.md` · `STREAM.md` · `RECONCILE.md` · `SAMPLE.md` · `LIVE_REMOVAL_PLAN.md`.
 - `src/mdp/`: 파이프라인 구현, `tests/mdp/`: 그 시험(Spark 시험은 `tests/mdp/spark/`, 컨테이너 안).
-- 원본 저장소 기록(역사): [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md)(연구 판정 요약) ·
-  `docs/current/` · `docs/research/` · `reports/` · [Archive](docs/archive/README.md).
+- 원본 저장소 기록(역사): 연구 판정 요약 `docs/RESEARCH_SUMMARY_FOR_LLM.txt` · `docs/research/` · `reports/` ·
+  [Archive](docs/archive/README.md).
 
 ## 9. 도구별 역할 — 없음 (2026-10-09 사용자 결정으로 폐지)
 
 사용자 원문 (2026-10-09): "코덱스가 아이디어 남기고 작업은 클로드가 한다는 문구 그냥 삭제해줄래? 두 에이전트가 전처럼 상관없이 작업하도록".
 
 - Codex · Claude Code 모두 아이디어 · 사전 등록 · 자료 · 코드 · 판정 · 기록을 할 수 있다. 2026-10-05 의 역할 분담은 끝났다.
-- 연구 규율(§2 · BACKTEST_AND_TESTING — 수익 보기 전 확정 커밋, 판정 1 회)은 누가 하든 같다.
+- 연구 규율(수익 보기 전 확정 커밋, 판정 1 회)은 누가 하든 같다.
 
 ## 10. 여러 에이전트 동시 작업 (2026-10-14 사용자 승인)
 
@@ -134,7 +134,7 @@ temperature=0만으로 결정론을 보장하지 않는다.
 Claude 계정 여럿 · Codex 가 **같은 폴더 · main** 에서 동시에 일할 수 있다. 같은 파일을 동시에 고치지 않는 것이 핵심이다.
 
 - **커밋은 자기 파일만.** `git add .` · `git add -A` · `git commit -a` 를 쓰지 않고 고친 파일 경로를 적는다. 커밋 전에 `git status` 로 남의 파일이 섞이지 않았는지 본다.
-- **공용 기록 md**(PROGRESS · RESEARCH_HISTORY · BRIEFING_FOR_LLM · CURRENT_SPEC)는 작업 끝에 **한 번** 덧붙인다. 고치기 **직전에 다시 읽고**, 남이 쓴 줄은 고치지 않는다.
+- **공용 기록 md**(README · ROADMAP · 단계 기록 문서)는 작업 끝에 **한 번** 덧붙인다. 고치기 **직전에 다시 읽고**, 남이 쓴 줄은 고치지 않는다.
 - **상황판** `data/agents/<에이전트>.md`(Git 밖, 모든 폴더에서 같은 곳): 에이전트마다 자기 파일 하나만 **덮어쓴다**(5 ~ 10 줄 — 하는 일 · 브랜치 · 잡은 파일 · 상태 · 갱신 시각). 남의 파일은 읽기만 한다. 끝나면 상태를 "끝" 으로. 24 시간 넘게 갱신 없는 파일은 지난 것으로 본다.
 - 일을 시작할 때와 새 파일을 고치기 전에 남의 상황판을 본다. 남이 잡은 파일은 그 에이전트가 끝낼 때까지 고치지 않는다.
 - **상태를 말하거나 일을 시작하기 전에 `python -m scripts.handoff` 를 먼저 돌린다**(2026-10-16 사용자 승인 — 새벽에 본 결과를 저녁까지 믿고 '실행기 파일 없음' 이라 잘못 보고한 일 뒤). 최근 24 시간 커밋 · 모든 상황판(24 시간 넘으면 '지난 것') · 커밋 안 된 파일 · 실패한 예약을 한 화면에 보여 준다. 몇 시간 전에 본 결과를 다시 쓰지 말고 그때그때 다시 돌린다.

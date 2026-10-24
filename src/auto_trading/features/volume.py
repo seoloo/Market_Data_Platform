@@ -1,6 +1,6 @@
 """T3 — 5분 거래량 확인. **곱셈 계수** 로 쓰인다.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §2 T3
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §2 T3
 
 거래량은 **방향이 없다.** 가중합에 더하면 "거래량이 많으니까 매수" 라는
 말이 안 되는 기여가 생긴다 (06-scoring-engine.md §2.2).

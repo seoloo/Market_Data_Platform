@@ -1,6 +1,6 @@
 """T1 / T2 — 진입 타이밍.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §2 T1, T2
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §2 T1, T2
 
 가설 H1 의 "15분 되돌림 이후 추세 방향으로 재개" 에 대응한다.
 

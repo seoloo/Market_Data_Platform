@@ -11,7 +11,7 @@ D14 이전에는 B2 가 방향 점수 자체에 곱해졌다. 그 구조에서�
 막아야 하는 극단 국면은 리스크 게이트(G5.1/G5.2)가 **명시적으로** 차단한다.
 완충장치와 차단장치를 분리한 것이 이 변경의 핵심이다.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §4-2
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §4-2
 """
 
 from __future__ import annotations

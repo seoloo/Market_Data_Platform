@@ -1,7 +1,7 @@
 """포트폴리오 보고서 — 연구 카드 공통 틀.
 
 카드 한 장 = 연구 하나(또는 한 번에 판정한 묶음). 칸 이름 없이 두 문단(가설·방법 / 결과·교훈)과 핵심 숫자 한 줄.
-숫자와 판정은 docs/current/RESEARCH_HISTORY.md 와 각 연구 문서가 기준이다.
+숫자와 판정은 각 연구 문서(docs/research)가 기준이다.
 """
 
 from __future__ import annotations

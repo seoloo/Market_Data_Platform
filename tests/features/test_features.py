@@ -416,7 +416,7 @@ def test_all_five_features_have_distinct_names():
 
 
 def test_default_timeframes_match_catalog():
-    """docs/STRATEGY-CATALOG.md §0 의 표와 일치해야 한다."""
+    """docs/archive/design/STRATEGY-CATALOG.md §0 의 표와 일치해야 한다."""
     assert TrendFeature().timeframe is Timeframe.H4
     assert VolatilityRegimeFeature().timeframe is Timeframe.H1
     assert PullbackFeature().timeframe is Timeframe.M15

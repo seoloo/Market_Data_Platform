@@ -1,6 +1,6 @@
 """B1 — 4시간 EMA(50) 추세. **방향 허가** 를 담당한다.
 
-사람이 읽는 설명: docs/STRATEGY-CATALOG.md §2 B1
+사람이 읽는 설명: docs/archive/design/STRATEGY-CATALOG.md §2 B1
 
 가설 H1 의 "4시간 추세가 명확한 구간에서" 에 대응한다 (13-decisions.md D11).
 이 값이 애매하면 (|값| < bias_threshold) **진입 자체를 하지 않는다.**

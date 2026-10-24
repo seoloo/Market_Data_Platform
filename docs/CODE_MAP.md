@@ -72,4 +72,5 @@ DAG [`airflow/dags/mdp_monthly_pipeline.py`](../airflow/dags/mdp_monthly_pipelin
 | 정보 알림 (정할 것 5, 실주문과 무관) | 몇 개 | `info_bot` · `market_brief` · `theme_alert` · `leader_alert` · `event_alert` |
 
 연구 문서 · 판정 결과(`docs/research/` · `reports/`)의 숫자와 결론은 바꾸지 않는다(절대 규칙 6).
-연구 판정 요약은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md) (원본 저장소 기록).
+연구 판정 요약은 `docs/RESEARCH_SUMMARY_FOR_LLM.txt` (원본 저장소 기록). 원본 운영 기록(PROGRESS · 운영 사양)은
+이 저장소에서 뺐다(2026-10-24).
