@@ -27,6 +27,7 @@ bronze_klines ─┘   (Spark)    (DuckDB 검산)   (Spark)  (PostgreSQL 복사 
 | `check_silver` | Airflow 컨테이너 | `python -m mdp.query.check_silver` — 실패하면 아래로 가지 않음 |
 | `gold` | Spark 컨테이너 | `python -m mdp.gold.bars_1m` |
 | `serve` | Airflow 컨테이너 | `python -m mdp.serve.bars_1m` |
+| `report` | Airflow 컨테이너 | `python -m mdp.ui.report` — [상태 화면](STATUS_PAGE.md) 다시 만들기 (6-3 에서 더함) |
 
 - **평소와 같은 명령을 부른다.** Airflow 전용 처리 코드는 없다. Airflow는 순서 · 다시 시도 · 기록만 맡고,
   계산은 이미 시험한 명령이 한다. 그래서 DAG 없이 손으로 돌린 결과와 DAG로 돌린 결과가 같은 코드에서 나온다.

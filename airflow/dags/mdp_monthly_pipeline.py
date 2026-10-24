@@ -16,6 +16,7 @@
 | ``check_silver`` | Airflow 안 | ``python -m mdp.query.check_silver`` (실패하면 멈춤) |
 | ``gold`` | Spark 컨테이너 | ``python -m mdp.gold.bars_1m`` |
 | ``serve`` | Airflow 안 | ``python -m mdp.serve.bars_1m`` |
+| ``report`` | Airflow 안 | ``python -m mdp.ui.report`` (상태 화면) |
 
 실패 처리: 작업마다 2 번 다시 시도(5 분 간격), 한 번에 한 달만
 (``max_active_runs=1`` — 단일 PC 메모리).
@@ -130,5 +131,7 @@ with DAG(
     )
     gold = _spark_task("gold", "mdp.gold.bars_1m")
     serve = BashOperator(task_id="serve", bash_command=f"python -m mdp.serve.bars_1m {COMMON}")
+    # 상태 화면(<lake>/_ui/index.html)을 새로 — 읽기만 하므로 다시 시도해도 안전하다
+    report = BashOperator(task_id="report", bash_command="python -m mdp.ui.report")
 
-    [bronze_trades, bronze_klines] >> silver >> check_silver >> gold >> serve
+    [bronze_trades, bronze_klines] >> silver >> check_silver >> gold >> serve >> report

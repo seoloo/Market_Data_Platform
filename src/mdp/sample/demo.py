@@ -165,6 +165,13 @@ def plan_steps(root: Path, *, with_stream: bool, build_image: bool) -> list[Step
         ]
     steps.append(
         Step(
+            "상태 화면 만들기",
+            f"레이크 · 실행 기록 · 대사를 HTML 한 장으로 — {root / 'ui' / 'index.html'}",
+            _host("mdp.ui.report", "--out", str(root / "ui" / "index.html")),
+        )
+    )
+    steps.append(
+        Step(
             "정답 맞추기 (DuckDB)",
             "넣은 결함을 빠짐없이 · 더하지도 않고 찾았나",
             _host("mdp.sample.verify", "--root", str(root)),

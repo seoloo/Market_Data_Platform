@@ -34,6 +34,7 @@ sample ─▶ 키 없는 합성 데이터로 위 전체를 한 번에 + 정답 �
 | `stream/` | 원문 토픽에 보내기(실시간 · 재생 + 결함 섞기) · 스트림 1분봉 · 배치와 맞대기 | Spark 컨테이너 · 호스트 | [STREAM](STREAM.md) |
 | `reconcile/` | 매일 대사 — 원인 나누기 · 배치 봉으로 메우기 · PostgreSQL 기록 | Spark 컨테이너 | [RECONCILE](RECONCILE.md) |
 | `sample/` | 합성 Bronze(결함 + 정답지) · 한 번에 돌리기 · 정답 맞추기 | 호스트 → 컨테이너 | [SAMPLE](SAMPLE.md) |
+| `ui/` | 상태 화면 — 레이크 · 실행 기록 · 대사를 HTML 한 장으로 (읽기만) | 호스트 · Airflow | [STATUS_PAGE](STATUS_PAGE.md) |
 | `runlog/` | 실행 기록(PostgreSQL) · 마이그레이션 SQL | 어디서나 | README 3-2 |
 | `spark/` | Delta를 켠 로컬 Spark 세션 · 표 경로 · CSV 글자 그대로 읽기 | 컨테이너 | — |
 | `verify/` | 기존 연구 추출기와 비교 | 호스트 | [발견 기록](findings/2026-10-21-qflow216-check-minute-chunk-boundary.md) |
