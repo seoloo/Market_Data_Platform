@@ -1,130 +1,51 @@
-"""Binance 현물 읽기 전용 어댑터 — 네트워크 없이 MockTransport로 검증. `.env` 로더 포함."""
+"""Binance 현물 공개 시세 어댑터 — 네트워크 없이 MockTransport로 검증. `.env` 읽기 포함.
+
+예전의 서명 · 잔고 · 주문 조회 · 키 권한 시험은 그 코드를 걷어 낼 때(README 6-3) 함께 지웠다.
+"""
 
 from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 
-from auto_trading.config.secrets import (
-    BinanceCredentials,
-    load_binance_credentials,
-    read_env_file,
-)
-from auto_trading.core.errors import ConfigError, ExchangeError, RateLimitError
-from auto_trading.exchange.binance_spot import BinanceSpotReadOnly, sign
-from auto_trading.exchange.spot import OrderStatus
+from auto_trading.config.secrets import read_env_file
+from auto_trading.core.errors import ExchangeError, RateLimitError
+from auto_trading.exchange.binance_spot import BinanceSpotPublic
 
-CREDS = BinanceCredentials("test-key", "test-secret")
+DAY_MS = 86_400_000
 
 
-def test_signature_matches_binance_documentation_vector() -> None:
-    secret = "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"
-    query = (
-        "symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1"
-        "&recvWindow=5000&timestamp=1499827319559"
-    )
-    assert sign(secret, query) == "c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71"
-
-
-def adapter(handler: object) -> BinanceSpotReadOnly:
-    client = httpx.Client(transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
-    return BinanceSpotReadOnly(CREDS, client=client, clock=lambda: 1_000_000)
-
-
-def routes(extra: dict[str, httpx.Response]) -> object:
-    seen: list[httpx.Request] = []
-
+def adapter(routes: dict[str, httpx.Response], seen: list[httpx.Request]) -> BinanceSpotPublic:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        if request.url.path == "/api/v3/time":
-            return httpx.Response(200, json={"serverTime": 1_000_500})
-        return extra[request.url.path]
+        return routes[request.url.path]
 
-    handler.seen = seen  # type: ignore[attr-defined]
-    return handler
+    return BinanceSpotPublic(client=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
-def test_signed_request_has_key_header_timestamp_offset_and_valid_signature() -> None:
-    handler = routes({"/api/v3/account": httpx.Response(200, json={"balances": []})})
-    adapter(handler).balances()
-    request = handler.seen[-1]  # type: ignore[attr-defined]
-    assert request.headers["X-MBX-APIKEY"] == "test-key"
-    query = urlparse(str(request.url)).query
-    body, _, signature = query.rpartition("&signature=")
-    assert sign("test-secret", body) == signature
-    assert parse_qs(body)["timestamp"] == ["1000500"]  # 로컬 1,000,000 + 서버 차이 500
-
-
-def test_timestamp_error_remeasures_clock_and_retries_read_once() -> None:
-    times = iter([1_000_500, 1_002_000])  # 두 번째로 잴 때 서버가 1.5 초 앞섬
-    calls: list[str] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        calls.append(request.url.path)
-        if request.url.path == "/api/v3/time":
-            return httpx.Response(200, json={"serverTime": next(times)})
-        ts = parse_qs(urlparse(str(request.url)).query)["timestamp"][0]
-        if ts == "1000500":
-            return httpx.Response(400, json={"code": -1021, "msg": "Timestamp ahead"})
-        return httpx.Response(200, json={"balances": []})
-
-    assert adapter(handler).balances() == {}
-    assert calls == ["/api/v3/time", "/api/v3/account", "/api/v3/time", "/api/v3/account"]
-
-
-def test_other_errors_are_not_retried() -> None:
-    calls: list[str] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        calls.append(request.url.path)
-        if request.url.path == "/api/v3/time":
-            return httpx.Response(200, json={"serverTime": 1_000_500})
-        return httpx.Response(400, json={"code": -2015, "msg": "Invalid API-key"})
-
-    with pytest.raises(ExchangeError, match="-2015"):
-        adapter(handler).balances()
-    assert calls.count("/api/v3/account") == 1
-
-
-def test_balances_filters_and_price_are_parsed() -> None:
-    handler = routes(
+def test_filters_and_price_are_parsed_without_any_key() -> None:
+    seen: list[httpx.Request] = []
+    info = {
+        "symbols": [
+            {
+                "symbol": "BTCUSDT",
+                "filters": [
+                    {"filterType": "LOT_SIZE", "stepSize": "0.00001000", "minQty": "0.00001000"},
+                    {"filterType": "NOTIONAL", "minNotional": "5.00000000"},
+                ],
+            }
+        ]
+    }
+    ex = adapter(
         {
-            "/api/v3/account": httpx.Response(
-                200,
-                json={
-                    "balances": [
-                        {"asset": "USDT", "free": "100.5", "locked": "0.5"},
-                        {"asset": "BTC", "free": "0.00000000", "locked": "0.00000000"},
-                    ]
-                },
-            ),
-            "/api/v3/exchangeInfo": httpx.Response(
-                200,
-                json={
-                    "symbols": [
-                        {
-                            "symbol": "BTCUSDT",
-                            "filters": [
-                                {
-                                    "filterType": "LOT_SIZE",
-                                    "stepSize": "0.00001000",
-                                    "minQty": "0.00001000",
-                                },
-                                {"filterType": "NOTIONAL", "minNotional": "5.00000000"},
-                            ],
-                        }
-                    ]
-                },
-            ),
+            "/api/v3/exchangeInfo": httpx.Response(200, json=info),
             "/api/v3/ticker/price": httpx.Response(200, json={"price": "65000.01"}),
-        }
+        },
+        seen,
     )
-    ex = adapter(handler)
-    assert ex.balances() == {"USDT": Decimal("101.0")}
     f = ex.filters("BTCUSDT")
     assert (f.step_size, f.min_qty, f.min_notional) == (
         Decimal("0.00001"),
@@ -132,67 +53,51 @@ def test_balances_filters_and_price_are_parsed() -> None:
         Decimal(5),
     )
     assert ex.last_price("BTCUSDT") == Decimal("65000.01")
+    assert all("X-MBX-APIKEY" not in r.headers and "signature" not in str(r.url) for r in seen)
 
 
-def test_get_order_maps_status_and_missing_order_is_none() -> None:
-    order = {
-        "clientOrderId": "t2l-1-BTCUSDT-B",
-        "orderId": 42,
-        "symbol": "BTCUSDT",
-        "side": "BUY",
-        "status": "FILLED",
-        "origQty": "0.01",
-        "executedQty": "0.01",
-        "cummulativeQuoteQty": "650.0",
-    }
-    ex = adapter(routes({"/api/v3/order": httpx.Response(200, json=order)}))
-    result = ex.get_order("BTCUSDT", "t2l-1-BTCUSDT-B")
-    assert result is not None and result.status is OrderStatus.FILLED
-    assert result.exchange_order_id == "42" and result.quote_qty == Decimal("650.0")
-    missing = httpx.Response(400, json={"code": -2013, "msg": "Order does not exist."})
-    assert adapter(routes({"/api/v3/order": missing})).get_order("BTCUSDT", "x") is None
+@pytest.mark.leakage
+def test_closed_daily_drops_the_unfinished_bar() -> None:
+    """진행 중인 봉을 쓰면 미래 값이 섞인다 — 마감된 봉만."""
+
+    def row(open_ms: int) -> list[object]:
+        return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + DAY_MS - 1, "15", 7]
+
+    as_of = 3 * DAY_MS - 1  # 이틀째 봉 마감 시각
+    rows = [row(0), row(DAY_MS), row(2 * DAY_MS)]  # 셋째 봉은 아직 진행 중
+    ex = adapter({"/api/v3/klines": httpx.Response(200, json=rows)}, [])
+    bars = ex.closed_daily("BTCUSDT", as_of - DAY_MS)
+    assert [b.open_ms for b in bars] == [0, DAY_MS]
+    assert bars[0].close == Decimal("1.5") and bars[0].trade_count == 7
 
 
-def test_errors_are_mapped_and_ordering_is_refused() -> None:
-    limited = adapter(routes({"/api/v3/ticker/price": httpx.Response(429, json={})}))
+def test_order_book_and_errors_are_mapped() -> None:
+    depth = {"bids": [["100.0", "1"]], "asks": [["100.5", "2"]]}
+    ex = adapter({"/api/v3/depth": httpx.Response(200, json=depth)}, [])
+    assert ex.order_book("BTCUSDT") == (
+        [(Decimal("100.0"), Decimal(1))],
+        [(Decimal("100.5"), Decimal(2))],
+    )
+    limited = adapter({"/api/v3/ticker/price": httpx.Response(429, json={})}, [])
     with pytest.raises(RateLimitError):
         limited.last_price("BTCUSDT")
-    denied = httpx.Response(401, json={"code": -2015, "msg": "Invalid API-key, IP, or permissions"})
-    with pytest.raises(ExchangeError, match="-2015"):
-        adapter(routes({"/api/v3/account": denied})).balances()
-    with pytest.raises(ExchangeError, match="읽기 전용"):
-        adapter(routes({})).place_market_order("BTCUSDT", "BUY", Decimal(1), "c")
+    bad = httpx.Response(400, json={"code": -1121, "msg": "Invalid symbol."})
+    with pytest.raises(ExchangeError, match="-1121"):
+        adapter({"/api/v3/ticker/price": bad}, []).last_price("NOPE")
 
 
-def test_api_restrictions_keeps_boolean_flags() -> None:
-    body = {"ipRestrict": True, "enableReading": True, "enableWithdrawals": False, "createTime": 1}
-    ex = adapter(routes({"/sapi/v1/account/apiRestrictions": httpx.Response(200, json=body)}))
-    assert ex.api_restrictions() == {
-        "ipRestrict": True,
-        "enableReading": True,
-        "enableWithdrawals": False,
-    }
+def test_public_adapter_has_no_account_or_order_methods() -> None:
+    ex = BinanceSpotPublic()
+    for name in ("balances", "api_restrictions", "get_order", "place_market_order"):
+        assert not hasattr(ex, name)
+    ex.close()
 
 
-class TestSecrets:
-    def test_env_file_parsing_and_masked_repr(self, tmp_path: Path) -> None:
-        env = tmp_path / ".env"
-        env.write_text(
-            "# 주석\nAT_MODE=paper   # 인라인 주석\nBINANCE_API_KEY=abcd1234\n"
-            'BINANCE_API_SECRET="s3cr3t"\nEMPTY=\n',
-            encoding="utf-8",
-        )
-        assert read_env_file(env)["AT_MODE"] == "paper"
-        creds = load_binance_credentials(env, environ={})
-        assert creds.api_secret == "s3cr3t"
-        assert "s3cr3t" not in repr(creds) and "abcd1234" not in str(creds)
-
-    def test_missing_credentials_raise_without_leaking(self, tmp_path: Path) -> None:
-        with pytest.raises(ConfigError, match="BINANCE_API_KEY"):
-            load_binance_credentials(tmp_path / "none.env", environ={})
-
-    def test_environment_overrides_file(self, tmp_path: Path) -> None:
-        env = tmp_path / ".env"
-        env.write_text("BINANCE_API_KEY=file\nBINANCE_API_SECRET=file\n", encoding="utf-8")
-        creds = load_binance_credentials(env, environ={"BINANCE_API_KEY": "envkey"})
-        assert creds.api_key == "envkey" and creds.api_secret == "file"
+def test_env_file_parsing(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    env.write_text(
+        '# 주석\nAT_MODE=paper   # 인라인 주석\nQUOTED="v"\nEMPTY=\n',
+        encoding="utf-8",
+    )
+    values = read_env_file(env)
+    assert values["AT_MODE"] == "paper" and values["QUOTED"] == "v" and values["EMPTY"] == ""

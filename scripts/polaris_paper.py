@@ -24,7 +24,6 @@ from __future__ import annotations
 import json
 import sys
 from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -35,9 +34,7 @@ if str(REPO / "src") not in sys.path:
 
 from auto_trading.config.secrets import (  # noqa: E402
     load_telegram_credentials,
-    load_toss_credentials,
 )
-from auto_trading.exchange.toss import TossReader, TossTokenCache  # noqa: E402
 from auto_trading.notify.channels import (  # noqa: E402
     NotifyError,
     OutboxNotifier,
@@ -186,26 +183,11 @@ def step(
 
 
 def _market_data(today: str) -> tuple[str, dict[str, float], float] | None:
-    """[쓰임] 토스에서 (마지막 종가 날짜, {종목: 종가}, 환율).
-
-    네 종목 종가 날짜가 다르면 None (다음 실행에서 다시)."""
-    reader = TossReader(
-        load_toss_credentials(REPO / ".env"), TossTokenCache(REPO / "data" / "toss_token.json")
-    )
-    try:
-        last: dict[str, tuple[str, Decimal]] = {}
-        for symbol in SYMBOLS:
-            closes = reader.daily_closes(symbol, 5, before_day=today)
-            if not closes:
-                return None
-            last[symbol] = closes[-1]
-        fx = float(reader.usd_krw())
-    finally:
-        reader.close()
-    days = {day for day, _price in last.values()}
-    if len(days) != 1:
-        return None
-    return days.pop(), {symbol: float(price) for symbol, (_day, price) in last.items()}, fx
+    """[쓰임] 종가 · 환율 — 토스증권 실계좌 키로 조회하던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    새 종가를 받지 않으므로 늘 None (Paper 는 저장된 상태 그대로)."""
+    print("Polaris Paper: 종가 조회 없음 — 실계좌 키로 받던 부분을 뺐다(README 6-3)")
+    return None
 
 
 def _send(text: str) -> None:

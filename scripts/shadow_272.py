@@ -195,12 +195,12 @@ def _long_targets(now_ms: int) -> tuple[dict[str, float], dict[str, dict[str, An
     [이유] Altair 은퇴(2026-10-19)로 scripts/altair_demo 를 retired/ 로 옮기면서, 이 그림자 기록이
            쓰던 함수만 여기로 그대로 옮겼다 (계산 같음)."""
     from auto_trading.config.schema import SpotTrendConfig
-    from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
+    from auto_trading.exchange.binance_spot import BinanceSpotPublic
     from auto_trading.features.tsmom import realized_vol_annual
     from auto_trading.strategy.spot_trend import spot_trend_targets
 
     as_of = now_ms - now_ms % DAY - 1
-    spot = BinanceSpotReadOnly(None)
+    spot = BinanceSpotPublic()
     try:
         daily = {SIGNAL[c]: spot.closed_daily(SIGNAL[c], as_of) for c in SIGNAL}
     finally:

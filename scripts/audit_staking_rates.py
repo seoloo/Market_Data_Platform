@@ -1,6 +1,7 @@
 """ETH·SOL Binance 스테이킹 비율 이력 수집 및 날짜 감사 (문서 90).
 
-`python -m scripts.audit_staking_rates` — 서명 USER_DATA GET만 사용한다.
+`python -m scripts.audit_staking_rates` — 서명 USER_DATA GET만 사용했다. 실계좌 키로 서명하는 받기는
+실주문 · 실계좌 코드를 걷어 낼 때 뺐다(README 6-3) — 이미 받아 둔 스냅숏 검증 함수는 그대로다.
 계좌/보유량/지급 내역이나 주문 API는 호출하지 않는다. APR은 수익으로 계산하지 않는다.
 검증된 원시 비율 행은 Git 제외 `data/research/staking/`에 해시별로 보존한다.
 """
@@ -17,10 +18,6 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Protocol
-
-from auto_trading.config.secrets import load_binance_credentials
-from auto_trading.core.errors import AutoTradingError
-from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "research" / "staking"
@@ -178,22 +175,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DATA)
     args = parser.parse_args()
-    try:
-        credentials = load_binance_credentials(REPO / ".env")
-        reader = BinanceSpotReadOnly(credentials)
-        try:
-            history = {asset: fetch_asset(reader, asset) for asset in ("ETH", "SOL")}
-        finally:
-            reader.close()
-        manifest = save_snapshot(history, destination=args.output)
-    except (AutoTradingError, OSError, TypeError, ValueError) as error:
-        print(f"스테이킹 이력 감사 중단: {type(error).__name__}", file=sys.stderr)
-        return 2
-    print(f"스테이킹 비율 스냅숏: {manifest}")
-    for asset in ("ETH", "SOL"):
-        rows = history[asset]
-        print(f"{asset}: {len(rows)}행, UTC 누락일 {len(missing_dates(rows))}개")
-    return 0
+    print(
+        "스테이킹 이력 받기 없음 — 실계좌 키로 서명하던 부분을 뺐다(README 6-3). "
+        f"저장된 스냅숏: {args.output}",
+        file=sys.stderr,
+    )
+    return 2
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ from typing import Any
 
 from auto_trading.ops.lt_paper import PaperState, step, trend_up
 from auto_trading.ops.news_rss import FEEDS, YAHOO_TICKER, NewsItem, dedupe, parse_feed
-from auto_trading.ops.us_daily_bars import Merge, last_settled_day, merge, settled, to_row
+from auto_trading.ops.us_daily_bars import Merge, merge, settled, to_row
 
 REPO = Path(__file__).resolve().parent.parent
 RESEARCH = REPO / "data" / "research" / "stocks"
@@ -86,34 +86,11 @@ def init() -> dict[str, object]:
 
 
 def update() -> dict[str, object]:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    meta = json.loads(META.read_text(encoding="utf-8"))
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    last_ok = last_settled_day()
-    appended = repaired = refetched = failed = 0
-    try:
-        for sym, excd in sorted(meta["exchanges"].items()):
-            path = BARS / f"{sym}.csv"
-            try:
-                m = fetch_merge(broker, sym.replace(".", "/"), excd, path, last_ok)
-            except Exception:
-                failed += 1
-                continue
-            appended += m.appended > 0
-            repaired += m.repaired > 0 or m.dropped_unsettled > 0
-            refetched += m.needs_full
-    finally:
-        broker.close()
+    """[쓰임] 시세 갱신 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 일봉으로만 돈다. 다시 받으려면 키 없는 공개 원천을 붙인다."""
     return {
-        "settled_through": last_ok,
-        "appended_symbols": appended,
-        "repaired_symbols": repaired,
-        "refetched_symbols": refetched,
-        "failed": failed,
+        "skipped": "시세 갱신 없음 — 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 일봉으로만"
     }
 
 

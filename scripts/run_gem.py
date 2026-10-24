@@ -43,32 +43,10 @@ P1_GAP, P2_GAP = 0.02, 0.10
 
 
 def fetch() -> dict[str, object]:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    GEM.mkdir(parents=True, exist_ok=True)
-    out: dict[str, object] = {}
-    try:
-        for sym, excd in SYMBOLS.items():
-            bars = broker.daily_history(sym, since="2007-01-01", exchange=excd, adjusted=True)
-            path = GEM / f"{sym}.csv"
-            with path.open("w", encoding="utf-8", newline="\n") as fh:
-                w = csv.writer(fh, lineterminator="\n")
-                w.writerow(["date", "close"])
-                for b in bars:
-                    d = datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d")
-                    w.writerow([d, str(b.close)])
-            out[sym] = {
-                "rows": len(bars),
-                "first": datetime.fromtimestamp(bars[0].open_ms / 1000, UTC).date().isoformat(),
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            }
-    finally:
-        broker.close()
-    return out
+    """[쓰임] 일봉 받기 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 자료를 읽는 명령은 그대로 돈다."""
+    raise SystemExit("일봉 받기: 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 자료로만 돈다")
 
 
 def _load(sym: str) -> dict[str, float]:

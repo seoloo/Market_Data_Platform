@@ -23,10 +23,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.lt_paper import _read, fetch_merge
+from scripts.lt_paper import _read
 
 from auto_trading.ops.qs_paper import LOOKBACKS, QsState, settle_year, step, trend_on
-from auto_trading.ops.us_daily_bars import last_settled_day
 
 REPO = Path(__file__).resolve().parent.parent
 RESEARCH = REPO / "data" / "research" / "tradfi"
@@ -52,27 +51,12 @@ def init() -> dict[str, object]:
 
 
 def update() -> dict[str, object]:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    last_ok = last_settled_day()
-    out: dict[str, object] = {"settled_through": last_ok}
-    try:
-        for sym in SYMBOLS:
-            m = fetch_merge(broker, sym, "NAS", BARS / f"{sym}.csv", last_ok)
-            out[sym] = {
-                "appended": m.appended,
-                "repaired": m.repaired,
-                "dropped_unsettled": m.dropped_unsettled,
-                "refetched": m.needs_full,
-                "last": m.rows[-1]["date"],
-            }
-    finally:
-        broker.close()
-    return out
+    """[쓰임] 시세 갱신 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 일봉으로만 돈다. 다시 받으려면 키 없는 공개 원천을 붙인다."""
+    return {
+        "skipped": "시세 갱신 없음 — 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 일봉으로만"
+    }
 
 
 def _panel() -> tuple[list[str], list[float], list[float]]:

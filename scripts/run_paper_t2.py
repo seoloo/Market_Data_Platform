@@ -23,7 +23,7 @@ from itertools import pairwise
 from pathlib import Path
 
 from auto_trading.core.errors import AutoTradingError
-from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
+from auto_trading.exchange.binance_spot import BinanceSpotPublic
 from auto_trading.execution.paper_t2 import PaperT2Runner
 from auto_trading.storage.db import connect
 from auto_trading.storage.migrations import apply_migrations
@@ -49,7 +49,7 @@ def _date(ms: int) -> str:
 def run() -> int:
     conn = connect(DB)
     apply_migrations(conn)
-    market = BinanceSpotReadOnly(None)  # 공개 시세만 — 키를 쓰지 않는다
+    market = BinanceSpotPublic()  # 공개 시세만 — 키를 쓰지 않는다
     try:
         runner = PaperT2Runner(
             market,

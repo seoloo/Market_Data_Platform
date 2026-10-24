@@ -10,16 +10,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from auto_trading.core.errors import ConfigError
-
 __all__ = [
-    "BinanceCredentials",
-    "KisCredentials",
     "OpenAIKey",
     "TelegramCredentials",
-    "load_binance_credentials",
     "load_gemini_key",
-    "load_kis_credentials",
     "load_openai_key",
     "load_telegram_credentials",
     "load_telegram_info_credentials",
@@ -43,29 +37,6 @@ def read_env_file(path: Path | str = ".env") -> dict[str, str]:
                 value = value.split(marker, 1)[0]
         values[key.strip()] = value.strip().strip('"').strip("'")
     return values
-
-
-@dataclass(frozen=True, slots=True)
-class BinanceCredentials:
-    api_key: str
-    api_secret: str
-
-    def __repr__(self) -> str:
-        return f"BinanceCredentials(api_key={self.api_key[:4]}…, api_secret=***)"
-
-    __str__ = __repr__
-
-
-def load_binance_credentials(
-    path: Path | str = ".env", environ: Mapping[str, str] | None = None
-) -> BinanceCredentials:
-    """환경변수가 `.env`보다 우선한다. 없으면 ConfigError (값은 메시지에 넣지 않는다)."""
-    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
-    key = merged.get("BINANCE_API_KEY", "")
-    secret = merged.get("BINANCE_API_SECRET", "")
-    if not key or not secret:
-        raise ConfigError("BINANCE_API_KEY / BINANCE_API_SECRET 가 .env 또는 환경변수에 없다")
-    return BinanceCredentials(key, secret)
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,53 +78,6 @@ def load_telegram_info_credentials(
 
 
 @dataclass(frozen=True, slots=True)
-class KisCredentials:
-    """한국투자증권 Open API (실전). 계좌번호는 앞 8자리(CANO) + 상품코드 2자리."""
-
-    app_key: str
-    app_secret: str
-    cano: str
-    product_code: str
-    trading_enabled: bool
-
-    def __repr__(self) -> str:
-        return (
-            "KisCredentials(app_key=***, app_secret=***, "
-            f"account=****{self.cano[-2:]}-{self.product_code}, "
-            f"trading_enabled={self.trading_enabled})"
-        )
-
-    __str__ = __repr__
-
-
-def load_kis_credentials(
-    path: Path | str = ".env", environ: Mapping[str, str] | None = None
-) -> KisCredentials:
-    """KIS 자격: ``KIS_APP_KEY``·``KIS_APP_SECRET``·``KIS_ACCOUNT_NO``·``KIS_TRADING_ENABLED``.
-
-    계좌번호는 숫자 10자리(``-`` 허용).
-
-    빠진 이름을 모두 적어 ConfigError 를 낸다(값은 메시지에 넣지 않는다).
-    ``KIS_TRADING_ENABLED`` 는 정확히 ``true`` 일 때만 참이다 — 그 밖의 값·누락은 거짓(주문 차단).
-    """
-    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
-    names = ("KIS_APP_KEY", "KIS_APP_SECRET", "KIS_ACCOUNT_NO")
-    missing = [n for n in names if not merged.get(n, "").strip()]
-    if missing:
-        raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
-    account = merged["KIS_ACCOUNT_NO"].replace("-", "").strip()
-    if len(account) != 10 or not account.isdigit():
-        raise ConfigError("KIS_ACCOUNT_NO 는 숫자 10자리(앞 8자리 계좌 + 상품코드 2자리)여야 한다")
-    return KisCredentials(
-        app_key=merged["KIS_APP_KEY"].strip(),
-        app_secret=merged["KIS_APP_SECRET"].strip(),
-        cano=account[:8],
-        product_code=account[8:],
-        trading_enabled=merged.get("KIS_TRADING_ENABLED", "").strip().lower() == "true",
-    )
-
-
-@dataclass(frozen=True, slots=True)
 class OpenAIKey:
     """AI API 키(ChatGPT·Gemini) — 문서 115 뉴스·AI 판단 기록용. 값은 보여 주지 않는다."""
 
@@ -184,75 +108,3 @@ def load_gemini_key(
     merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
     value = merged.get("GEMINI_API_KEY", "").strip()
     return OpenAIKey(value) if value else None
-
-
-@dataclass(frozen=True, slots=True)
-class TossCredentials:
-    """토스증권 Open API (문서 118 §6). 값은 보여 주지 않는다."""
-
-    client_id: str
-    client_secret: str
-    account_seq: int
-    trading_enabled: bool
-
-    def __repr__(self) -> str:
-        return (
-            f"TossCredentials(client_id=***, client_secret=***, account_seq={self.account_seq}, "
-            f"trading_enabled={self.trading_enabled})"
-        )
-
-    __str__ = __repr__
-
-
-def load_toss_credentials(
-    path: Path | str = ".env", environ: Mapping[str, str] | None = None
-) -> TossCredentials:
-    """``TOSS_CLIENT_ID``·``TOSS_CLIENT_SECRET`` (+ 선택 ``TOSS_ACCOUNT_SEQ``, 기본 1).
-
-    ``TOSS_TRADING_ENABLED`` 가 정확히 ``true`` 일 때만 주문한다 — 사용자가 직접 켠다.
-    """
-    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
-    names = ("TOSS_CLIENT_ID", "TOSS_CLIENT_SECRET")
-    missing = [n for n in names if not merged.get(n, "").strip()]
-    if missing:
-        raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
-    seq = merged.get("TOSS_ACCOUNT_SEQ", "1").strip() or "1"
-    if not seq.isdigit():
-        raise ConfigError("TOSS_ACCOUNT_SEQ 는 숫자여야 한다")
-    return TossCredentials(
-        client_id=merged["TOSS_CLIENT_ID"].strip(),
-        client_secret=merged["TOSS_CLIENT_SECRET"].strip(),
-        account_seq=int(seq),
-        trading_enabled=merged.get("TOSS_TRADING_ENABLED", "").strip().lower() == "true",
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class NamuCredentials:
-    """NH투자증권 나무 플러그 Open API (사용자 2026-10-15 발급). 값은 보여 주지 않는다."""
-
-    app_key: str
-    app_secret: str
-    trading_enabled: bool = False
-    """``NAMU_TRADING_ENABLED`` 가 정확히 ``true`` 일 때만 실전 주문 — 사용자가 직접 켠다."""
-
-    def __repr__(self) -> str:
-        return (
-            f"NamuCredentials(app_key=***, app_secret=***, trading_enabled={self.trading_enabled})"
-        )
-
-
-def load_namu_credentials(
-    path: Path | str = ".env", environ: Mapping[str, str] | None = None
-) -> NamuCredentials:
-    """``NAMU_APP_API_KEY`` · ``NAMU_APP_SECRET_API_KEY`` · ``NAMU_TRADING_ENABLED``(기본 꺼짐)."""
-    merged = {**read_env_file(path), **(dict(os.environ) if environ is None else dict(environ))}
-    names = ("NAMU_APP_API_KEY", "NAMU_APP_SECRET_API_KEY")
-    missing = [n for n in names if not merged.get(n, "").strip()]
-    if missing:
-        raise ConfigError(f"{' / '.join(missing)} 가 .env 또는 환경변수에 없다")
-    return NamuCredentials(
-        merged[names[0]].strip(),
-        merged[names[1]].strip(),
-        trading_enabled=merged.get("NAMU_TRADING_ENABLED", "").strip().lower() == "true",
-    )

@@ -53,69 +53,10 @@ def read_series(name: str) -> dict[str, float]:
 
 
 def fetch() -> int:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    manifest = _load_manifest()
-    try:
-        for symbol in SYMBOLS:
-            for adjusted, tag in ((True, "adj"), (False, "raw")):
-                if (
-                    f"{symbol}_{tag}" in manifest["files"]
-                    and (DATA / f"{symbol}_{tag}.csv").exists()
-                ):
-                    continue  # 이미 받았다 (다시 받으려면 manifest.json 을 지운다)
-                bars = broker.daily_history(symbol, since=SINCE, until=UNTIL, adjusted=adjusted)
-                rows = [
-                    (
-                        datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d"),
-                        b.open,
-                        b.high,
-                        b.low,
-                        b.close,
-                        b.volume,
-                    )
-                    for b in bars
-                ]
-                name = f"{symbol}_{tag}"
-                digest = _write_csv(
-                    DATA / f"{name}.csv", rows, ("date", "open", "high", "low", "close", "volume")
-                )
-                manifest["files"][name] = {
-                    "source": f"KIS HHDFS76240000 MODP={'1' if adjusted else '0'}",
-                    "rows": len(rows),
-                    "first": rows[0][0] if rows else None,
-                    "last": rows[-1][0] if rows else None,
-                    "sha256": digest,
-                }
-                print(name, manifest["files"][name])
-                _save_manifest(manifest)
-    finally:
-        broker.close()
-    for sid in FRED:
-        if sid in manifest["files"] and (DATA / f"{sid}.csv").exists():
-            continue
-        fred_rows: list[tuple[str, float, float, float, float, int]] = []
-        for day, value in _fred_observations(sid):
-            if value not in ("", ".") and SINCE <= day <= UNTIL:
-                v = float(value)
-                fred_rows.append((day, v, v, v, v, 0))
-        digest = _write_csv(
-            DATA / f"{sid}.csv", fred_rows, ("date", "open", "high", "low", "close", "volume")
-        )
-        manifest["files"][sid] = {
-            "source": f"FRED {sid}",
-            "rows": len(fred_rows),
-            "first": fred_rows[0][0] if fred_rows else None,
-            "last": fred_rows[-1][0] if fred_rows else None,
-            "sha256": digest,
-        }
-        print(sid, manifest["files"][sid])
-        _save_manifest(manifest)
-    return 0
+    """[쓰임] 일봉 받기 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 자료를 읽는 명령은 그대로 돈다."""
+    raise SystemExit("일봉 받기: 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 자료로만 돈다")
 
 
 def _fred_observations(sid: str) -> list[tuple[str, str]]:

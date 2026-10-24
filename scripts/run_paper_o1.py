@@ -38,7 +38,7 @@ from pathlib import Path
 from auto_trading.backtest.overlay import O2_STOP, O3_2X_LIMIT40, OverlayConfig
 from auto_trading.core.errors import AutoTradingError
 from auto_trading.core.types import Candle
-from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
+from auto_trading.exchange.binance_spot import BinanceSpotPublic
 from auto_trading.exchange.binance_usdm_public import BinanceUsdmPublic
 from auto_trading.execution.paper_overlay import PaperOverlayRunner, verify_ledger
 from auto_trading.storage.db import connect
@@ -87,7 +87,7 @@ class BinanceOverlayMarket:
     """현물 공개 시세 + USD-M 공개 시세. 키를 쓰지 않는다."""
 
     def __init__(self) -> None:
-        self._spot = BinanceSpotReadOnly(None)
+        self._spot = BinanceSpotPublic()
         self._perp = BinanceUsdmPublic()
 
     def spot_daily(self, symbol: str, as_of_ms: int, limit: int) -> list[Candle]:

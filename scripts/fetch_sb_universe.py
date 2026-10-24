@@ -11,11 +11,9 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import re
 import sys
-import time
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -136,55 +134,10 @@ def tickers() -> dict[str, object]:
 
 
 def bars() -> dict[str, object]:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.core.errors import ExchangeError
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    union = json.loads(UNIVERSE.read_text(encoding="utf-8"))["union"]
-    status_path = OUT / "fetch_status.json"
-    status: dict[str, object] = (
-        json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
-    )
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    try:
-        for n, symbol in enumerate(union, 1):
-            path = OUT / f"{symbol}.csv"
-            if path.exists() or symbol in status:
-                continue
-            kis_symbol = symbol.replace(".", "/")
-            got = None
-            for excd in EXCHANGES:
-                try:
-                    rows = broker.daily_history(
-                        kis_symbol, since=SINCE, until=UNTIL, exchange=excd, adjusted=True
-                    )
-                except ExchangeError as exc:
-                    if "초당" in str(exc):
-                        time.sleep(2.0)
-                    continue
-                if rows:
-                    got = (excd, rows)
-                    break
-            if got is None:
-                status[symbol] = {"ok": False}
-            else:
-                excd, rows = got
-                with path.open("w", encoding="utf-8", newline="\n") as fh:
-                    w = csv.writer(fh, lineterminator="\n")
-                    w.writerow(("date", "open", "high", "low", "close", "volume"))
-                    for b in rows:
-                        day = datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d")
-                        w.writerow((day, b.open, b.high, b.low, b.close, b.volume))
-                status[symbol] = {"ok": True, "exchange": excd, "rows": len(rows)}
-            status_path.write_text(json.dumps(status, indent=1), encoding="utf-8")
-            sys.stderr.write(f"{n}/{len(union)} {symbol} {status[symbol]}\n")
-            sys.stderr.flush()
-    finally:
-        broker.close()
-    ok = sum(1 for v in status.values() if isinstance(v, dict) and v.get("ok"))
-    return {"symbols": len(union), "ok": ok, "failed": len(status) - ok}
+    """[쓰임] 일봉 받기 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 자료를 읽는 명령은 그대로 돈다."""
+    raise SystemExit("일봉 받기: 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 자료로만 돈다")
 
 
 def main(argv: list[str]) -> int:

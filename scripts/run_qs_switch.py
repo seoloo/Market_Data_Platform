@@ -18,7 +18,7 @@ import statistics
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date
 from decimal import Decimal
 from itertools import pairwise
 from pathlib import Path
@@ -244,27 +244,12 @@ def _inputs() -> tuple[list[str], dict[str, float], dict[str, float]]:
 
 
 def fetch_tqqq() -> int:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
+    """[쓰임] TQQQ 일봉 받기 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 자료를 읽는 명령은 그대로 돈다."""
+    raise SystemExit(
+        "TQQQ 일봉 받기: 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 자료로만 돈다"
     )
-    try:
-        bars = broker.daily_history(
-            "TQQQ", since="2010-02-01", until=TO, exchange="NAS", adjusted=True
-        )
-    finally:
-        broker.close()
-    path = DATA / "TQQQ_adj.csv"
-    with path.open("w", encoding="utf-8", newline="\n") as fh:
-        w = csv.writer(fh, lineterminator="\n")
-        w.writerow(("date", "open", "high", "low", "close", "volume"))
-        for b in bars:
-            day = datetime.fromtimestamp(b.open_ms / 1000, UTC).strftime("%Y-%m-%d")
-            w.writerow((day, b.open, b.high, b.low, b.close, b.volume))
-    print(json.dumps({"rows": len(bars), "path": str(path)}))
-    return 0
 
 
 def audit() -> dict[str, object]:

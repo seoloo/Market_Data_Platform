@@ -52,21 +52,9 @@ def _calendar_rows(root: Path, today: date, now_ms: int) -> list[EarningsDay]:
 
 
 def _held(root: Path) -> list[str]:
-    """토스 미국 보유 종목 (조회만). 실패하면 빈 목록."""
-    try:
-        from auto_trading.config.secrets import load_toss_credentials
-        from auto_trading.exchange.toss import TossReader, TossTokenCache, is_kr_symbol
-
-        r = TossReader(
-            load_toss_credentials(root / ".env"), TossTokenCache(root / "data" / "toss_token.json")
-        )
-        try:
-            return [s for s in r.holdings() if not is_kr_symbol(s)]
-        finally:
-            r.close()
-    except Exception as exc:  # 보유 조회 실패 — 관심 · 대형주만 본다
-        print(f"토스 보유 조회 건너뜀: {type(exc).__name__}")
-        return []
+    """[쓰임] 보유 종목 — 토스증권 실계좌 키로 조회하던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2). 관심 · 대형주만 본다."""
+    return []
 
 
 def _earnings(root: Path, today: date) -> list[Earning]:

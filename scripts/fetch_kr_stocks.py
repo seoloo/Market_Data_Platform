@@ -173,11 +173,11 @@ def window(info: Mapping[str, str], start: str = START, end: str = END) -> tuple
 
 
 def _kis() -> Any:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    return KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
+    """[쓰임] 국내 종목 받기 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 자료를 읽는 명령은 그대로 돈다."""
+    raise SystemExit(
+        "국내 종목 받기: 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 자료로만 돈다"
     )
 
 

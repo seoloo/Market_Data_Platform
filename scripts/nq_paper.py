@@ -27,11 +27,10 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from scripts.lt_paper import UA, _read, fetch_merge
+from scripts.lt_paper import UA, _read
 
 from auto_trading.ops.lt_paper import PaperState
 from auto_trading.ops.nq_paper import TOP_N, next_rebalance, rebalance_days, step
-from auto_trading.ops.us_daily_bars import last_settled_day
 
 REPO = Path(__file__).resolve().parent.parent
 ROOT = REPO / "data" / "nq_paper"
@@ -104,37 +103,12 @@ def init() -> dict[str, object]:
 
 
 def update() -> dict[str, object]:
-    from auto_trading.config.secrets import load_kis_credentials
-    from auto_trading.exchange.kis import KisOverseasReadOnly, KisTokenCache
-
-    meta = json.loads(META.read_text(encoding="utf-8"))
-    broker = KisOverseasReadOnly(
-        load_kis_credentials(REPO / ".env"), KisTokenCache(REPO / "data" / "kis_token.json")
-    )
-    last_ok = last_settled_day()
-    failed: list[str] = []
-    changed = 0
-    try:
-        for sym in sorted(meta["symbols"]):
-            path = BARS / f"{sym}.csv"
-            if not path.exists():
-                path.write_text("date,open,high,low,close,volume\n", encoding="utf-8")
-            try:
-                m = fetch_merge(
-                    broker,
-                    sym.replace(".", "/"),
-                    "NAS",
-                    path,
-                    last_ok,
-                    since_if_empty=HISTORY_SINCE,
-                )
-            except Exception:
-                failed.append(sym)
-                continue
-            changed += bool(m.appended or m.repaired or m.dropped_unsettled or m.needs_full)
-    finally:
-        broker.close()
-    return {"settled_through": last_ok, "changed_symbols": changed, "failed": failed}
+    """[쓰임] 시세 갱신 — 한국투자증권 실계좌 키로 받던 부분은
+    실주문 코드를 걷어 낼 때 뺐다(README 6-3, 정할 것 2).
+    저장된 일봉으로만 돈다. 다시 받으려면 키 없는 공개 원천을 붙인다."""
+    return {
+        "skipped": "시세 갱신 없음 — 실계좌 키로 받던 부분을 뺐다(README 6-3). 저장된 일봉으로만"
+    }
 
 
 def _panel() -> tuple[list[str], dict[str, list[float | None]]]:

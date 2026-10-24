@@ -8,7 +8,8 @@
 하는 일:
 1. Paper 와 같은 실행기를 실거래 예정 금액으로 돌린다 (``spot_orders`` mode='shadow',
    ``paper_days`` strategy_id=``t2_shadow_<금액>``). 금액이 다르면 원장도 다르다.
-2. 실계좌를 **읽기만** 한다: 키 권한(읽기 전용·IP 제한이어야 함), 서버 시계, 잔고.
+2. (예전에는 실계좌 키 권한 · 서버 시계 · 잔고를 읽었다. 실주문 · 실계좌 코드를 걷어 낼 때 뺐다 —
+   README 6-3. 보고서에는 '읽지 않음' 으로 남는다.)
 3. 그날 주문 크기로 호가를 읽어 체결 미끄러짐을 추정한다.
 4. ``data/HALT`` (긴급 정지 스위치)가 있으면 실거래처럼 그날은 체결하지 않는다.
 
@@ -29,9 +30,8 @@ from pathlib import Path
 from typing import Any
 
 from auto_trading.config.schema import SpotTrendConfig
-from auto_trading.config.secrets import BinanceCredentials, load_binance_credentials
 from auto_trading.core.errors import AutoTradingError
-from auto_trading.exchange.binance_spot import BinanceSpotReadOnly
+from auto_trading.exchange.binance_spot import BinanceSpotPublic
 from auto_trading.execution.paper_t2 import PaperT2Runner, ledger_balances
 from auto_trading.execution.shadow_t2 import book_slippage_bps, readiness_findings
 from auto_trading.ops.kill_switch import halted_reason
@@ -47,7 +47,6 @@ for _stream in (sys.stdout, sys.stderr):
 
 REPO = Path(__file__).resolve().parent.parent
 DB = REPO / "data" / "trading.db"
-ENV = REPO / ".env"
 HALT = REPO / "data" / "HALT"
 REPORTS = REPO / "reports" / "shadow" / "t2"
 MODE = "shadow"
@@ -69,9 +68,7 @@ def strategy_id(allocation: Decimal) -> str:
     return f"t2_shadow_{int(allocation)}"
 
 
-def _slippage(
-    market: BinanceSpotReadOnly, symbol: str, sizes: dict[str, Decimal]
-) -> dict[str, Any]:
+def _slippage(market: BinanceSpotPublic, symbol: str, sizes: dict[str, Decimal]) -> dict[str, Any]:
     bids, asks = market.order_book(symbol)
     mid = (bids[0][0] + asks[0][0]) / 2
     out: dict[str, Any] = {
@@ -91,12 +88,7 @@ def _slippage(
 def run(allocation: Decimal) -> int:
     now = int(time.time() * 1000)
     halt = halted_reason(HALT)
-    creds: BinanceCredentials | None
-    try:
-        creds = load_binance_credentials(ENV)
-    except AutoTradingError:
-        creds = None  # 키가 없어도 원장·호가는 돈다 — 계좌 점검만 경고로 남는다
-    market = BinanceSpotReadOnly(creds)
+    market = BinanceSpotPublic()  # 공개 시세 · 호가만 — 키를 쓰지 않는다
     conn = connect(DB)
     apply_migrations(conn)
     sid = strategy_id(allocation)
@@ -125,14 +117,9 @@ def run(allocation: Decimal) -> int:
         else:
             report["status"] = "HALTED"
             day = None
-        # 실계좌 읽기 (실패해도 그림자 운영은 계속 — 보고만 한다)
+        # 실계좌 읽기는 걷어 냈다(README 6-3) — 점검표에는 '읽지 않음' 으로 남는다
         restrictions = balances = offset = None
-        try:
-            restrictions = market.api_restrictions()
-            offset = market.clock_offset_ms()
-            balances = market.balances()
-        except AutoTradingError as exc:
-            report["account_error"] = str(exc)
+        report["account_error"] = "실계좌 읽기 없음 — 실주문 · 실계좌 코드를 걷어 냈다(README 6-3)"
         symbols = SpotTrendConfig().symbols
         prices = {s: market.last_price(s) for s in symbols}
         # 목표 대비 실제 비중 (최소 주문·수량 단위 영향)
