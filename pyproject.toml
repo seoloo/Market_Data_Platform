@@ -165,22 +165,7 @@ forbidden_modules = [
     "auto_trading.ai",
     "auto_trading.execution",
     "auto_trading.backtest",
-    "auto_trading.app",
     "auto_trading.ops",
-]
-
-# UI 는 읽기 전용 대시보드다. 매매 로직에 닿으면 안 된다 (D10 §3.2).
-[[tool.importlinter.contracts]]
-name = "UI 는 매매 로직을 import 하지 않는다"
-type = "forbidden"
-source_modules = ["auto_trading.ui"]
-forbidden_modules = [
-    "auto_trading.exchange",
-    "auto_trading.execution",
-    "auto_trading.strategy",
-    "auto_trading.risk",
-    "auto_trading.ai",
-    "auto_trading.backtest",
 ]
 
 # 순수 계층은 config.schema(모델)만 쓰고 config.loader(파일 I/O)는 쓰지 않는다.
@@ -217,7 +202,6 @@ source_modules = [
     "auto_trading.risk",
     "auto_trading.execution",
     "auto_trading.exchange",
-    "auto_trading.app",
 ]
 forbidden_modules = [
     "auto_trading.research.elliott",

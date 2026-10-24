@@ -9,9 +9,8 @@
 * 발표: SEC submissions 8-K Item 2.02 접수 시각(``.env`` ``SEC_CONTACT_EMAIL`` 연락처).
 * 가상 10,000 USD · 신호마다 500 USD · 동시 최대 20 자리.
 * R + 1 시가 매수 · R + 20 종가 매도 · 편도 0.15%.
-* Paper 자체는 텔레그램 없음. 새 신호 중 갭 +10% 이상은 💹 PEAD 알림(실거래 버튼,
-  ``size_guard.offer_pead``, 설정 ``stock.pead``)으로 보낸다(2026-10-17 사용자).
-  Paper 계산은 그대로.
+* Paper 자체는 텔레그램 없음. (예전에는 새 신호를 실거래 버튼 알림으로 넘겼다 — 실주문 코드를
+  걷어 낼 때 그 부분만 뺐다, README 6-3. Paper 계산은 그대로.)
 """
 
 from __future__ import annotations
@@ -180,16 +179,6 @@ def run() -> dict[str, Any]:
     d, o, c, _ = _bars(BARS / "SPY.csv")
     spy = {day: (oo, cc) for day, oo, cc in zip(d, o, c, strict=True)}
     sigs = signals(earn)
-    fresh = [s for s in sigs if s["entry_day"] is None]  # 반응일 다음 장이 아직 안 열림
-    if fresh:
-        try:
-            from scripts import size_guard
-
-            sent = size_guard.offer_pead(fresh)
-            if sent:
-                print(f"PEAD 알림 {len(sent)} 건", flush=True)
-        except Exception as exc:  # 알림 실패가 Paper 기록을 막지 않는다
-            print(f"PEAD 알림 건너뜀: {type(exc).__name__}: {exc}", flush=True)
     rep = {
         "made_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "start": START,

@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 import scripts.ew_indicator_1h as mod
-from scripts.demo_ew_btc import Store
 
 
 def test_stretch_maps_real_hour_to_engine_four_hours() -> None:
@@ -28,7 +27,7 @@ def test_check_once_alerts_only_new_pivots_with_pattern(
     rows: list[Any] = [(4 * 1000 - 1, None, 10, info_miss)]
     monkeypatch.setattr(mod, "fetch_real_minutes", lambda c, n: [])
     monkeypatch.setattr(mod, "scan", lambda m, t: rows)
-    store = Store(tmp_path)
+    store = mod.Store(tmp_path)
     assert mod.check_once(None, store, sent.append, 0) == 0  # 첫 실행: 기록만
     rows.extend([(4 * 2000 - 1, None, 10, info_miss), (4 * 3000 - 1, None, 10, info_hit)])
     assert mod.check_once(None, store, sent.append, 0) == 1
