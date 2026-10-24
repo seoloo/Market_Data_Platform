@@ -1,5 +1,11 @@
 # 운영·외부 연동·데이터 보존
 
+> ⚠️ **원본 연구 · 실거래 저장소(「오르빗」)에서 옮겨 온 기록이다.** 여기서 말하는 실주문 · 실계좌 ·
+> 예약 작업 · 화면 · 텔레그램 봇 코드는 이 저장소에서 지웠다([README 6-3](../../README.md),
+> [진행 기록](../LIVE_REMOVAL_PLAN.md), 2026-10-24). 실행 지시가 아니라 역사 기록으로만 읽는다.
+> 지금 저장소의 안내는 [README](../../README.md) · [로드맵](../ROADMAP.md) · [설계 결정](../adr/README.md).
+
+
 기준일: 2026-09-23. 백필/저장 기반은 구현, 주문 연동·운영 자동화·UI·Shadow 파이프라인은 계획이다.
 실거래 활성화와 데이터 삭제는 이번 문서 작업의 범위가 아니다.
 
@@ -248,10 +254,10 @@ live SQLite DB 파일만 단순 복사하지 않는다. SQLite backup API 또는
 
 ## 오르빗 소유자 전용 웹 조회 (2026-10-16)
 
-- 주소 https://orbit-investment-seolh.workspace-655977.chatgpt.site / Sites project `appgprj_6ad219930e5c8191bbcc496e75c6850b`.
+- 주소 https://orbit-investment-<사용자>.workspace-655977.chatgpt.site / Sites project `appgprj_6ad219930e5c8191bbcc496e75c6850b`.
   ChatGPT 공식 로그인 후 소유자 1명만 허용하며 외부 방문자는 없다. 익명 홈페이지·API 401 확인.
   사용자는 이 Site를 만든 것과 같은 ChatGPT 계정으로 로그인한다. 별도 Supabase·Google OAuth 스택은 만들지 않았다.
-- 소스/수동 동기화 도구: `C:/Users/seolh/.codex/visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/orbit-web-site/`.
+- 소스/수동 동기화 도구: `<사용자 홈>/.codex/visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/orbit-web-site/`.
   `README-ORBIT.md`의 두 수동 명령(기존 Python으로 `tools/orbit_export.py` → `tools/orbit_sync.py upload`)을 따른다.
   PC 원본 장부는 읽기만 하며 키 없는 공개 시세 외에 거래소 인증·주문 API를 부르지 않는다. `.env`는 읽지 않는다.
 - `ORBIT_INGEST_SECRET`은 Sites 런타임 secret. 서비스 접근/쓰기 자격은 그 PC의 `local-data/service-credentials.dpapi`에

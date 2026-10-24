@@ -6,8 +6,8 @@
 
 - 사용자(2026-10-11)가 전달한 프롬프트: 기존 연구를 바탕으로 사이클 투자 강의(권재일 사이클투자 연구소, 21 편)에서 쓸 요소를 검토하고, 독립 가설이 남을 때만 후향 파일럿.
 - 먼저 읽은 자료(모두 열림 — 접근 실패 경로 없음):
-  1. `C:\Users\seolh\Documents\Codex\2026-10-11\romance-of-the-three-kingdoms-iii\outputs\사이클투자_21편_분석자료.md` (38,943 바이트, 전체)
-  2. `C:\Users\seolh\Documents\Codex\2026-10-11\romance-of-the-three-kingdoms-iii\outputs\사이클투자_21편_LLM요약.txt` (10,842 바이트, 전체)
+  1. `<사용자 홈>\Documents\Codex\2026-10-11\romance-of-the-three-kingdoms-iii\outputs\사이클투자_21편_분석자료.md` (38,943 바이트, 전체)
+  2. `<사용자 홈>\Documents\Codex\2026-10-11\romance-of-the-three-kingdoms-iii\outputs\사이클투자_21편_LLM요약.txt` (10,842 바이트, 전체)
   3. `docs/RESEARCH_SUMMARY_FOR_LLM.txt` (전체)
 - 대조한 기존 문서 · 코드: [RESEARCH_HISTORY](../current/RESEARCH_HISTORY.md) 전체, [08 WA](08-wa-preregistration.md), [48 FB · LQ](48-perp-positioning-events.md), [139 KB](139-ema-box-breakout-preregistration.md), [157 KB-UNIV](157-kb-survivorship-free-preregistration.md), [159 ALT-PATTERN](159-alt-reversal-patterns-preregistration.md), [15 T](15-t-trend-preregistration.md), [209 파일럿 등록](209-t2-pyramiding-pilot-registration.md) · `reports/pyramiding_209/results.json`, [210](210-volume-clock-and-directional-change-pilot.md), [212](212-residual-reversal-pilot.md), [213](213-continuous-trend-strength-pilot.md), [214](214-buy-timing-short-term-pilot.md), [215](215-dominance-signal-data-audit.md), `archive/research/15-h1-postmortem.md` · `26-r1-preregistration.md`, 코드 `scripts/run_resid_rev_212.py` · `scripts/run_qb_dc_210.py` · `research/pyramiding_209.py`.
 - **영상 자체는 보지 않았다.** 위 분석자료는 자동자막 기반 문헌 검토이고 화면의 차트 수치 · 설정은 검증되지 않았다. 강의의 주장이나 사례를 수익성 증거로 쓰지 않는다.

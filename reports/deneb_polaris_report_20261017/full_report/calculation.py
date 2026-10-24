@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import date,timedelta
 from types import FrameType
 from typing import Any
-R=Path('C:/Users/seolh/Documents/GitHub/Auto_Trading')
+R=Path('<사용자 홈>/Documents/GitHub/Auto_Trading')
 W=Path(__file__).parent
 sys.path[:0]=[str(R),str(R/'src')]
 sys.path.append(str(R/'.venv/Lib/site-packages'))

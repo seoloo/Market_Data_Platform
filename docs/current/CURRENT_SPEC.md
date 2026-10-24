@@ -1,5 +1,11 @@
 # 현재 시스템 명세
 
+> ⚠️ **원본 연구 · 실거래 저장소(「오르빗」)에서 옮겨 온 기록이다.** 여기서 말하는 실주문 · 실계좌 ·
+> 예약 작업 · 화면 · 텔레그램 봇 코드는 이 저장소에서 지웠다([README 6-3](../../README.md),
+> [진행 기록](../LIVE_REMOVAL_PLAN.md), 2026-10-24). 실행 지시가 아니라 역사 기록으로만 읽는다.
+> 지금 저장소의 안내는 [README](../../README.md) · [로드맵](../ROADMAP.md) · [설계 결정](../adr/README.md).
+
+
 기준일: 2026-09-24 · 상태: A1 종료(DATA_INSUFFICIENT) / WA TRAIN `REJECT` / K VALIDATION `REJECT` / M TRAIN `REJECT` / F 전향 관찰 / **T 추세 추종 1회 판정 PASS · 전향 관찰 중**(2026-09-24). 승인된 전략 없음.
 목표는 BTC 선물 자동매매로 비용 이후의 재현 가능한 수익을 검증하고, 위험을 통제하며 모든 판단을 연구 데이터로 남기는 것이다. 수익성은 아직 입증되지 않았다.
 
@@ -341,7 +347,7 @@ config/event_calendar.yaml에 커버리지 시작·끝·검증일을 명시하�
 
 ## 2026-10-16 오르빗 웹 조회 — PC 실행기와 분리
 
-사용자 승인 Sites 웹은 https://orbit-investment-seolh.workspace-655977.chatgpt.site 에 소유자 전용으로 배포됐다.
+사용자 승인 Sites 웹은 https://orbit-investment-<사용자>.workspace-655977.chatgpt.site 에 소유자 전용으로 배포됐다.
 기존 exe/127.0.0.1 서버를 공개한 것이 아니라 별도 소스·D1·공식 ChatGPT 인증의 조회 전용 웹이다.
 운영 절차·제한은 [OPERATIONS의 웹 조회 절](OPERATIONS.md#오르빗-소유자-전용-웹-조회-2026-10-16)을 따른다.
 화면은 허용 필드만 있는 PC 장부 복사본이며 계좌 실시간 조회·주문·예약 제어·거래소 키 입력이 없다.

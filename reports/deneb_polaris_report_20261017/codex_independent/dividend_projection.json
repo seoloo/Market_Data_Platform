@@ -1,13 +1,13 @@
 {
   "spec_sha": "b96dcd00180394b39dea24f8b0cc68380ffbdabd7ed4ae2ddd1ce9dadda1850a",
   "source_hashes": {
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\reports\\deneb_polaris_report_20261017\\codex_independent\\calculation_spec.json": "b96dcd00180394b39dea24f8b0cc68380ffbdabd7ed4ae2ddd1ce9dadda1850a",
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\reports\\deneb_polaris_report_20261017\\six_layouts\\calculation_result.json": "8487b9c2c1a6b83e003bc2b8c58b415e6e5ee49bfcdb6cbe195b018df358830d",
-    "C:\\Users\\seolh\\.codex\\visualizations\\2026\\09\\20\\01a0bf5b-5cc1-7e93-a3a2-5535af4738ba\\deneb-polaris-independent\\build\\prepare.py": "0c291650a25cd676d5a057adaa9a67307ecb111131500af9e8a6c81c35c346a3",
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\scripts\\run_brake_184.py": "4b81103551debb752c259cf21f93c28560ae4528c36eb44e55039cac2f990f84",
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\scripts\\run_brake_183.py": "b2612556a7d24339cd17c0ffdfe02b2c8384699249a173caba8859d92492fa25",
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\src\\auto_trading\\ops\\polaris.py": "b5d0b63e187b97dc08bd520c4c02aee1dd915105708b91b05a19e153bd302e64",
-    "C:\\Users\\seolh\\Documents\\GitHub\\Auto_Trading\\src\\auto_trading\\ops\\deneb_guard.py": "af460db351694d096fc6afaf36e39a73f1810a4c181a41458dd7d3ed556ed07f"
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\reports\\deneb_polaris_report_20261017\\codex_independent\\calculation_spec.json": "b96dcd00180394b39dea24f8b0cc68380ffbdabd7ed4ae2ddd1ce9dadda1850a",
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\reports\\deneb_polaris_report_20261017\\six_layouts\\calculation_result.json": "8487b9c2c1a6b83e003bc2b8c58b415e6e5ee49bfcdb6cbe195b018df358830d",
+    "<사용자 홈>\\.codex\\visualizations\\2026\\09\\20\\01a0bf5b-5cc1-7e93-a3a2-5535af4738ba\\deneb-polaris-independent\\build\\prepare.py": "0c291650a25cd676d5a057adaa9a67307ecb111131500af9e8a6c81c35c346a3",
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\scripts\\run_brake_184.py": "4b81103551debb752c259cf21f93c28560ae4528c36eb44e55039cac2f990f84",
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\scripts\\run_brake_183.py": "b2612556a7d24339cd17c0ffdfe02b2c8384699249a173caba8859d92492fa25",
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\src\\auto_trading\\ops\\polaris.py": "b5d0b63e187b97dc08bd520c4c02aee1dd915105708b91b05a19e153bd302e64",
+    "<사용자 홈>\\Documents\\GitHub\\Auto_Trading\\src\\auto_trading\\ops\\deneb_guard.py": "af460db351694d096fc6afaf36e39a73f1810a4c181a41458dd7d3ed556ed07f"
   },
   "projection": [
     {

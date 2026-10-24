@@ -66,7 +66,7 @@
 ## 5. 스케줄 등록 (사용자가 1 회, PowerShell)
 
 ```powershell
-Register-ScheduledTask -TaskName "AutoTrading_QNDX_Alert" -Action (New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\qndx_alert.py run") -Trigger (New-ScheduledTaskTrigger -Daily -At 21:00)
+Register-ScheduledTask -TaskName "AutoTrading_QNDX_Alert" -Action (New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\qndx_alert.py run") -Trigger (New-ScheduledTaskTrigger -Daily -At 21:00)
 ```
 
 문서 84 §3 의 설정(놓치면 켤 때 실행 · 로그인 없이 실행)을 `AutoTrading_*` 전체에 적용하는 명령을 한 번 더 실행하면 이 작업에도 적용된다.

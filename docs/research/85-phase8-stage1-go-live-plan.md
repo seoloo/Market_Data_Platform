@@ -97,11 +97,11 @@ L3 를 만들 때 이것을 실행기에 넣을지(넣으면 T/v2 검증 결과�
 ## 6. 긴급 정지 스위치 사용법
 
 켜기 — 둘 중 하나:
-- 탐색기에서 `C:\Users\seolh\Documents\GitHub\Auto_Trading\data\` 에 `HALT` 라는 파일을 만들고 첫 줄에 사유를 적는다(확장자 없음).
+- 탐색기에서 `<사용자 홈>\Documents\GitHub\Auto_Trading\data\` 에 `HALT` 라는 파일을 만들고 첫 줄에 사유를 적는다(확장자 없음).
 - PowerShell:
 
 ```powershell
-Set-Content -Path "C:\Users\seolh\Documents\GitHub\Auto_Trading\data\HALT" -Value "사유를 여기에" -Encoding utf8
+Set-Content -Path "<사용자 홈>\Documents\GitHub\Auto_Trading\data\HALT" -Value "사유를 여기에" -Encoding utf8
 ```
 
 끄기: 파일을 지운다. 코드는 이 파일을 **만들거나 지우지 않는다.**
@@ -231,14 +231,14 @@ L3(실계좌 주문 어댑터)는 규칙대로 **아직 만들지 않았다** �
 **S4U 전환 명령 (관리자 PowerShell, 사용자):**
 
 ```powershell
-$p = New-ScheduledTaskPrincipal -UserId "seolh" -LogonType S4U -RunLevel Limited
+$p = New-ScheduledTaskPrincipal -UserId "<사용자>" -LogonType S4U -RunLevel Limited
 "AG_Paper","LT_Paper","QS_Paper","Toss_Accumulate","Toss_FX" | ForEach-Object { Set-ScheduledTask -TaskName "AutoTrading_$_" -Principal $p | Out-Null; "AutoTrading_$_" }
 ```
 
 **출발 날 예약 작업 등록은 창 없는 실행기로** (§4 5, L5 — 스크립트 이름은 L3 때 확정):
 
 ```powershell
-$repo = "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$repo = "<사용자 홈>\Documents\GitHub\Auto_Trading"
 $a = New-ScheduledTaskAction -Execute "$repo\.venv\Scripts\pythonw.exe" -Argument "`"$repo\scripts\task_launcher.py`" scripts\<실거래 스크립트>.py" -WorkingDirectory $repo
 ```
 

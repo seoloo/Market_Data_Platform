@@ -21,46 +21,41 @@
    새 파이프라인이 다른 값을 내면 원래 문서는 두고 차이를 별도 문서로 보고한다.
 7. **확인하지 못한 API 한도·필드 의미·수치는 추측하지 않고 '확인 필요'로 표시한다.**
 
-이 절과 아래 절이 충돌하면 이 절을 따른다. 아래 절은 원본 저장소의 규약을 그대로 옮긴 것이라
-실거래 · 원본 문서(`PROGRESS.md`, `data/agents/` 등)를 가리키는 곳이 남아 있다 — 포트폴리오용으로 바꾸기 전까지는
-이 절의 규칙이 먼저다.
+이 절과 아래 절이 충돌하면 이 절을 따른다. 아래 절은 원본 저장소의 규약을 포트폴리오용으로 고친 것이다
+(2026-10-24, 실주문 · 실계좌 코드를 걷어 낸 뒤 — [README 6-3](README.md)).
 
 ## 0. 작업 시작 순서
 
 0. 상황판 `data/agents/*.md`(Git 밖): 다른 에이전트가 지금 하는 일 · 잡은 파일 (§10).
-1. [PROGRESS.md](PROGRESS.md): 현재 위치와 다음 작업.
-2. [CURRENT_SPEC.md](docs/current/CURRENT_SPEC.md): 현행 결정·구현 상태·미해결 등록부.
-3. [BACKTEST_AND_TESTING.md](docs/current/BACKTEST_AND_TESTING.md): 해당 Phase 게이트.
-4. 작업 관련 Current 문서만 추가로 읽는다. Archive 전체를 자동으로 읽지 않는다.
+1. [README](README.md) · [ROADMAP](docs/ROADMAP.md): 지금 단계와 다음 작업.
+2. [설계 결정(ADR)](docs/adr/README.md): 왜 이렇게 짰는지 — 결정을 바꾸려면 새 기록을 더한다.
+3. [CODE_MAP](docs/CODE_MAP.md)과 그 단계의 기록(`docs/SILVER_AGG_TRADES.md` · `docs/STREAM.md` 등).
+4. 옮겨 온 연구 코드(`src/auto_trading` · `scripts`)를 고칠 때만 `docs/current/` 를 본다. 이 문서들은
+   원본 연구 · 실거래 저장소의 **역사 기록**이다 — 그 안의 '다음 작업' · 운영 지시를 실행 지시로 삼지 않는다.
+   Archive(`docs/archive/` · `docs/phase0/`)도 같다.
 
-현재 기준은 docs/current/의 5개 문서다. docs/phase0/와 STRATEGY-CATALOG는 호환 안내문이다.
-Archive는 역사적 증거이며 그 안의 “확정/다음 작업” 문구를 실행 지시로 삼지 않는다.
-D22는 INCOMPLETE / EXCLUDED. 옛 H1 코드가 남아 있다는 이유로 현행 전략이라고 부르지 않는다.
-새 전략 후보는 최대 3개를 비교하고 사용자가 고른 하나만 구현·검증한다.
+## 1. 단계 보고와 기록
 
-## 1. Phase 보고와 인계
-
-작업 응답 시작: “📍 현재: Phase N — 항목”, “🎯 이번 작업: 구체적인 범위”.
-종료: “✅ 완료”, “📍 현재 Phase”, “➡️ 다음 작업: Phase와 항목”, “⚠️ 미해결”, “📦 커밋 제안”.
-Phase 번호/게이트는 BACKTEST_AND_TESTING을 따른다. 임의 진행률이나 미검증 통과를 만들지 않는다.
-게이트 미통과 상태에서 다음 Phase로 넘어가지 않는다. 예외 이동은 사용자 승인 필요.
-매 작업 종료 시 PROGRESS를 갱신하되, 사용자가 읽기 전용을 요구하면 그 지시가 우선한다.
-연구 판정·전략 상태·운영 단계·일정이 바뀌면 [BRIEFING_FOR_LLM](docs/BRIEFING_FOR_LLM.md)(다른 AI 에 붙여 넣는 요약)도 같은 커밋에서 고친다.
+- 단계는 README 로드맵 번호(예: 4-6, 5-2, 6-3)로 말한다. 임의 진행률이나 확인하지 않은 통과를 만들지 않는다.
+- 단계가 끝나면 그 단계 기록 문서 · [ROADMAP](docs/ROADMAP.md) · README 를 같은 커밋에서 고친다.
+- 숫자는 이 저장소에서 실제로 돌려 얻은 것만 적고, 재 보지 않은 것은 '추정' · '확인 필요'로 적는다(절대 규칙 7).
+- `PROGRESS.md` · `docs/BRIEFING_FOR_LLM.md` 는 원본 저장소 기록이라 더 덧붙이지 않는다.
 
 ## 2. 변경할 수 없는 핵심 원칙
 
-규칙의 상세 기준과 한도는 [TRADING_CORE](docs/current/TRADING_CORE.md), 데이터 경계는 CURRENT_SPEC, 검증 기준은 BACKTEST_AND_TESTING이 단일 원천이다.
+데이터 파이프라인의 기준은 [설계 결정](docs/adr/README.md)이 단일 원천이다.
 
-- Pure Core: core/features/strategy/risk에서 I/O·실시간 시계·시드 없는 난수 금지. exchange/storage/marketdata/notify/ai import 금지. snapshot.as_of_ms 사용.
-- 미래 데이터 금지: causal 정규화, 마감봉, confirmed_at_ms 기준 스윙만 사용. 전체 표본 fit 금지.
-- 거래소가 진실의 원천: 로컬 차이는 위험 이벤트로 기록하고 reconcile.
-- 거래소 측 보호주문 필수: 로컬 stop만으로 운용 금지. 보호 실패 시 TRADING_CORE의 청산 규칙.
-- 멱등 주문: 동일 결정의 주문 ID는 재시작 후에도 동일, UNKNOWN에서 추정 재주문 금지.
-- **주문 유형:** '모든 매매는 지정가(시장가 금지)' 규칙은 **2026-10-18 사용자 지시로 삭제**("그냥 모든 매매는 지정가 그 내용 삭제 부탁해"). 지금 실행기는 그대로(대부분 가격 한도 지정가)이고, 시장가를 쓸지는 전략 · 사전 등록마다 정해 적는다. 이력은 TRADING_CORE §주문 유형.
-- Fail-closed: 결측/stale/불명은 신규 진입 거부. DEGRADED/HALTED에도 청산·위험 축소 허용.
-- 모든 평가 기록: config/code 버전·snapshot_digest·구성 신호·veto를 주문 유무와 무관하게 남긴다.
+- Bronze는 받은 그대로 둔다(덮어쓰지 않고 지우지 않는다). Silver · Gold는 같은 명령으로 다시 만들 수 있어야
+  한다(멱등) — [ADR 0001](docs/adr/0001-bronze-immutable.md).
+- 검산은 만든 엔진과 다른 엔진으로 한다(Spark가 만들면 DuckDB가 센다) — [ADR 0003](docs/adr/0003-spark-writes-duckdb-reads.md).
+- 미래 데이터 금지: 마감된 봉 · 확정된 분만 쓴다. 전체 표본 fit 금지(연구 코드 포함).
+- Pure Core: `core` · `features` · `strategy` · `risk` 에서 I/O · 실시간 시계 · 시드 없는 난수 금지
+  (import-linter 계약으로 지킨다).
+- Fail-closed: 결측 · 체크섬 불일치 · 불명은 조용히 넘기지 않고 멈춘다.
+- 모든 실행 기록: 코드 버전 · 인자 해시 · 산출물 체크섬 · Delta 버전을 남긴다(`mdp.runlog`).
+- 실거래 원칙(거래소 측 보호 주문 · 멱등 주문 · 주문 유형 등)은 그 코드를 걷어 내며 없어졌다 — 되살리지 않는다(절대 규칙 2).
 
-원칙·위험 한도를 임의로 완화하지 않는다. 변경이 필요하면 근거와 대안을 보고하고 승인받는다.
+원칙을 임의로 완화하지 않는다. 변경이 필요하면 근거와 대안을 보고하고 승인받는다.
 
 ## 3. 코드 규약
 
@@ -84,11 +79,10 @@ ruff format / ruff check 준수. 기존 사용자 변경 보존. 범위 밖 코�
 
 ## 5. 금지 사항과 충돌 처리
 
-실거래 무승인 활성화, 위험 한도 완화, 성과 기반 파라미터 낚시, OOS 재튜닝, 기각 전략 이름 바꾸기, 무검증 수익 주장 금지.
-Elliott/JEV/News AI는 초기 Shadow 전용이며 주문·veto·사이징에 영향 금지.
-아카이브와 현행 문서 충돌 시 Current를 따른다. Current 내부 충돌은 미해결 등록부에 남기고 사용자에게 확인한다.
-문서와 코드가 다르면 구현 차이를 보고한다. 진단/문서 정리 요청을 코드 변경 권한으로 확대하지 않는다.
-C1 손절 WIDEN 같은 명시적 미해결 항목은 설계·코드·테스트를 별도 승인 범위에서 함께 처리한다.
+실주문 · 실계좌 연동 되살리기(절대 규칙 2), 성과 기반 파라미터 낚시, OOS 재튜닝, 기각 전략 이름 바꾸기,
+무검증 수익 주장, 연구 문서 · 판정 결과 숫자 바꾸기(절대 규칙 6) 금지.
+문서와 코드가 다르면 구현 차이를 보고한다. 진단 · 문서 정리 요청을 코드 변경 권한으로 확대하지 않는다.
+옮겨 온 원본 기록(`docs/current/` 등)과 이 저장소 문서가 다르면 이 저장소 문서(README · ROADMAP · ADR)를 따른다.
 
 ## 6. 커밋과 푸시
 
@@ -99,12 +93,12 @@ C1 손절 WIDEN 같은 명시적 미해결 항목은 설계·코드·테스트�
 **2026-10-05 사용자 지시 — GitHub Actions 사용량 최소화 (Claude·Codex 등 모든 에이전트 공통):** 사용량이 한도에 가깝다(2,000 분 중 1,800 분, 11/01 초기화, 사용자의 다른 저장소 작업과 공유). 수정·추가가 잦은 작업 방식이라 아래를 지킨다.
 - 커밋은 검증 뒤 그대로 한다. **푸시는 원격보다 앞선 커밋이 10 개쯤 쌓였을 때 한 번** 한다(`git rev-list --count @{u}..HEAD`). 사용자가 요청하거나 다른 세션과 맞춰야 할 때만 그 전에 푸시한다. 보고 때 아직 안 올린 커밋 수를 적는다.
 - 커밋 전 로컬 검증(§4 의 pytest · `pytest -m leakage` · mypy · ruff · lint-imports)을 빠짐없이 돌린다 — CI 를 시험 도구로 쓰지 않는다. CI 실패를 고치려고 푸시를 거듭하지 않는다.
-- PR·`main` 푸시·`workflow_dispatch` 수동 실행·재실행은 사용자가 요청할 때만 한다(PR 과 `main` 푸시는 CI 를 돌린다 — 작업 브랜치 푸시는 CI 를 돌리지 않는다).
+- PR·`main` 푸시·`workflow_dispatch` 수동 실행·재실행은 사용자가 요청할 때만 한다(PR 과 `main` 푸시는 CI 를 돌린다 — 작업 브랜치 푸시는 CI 를 돌리지 않지만, **그 브랜치에 열린 PR 이 있으면 돈다**. 푸시 전에 `gh pr list --repo seoloo/Market_Data_Platform` 으로 확인한다, 2026-10-22).
 - 강제 푸시·커밋 고쳐 다시 올리기를 하지 않는다.
 - CI 설정(`.github/workflows/`)은 사용량을 줄이도록 짜여 있다: `ci.yml` 은 문서(`docs/**`·`*.md`)·`reports/**` 만 바뀐 푸시를 건너뛰고 새 푸시가 오면 이전 실행을 취소하며 한 작업에서 pip 캐시로 한 번 설치한다. `secrets.yml`(gitleaks)은 짧고 `main` 푸시·PR 마다 돈다. 이 절약 설정을 되돌리거나 작업·매트릭스·예약 실행을 늘리려면 사용자 승인이 필요하다.
 기존 사용자 변경이나 범위 밖 파일은 포함하지 않는다. 원격 선행·충돌·푸시 실패 시 강제 푸시나 임의 병합을 하지 말고 상태를 보고한다.
 커밋은 GitHub Desktop용 한글 제목(50자 이내)을 사용하고 실제 포함 파일을 보고한다.
-제목은 P0~P9 또는 docs:/chore:. 기술 식별자는 원문 유지. 본문은 변경 이유를 한글로.
+제목은 `feat(단계):` · `fix:` · `docs:` · `chore:` (원본 시절의 P0~P9 도 남아 있다). 기술 식별자는 원문 유지. 본문은 변경 이유를 한글로.
 여러 논리 단위면 제목/파일을 나누고 한 번에 할 대안도 제시한다. 파일이 많으면 개수로 요약한다.
 골든 결과가 바뀌면 이유 필수. 테스트가 깨진 상태의 커밋 제안 금지.
 .env/키/토큰이 포함될 수 있는 커밋은 금지. .env/.venv가 변경 목록에 보이면 경고한다.
@@ -112,21 +106,20 @@ C1 손절 WIDEN 같은 명시적 미해결 항목은 설계·코드·테스트�
 ## 7. 에이전트·LLM 이식성
 
 CLAUDE.md 및 다른 도구 진입 파일은 이 파일을 가리키는 포인터만 둔다.
-도구별 규칙 복제 금지. 코드/사양 인계는 PROGRESS와 Current로 수행한다.
+도구별 규칙 복제 금지. 코드 · 사양 인계는 README · ROADMAP · ADR · 단계 기록 문서로 한다.
 시스템 LLM은 공급자 비종속 인터페이스, 모델/프롬프트/입력 해시/응답 저장을 요구한다.
-temperature=0만으로 결정론을 보장하지 않는다. 저장 응답 재생/캐시와 Shadow 경계는 [OPERATIONS](docs/current/OPERATIONS.md)를 따른다.
+temperature=0만으로 결정론을 보장하지 않는다.
 
 ## 8. 주요 위치
 
-- [CURRENT_SPEC](docs/current/CURRENT_SPEC.md): 시스템 기준과 문서 라우팅.
-- [TRADING_CORE](docs/current/TRADING_CORE.md): 리스크·실행 안전.
-- [BACKTEST_AND_TESTING](docs/current/BACKTEST_AND_TESTING.md): 연구와 Phase 게이트.
-- [OPERATIONS](docs/current/OPERATIONS.md): 운영·보안·보존 정책.
-- [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md): 연구 판정 요약.
-- [BRIEFING_FOR_LLM](docs/BRIEFING_FOR_LLM.md): 외부 AI 대화용 파생 요약(기준 문서 아님).
-- [IDEAS](docs/research/IDEAS.md): 다음 연구 아이디어 목록.
-- config/: 실행 설정, src/auto_trading/: 구현, tests/: 검증.
-- [Archive](docs/archive/README.md): 필요할 때만 과거 근거 조회.
+- [README](README.md) · [ROADMAP](docs/ROADMAP.md): 지금 무엇이 되어 있고 다음은 무엇인가.
+- [설계 결정(ADR)](docs/adr/README.md): 결정마다 맥락 · 다른 안 · 치르는 값 · 잰 근거.
+- [CODE_MAP](docs/CODE_MAP.md): 파이프라인(`src/mdp`)과 옮겨 온 연구 코드의 지도.
+- 단계 기록: `docs/SILVER_AGG_TRADES.md` · `BENCHMARK.md` · `GOLD_BARS_1M.md` · `REPROCESSING.md` ·
+  `AIRFLOW.md` · `STREAM.md` · `RECONCILE.md` · `SAMPLE.md` · `LIVE_REMOVAL_PLAN.md`.
+- `src/mdp/`: 파이프라인 구현, `tests/mdp/`: 그 시험(Spark 시험은 `tests/mdp/spark/`, 컨테이너 안).
+- 원본 저장소 기록(역사): [RESEARCH_HISTORY](docs/current/RESEARCH_HISTORY.md)(연구 판정 요약) ·
+  `docs/current/` · `docs/research/` · `reports/` · [Archive](docs/archive/README.md).
 
 ## 9. 도구별 역할 — 없음 (2026-10-09 사용자 결정으로 폐지)
 

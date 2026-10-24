@@ -57,7 +57,7 @@
 작업 스케줄러 등록 (사용자가 PowerShell 에서 1회 실행 — 시스템 설정이라 에이전트가 직접 등록하지 않는다):
 
 ```powershell
-Register-ScheduledTask -TaskName "AutoTrading_Testnet_Drill" -Action (New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\testnet_drill.py") -Trigger (New-ScheduledTaskTrigger -Daily -At 09:14)
+Register-ScheduledTask -TaskName "AutoTrading_Testnet_Drill" -Action (New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\testnet_drill.py") -Trigger (New-ScheduledTaskTrigger -Daily -At 09:14)
 ```
 
 ## 6. 기록

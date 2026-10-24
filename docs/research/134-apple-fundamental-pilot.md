@@ -62,8 +62,8 @@ PDF 읽기 스킬을 사용해 Apple 공식 PDF p1(손익)·p3(현금흐름)를 
 기간·열·단위·숫자를 눈으로 대조했다. SEC HTML의 연결 재무표와 dimension 없는 CIK context도 확인했다.
 Q4 PDF p4의 non-GAAP 조정값은 선택하지 않았다. 원문 PDF는 다음과 같다.
 
-:codex-file-citation{path="C:/Users/seolh/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/apple-fy2024-q4.pdf" purpose="source"}
-:codex-file-citation{path="C:/Users/seolh/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/apple-fy2024-q3.pdf" purpose="source"}
+:codex-file-citation{path="<사용자 홈>/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/apple-fy2024-q4.pdf" purpose="source"}
+:codex-file-citation{path="<사용자 홈>/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/apple-fy2024-q3.pdf" purpose="source"}
 
 선택 태그는 매출 `RevenueFromContractWithCustomerExcludingAssessedTax`, 영업이익 `OperatingIncomeLoss`,
 영업현금흐름 `NetCashProvidedByUsedInOperatingActivities`, taxonomy `us-gaap`, unit `USD`다.
@@ -109,7 +109,7 @@ Q4 현금흐름은 연간−9개월 **파생값**이며 PDF에 직접 분기 현
 2024-11-03 DST 종료를 넘겨 판단하므로 8월과 11월의 UTC 종가 시각이 다르다.
 일반 거래일/DST 자동 달력 구현은 아직 없으며 이번 두 날짜 확인을 전체 기간 통과로 확대하지 않는다.
 
-:codex-file-citation{path="C:/Users/seolh/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/nyse-2024-calendar.pdf" purpose="source"}
+:codex-file-citation{path="<사용자 홈>/Documents/GitHub/Auto_Trading/data/research/fundamental_pilot/nyse-2024-calendar.pdf" purpose="source"}
 
 10월·가용 가정 이전의 연간 값 차단, 2023년에 2024 제출본 비교값이 보이지 않음을 검사했다.
 실제 정정 제출본 비교는 이번 표본에서 수행하지 않았으며 133 합성 검증 수준으로 남아 있다.

@@ -138,7 +138,7 @@ Paper · 연구 스크립트 5 개가 이 용도로 쓴다(`run_paper_o1` · `ru
 
 - **개인 정보가 남은 문서**:
   - 대상: `PROGRESS.md` · `docs/BRIEFING_FOR_LLM.md` · `docs/current/OPERATIONS.md` · `docs/current/RESEARCH_HISTORY.md` ·
-    `docs/research/` 4 개 · `reports/deneb_polaris_report_20261017/` 2 개 (`C:\Users\seolh` 경로 · 봇 이름).
+    `docs/research/` 4 개 · `reports/deneb_polaris_report_20261017/` 2 개 (`<사용자 홈>` 경로 · 봇 이름).
   - 연구 문서라 숫자 · 결론은 건드리지 않고 경로 · 이름만 가리는 작업을 3 단계 문서 정리 때 따로 한다.
 - **실거래를 설명하는 문서**(`docs/CODE_MAP.md` · `docs/current/OPERATIONS.md` · `docs/REFACTOR_PLAN.md` 등)와 AGENTS.md §0 · §5: 코드를 지운 뒤 함께 고친다.
 - `config/live.yaml` · `testnet.yaml`: 설정 스키마 시험이 읽는다. 지우면 그 시험도 고쳐야 해서 코드 정리 뒤에 판단.

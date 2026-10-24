@@ -257,7 +257,9 @@ class TestRealConfigFiles:
     설정 파일이 깨진 채로 커밋되는 것을 CI 에서 막는다.
     """
 
-    @pytest.mark.parametrize("mode", ["backtest", "paper", "testnet", "live"])
+    # testnet · live 오버레이(config/testnet.yaml · live.yaml)는 실주문 코드를 걷어 낼 때
+    # 지웠다(README 6-3).
+    @pytest.mark.parametrize("mode", ["backtest", "paper"])
     def test_all_modes_load(self, mode: str):
         loaded = load_config(mode, config_dir=CONFIG_DIR, apply_env=False)
         assert loaded.config.mode.value == mode
@@ -276,11 +278,6 @@ class TestRealConfigFiles:
         assert cfg.risk.daily_trade_limit is None
         assert cfg.risk.same_direction_limit is None
         assert cfg.risk.max_drawdown_pct == Decimal("0.30")  # 2026-09-24 사용자 정정
-
-    def test_live_starts_at_leverage_three(self):
-        """Phase 8 출발값 (D9 §2)."""
-        cfg = load_config("live", config_dir=CONFIG_DIR, apply_env=False).config
-        assert cfg.risk.max_leverage == 3
 
     def test_a1_overlay_is_backtest_only_and_has_no_h1_edge_table(self):
         loaded = load_config("backtest", strategy="a1_v1", config_dir=CONFIG_DIR, apply_env=False)

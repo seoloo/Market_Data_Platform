@@ -41,7 +41,7 @@
 
 ### 3.1 읽은 자료
 
-- **P**: 사용자 제공 `엘리어트 파동 이론(by+엘갤).pdf`, 21쪽. 원본 위치 `C:/Users/seolh/Downloads/`.
+- **P**: 사용자 제공 `엘리어트 파동 이론(by+엘갤).pdf`, 21쪽. 원본 위치 `<사용자 홈>/Downloads/`.
   SHA-256 `7b1b8e64caebad8854292952f1d7e54e6a3cc4816c85efaf20d4a94fb1ce91d2`.
   전체 본문 추출, p.4·9·13·15·17·20 도해/표 렌더링 확인. 번역·편집 DOOROO, p.2에 원자료 출처 명시.
 - **A**: [요청한 Aurra 한국어 URL](https://www.aurra.markets/ko-kr/academy/advanced-guides/elliott-wave-theory-a-trader-guide-to-wave-counting-and-strategy)은 읽기 도구에서 오류.

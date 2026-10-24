@@ -1,5 +1,11 @@
 # 개인 자동매매 · 적립 프로젝트 — 연구 요약 (2026-10-11 기준, Glide · Cruise 실거래 반영)
 
+> ⚠️ **원본 연구 · 실거래 저장소(「오르빗」)에서 옮겨 온 기록이다.** 여기서 말하는 실주문 · 실계좌 ·
+> 예약 작업 · 화면 · 텔레그램 봇 코드는 이 저장소에서 지웠다([README 6-3](../README.md),
+> [진행 기록](LIVE_REMOVAL_PLAN.md), 2026-10-24). 실행 지시가 아니라 역사 기록으로만 읽는다.
+> 지금 저장소의 안내는 [README](../README.md) · [로드맵](ROADMAP.md) · [설계 결정](adr/README.md).
+
+
 > 다른 AI(GPT 등)와 대화할 때 **이 파일 전체를 붙여 넣는** 요약이다. 키·계좌 잔고·개인 정보는 넣지 않는다.
 > **파생 요약이다** — 기준 원천은 [RESEARCH_HISTORY](current/RESEARCH_HISTORY.md)·각 연구 문서·[PROGRESS](../PROGRESS.md)이고, 다르면 원천이 맞다.
 > 갱신 규칙([AGENTS](../AGENTS.md) §1): 연구 판정·전략 상태·운영 단계·일정이 바뀌는 작업은 이 파일도 같은 커밋에서 고친다.
@@ -879,7 +885,7 @@ T/v2 롱 허용에서 작은 선물 진입 후 고정ATR +2A/+4A에서 최초 �
 
 ### 2026-10-16 추가 인계 — 오르빗 소유자 전용 웹 배포
 
-- Sites https://orbit-investment-seolh.workspace-655977.chatgpt.site 에 별도 조회 전용 웹 배포 성공. 소스는 Git 밖 `visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/orbit-web-site/`의 독립 Sites 저장소이며 소스 커밋 `ce9bbee4dbe9bfb2a01e99a65679a1ec5b6785ae`. 기존 PC 서버 공개/터널링이 아니다.
+- Sites https://orbit-investment-<사용자>.workspace-655977.chatgpt.site 에 별도 조회 전용 웹 배포 성공. 소스는 Git 밖 `visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/orbit-web-site/`의 독립 Sites 저장소이며 소스 커밋 `ce9bbee4dbe9bfb2a01e99a65679a1ec5b6785ae`. 기존 PC 서버 공개/터널링이 아니다.
 - 공식 ChatGPT 로그인·소유자만 허용. 익명 홈페이지/API401, 허용 필드 장부 4개 최초 수동 업로드·서버 digest 재조회 성공. 사이트 키는 런타임 secret, PC 서비스 자격은 CurrentUser DPAPI/Git 제외. 거래소 키·계좌번호·원본 주문 ID·메모·원본 장부를 보내지 않는다. 주문·예약 제어 기능 없음.
 - 승인 v2 오비/전체 구름·밤하늘/반응형 유지, 실제 장부 표시로 교체. 자산 구성 불일치 등 기존 이력 6개 제외·현재 유효 그래프 0개. 평가 차액은 확정 수익률이 아니고 USDT≈USD/현재 환율 근사다. Altair는 선물 자금만 연결, 실제 포지션/미실현손익 미연결을 명시했다.
 - 중요: **자동 PC 업로드 예약 미등록**. 웹 60초 새로고침은 서버에 저장된 자료만 읽고 10분 경과는 지연 표시한다. 사용자 최종 ChatGPT 로그인은 본인이 완료해야 한다. 후속은 표시용 자동 동기화와 유효 기간별 그래프 기록 확보다.
@@ -1028,7 +1034,7 @@ T/v2 롱 허용에서 작은 선물 진입 후 고정ATR +2A/+4A에서 최초 �
 
 ## 2026-10-18 연구 283 정보 봇 목적지와 연결 확인
 
-- 사용자 지정에 따라 `@trading_alert_seolho_info_bot`의 기존 개인 대화를 [목적지](research/283-kr-us-valuation-alert-design.md)로 확정. 기존 `scripts.info_bot.info_credentials` 전용 자격과 전송기만 사용, getMe 이름/getChat 개인 수신처 일치 확인 후 연결 안내1건의 API 성공 응답을 받았다. 토큰/채팅ID/개인정보/응답 전문은 기록하지 않았다.
+- 사용자 지정에 따라 `@trading_alert_<이름>_info_bot`의 기존 개인 대화를 [목적지](research/283-kr-us-valuation-alert-design.md)로 확정. 기존 `scripts.info_bot.info_credentials` 전용 자격과 전송기만 사용, getMe 이름/getChat 개인 수신처 일치 확인 후 연결 안내1건의 API 성공 응답을 받았다. 토큰/채팅ID/개인정보/응답 전문은 기록하지 않았다.
 - 안내에는 자동 기업 선별·관심 등록·미등록 기업 재추천·전용 DB가 아직 미구현임을 명시. 이는 기존 발송 통로 점검이지 자동 서비스 등록이 아니다. getUpdates/메뉴/공지/환경/코드/주문/계좌/예약 변경 없음, 매매 봇으로 대체 발송 금지.
 - Phase 0 유지. 기존 가짜 전송 테스트17개와 문서/보존/범위 검사, 코드 변경이 없어 전체 코드 검증은 재실행하지 않았다. 다음은 재무 입력/조건 확정 후 DB·선별·발송 실행기를 구현하는 것이다.
 

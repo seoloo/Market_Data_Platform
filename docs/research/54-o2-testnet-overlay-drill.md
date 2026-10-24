@@ -73,7 +73,7 @@ V2 의 선물 일일 실행기(`execution/overlay_futures.py`)를 **테스트넷
 ## 4. 운영 등록 (사용자가 1회)
 
 ```powershell
-Register-ScheduledTask -TaskName "AutoTrading_Testnet_Overlay" -Action (New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\testnet_overlay_drill.py") -Trigger (New-ScheduledTaskTrigger -Daily -At 20:45)
+Register-ScheduledTask -TaskName "AutoTrading_Testnet_Overlay" -Action (New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\testnet_overlay_drill.py") -Trigger (New-ScheduledTaskTrigger -Daily -At 20:45)
 ```
 
 저녁 순서: **선물 실행기 훈련 20:45** → T/v2 21:00 → O 21:02~21:06 → 테스트넷 21:08 → 그림자 21:10 → 점검 21:20.

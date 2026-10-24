@@ -18,7 +18,7 @@ Deneb·Polaris 투자 전략 설명서 제작 요청
 
 작업 범위와 시작 순서
 
-- 프로젝트: C:/Users/seolh/Documents/GitHub/Auto_Trading
+- 프로젝트: <사용자 홈>/Documents/GitHub/Auto_Trading
 - AGENTS.md, data/agents/*.md, PROGRESS.md, docs/current/CURRENT_SPEC.md, docs/current/BACKTEST_AND_TESTING.md부터 확인해 줘.
 - 현행 Deneb·Polaris 구현과 연구 근거, 기존 보고서 계산 원장을 먼저 확인해 줘. 과거 문서의 ‘확정’ 표현을 현행 운용 상태로 오인하지 마.
 - 보고서와 보고서 전용 계산·시각화 산출물만 작업해 줘. 실거래·기존 Paper·전략·주문·계좌·예약·설정은 변경하거나 실행하지 마.
@@ -45,7 +45,7 @@ Deneb·Polaris 투자 전략 설명서 제작 요청
 
 1. 이전에 선택한 ‘4번 참고 PDF’인 UBS Global Wealth Report 2025의 편집 스타일을 실제로 열어 보고 따라 줘. 색상만 비슷하게 하는 것이 아니라 지면 구조를 따라야 해.
    원본 PDF:
-   C:/Users/seolh/.codex/visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/deneb-polaris-report/build/ubs-reference-copy.pdf
+   <사용자 홈>/.codex/visualizations/2026/09/20/01a0bf5b-5cc1-7e93-a3a2-5535af4738ba/deneb-polaris-report/build/ubs-reference-copy.pdf
    원본 대표 지면:
    같은 폴더의 ubs-page-09.png, ubs-page-12.png, ubs-page-15.png
    원본을 못 찾으면 임의의 다른 템플릿을 같은 것이라고 하지 말고, 파일 경로를 확인하거나 원본 제공을 요청해 줘.

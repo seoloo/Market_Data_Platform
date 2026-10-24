@@ -30,10 +30,10 @@
 ## 5. 예약 작업 (사용자, 관리자 PowerShell)
 
 ```powershell
-$repo = "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$repo = "<사용자 홈>\Documents\GitHub\Auto_Trading"
 $a = New-ScheduledTaskAction -Execute "$repo\.venv\Scripts\pythonw.exe" -Argument "`"$repo\scripts\task_launcher.py`" -m scripts.theme_alert weekly" -WorkingDirectory $repo
 $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Saturday -At 09:00
 $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun
-$p = New-ScheduledTaskPrincipal -UserId "seolh" -LogonType S4U -RunLevel Limited
+$p = New-ScheduledTaskPrincipal -UserId "<사용자>" -LogonType S4U -RunLevel Limited
 Register-ScheduledTask -TaskName "AutoTrading_Theme_Alert" -Action $a -Trigger $t -Settings $s -Principal $p
 ```

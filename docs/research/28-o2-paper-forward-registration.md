@@ -51,7 +51,7 @@ O/v1 전향 관찰(25)은 이미 시작했고 4주 점검(2026-10-24)이 잡혀 
 작업 스케줄러 등록 (사용자가 PowerShell 에서 1회 실행 — 시스템 설정이라 에이전트가 직접 등록하지 않는다):
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\run_paper_o1.py run --ledger o2"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\run_paper_o1.py run --ledger o2"
 Register-ScheduledTask -TaskName "AutoTrading_Paper_O2" -Action $a -Trigger (New-ScheduledTaskTrigger -Daily -At 09:12)
 ```
 

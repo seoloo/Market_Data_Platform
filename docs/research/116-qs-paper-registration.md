@@ -42,7 +42,7 @@
 ## 6. 예약 작업 (사용자가 PowerShell 에서 등록)
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.qs_paper daily" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.qs_paper daily" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"
 $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 21:15
 Register-ScheduledTask -TaskName "AutoTrading_QS_Paper" -Action $a -Trigger $t
 ```

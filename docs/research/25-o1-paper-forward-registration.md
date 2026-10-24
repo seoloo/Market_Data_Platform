@@ -86,7 +86,7 @@ T/v2 Paper 는 T/v2 의 운영 점검(Phase 6)이다. O/v1 은 그 신호에 **�
 작업 스케줄러 등록 (사용자가 PowerShell 에서 1회 실행 — 시스템 설정이라 에이전트가 직접 등록하지 않는다):
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\run_paper_o1.py run"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\run_paper_o1.py run"
 Register-ScheduledTask -TaskName "AutoTrading_Paper_O1" -Action $a -Trigger (New-ScheduledTaskTrigger -Daily -At 09:10)
 ```
 

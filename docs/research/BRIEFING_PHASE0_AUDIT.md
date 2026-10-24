@@ -132,7 +132,7 @@
 **예약 작업(사용자 등록)**: 화 ~ 토 07:30 KST(미국 월 ~ 금 마감 뒤).
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.market_brief run" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:30; Register-ScheduledTask -TaskName "AutoTrading_MarketBrief" -Action $a -Trigger $t -Description "미국 시장 브리핑 (IDEAS 29, 읽기 전용)"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.market_brief run" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:30; Register-ScheduledTask -TaskName "AutoTrading_MarketBrief" -Action $a -Trigger $t -Description "미국 시장 브리핑 (IDEAS 29, 읽기 전용)"
 ```
 
 **정확성 검산(§6) 진행 방식:**

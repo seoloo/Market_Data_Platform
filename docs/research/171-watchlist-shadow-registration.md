@@ -58,7 +58,7 @@
 - **예약 작업(사용자 등록)**: 매일 21:40 KST. 다른 21 시 작업 뒤다.
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.watchlist_shadow run" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Daily -At 21:40; Register-ScheduledTask -TaskName "AutoTrading_Watchlist" -Action $a -Trigger $t -Description "관찰 바구니 그림자 기록 (문서 171, 돈 없음)"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.watchlist_shadow run" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Daily -At 21:40; Register-ScheduledTask -TaskName "AutoTrading_Watchlist" -Action $a -Trigger $t -Description "관찰 바구니 그림자 기록 (문서 171, 돈 없음)"
 ```
 
 ## 6. 첫 실행 (2026-10-08)

@@ -84,7 +84,7 @@
 `--allocation` 에 그 금액을 넣어 등록한다. 아래 예시는 1,000 USDT 다.
 
 ```powershell
-Register-ScheduledTask -TaskName "AutoTrading_Shadow_T2" -Action (New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\run_shadow_t2.py run --allocation 1000") -Trigger (New-ScheduledTaskTrigger -Daily -At 21:10)
+Register-ScheduledTask -TaskName "AutoTrading_Shadow_T2" -Action (New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\run_shadow_t2.py run --allocation 1000") -Trigger (New-ScheduledTaskTrigger -Daily -At 21:10)
 ```
 
 순서: T/v2 21:00 → O 21:02~21:06 → 테스트넷 21:08 → **그림자 21:10** → 점검 21:20.

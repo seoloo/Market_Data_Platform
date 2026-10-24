@@ -32,7 +32,7 @@
 - 주문은 없다. 이 기록은 실거래 승인 단계와 무관하다. AI 답은 매매에 쓰지 않는다(AGENTS: LLM 이 BUY·SELL 을 내리지 않는다).
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.kr_shadow daily" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.kr_shadow daily" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"
 $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At 20:20
 Register-ScheduledTask -TaskName "AutoTrading_KR_Shadow" -Action $a -Trigger $t
 ```

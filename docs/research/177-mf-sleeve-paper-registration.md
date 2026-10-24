@@ -29,7 +29,7 @@
 - 권장 예약: **화 ~ 토 07:40 KST**(미국 마감 뒤, 시장 브리핑 07:30 다음). 하루 빠져도 다음 실행이 밀린 날을 모두 처리한다.
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"C:\Users\seolh\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.mf_paper run" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:40; Register-ScheduledTask -TaskName "AutoTrading_MF_Paper" -Action $a -Trigger $t -Description "나스닥 + 추세 추종 소매 Paper (문서 177, 돈 없음)"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\pythonw.exe" -Argument "`"<사용자 홈>\Documents\GitHub\Auto_Trading\scripts\task_launcher.py`" -m scripts.mf_paper run" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"; $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday,Saturday -At 07:40; Register-ScheduledTask -TaskName "AutoTrading_MF_Paper" -Action $a -Trigger $t -Description "나스닥 + 추세 추종 소매 Paper (문서 177, 돈 없음)"
 ```
 
 ## 4. 판단 (미리 정함, `python -m scripts.mf_paper judge`)

@@ -35,7 +35,7 @@ A(매달 QQQ)와 AG-US 는 이미 [116 QS Paper](116-qs-paper-registration.md) �
 ## 5. 예약 작업 (사용자가 PowerShell 에서 등록)
 
 ```powershell
-$a = New-ScheduledTaskAction -Execute "C:\Users\seolh\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.ag_paper daily" -WorkingDirectory "C:\Users\seolh\Documents\GitHub\Auto_Trading"
+$a = New-ScheduledTaskAction -Execute "<사용자 홈>\Documents\GitHub\Auto_Trading\.venv\Scripts\python.exe" -Argument "-m scripts.ag_paper daily" -WorkingDirectory "<사용자 홈>\Documents\GitHub\Auto_Trading"
 $t = New-ScheduledTaskTrigger -Daily -At 21:17
 $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun
 Register-ScheduledTask -TaskName "AutoTrading_AG_Paper" -Action $a -Trigger $t -Settings $s
