@@ -206,9 +206,14 @@ def demo_t2_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     return check_demo_t2(report, int(unresolved), now_ms)
 
 
+def _on_windows() -> bool:
+    """윈도우인가 — 함수로 두어 리눅스 mypy 가 아래 윈도우 코드를 닿지 않는다고 보지 않게."""
+    return sys.platform == "win32"
+
+
 def _task_disabled(name: str) -> bool:
     """예약 작업을 꺼 뒀는가 (윈도우 · 읽기만). 모르면 False — 평소처럼 본다."""
-    if sys.platform != "win32":
+    if not _on_windows():
         return False
     try:
         done = subprocess.run(
@@ -280,7 +285,7 @@ $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString('MM-dd H
 
 def pc_status(now_ms: int) -> tuple[list[str], list[Finding]]:
     """예약 작업·비정상 종료 요약 (문서 84). 읽기만 한다. 윈도우가 아니거나 조회 실패면 정보로만."""
-    if sys.platform != "win32":
+    if not _on_windows():
         return [], []
     try:
         done = subprocess.run(

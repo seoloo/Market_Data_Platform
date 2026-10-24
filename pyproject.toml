@@ -47,7 +47,16 @@ line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
 # 문서의 코드 블록은 의사코드가 섞여 있으므로 포맷 대상에서 제외한다.
-extend-exclude = ["docs", "*.md"]
+# 연구 스크립트 3 개는 원본에서 옮겨 온 그대로 둔다 — 고치면(예: B023 반복 변수 묶기) 연구 결과가 달라질 수
+# 있어서다(절대 규칙 6, README C-1). 이 저장소의 새 코드는 모두 검사한다.
+extend-exclude = [
+    "docs",
+    "*.md",
+    "reports",  # 연구 산출물(규칙 6) — .gitignore 대상이지만 일부는 추적된다. git 없는 곳에서도 같게
+    "scripts/run_deneb1x_262.py",
+    "scripts/run_qqq_combo_263.py",
+    "scripts/run_split_264.py",
+]
 
 [tool.ruff.lint]
 select = [

@@ -50,10 +50,15 @@ README 에는 요약만 두고, 단계별 전체 기록은 여기에 둔다. 단
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| C-1 | 옮겨 온 코드의 CI 실패 정리 — 대부분은 6-3(실거래 코드 걷어 내기)에서 파일째 사라진다. 남는 연구 스크립트는 고치거나 검사 대상에서 뺀다(연구 숫자 · 결론은 바꾸지 않음) | ⏳ |
-| C-2 | 로컬 CI 재현 스크립트를 저장소에 — push 전에 CI 와 같은 컨테이너에서 같은 단계를 돌린다 | ⏳ |
-| C-3 | Spark 시험(`tests/mdp/spark`)도 CI 에서 — Spark 이미지 빌드 캐시로 시간을 줄인다 | ⏳ |
-| C-4 | `main` 보호 규칙 — PR 로만 합치고, 필수 검사(CI · Secrets) 통과해야 합치기 | ⏳ |
+| C-1 | 옮겨 온 코드의 CI 실패 정리 — 대부분은 6-3(실거래 코드 걷어 내기)에서 파일째 사라진다. 남는 연구 스크립트는 고치거나 검사 대상에서 뺀다(연구 숫자 · 결론은 바꾸지 않음) | ✅ 2026-10-24 · CI 조건(파이썬 3.11 · 리눅스)에서 6 단계 모두 통과 — mypy 23 → 0 (형 표기 · 시험만 고침), 3.11 에서 못 읽던 연구 시험 4 모듈은 실행 중 만들던 `array[int]` 형 별칭 2 곳을 글자로, ruff 16 · 서식 3 은 연구 스크립트 3 개를 검사에서 뺌(고치면 결과가 바뀔 수 있음), `reports/` 도 검사에서 뺌 |
+| C-2 | 로컬 CI 재현 스크립트를 저장소에 — push 전에 CI 와 같은 컨테이너에서 같은 단계를 돌린다 | ✅ `bash scripts/ci_local.sh` — `python:3.11-slim` 에 git 이 아는 파일만 넘겨 6 단계, 약 3.5 분(두 번째부터) |
+| C-3 | Spark 시험(`tests/mdp/spark`)도 CI 에서 — Spark 이미지 빌드 캐시로 시간을 줄인다 | 🟡 `.github/workflows/spark.yml` 작성 (파이프라인 · Spark 시험 · 이미지가 바뀔 때만, 이미지 층 캐시). GitHub 에서는 아직 안 돌려 봄 — Actions 사용 시간 한도 · main/PR 에서만 돈다 |
+| C-4 | `main` 보호 규칙 — PR 로만 합치고, 필수 검사(CI · Secrets) 통과해야 합치기 | ⏸ GitHub 무료 요금제의 비공개 저장소는 보호 규칙을 쓸 수 없다(API 403 'Upgrade to GitHub Pro or make this repository public', 2026-10-24 확인). 공개할 때 적용 — 아래 명령 |
 
 - GitHub Actions 사용 시간이 모자라 2026-10-23 PR 검사가 시작도 못 했다("spending limit"). 초기화는 11/01 로 알고 있다.
+- C-4 를 공개 뒤 적용하는 명령 (필수 검사 = `check` · `gitleaks`, PR 로만 합치기, 강제 push 막기):
+  `gh api -X PUT repos/<소유자>/<저장소>/branches/main/protection --input protection.json` — 내용은
+  `{"required_status_checks": {"strict": true, "contexts": ["check", "gitleaks"]}, "enforce_admins": false,
+  "required_pull_request_reviews": {"required_approving_review_count": 0}, "restrictions": null,
+  "allow_force_pushes": false, "allow_deletions": false}` (검사 이름은 공개 저장소에서 한 번 돈 뒤 확인 필요).
 - PR 이 열려 있으면 그 브랜치에 push 할 때마다 CI 가 돈다 — 검사 시간을 아끼려면 합칠 준비가 됐을 때 PR 을 연다.

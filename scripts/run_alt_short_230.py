@@ -168,7 +168,7 @@ def run() -> int:
             per_coin[s] = {"n": len(tr), "total": total(tr), "stops": sum(t.stopped for t in tr)}
         eligible = [v for v in per_coin.values() if v["n"] >= 10]
         share_pos = sum(v["total"] > 0 for v in eligible) / len(eligible) if eligible else 0.0
-        counts = {s: v["n"] for s, v in per_coin.items() if v["n"]}
+        counts = {s: int(v["n"]) for s, v in per_coin.items() if v["n"]}
         rnd = _random_means(cache, counts, cfg[2], cfg[3])
         opt_tr = run_config(opt, *cfg, FROM, TO)
         mean = pooled["mean"] or 0.0

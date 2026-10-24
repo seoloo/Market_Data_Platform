@@ -250,6 +250,7 @@ docker compose run --rm spark python -m mdp.stream.produce --source live --symbo
 pytest tests/mdp                                                   # 파이프라인 시험 93개 (PostgreSQL 시험 4개는 MDP_TEST_PG_DSN 있을 때)
 docker compose run --rm spark python -m pytest tests/mdp/spark -q  # Spark 시험 12개 (컨테이너 안)
 ruff check src tests && mypy
+bash scripts/ci_local.sh                                         # CI 와 같은 조건(파이썬 3.11 · 리눅스 컨테이너)으로 6 단계
 ```
 
 ## 9. 기술 스택 · 구조

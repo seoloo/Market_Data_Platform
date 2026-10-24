@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.research import wallet_grid_20261013 as pure
@@ -41,7 +41,8 @@ FILES = (
 )
 START, END = base.START, base.END
 SCALE = 100_000_000
-Columns = tuple[array[int], array[int], array[int], array[int], array[int]]
+# 글자로 둔다 — 파이썬 3.11 은 array[int] 를 실행 중에 만들지 못한다(CI, README C-1)
+Columns: TypeAlias = "tuple[array[int], array[int], array[int], array[int], array[int]]"
 INVENTORY_ID = "4875010dc542af6e6d69110132afddc5495f56c4806c4b9ff4e6af80e20d8aab"
 
 

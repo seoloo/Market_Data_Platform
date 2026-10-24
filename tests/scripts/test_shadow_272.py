@@ -25,7 +25,7 @@ def test_summary_counts_filled_and_compounds_funding_diff() -> None:
     assert abs(s["funding_cum_diff"] - (1.01 * 0.995 - 1)) < 1e-12
 
 
-def test_run_waits_four_hours(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_run_waits_four_hours(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(m, "DATA", tmp_path)
     (tmp_path / "state.json").write_text('{"ran_ms": 1000}', encoding="utf-8")
     assert m.run(1000 + m.EVERY - 1) is None  # 아직 4 시간 안 됨 → 네트워크 안 씀

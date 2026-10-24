@@ -14,14 +14,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from auto_trading.core.errors import DataIntegrityError
 from auto_trading.research import wallet_grid_20261013 as p
 
 SCALE = 100_000_000
 START, END = 1590969600000, 1788220800000
-Columns = tuple[array[int], array[int], array[int], array[int], array[int]]
+# 글자로 둔다 — 파이썬 3.11 은 array[int] 를 실행 중에 만들지 못한다(CI, README C-1)
+Columns: TypeAlias = "tuple[array[int], array[int], array[int], array[int], array[int]]"
 CLOSED_TEXT = (
     ("2020-06-28T02:00", "2020-06-28T05:30"),
     ("2020-11-30T06:00", "2020-11-30T07:00"),
