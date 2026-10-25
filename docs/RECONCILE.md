@@ -6,6 +6,8 @@
 > 13,897, 늦어서 빠진 체결 678 = Spark가 워터마크로 버린 678).
 > 코드: [`src/mdp/reconcile/daily.py`](../src/mdp/reconcile/daily.py) · 표: [`005_reconcile.sql`](../src/mdp/runlog/sql/005_reconcile.sql)
 
+![스트림 · 배치 대사](diagrams/04_reconcile.png)
+
 ## 왜 필요한가
 
 PC가 늘 켜져 있지 않으니 스트림은 **반드시 끊긴다.** 그래서 목표는 '24시간 무중단'이 아니라 **빈 곳을 정확히

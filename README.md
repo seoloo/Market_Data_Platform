@@ -56,10 +56,9 @@ flowchart LR
 Airflow는 위 단계를 **평소와 같은 명령**으로 차례대로 부르고, 무거운 Spark 단계는 Spark 컨테이너를 따로 띄워
 돌린다([기록](docs/AIRFLOW.md)).
 
-목표 구조 전체(Gold · DuckDB · Kafka 스트림 · 매일 대사 포함)는 아래 그림입니다. 오른쪽 위에 '계획'으로
-표시돼 있고, 단계가 끝날 때마다 고칩니다.
+구현된 구조 전체(배치 · 스트림 · 매일 대사 · PostgreSQL · DuckDB)는 아래 그림입니다.
 
-![목표 구조](docs/diagrams/02_to_be.png)
+![구현된 구조](docs/diagrams/02_to_be.png)
 
 ## 2. 왜 만들었나
 
