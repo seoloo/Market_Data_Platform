@@ -213,6 +213,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument(
+        "--require-all",
+        action="store_true",
+        help="아직 안 올라온 파일이 하나라도 있으면 종료 코드 2 (예약 실행이 나중에 다시 시도하게)",
+    )
+    parser.add_argument(
         "--pg-dsn",
         default=os.environ.get("MDP_PG_DSN"),
         help="실행 기록 PostgreSQL 주소 (기본: MDP_PG_DSN, 없으면 기록 안 함)",
@@ -251,7 +256,7 @@ def main(argv: Sequence[str] | None = None, *, today: date | None = None) -> int
     with BronzeFetcher(bronze_root) as fetcher:
         if args.pg_dsn:
             with PostgresRecorder(args.pg_dsn) as recorder:
-                run_sync(
+                results = run_sync(
                     fetcher,
                     files,
                     args.manifest,
@@ -264,7 +269,7 @@ def main(argv: Sequence[str] | None = None, *, today: date | None = None) -> int
                 )
         else:
             log_json(event="runlog_off", reason="MDP_PG_DSN 없음 — 실행 기록 없이 받는다")
-            run_sync(
+            results = run_sync(
                 fetcher,
                 files,
                 args.manifest,
@@ -275,6 +280,12 @@ def main(argv: Sequence[str] | None = None, *, today: date | None = None) -> int
                 end=end,
                 verify=args.verify,
             )
+    missing = [r.file.relative_path for r in results if r.status is FetchStatus.MISSING_AT_SOURCE]
+    if args.require_all and missing:
+        # [이유] 바이낸스는 하루 파일을 다음 날 올린다 — 매일 예약은 '아직 없음' 을 실패로 알려야
+        #        Airflow 가 다시 시도한다(없는 채로 Silver · 대사까지 가지 않게).
+        log_json(event="not_yet_published", files=missing)
+        return 2
     return 0
 
 

@@ -60,3 +60,13 @@ def test_spark_mounts_missing_path_stops() -> None:
     sources = {inside: "H:" for inside in AIRFLOW_TO_SPARK if inside != "/opt/mdp/bronze"}
     with pytest.raises(RuntimeError, match="/opt/mdp/bronze"):
         spark_mounts(sources, "mdp_mdp_staging")
+
+
+def test_day_param_wins_and_falls_back_to_interval() -> None:
+    from mdp.orchestrate.window import mdp_day, mdp_day_month
+
+    assert mdp_day({"day": "2026-10-25"}, MARCH) == "2026-10-25"
+    assert mdp_day({}, datetime(2026, 10, 25, 0, tzinfo=UTC)) == "2026-10-25"
+    assert mdp_day_month({"day": "2026-10-25"}, None) == "2026-10"
+    with pytest.raises(ValueError, match="day"):
+        mdp_day({"day": ""}, None)

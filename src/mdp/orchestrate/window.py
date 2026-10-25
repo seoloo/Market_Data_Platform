@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from typing import Any
 
-__all__ = ["mdp_month", "mdp_month_end", "mdp_month_start"]
+__all__ = ["mdp_day", "mdp_day_month", "mdp_month", "mdp_month_end", "mdp_month_start"]
 
 
 def _month(params: Mapping[str, Any], interval_start: datetime | None) -> date:
@@ -49,3 +49,21 @@ def mdp_month_end(params: Mapping[str, Any], interval_start: datetime | None) ->
     first = _month(params, interval_start)
     next_first = date(first.year + first.month // 12, first.month % 12 + 1, 1)
     return f"{next_first - timedelta(days=1):%Y-%m-%d}"
+
+
+def mdp_day(params: Mapping[str, Any], interval_start: datetime | None) -> str:
+    """[쓰임] 매일 예약(대사)의 그날 ``YYYY-MM-DD`` — 매개변수 ``day`` 가 먼저, 없으면 예약 구간
+    시작일.
+    [이유] ``@daily`` 는 D 일 구간 [D, D+1)을 D+1 에 돌린다 — 그날 일 파일이 올라온 뒤에
+           대사한다."""
+    text = str(params.get("day") or "").strip()
+    if text:
+        return date.fromisoformat(text).isoformat()
+    if interval_start is None:
+        raise ValueError("돌릴 날을 모른다 — 매개변수 day(YYYY-MM-DD)를 주거나 예약 실행으로")
+    return interval_start.date().isoformat()
+
+
+def mdp_day_month(params: Mapping[str, Any], interval_start: datetime | None) -> str:
+    """[쓰임] 그날이 속한 달 ``YYYY-MM`` — Silver · Gold 는 달 단위로 다시 만든다."""
+    return mdp_day(params, interval_start)[:7]

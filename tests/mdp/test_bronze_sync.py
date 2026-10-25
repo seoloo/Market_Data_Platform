@@ -211,3 +211,28 @@ def test_main_backfill_days_end_to_end(
     assert main(argv, today=TODAY) == 0
     assert '"event": "summary"' in caplog.text and '"downloaded": 1' in caplog.text
     assert day.relative_path in (tmp_path / "m.csv").read_text()
+
+
+def test_main_require_all_fails_while_a_day_is_not_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("MDP_PG_DSN", raising=False)
+    source = FakeSource({})  # 원천에 아무것도 없다 — 아직 안 올라온 날
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kwargs: real_client(transport=source.transport(), **kwargs)
+    )
+    argv = [
+        "--dataset",
+        "aggTrades",
+        "--symbol",
+        "BTCUSDT",
+        "--days",
+        "2024-03-05",
+        "--root",
+        str(tmp_path / "bronze"),
+        "--manifest",
+        str(tmp_path / "m.csv"),
+    ]
+    assert main(argv, today=TODAY) == 0  # 예전처럼 — 알리기만
+    assert main([*argv, "--require-all"], today=TODAY) == 2  # 예약 실행은 실패로 → 다시 시도

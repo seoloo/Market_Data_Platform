@@ -30,58 +30,16 @@ Spark 작업은 실행 시간 제한 1 시간.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from functools import lru_cache
 from typing import Any
 
-from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.sdk import DAG, Param
-from docker.types import Mount
+from mdp_dag_common import spark_task
 
-from mdp.orchestrate.mounts import current_container_mounts, host_sources, spark_mounts
 from mdp.orchestrate.window import mdp_month, mdp_month_end, mdp_month_start
 
-SPARK_IMAGE = "mdp-spark:4.0.1-delta4.0.1"
-STAGING_VOLUME = "mdp_mdp_staging"
 MONTH = "{{ mdp_month(params, data_interval_start) }}"
 COMMON = f"--symbol {{{{ params.symbol }}}} --month {MONTH}"
-
-
-@lru_cache(maxsize=1)
-def _spark_mounts() -> list[Mount]:
-    """[쓰임] Spark 컨테이너에 붙일 호스트 경로(Airflow 컨테이너 연결 정보에서 찾음).
-    DAG 를 읽을 때 한 번."""
-    sources = host_sources(current_container_mounts())
-    return [
-        Mount(target=target, source=source, type=kind, read_only=read_only)
-        for source, target, kind, read_only in spark_mounts(sources, STAGING_VOLUME)
-    ]
-
-
-def _spark_task(task_id: str, module: str) -> DockerOperator:
-    """[쓰임] Spark 이미지로 우리 명령 하나를 돌리는 작업 (compose 의 spark 서비스와 같은 환경)."""
-    import os
-
-    return DockerOperator(
-        task_id=task_id,
-        image=SPARK_IMAGE,
-        command=f"python -m {module} {COMMON}",
-        docker_url="unix://var/run/docker.sock",
-        network_mode="bridge",
-        mounts=_spark_mounts(),
-        mount_tmp_dir=False,
-        auto_remove="success",
-        extra_hosts={"host.docker.internal": "host-gateway"},
-        environment={
-            "MDP_BRONZE_ROOT": "/lake/bronze",
-            "MDP_LAKE_ROOT": "/lake",
-            "MDP_STAGING_ROOT": "/staging",
-            "MDP_PG_DSN": os.environ.get("MDP_SPARK_PG_DSN", ""),
-            "MDP_SPARK_MEMORY": os.environ.get("MDP_SPARK_MEMORY", "6g"),
-            "MDP_SPARK_CORES": os.environ.get("MDP_SPARK_CORES", "8"),
-        },
-        execution_timeout=timedelta(hours=1),
-    )
 
 
 default_args: dict[str, Any] = {
@@ -125,11 +83,11 @@ with DAG(
             f" --symbol {{{{ params.symbol }}}} {span}"
         ),
     )
-    silver = _spark_task("silver", "mdp.silver.agg_trades")
+    silver = spark_task("silver", f"python -m mdp.silver.agg_trades {COMMON}")
     check_silver = BashOperator(
         task_id="check_silver", bash_command=f"python -m mdp.query.check_silver {COMMON}"
     )
-    gold = _spark_task("gold", "mdp.gold.bars_1m")
+    gold = spark_task("gold", f"python -m mdp.gold.bars_1m {COMMON}")
     serve = BashOperator(task_id="serve", bash_command=f"python -m mdp.serve.bars_1m {COMMON}")
     # 상태 화면(<lake>/_ui/index.html)을 새로 — 읽기만 하므로 다시 시도해도 안전하다
     report = BashOperator(task_id="report", bash_command="python -m mdp.ui.report")

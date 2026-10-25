@@ -111,6 +111,25 @@ docker exec mdp-airflow-1 airflow backfill create --dag-id mdp_monthly_pipeline 
 PostgreSQL 복사본의 SHA-256(`9883fca0…`)도 4-4에서 손으로 돌렸을 때와 같다. 즉 **같은 달을 오케스트레이터로
 다시 돌려도 결과가 바뀌지 않는다**(멱등) — 다시 시도 설정이 안전하다는 근거다.
 
+## 매일 대사 DAG
+
+`mdp_daily_reconcile` — 매일 D 일을 대사한다([대사 기록](RECONCILE.md)). 월 DAG 와 Spark 작업 만들기를
+함께 쓴다(`airflow/dags/mdp_dag_common.py`).
+
+```text
+bronze_trades ─┐ (D 일 일 파일, 아직 없으면 실패 → 1 시간마다 다시, 최대 하루)
+               ├─▶ silver ─▶ check_silver ─▶ gold ─▶ stream ─▶ reconcile ─▶ report
+bronze_klines ─┘   (그달)                      (그달)  (원문 토픽)  (D, 메우기)  (상태 화면)
+```
+
+- **D+1 에 돈다**: 바이낸스는 D 일 일 파일을 다음 날 올린다. 받기에 `--require-all` 을 줘서 '아직 없음' 이면 종료 코드
+  2 → Airflow 가 1 시간 뒤 다시 시도한다(올라오는 시각은 확인 필요라 넉넉히 하루). 없는 채로 대사까지 가지 않는다.
+- **스트림 봉은 그때 한 번에**: 계속 도는 스트림 작업을 PC 에 늘 띄워 두지 않고, 원문 토픽에서 지난번 다음 메시지부터
+  `--trigger available-now` 로 확정한다(체크포인트 이름 고정). 받기(`stream.produce --source live`)는 따로 돈다.
+- 스트림 · 대사 작업은 Kafka 에 닿아야 해서 compose 네트워크(`mdp_default`)에 붙는다.
+- 받기 전 날(2026-10-24)로 끝까지 돌려 확인: 8 개 작업 모두 성공, 4 분 20 초. 대사는 1,440 분 모두 '끊김' · 그날 체결
+  842,302 건 모두 '받지 못함' — 받기를 켜기 전 날이라 맞는 답이다. 2026-10-25 부터 예약으로 켜 두었다.
+
 ## 시험
 
 - 호스트: [`tests/mdp/test_orchestrate.py`](../tests/mdp/test_orchestrate.py) — 달 정하기(매개변수 우선 ·

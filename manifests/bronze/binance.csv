@@ -1,5 +1,6 @@
 relative_path,size_bytes,sha256
 data/futures/um/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-03-05.zip,66654600,705291994eb9a555cc7a11d038659ff7630c303c8ced5338eb57051732a2e666
+data/futures/um/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2026-10-24.zip,10481967,c36eaf1ee669aeae2ac8fa8bb6b7c2ff8c1cc45887e944842ee55adb1603f001
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-01.zip,61756,062f32fefdfb1d1cfbb6d58ee04c28dd6c45dbf2b52ed60fa4ad6a27b0b19bc5
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-02.zip,62478,9a831b07b2ce50e54e99490c3549b2e426955bc2608c78c31d3761d989e1cf28
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-03.zip,55463,7cc6d272810c07d24c4d2dd35efa53b979198f8bcd918cbb7b5fec3e0cd31be2
@@ -19,6 +20,7 @@ data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-16.zip,60989,1fbdf828
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-17.zip,56233,b9d3c1e53d0d506ad2930dbd5f5038111ff93a890dac2d61395622ba9990e0ae
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-18.zip,59759,b2ab88a1e7dde22620a427e6ba745dd98c75ba6448979a7cbe4067df7161d031
 data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-19.zip,60883,df9be77f675d7bfaa06b4f5849a5f858abb23b5ecaf6d900dd7412c712645402
+data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2026-10-24.zip,59422,86e05a5ca9c1b87762c9c466e16a4553dd636809b1f85a2fcfc6ec9fbfccd803
 data/futures/um/monthly/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-03.zip,847406944,8ceb6fd06fc3bff87870e7adc362ca0e2f463f57a04599d2506e40320921401d
 data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2024-03.zip,939,711dcaf2a341aedfd06447b4117b540f60adb0784c5e64a313c718e4cf092bc3
 data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2026-08.zip,896,7c108b3a02bd6dc7345ca7323e3a49664edcea0afdcf780ffb3b44762c45a964
