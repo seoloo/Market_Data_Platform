@@ -148,6 +148,27 @@ services:
       retries: 12
     restart: unless-stopped
 
+  # 국내 주식 실시간 체결 받기(K-4) — 한국투자증권 웹소켓 → Kafka 원문 토픽. 시세 조회만.
+  # 키는 이 서비스에만, .env 에서 이 이름들만 넘긴다(.env 통째로 넘기지 않는다 — 다른 키가 섞이지 않게).
+  kis-capture:
+    image: mdp-spark:4.0.1-delta4.0.1
+    profiles: ["stream"]
+    environment:
+      MDP_KAFKA_BOOTSTRAP: kafka:9092
+      MDP_PG_DSN: ${MDP_PG_DSN_CONTAINER:-postgresql://mdp:mdp_local_only@host.docker.internal:56432/mdp}
+      MDP_KIS_ENV: ${MDP_KIS_ENV:-demo}
+      KIS_APP_KEY: ${KIS_APP_KEY:-}
+      KIS_APP_SECRET: ${KIS_APP_SECRET:-}
+      KIS_PAPER_APP_KEY: ${KIS_PAPER_APP_KEY:-}
+      KIS_PAPER_APP_SECRET: ${KIS_PAPER_APP_SECRET:-}
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   mdp_pg:
   mdp_staging:

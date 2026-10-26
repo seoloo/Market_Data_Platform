@@ -24,7 +24,7 @@ sample ─▶ 키 없는 합성 데이터로 위 전체를 한 번에 + 정답 �
 
 | 폴더 | 하는 일 | 어디서 도나 | 기록 |
 |---|---|---|---|
-| `kis/` | 국내 주식 원천 접속 창구 — 허용한 시세 조회만 · 토큰 캐시 · 요청 간격 · 다시 시도 · 이어 받기 | 호스트 · Airflow | [KIS](KIS.md) |
+| `kis/` | 국내 주식 원천 접속 창구 — 허용한 시세 조회만 · 토큰 캐시 · 요청 간격 · 다시 시도 · 이어 받기, 실시간 체결 글자 읽기 · 구독(`realtime`) | 호스트 · Airflow | [KIS](KIS.md) · [KIS_STREAM](KIS_STREAM.md) |
 | `bronze/` | 받기 · 체크섬 대조 · 증분 받기와 백필 · 체크섬 목록 — 바이낸스 `fetch` · `sync`, 국내 주식 `kis`, 받아 둔 자료 `imported` | 호스트 · Airflow | [KIS](KIS.md) |
 | `silver/` | 출처 고르기 · 정제 · 격리 · 빈 곳 · 날 대조 (바이낸스 `agg_trades`, 국내 주식 `kr_stocks` — 장 구간 · 빈 구간 · 감사, `kr_universe` — 상장 이력 · 폐지 종목 포함 가격) | Spark 컨테이너 | [SILVER_AGG_TRADES](SILVER_AGG_TRADES.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) |
 | `gold/` | 체결 → 1분봉 (`bar_aggregations` — 스트림과 같은 집계식) · 공식 봉 대조, 국내 주식 `kr_stocks` — 분봉 ↔ 일봉 대조 · 수정주가 사건, `kr_universe` — 생존 편향 · 두 출처 대조 | Spark 컨테이너 | [GOLD_BARS_1M](GOLD_BARS_1M.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) · [KR_UNIVERSE](KR_UNIVERSE.md) |
@@ -33,8 +33,8 @@ sample ─▶ 키 없는 합성 데이터로 위 전체를 한 번에 + 정답 �
 | `bench/` | 같은 과제를 연구 추출기 · DuckDB · Spark로 | 호스트 + 컨테이너 | [BENCHMARK](BENCHMARK.md) |
 | `reprocess/` | 규칙 바꿔 다시 만들기 · 버전 비교 · 되돌리기 | 호스트 + 컨테이너 | [REPROCESSING](REPROCESSING.md) |
 | `orchestrate/` | Airflow가 돌릴 달 · Spark 컨테이너에 붙일 호스트 경로 | Airflow | [AIRFLOW](AIRFLOW.md) |
-| `stream/` | 원문 토픽에 보내기(실시간 · 재생 + 결함 섞기) · 스트림 1분봉 · 배치와 맞대기 | Spark 컨테이너 · 호스트 | [STREAM](STREAM.md) |
-| `reconcile/` | 매일 대사 — 원인 나누기 · 배치 봉으로 메우기 · PostgreSQL 기록 | Spark 컨테이너 | [RECONCILE](RECONCILE.md) |
+| `stream/` | 원문 토픽에 보내기(실시간 · 재생 + 결함 섞기) · 스트림 1분봉 · 배치와 맞대기, 국내 주식 `kis_produce` · `kis_bars` | Spark 컨테이너 · 호스트 | [STREAM](STREAM.md) · [KIS_STREAM](KIS_STREAM.md) |
+| `reconcile/` | 매일 대사 — 원인 나누기 · 배치 봉으로 메우기 · PostgreSQL 기록, 국내 주식 `kis_daily` — 누적 거래량으로 놓친 체결 가르기 | Spark 컨테이너 | [RECONCILE](RECONCILE.md) · [KIS_STREAM](KIS_STREAM.md) |
 | `sample/` | 합성 Bronze(결함 + 정답지) · 한 번에 돌리기 · 정답 맞추기 | 호스트 → 컨테이너 | [SAMPLE](SAMPLE.md) |
 | `ui/` | 상태 화면 — 레이크 · 실행 기록 · 대사를 HTML 한 장으로 (읽기만) | 호스트 · Airflow | [STATUS_PAGE](STATUS_PAGE.md) |
 | `runlog/` | 실행 기록(PostgreSQL) · 마이그레이션 SQL | 어디서나 | README 3-2 |
