@@ -64,6 +64,7 @@ __all__ = [
     "run_fetch",
     "setup_cli_logging",
     "update_manifest",
+    "write_manifest_entries",
 ]
 
 log = logging.getLogger(__name__)
@@ -346,14 +347,27 @@ def update_manifest(manifest_path: Path, results: Iterable[FetchResult]) -> int:
               돌려준다.
     [이유] 데이터는 커밋하지 않고 이 목록만 커밋한다(절대 규칙 5) — 누가 다시 받아도 같은 파일인지
            이 목록으로 확인한다. 경로 순으로 정렬해 두 번 돌려도 같은 파일이 나온다."""
+    return write_manifest_entries(
+        manifest_path,
+        (
+            (result.file.relative_path, result.size_bytes, result.sha256)
+            for result in results
+            if result.sha256 is not None and result.size_bytes is not None
+        ),
+    )
+
+
+def write_manifest_entries(manifest_path: Path, rows: Iterable[tuple[str, int, str]]) -> int:
+    """[쓰임] 체크섬 목록 CSV 에 (상대 경로, 크기, SHA-256) 줄을 더하거나 고친다.
+    바뀐 줄 수를 돌려준다.
+    [이유] 원천마다(바이낸스 · 한국투자증권 · 들여온 자료) 목록 파일은 따로지만
+           모양 · 정렬 · 원자적 쓰기는 같게."""
     entries = read_manifest(manifest_path)
     changed_count = 0
-    for result in results:
-        if result.sha256 is None or result.size_bytes is None:
-            continue
-        entry = (result.size_bytes, result.sha256)
-        if entries.get(result.file.relative_path) != entry:
-            entries[result.file.relative_path] = entry
+    for relative_path, size_bytes, sha256 in rows:
+        entry = (size_bytes, sha256)
+        if entries.get(relative_path) != entry:
+            entries[relative_path] = entry
             changed_count += 1
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [",".join(MANIFEST_COLUMNS)]
