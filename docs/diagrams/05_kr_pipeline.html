@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .row { display: grid; grid-template-columns: 1fr 40px 1.1fr 40px 1.2fr 40px 1.15fr; align-items: center; }
+  .lanes { display: flex; flex-direction: column; gap: 14px; }
+  .meet { display: grid; grid-template-columns: 1.3fr 40px 1fr 14px 0.9fr; gap: 0; margin-top: 14px; align-items: stretch; }
+  .meet .arrow { align-self: center; }
+  .strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+  .strip .box h3 { font-size: 14px; }
+  .where { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin-top: 6px; }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+</style></head>
+<body><div class="figure">
+
+  <div class="head">
+    <div>
+      <h1>국내 주식 구조 — 시세 조회만, 받은 그대로, 같은 원천의 두 표로 맞춘다</h1>
+      <p>한국투자증권 시세를 응답 그대로 보관하고, 장 규칙은 시각이 아니라 자료로 찾는다. 체결 이력이 없는 원천이라 대사의 정답은 같은 원천의 분봉 · 일봉이다.</p>
+    </div>
+    <span class="badge done">구현됨 · 2026-10-26 (실시간 대사는 결과 대기)</span>
+  </div>
+
+  <div class="lanes">
+    <div class="lane">
+      <div class="lane-title">배치 — 한국투자증권 Open API(허용 목록 · 조회만) + 받아 둔 자료 → Spark 4 + Delta 4</div>
+      <div class="row">
+        <div class="stack">
+          <div class="box plain"><span class="tag">원천</span><h3>한국투자증권 시세</h3><p>휴장일 · 일봉(원주가 · 수정주가) · 분봉<br>주문 · 잔고 · 계좌 경로는 보내기 전 차단</p></div>
+          <div class="box plain"><span class="tag">받아 둔 자료</span><h3>원본 연구 저장소</h3><p>970 종목 가격 · KIND 상장폐지 현황</p></div>
+        </div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box bronze"><span class="tag">BRONZE</span><h3>응답 · 파일 그대로</h3><p>받을 때 SHA-256 · 체크섬 목록(커밋)<br>장 안 열린 날 분봉은 저장 안 함<br>(원천이 전 거래일 분봉을 돌려준다)</p><div class="where">분봉 753 날 · 일봉 846 단위 · 들여온 파일 3,359</div></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box silver"><span class="tag">SILVER</span><h3>장 규칙을 자료로 표시</h3><p>마감 봉 = 10 분 빈 뒤의 첫 봉<br>(15:30 · 늦게 연 날 16:30)<br>시장 전체 빈 구간 · 날 감사 · 격리<br>상장 이력(폐지 포함) · 348 만 줄 가격</p><div class="where">반올림 · 정밀도 잃은 값은 줄마다 표시</div></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box gold"><span class="tag">GOLD</span><h3>맞대고 원인 이름 붙이기</h3><p>분봉 → 하루 봉 = 일봉<br>두 주식 470 일 중 464 일 같음<br>수정주가 사건 31 개(삼성전자 ×50)<br>생존 편향 평균 +1.34 %p / 해</p></div>
+      </div>
+    </div>
+
+    <div class="lane">
+      <div class="lane-title">실시간 — 한국투자증권 웹소켓 + Kafka 1대(KRaft) + Spark Structured Streaming</div>
+      <div class="row">
+        <div class="box plain"><span class="tag">원천</span><h3>실시간 체결 H0STCNT0</h3><p>정한 시각에 붙어 구독(이 TR 만 허용)<br>PINGPONG 응답 · 끊기면 다시 붙기</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box stream"><span class="tag">KAFKA</span><h3>원문 토픽</h3><p>받은 글자 그대로 + 받은 시각<br>보관 7 일 · 처음부터 다시 읽기</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box stream"><span class="tag">컨슈머</span><h3>1분봉 만들기</h3><p>체결 번호가 없어 <b>누적 거래량</b>을 번호로<br>중복 제거 · 놓친 체결 찾기 · 워터마크</p></div>
+        <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+        <div class="box gold"><span class="tag">GOLD</span><h3>스트림 1분봉</h3><p>확정된 분만 MERGE<br>누적이 끊긴 분은 <code>acml_contiguous</code> 거짓</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meet">
+    <div class="box okbox"><span class="tag">장 마감 뒤 대사</span><h3>스트림 1분봉 = 분봉 조회 ?</h3><p>원천에 체결 이력이 없어 정답은 같은 원천의 분봉. 분마다 같음 · 못 받음 · 체결 놓침 · 값 다름으로 나눈다(누적 거래량으로 가름).</p></div>
+    <div class="arrow"><svg width="36" height="16"><path d="M2 8h28" stroke="#8a8f98" stroke-width="2"/><path d="M25 3l7 5-7 5" fill="none" stroke="#8a8f98" stroke-width="2"/></svg></div>
+    <div class="box dbbox"><span class="tag">POSTGRESQL · 로컬 Docker</span><h3>실행 기록</h3><p>작업마다 코드 버전 · 인자 해시 · Delta 버전 · 행 수 · 걸린 시간</p></div>
+    <div></div>
+    <div class="box plain"><span class="tag">DUCKDB · 읽기만</span><h3>검산 · 상태 화면</h3><p>Spark 가 쓴 표를 따로 읽어 확인</p></div>
+  </div>
+
+  <div class="strip">
+    <div class="box"><h3>조회 전용 키</h3><p>(방법, 경로, TR) 허용 목록 — 주문 경로는 네트워크에 닿지 않는다(시험)</p></div>
+    <div class="box"><h3>발견한 원본 문제</h3><p>가격의 큰 숫자가 유효 숫자 6 자리로 잘림 · 1 원으로 뭉개진 수정주가</p></div>
+    <div class="box"><h3>두 번째 원천</h3><p>바이낸스 선물 체결 — 같은 틀로 재처리 · 스트림 = 배치를 먼저 증명</p></div>
+    <div class="box"><h3>데이터는 커밋 안 함</h3><p>받는 코드와 체크섬 목록만 레포에</p></div>
+  </div>
+
+  <div class="foot"><span>Market Data Platform · 그림 5 · 국내 주식 구조</span><span>근거: docs/KIS · KR_SILVER_GOLD · KR_UNIVERSE · KIS_STREAM · adr/0012</span></div>
+</div></body></html>

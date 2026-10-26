@@ -20,7 +20,11 @@ python -m mdp.ui.report --serve 8765       # http://127.0.0.1:8765 — 열 때�
 
 | 영역 | 어디서 읽나 | 무엇을 보나 |
 |---|---|---|
-| 한눈에 | 아래 전부 | 마지막 실행 · Delta 표 수 · Silver 행 · Gold 봉 · 최근 대사 일치율(스트림 몫) |
+| 한눈에 | 아래 전부 | 마지막 실행 · Delta 표 수 · 국내 분봉 수 · 국내 유니버스 가격 줄 · 바이낸스 체결 · 1분봉 · 최근 대사 일치율 |
+| 국내 주식 — 분봉 = 일봉? | `gold/kr_daily_from_minutes` | 종목마다 결과별 날 수 — 원주가와 같음 · 수정주가와 같음 · 마감 봉 없음 · 가격 기준 다름 (누적 막대 + 표) |
+| 국내 주식 — 날 감사 · 시장 전체 빈 구간 | `silver/kr_minute_audit_daily` · `kr_minute_gaps` | 온전한 날 · 마감 봉 없는 날 · 장 후 봉, 모든 종목이 함께 빈 구간(늦게 열림 · 장 중 정지) |
+| 국내 주식 — 수정주가 사건 · 생존 편향 | `gold/kr_adjustment_events` · `kr_survivorship_yearly` | 종목마다 사건 수 · 가장 큰 배수, 해마다 전체 vs 생존만 평균과 차이(%p, 음수인 해가 있어 막대 없이 표로) |
+| 국내 주식 — 실시간 대사 | `gold/kr_reconcile_daily` | 같음 · 못 받음 · 체결 놓침 · 값 다름 (표가 없으면 '아직 없음') |
 | 작업별 마지막 실행 · 최근 실행 | PostgreSQL `pipeline_runs` | 상태(아이콘 + 글자) · 걸린 시간 · 코드 버전 · 실패 이유 |
 | Delta 표 | `_delta_log` + DuckDB | 표마다 최신 버전 · 행 수 · 마지막 작업(WRITE · MERGE) · 시각 |
 | Silver 품질 | Silver 감사 표 | 날 대조(정상 · 의심) · 격리 이유별 줄 · 빈 곳 위치 |

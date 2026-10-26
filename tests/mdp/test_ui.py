@@ -57,6 +57,47 @@ def test_render_shows_section_errors_instead_of_failing() -> None:
     assert "PostgreSQL 주소가 없다" in html and "작업별 마지막 실행" in html
 
 
+def test_domestic_sections_come_first_and_missing_tables_say_so() -> None:
+    page = _page(
+        kr_daily_check=Section(
+            rows=[
+                {
+                    "symbol": "005930",
+                    "result": "match_raw",
+                    "days": 233,
+                    "first_day": date(2025, 10, 16),
+                    "last_day": date(2026, 9, 30),
+                },
+                {
+                    "symbol": "005930",
+                    "result": "no_closing_bar",
+                    "days": 2,
+                    "first_day": None,
+                    "last_day": None,
+                },
+            ]
+        ),
+        kr_survivorship=Section(
+            rows=[
+                {
+                    "year": 2010,
+                    "members_at_start": 685,
+                    "delisted_in_year": 20,
+                    "survivors": 545,
+                    "all_pct": 17.44,
+                    "survivors_pct": 23.74,
+                    "bias_pp": 6.29,
+                },
+            ]
+        ),
+    )
+    html = render(page)
+    assert html.index("국내 주식 — 분봉으로 만든 하루 봉") < html.index("두 번째 원천 — 바이낸스")
+    assert "match_raw" in html and "233" in html and "6.29" in html
+    assert "005930 · 원주가와 같음 233일" in html  # 누적 막대 풍선 글은 날 단위
+    assert html.count("표가 아직 없다") >= 4  # 감사 · 빈 구간 · 사건 · 실시간 대사는 없음
+
+
 def test_reconcile_keeps_only_symbols_in_this_lake() -> None:
     daily = [{"symbol": "DEMOUSDT", "trade_date": date(2024, 1, 1), "rows": 1, "suspect": False}]
     page = _page(

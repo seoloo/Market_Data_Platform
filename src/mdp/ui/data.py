@@ -119,6 +119,52 @@ LAKE_SQL: dict[str, tuple[str, str, str]] = {
         " count(*) FILTER (WHERE coalesce(repaired, false)) AS repaired_bars"
         " FROM {t} GROUP BY ALL ORDER BY symbol, trade_date",
     ),
+    # 국내 주식 (주 원천, K-3 · K-3b · K-4)
+    "kr_daily_check": (
+        "gold",
+        "kr_daily_from_minutes",
+        "SELECT symbol, result, count(*) AS days, min(trade_date) AS first_day,"
+        " max(trade_date) AS last_day FROM {t} GROUP BY ALL ORDER BY symbol, result",
+    ),
+    "kr_audit": (
+        "silver",
+        "kr_minute_audit_daily",
+        "SELECT symbol, count(*) AS days, count(*) FILTER (WHERE status = 'ok') AS ok_days,"
+        " count(*) FILTER (WHERE status = 'no_closing_bar') AS no_closing_bar,"
+        " count(*) FILTER (WHERE status = 'not_open_in_calendar') AS not_open_in_calendar,"
+        " sum(bars) AS bars, sum(after_hours_bars) AS after_hours_bars,"
+        " min(trade_date) AS first_day, max(trade_date) AS last_day FROM {t}"
+        " GROUP BY ALL ORDER BY symbol",
+    ),
+    "kr_halts": (
+        "silver",
+        "kr_minute_gaps",
+        "SELECT trade_date, kind, min(start_time) AS start_time, max(end_time) AS end_time,"
+        " max(minutes) AS minutes, count(DISTINCT symbol) AS symbols FROM {t}"
+        " WHERE market_wide GROUP BY ALL ORDER BY trade_date",
+    ),
+    "kr_events": (
+        "gold",
+        "kr_adjustment_events",
+        "SELECT symbol, count(*) AS events, min(trade_date) AS first_day,"
+        " max(trade_date) AS last_day, max(step) AS max_step FROM {t}"
+        " GROUP BY ALL ORDER BY symbol",
+    ),
+    "kr_survivorship": (
+        "gold",
+        "kr_survivorship_yearly",
+        "SELECT year, members_at_start, delisted_in_year, survivors,"
+        " 100 * mean_return_all AS all_pct, 100 * mean_return_survivors AS survivors_pct,"
+        " 100 * survivorship_bias AS bias_pp FROM {t} ORDER BY year",
+    ),
+    "kr_reconcile": (
+        "gold",
+        "kr_reconcile_daily",
+        "SELECT symbol, trade_date, minutes, matched, stream_missing, only_stream,"
+        " missed_trades, values_differ, stream_first, stream_last, reconciled_at FROM {t}"
+        " QUALIFY row_number() OVER (PARTITION BY symbol, trade_date"
+        " ORDER BY reconciled_at DESC) = 1 ORDER BY trade_date, symbol",
+    ),
 }
 """영역 이름 → (계층, 표, SQL 틀). 표가 없으면 그 영역은 '아직 없음'."""
 RUNS_FILTER = "(params ->> 'symbol' IS NULL OR params ->> 'symbol' = ANY(%(symbols)s))"

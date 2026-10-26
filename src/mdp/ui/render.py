@@ -41,6 +41,17 @@ RECONCILE_PARTS: Final = (
 )
 """대사 분 구성 — 이 순서대로 범주 색 1 ~ 6 번을 붙인다."""
 
+KR_DAILY_PARTS: Final = (
+    ("match_raw", "원주가와 같음"),
+    ("match_adjusted", "수정주가와 같음"),
+    ("no_closing_bar", "마감 봉 없음"),
+    ("price_basis_differs", "가격 기준 다름(ETF)"),
+    ("other", "그 밖"),
+)
+"""국내 주식 분봉 ↔ 일봉 대조 결과 — 이 순서대로 범주 색 1 ~ 5 번 (``no_daily`` 는 셈에서 뺀다)."""
+
+MISSING: Final = Section(error="표가 아직 없다 (그 단계를 돌리지 않음)")
+
 FOLD_AFTER: Final = 12
 """이보다 긴 표는 '표 보기' 로 접는다."""
 
@@ -86,6 +97,7 @@ header p { margin: 0; color: var(--text-secondary); }
 section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
   padding: 16px 18px; margin-top: 16px; }
 section h2 { font-size: 16px; margin: 0 0 4px; }
+h2.part { font-size: 18px; margin: 32px 0 8px; color: var(--text-muted); }
 section > p.note { margin: 0 0 12px; color: var(--text-secondary); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;
   margin-top: 16px; }
@@ -254,7 +266,9 @@ def _segment_widths(values: Sequence[float], width: float, min_w: float = 5.0) -
     return [min_w if s else r * scale for r, s in zip(raw, small, strict=True)]
 
 
-def _stacked_rows(rows: Sequence[tuple[str, Sequence[tuple[int, str, float]]]]) -> str:
+def _stacked_rows(
+    rows: Sequence[tuple[str, Sequence[tuple[int, str, float]]]], unit: str = "분"
+) -> str:
     """[쓰임] 가로 100% 누적 막대 — 줄마다 (이름, [(색 번호, 이름, 값)]). 칸 사이 2px 틈."""
     if not rows:
         return ""
@@ -275,7 +289,7 @@ def _stacked_rows(rows: Sequence[tuple[str, Sequence[tuple[int, str, float]]]]) 
             parts.append(
                 f'<rect class="mark" x="{x:.1f}" y="{y}" width="{seg_w:.1f}" height="{row_h}"'
                 f' rx="3" fill="var(--series-{slot})"><title>{escape(label)} · {escape(name)}'
-                f" {value:,.0f}분 ({100 * value / total:.1f}%)</title></rect>"
+                f" {value:,.0f}{unit} ({100 * value / total:.1f}%)</title></rect>"
             )
             x += w
     parts.append("</svg>")
@@ -305,10 +319,20 @@ def _tiles(data: PageData, reconcile: Sequence[dict[str, Any]]) -> str:
             escape(f"{last['job']} · {_fmt(last['started_at'])}") if last else "실행 기록 없음",
         ),
         ("Delta 표", escape(_fmt(len(data.tables))), "Silver · Gold"),
-        ("Silver 체결", escape(_fmt(rows_by_table.get("silver/agg_trades"))), "깨끗한 체결 행"),
-        ("Gold 1분봉", escape(_fmt(rows_by_table.get("gold/bars_1m"))), "배치 봉"),
         (
-            "대사 일치율 (최근)",
+            "국내 분봉",
+            escape(_fmt(rows_by_table.get("silver/kr_minute_bars"))),
+            "한국투자증권 · 봉",
+        ),
+        (
+            "국내 유니버스",
+            escape(_fmt(rows_by_table.get("silver/kr_universe_prices"))),
+            "상장폐지 포함 · 가격 줄",
+        ),
+        ("바이낸스 체결", escape(_fmt(rows_by_table.get("silver/agg_trades"))), "깨끗한 체결 행"),
+        ("바이낸스 1분봉", escape(_fmt(rows_by_table.get("gold/bars_1m"))), "배치 봉"),
+        (
+            "바이낸스 대사 (최근)",
             escape(f"{float(latest_rate['match_rate']) * 100:.1f}%") if latest_rate else "—",
             escape(f"{latest_rate['symbol']} {latest_rate['trade_date']} · 스트림 몫")
             if latest_rate
@@ -324,6 +348,181 @@ def _tiles(data: PageData, reconcile: Sequence[dict[str, Any]]) -> str:
         )
         + "</div>"
     )
+
+
+def _kr_sections(s: dict[str, Section]) -> list[str]:
+    """[쓰임] 국내 주식(주 원천) 영역들 — 분봉 = 일봉 대조 · 날 감사 · 시장 전체 빈 구간 · 수정주가
+    사건 · 생존 편향 · 실시간 대사. 표가 없는 영역은 '아직 없음'."""
+    check = s.get("kr_daily_check", MISSING)
+    by_symbol: dict[str, dict[str, int]] = {}
+    for r in check.rows:
+        by_symbol.setdefault(str(r["symbol"]), {})[str(r["result"])] = int(r["days"])
+    stacked = _stacked_rows(
+        [
+            (
+                symbol,
+                [
+                    (i + 1, name, float(counts.get(key, 0)))
+                    for i, (key, name) in enumerate(KR_DAILY_PARTS)
+                ],
+            )
+            for symbol, counts in sorted(by_symbol.items())
+        ],
+        unit="일",
+    )
+    legend = _legend([(i + 1, name) for i, (_, name) in enumerate(KR_DAILY_PARTS)])
+    audit, halts = s.get("kr_audit", MISSING), s.get("kr_halts", MISSING)
+    events, survivorship = s.get("kr_events", MISSING), s.get("kr_survivorship", MISSING)
+    reconcile = s.get("kr_reconcile", MISSING)
+    return [
+        _section(
+            "국내 주식 — 분봉으로 만든 하루 봉 = 일봉?",
+            "같은 원천(한국투자증권)의 분봉과 일봉을 날마다 맞댐. 시가 = 첫 정규 봉,"
+            " 종가 = 마감 동시호가 봉. 일봉을 아직 안 받은 날은 뺀다.",
+            _or_error(
+                check,
+                (legend + stacked if by_symbol else "")
+                + _table(
+                    check.rows,
+                    [
+                        ("symbol", "종목"),
+                        ("result", "결과"),
+                        ("days", "날"),
+                        ("first_day", "처음"),
+                        ("last_day", "마지막"),
+                    ],
+                    numeric=("days",),
+                ),
+            ),
+        ),
+        _section(
+            "국내 주식 — 분봉 날 감사",
+            "종목마다 받은 날 · 마감 봉 없는 날 · 달력은 쉬는 날인데 분봉이 있는 날 · 장 후 봉 수.",
+            _or_error(
+                audit,
+                _table(
+                    audit.rows,
+                    [
+                        ("symbol", "종목"),
+                        ("days", "날"),
+                        ("ok_days", "온전"),
+                        ("no_closing_bar", "마감 봉 없음"),
+                        ("not_open_in_calendar", "달력은 휴장"),
+                        ("bars", "봉"),
+                        ("after_hours_bars", "장 후 봉"),
+                        ("first_day", "처음"),
+                        ("last_day", "마지막"),
+                    ],
+                    numeric=(
+                        "days",
+                        "ok_days",
+                        "no_closing_bar",
+                        "not_open_in_calendar",
+                        "bars",
+                        "after_hours_bars",
+                    ),
+                ),
+            ),
+        ),
+        _section(
+            "국내 주식 — 시장 전체 빈 구간",
+            "모든 종목이 같은 때 10 분 넘게 봉이 빈 구간 — 늦게 연 날(opening)과 장 중 정지로"
+            " 보이는 구간(intraday, 원인 확인 필요).",
+            _or_error(
+                halts,
+                _table(
+                    halts.rows,
+                    [
+                        ("trade_date", "날짜"),
+                        ("kind", "종류"),
+                        ("start_time", "시작"),
+                        ("end_time", "끝"),
+                        ("minutes", "분"),
+                        ("symbols", "종목"),
+                    ],
+                    numeric=("minutes", "symbols"),
+                ),
+            ),
+        ),
+        _section(
+            "국내 주식 — 수정주가 사건",
+            "원주가 ÷ 수정주가 비율이 앞 거래일보다 0.2% 넘게 바뀐 날 (분할 · 분배락)."
+            " 가장 큰 배수 = 분할 비율.",
+            _or_error(
+                events,
+                _table(
+                    events.rows,
+                    [
+                        ("symbol", "종목"),
+                        ("events", "사건"),
+                        ("first_day", "처음"),
+                        ("last_day", "마지막"),
+                        ("max_step", "가장 큰 배수"),
+                    ],
+                    numeric=("events", "max_step"),
+                ),
+            ),
+        ),
+        _section(
+            "국내 주식 — 생존 편향",
+            "해마다 연초 종목 전체의 평균 수익률 vs 지금도 상장된 종목만의 평균 (상장폐지 종목 포함"
+            " 유니버스, 수정주가 종가 · 단순 평균). 차이 = 생존 편향(%p, 아래쪽 어림).",
+            _or_error(
+                survivorship,
+                _table(
+                    survivorship.rows,
+                    [
+                        ("year", "해"),
+                        ("members_at_start", "연초 종목"),
+                        ("delisted_in_year", "그 해 폐지"),
+                        ("survivors", "생존"),
+                        ("all_pct", "전체 평균 %"),
+                        ("survivors_pct", "생존만 %"),
+                        ("bias_pp", "차이 %p"),
+                    ],
+                    numeric=(
+                        "members_at_start",
+                        "delisted_in_year",
+                        "survivors",
+                        "all_pct",
+                        "survivors_pct",
+                        "bias_pp",
+                    ),
+                ),
+            ),
+        ),
+        _section(
+            "국내 주식 — 실시간 대사",
+            "장 마감 뒤 스트림 1분봉 ↔ 분봉 조회 (정규장 · 마감 봉). 놓친 체결은 누적 거래량이"
+            " 끊긴 것으로 가른다.",
+            _or_error(
+                reconcile,
+                _table(
+                    reconcile.rows,
+                    [
+                        ("symbol", "종목"),
+                        ("trade_date", "날짜"),
+                        ("minutes", "분"),
+                        ("matched", "같음"),
+                        ("stream_missing", "못 받음"),
+                        ("missed_trades", "체결 놓침"),
+                        ("values_differ", "값 다름"),
+                        ("only_stream", "스트림만"),
+                        ("stream_first", "첫 봉"),
+                        ("stream_last", "끝 봉"),
+                    ],
+                    numeric=(
+                        "minutes",
+                        "matched",
+                        "stream_missing",
+                        "missed_trades",
+                        "values_differ",
+                        "only_stream",
+                    ),
+                ),
+            ),
+        ),
+    ]
 
 
 def render(data: PageData) -> str:
@@ -391,9 +590,12 @@ def render(data: PageData) -> str:
     )
     body = [
         "<header><h1>Market Data Platform — 파이프라인 상태</h1>"
+        "<p>주 원천: 국내 주식(한국투자증권, 시세 조회만) · 두 번째 원천: 바이낸스 선물 체결</p>"
         f"<p>{escape(_fmt(data.generated_at))} 기준 · 레이크 <code>{escape(lake)}</code></p>"
         "</header>",
         _tiles(data, reconcile_rows),
+        *_kr_sections(s),
+        '<h2 class="part">두 번째 원천 — 바이낸스 선물 체결</h2>',
         _section(
             "작업별 마지막 실행",
             "실행 기록(PostgreSQL pipeline_runs) — 작업마다 가장 최근 한 번.",
