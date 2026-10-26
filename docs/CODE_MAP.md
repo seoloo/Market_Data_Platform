@@ -26,8 +26,8 @@ sample ─▶ 키 없는 합성 데이터로 위 전체를 한 번에 + 정답 �
 |---|---|---|---|
 | `kis/` | 국내 주식 원천 접속 창구 — 허용한 시세 조회만 · 토큰 캐시 · 요청 간격 · 다시 시도 · 이어 받기 | 호스트 · Airflow | [KIS](KIS.md) |
 | `bronze/` | 받기 · 체크섬 대조 · 증분 받기와 백필 · 체크섬 목록 — 바이낸스 `fetch` · `sync`, 국내 주식 `kis`, 받아 둔 자료 `imported` | 호스트 · Airflow | [KIS](KIS.md) |
-| `silver/` | 출처 고르기 · 정제 · 격리 · 빈 곳 · 날 대조 (바이낸스 `agg_trades`, 국내 주식 `kr_stocks` — 장 구간 · 빈 구간 · 감사) | Spark 컨테이너 | [SILVER_AGG_TRADES](SILVER_AGG_TRADES.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) |
-| `gold/` | 체결 → 1분봉 (`bar_aggregations` — 스트림과 같은 집계식) · 공식 봉 대조, 국내 주식 `kr_stocks` — 분봉 ↔ 일봉 대조 · 수정주가 사건 | Spark 컨테이너 | [GOLD_BARS_1M](GOLD_BARS_1M.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) |
+| `silver/` | 출처 고르기 · 정제 · 격리 · 빈 곳 · 날 대조 (바이낸스 `agg_trades`, 국내 주식 `kr_stocks` — 장 구간 · 빈 구간 · 감사, `kr_universe` — 상장 이력 · 폐지 종목 포함 가격) | Spark 컨테이너 | [SILVER_AGG_TRADES](SILVER_AGG_TRADES.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) |
+| `gold/` | 체결 → 1분봉 (`bar_aggregations` — 스트림과 같은 집계식) · 공식 봉 대조, 국내 주식 `kr_stocks` — 분봉 ↔ 일봉 대조 · 수정주가 사건, `kr_universe` — 생존 편향 · 두 출처 대조 | Spark 컨테이너 | [GOLD_BARS_1M](GOLD_BARS_1M.md) · [KR_SILVER_GOLD](KR_SILVER_GOLD.md) · [KR_UNIVERSE](KR_UNIVERSE.md) |
 | `serve/` | Gold → PostgreSQL 한 트랜잭션 복사 · 양쪽 SHA-256 | 호스트 (DuckDB) | 〃 |
 | `query/` | Delta 표를 Spark 없이 SQL로 · Silver 검산 | 호스트 (DuckDB) | README 4-2 |
 | `bench/` | 같은 과제를 연구 추출기 · DuckDB · Spark로 | 호스트 + 컨테이너 | [BENCHMARK](BENCHMARK.md) |
