@@ -6,7 +6,12 @@
 
 from __future__ import annotations
 
-__all__ = ["BronzeConflictError", "DataIntegrityError", "SourceUnavailableError"]
+__all__ = [
+    "BronzeConflictError",
+    "DataIntegrityError",
+    "ForbiddenRequestError",
+    "SourceUnavailableError",
+]
 
 
 class DataIntegrityError(Exception):
@@ -22,3 +27,8 @@ class BronzeConflictError(DataIntegrityError):
 
 class SourceUnavailableError(Exception):
     """[쓰임] 원천 서버에서 여러 번 다시 시도해도 받지 못했다(네트워크 · 5xx)."""
+
+
+class ForbiddenRequestError(Exception):
+    """[쓰임] 접속 창구의 허용 목록에 없는 요청 — 보내기 전에 멈춘다(예: 주문 · 잔고 · 계좌 경로).
+    [이유] 증권사 키는 시세 조회에만 쓴다(절대 규칙 2). 코드 실수로도 주문 경로에 닿지 않게 한다."""

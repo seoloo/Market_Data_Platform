@@ -1,4 +1,4 @@
-# 코드 지도 (2026-10-24)
+# 코드 지도 (2026-10-26)
 
 > 처음 보는 사람이 "무엇이 · 어디에 · 언제 도는지" 찾는 지도. 이 저장소는 **두 부분**이다.
 >
@@ -13,7 +13,8 @@
 ## 1. 데이터 엔지니어링 파이프라인 — `src/mdp/`
 
 ```text
-바이낸스 공개 아카이브 ─▶ bronze ─▶ silver ─▶ gold ─▶ serve (PostgreSQL)
+국내 주식 (한국투자증권, 시세 조회만 · 주 원천) ─▶ kis 접속 창구 ─▶ … K-2 부터 만드는 중
+바이낸스 공개 아카이브 (두 번째 원천) ─▶ bronze ─▶ silver ─▶ gold ─▶ serve (PostgreSQL)
                                      │          │
                                      └─ query (DuckDB 검산 · SQL) · bench · reprocess
 실시간 체결 / Bronze 재생 ─▶ stream (Kafka → Spark Structured Streaming) ─▶ reconcile (매일 대사)
@@ -23,6 +24,7 @@ sample ─▶ 키 없는 합성 데이터로 위 전체를 한 번에 + 정답 �
 
 | 폴더 | 하는 일 | 어디서 도나 | 기록 |
 |---|---|---|---|
+| `kis/` | 국내 주식 원천 접속 창구 — 허용한 시세 조회만 · 토큰 캐시 · 요청 간격 · 다시 시도 · 이어 받기 | 호스트 · Airflow | [KIS](KIS.md) |
 | `bronze/` | 받기 · 체크섬 대조 · 증분 받기와 백필 · 체크섬 목록 | 호스트 · Airflow | — |
 | `silver/` | 출처 고르기 · 정제 · 격리 · 빈 곳 · 날 대조 | Spark 컨테이너 | [SILVER_AGG_TRADES](SILVER_AGG_TRADES.md) |
 | `gold/` | 체결 → 1분봉 (`bar_aggregations` — 스트림과 같은 집계식) · 공식 봉 대조 | Spark 컨테이너 | [GOLD_BARS_1M](GOLD_BARS_1M.md) |
